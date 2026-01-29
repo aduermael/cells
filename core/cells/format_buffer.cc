@@ -749,10 +749,24 @@ std::optional<FormatBuffer> FormatBuffer::fromFormatCode(const std::string& form
                formatCode.find('0') != std::string::npos ||
                formatCode.find('#') != std::string::npos) {
         // Numeric format
-        buf.setCategory(NumberFormatCategory::NUMBER);
-        buf.setDecimals(parsed.decimalPlaces);
-        if (parsed.hasThousandsSeparator) {
-            buf.setThousandsSeparator(true);
+        // Check if any section has prefix/suffix text - if so, store as custom
+        bool hasTextLiterals = false;
+        for (const auto& section : parsed.sections) {
+            if (!section.prefix.empty() || !section.suffix.empty()) {
+                hasTextLiterals = true;
+                break;
+            }
+        }
+        if (hasTextLiterals) {
+            // Format has prefix/suffix text - store as CUSTOM to preserve full code
+            buf.setCategory(NumberFormatCategory::CUSTOM);
+            buf.setCustomFormatCode(formatCode);
+        } else {
+            buf.setCategory(NumberFormatCategory::NUMBER);
+            buf.setDecimals(parsed.decimalPlaces);
+            if (parsed.hasThousandsSeparator) {
+                buf.setThousandsSeparator(true);
+            }
         }
     } else {
         // Unknown format - store as custom

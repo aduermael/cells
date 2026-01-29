@@ -431,13 +431,13 @@ export function handleSetCellFormatAt(
     params: Record<string, unknown>,
     respond: RespondFn,
 ): void {
-    const { col, row, formatId } = params as {
+    const { col, row, formatJson } = params as {
         col: number;
         row: number;
-        formatId: string;
+        formatJson: string;  // JSON-encoded format properties
     };
     const result = JSON.parse(
-        engine.setCellFormatAt(col, row, formatId),
+        engine.setCellFormatAt(col, row, formatJson),
     ) as JsonResult;
     if (result.error) {
         respond({ type: "error", error: result.error });
@@ -463,13 +463,22 @@ export function handleCreateCustomFormat(
     const { formatCode } = params as { formatCode: string };
     const result = JSON.parse(engine.createCustomFormat(formatCode)) as {
         success?: boolean;
-        formatId?: string;
+        format?: {
+            category?: string;
+            decimals?: number;
+            separator?: boolean;
+            currency?: string;
+            formatCode?: string;
+            effectiveFormatCode?: string;
+            base64?: string;
+        };
         error?: string;
     };
     if (result.error) {
         respond({ type: "error", error: result.error });
     } else {
-        respond({ type: "formatCreated", formatId: result.formatId });
+        // Return format properties (content-addressed format system)
+        respond({ type: "formatCreated", success: true, format: result.format });
     }
 }
 

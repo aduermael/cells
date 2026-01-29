@@ -370,6 +370,7 @@ std::string CellsEngine::createCustomFormat(const std::string& formatCode) {
     if (!maybeFormat.has_value()) {
         // If fromFormatCode fails, create a format with just the custom code
         FormatBuffer format;
+        format.setCategory(NumberFormatCategory::CUSTOM);
         format.setCustomFormatCode(formatCode);
         return "{\"success\":true,\"format\":" + formatBufferToJson(format) + "}";
     }

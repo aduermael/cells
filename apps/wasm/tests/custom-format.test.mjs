@@ -17,7 +17,7 @@ import {
 } from './helpers.mjs';
 
 /**
- * Create a custom format via the client API and return the format ID
+ * Create a custom format via the client API and return the format properties
  */
 async function createCustomFormat(page, formatCode) {
   return await page.evaluate(async (code) => {
@@ -29,15 +29,17 @@ async function createCustomFormat(page, formatCode) {
     if (result.error) {
       throw new Error(result.error);
     }
-    return result.formatId;
+    // Return the format properties (content-addressed format system)
+    return result.format;
   }, formatCode);
 }
 
 /**
  * Apply a format to a cell by reference (e.g., "A1")
+ * @param {Object} format - Format properties (content-addressed format)
  */
-async function setCellFormat(page, cellRef, formatId) {
-  return await page.evaluate(async ({ cellRef, formatId }) => {
+async function setCellFormat(page, cellRef, format) {
+  return await page.evaluate(async ({ cellRef, format }) => {
     const ctx = window._appContext;
     if (!ctx?.app?.dataSource?.client) {
       throw new Error('App context not available');
@@ -53,9 +55,10 @@ async function setCellFormat(page, cellRef, formatId) {
     }
     col -= 1; // 0-indexed
 
-    const result = await ctx.app.dataSource.client.setCellFormatAt(col, row, formatId);
+    // setCellFormatAt now takes format properties, not format ID
+    const result = await ctx.app.dataSource.client.setCellFormatAt(col, row, format);
     return result.success;
-  }, { cellRef, formatId });
+  }, { cellRef, format });
 }
 
 /**
@@ -110,57 +113,54 @@ const tests = {
     await setCellValue(ctx.page, 'A1', '1234.5678');
     await sleep(200);
 
-    // Create a custom format with 3 decimal places
-    const formatId = await createCustomFormat(ctx.page, '#,##0.000');
-    assertTrue(formatId, 'Should return a format ID');
-    assertTrue(formatId.length === 8, 'Format ID should be 8 characters');
+    // Create a format with 3 decimal places and thousands separator
+    // Note: #,##0.000 is parsed as NUMBER format (not CUSTOM) because it's a recognized pattern
+    const format = await createCustomFormat(ctx.page, '#,##0.000');
+    assertTrue(format, 'Should return format properties');
+    assertTrue(format.category === 'NUMBER', 'Format category should be NUMBER (recognized format)');
+    assertEqual(format.decimals, 3, 'Format should have 3 decimals');
+    assertTrue(format.separator === true, 'Format should have thousands separator');
 
     // Apply the format to the cell
     await clickCell(ctx.page, 'A1');
     await sleep(100);
-    const success = await setCellFormat(ctx.page, 'A1', formatId);
+    const success = await setCellFormat(ctx.page, 'A1', format);
     assertTrue(success, 'setCellFormat should succeed');
     await sleep(200);
 
-    // Verify the display value uses the custom format
+    // Verify the display value uses the format
     const display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1,234.568', 'Cell should display with custom format (3 decimals, thousands separator)');
+    assertEqual(display, '1,234.568', 'Cell should display with format (3 decimals, thousands separator)');
   },
 
-  'Custom format appears in available formats': async (ctx) => {
+  'Create percentage format via createCustomFormat': async (ctx) => {
+    // Note: With content-addressed formats, createCustomFormat doesn't register formats globally.
+    // It simply parses a format code and returns the format properties.
+    // getAvailableFormats returns predefined format templates.
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Get initial formats
-    const initialFormats = await getAvailableFormats(ctx.page);
-    const initialCount = initialFormats.length;
-
-    // Create a custom format
-    const formatId = await createCustomFormat(ctx.page, '0.00%');
-
-    // Get formats again
-    const updatedFormats = await getAvailableFormats(ctx.page);
-    assertEqual(updatedFormats.length, initialCount + 1, 'Should have one more format');
-
-    // Find the custom format
-    const customFormat = updatedFormats.find(f => f.id === formatId);
-    assertTrue(customFormat, 'Custom format should be in the list');
-    assertEqual(customFormat.isCustom, true, 'Format should be marked as custom');
-    assertEqual(customFormat.formatCode, '0.00%', 'Format code should match');
+    // Create a percentage format via createCustomFormat
+    const format = await createCustomFormat(ctx.page, '0.00%');
+    assertTrue(format, 'Should return format properties');
+    assertEqual(format.category, 'PERCENTAGE', 'Format category should be PERCENTAGE');
+    assertEqual(format.decimals, 2, 'Format should have 2 decimals');
   },
 
   'Custom format persists through save/load': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter a value and create custom format
+    // Enter a value and create custom format with prefix text
     await setCellValue(ctx.page, 'A1', '9876.54');
     await sleep(200);
 
-    const formatId = await createCustomFormat(ctx.page, '"Value: "#,##0.00');
+    // This format has a custom prefix, so it should be category CUSTOM
+    const format = await createCustomFormat(ctx.page, '"Value: "#,##0.00');
+    assertTrue(format, 'Should return format properties');
     await clickCell(ctx.page, 'A1');
     await sleep(100);
-    await setCellFormat(ctx.page, 'A1', formatId);
+    await setCellFormat(ctx.page, 'A1', format);
     await sleep(200);
 
     // Verify initial display
@@ -169,8 +169,7 @@ const tests = {
 
     // Save to .cells format
     const cellsContent = await exportToCells(ctx.page);
-    assertTrue(cellsContent.includes('F '), '.cells file should contain format definition (F line)');
-    assertTrue(cellsContent.includes(formatId), '.cells file should contain the format ID');
+    assertTrue(cellsContent.length > 0, '.cells file should have content');
 
     // Reload the page and load the file
     await ctx.page.goto(ctx.baseUrl);
@@ -181,22 +180,20 @@ const tests = {
     // Verify the format still works
     display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, 'Value: 9,876.54', 'After reload, cell should still display with custom format');
-
-    // Verify format is in available formats
-    const formats = await getAvailableFormats(ctx.page);
-    const customFormat = formats.find(f => f.id === formatId);
-    assertTrue(customFormat, 'Custom format should still exist after reload');
-    assertEqual(customFormat.isCustom, true, 'Format should still be marked as custom');
   },
 
-  'Multiple custom formats work correctly': async (ctx) => {
+  'Multiple formats work correctly': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Create multiple custom formats
+    // Create multiple formats (returns format properties)
     const format1 = await createCustomFormat(ctx.page, '[Red]#,##0.00');
     const format2 = await createCustomFormat(ctx.page, '0.0000');
     const format3 = await createCustomFormat(ctx.page, '"$"#,##0" USD"');
+
+    assertTrue(format1, 'format1 should be returned');
+    assertTrue(format2, 'format2 should be returned');
+    assertTrue(format3, 'format3 should be returned');
 
     // Enter values
     await setCellValue(ctx.page, 'A1', '100');
@@ -204,7 +201,7 @@ const tests = {
     await setCellValue(ctx.page, 'A3', '999');
     await sleep(200);
 
-    // Apply different formats
+    // Apply different formats (using format properties)
     await setCellFormat(ctx.page, 'A1', format1);
     await setCellFormat(ctx.page, 'A2', format2);
     await setCellFormat(ctx.page, 'A3', format3);
@@ -215,9 +212,9 @@ const tests = {
     const display2 = await getCellDisplayValue(ctx.page, 'A2');
     const display3 = await getCellDisplayValue(ctx.page, 'A3');
 
-    assertEqual(display1, '100.00', 'A1 should use red number format (color not visible in text)');
+    assertEqual(display1, '100.00', 'A1 should use number format with 2 decimals (color not visible in text)');
     assertEqual(display2, '3.1416', 'A2 should use 4 decimal format');
-    assertEqual(display3, '$999 USD', 'A3 should use currency suffix format');
+    assertEqual(display3, '$999 USD', 'A3 should use custom currency suffix format');
   },
 };
 

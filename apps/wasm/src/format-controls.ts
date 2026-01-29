@@ -530,8 +530,8 @@ export class FormatControls {
       this.currencyDropdownLabel.textContent = symbol;
       this.setDisplayedFormat("CURRENCY");
       this.currencyDropdown.classList.add("active");
+      // Trigger re-render (don't call updateFormulaBar - same reason as handleCategorySelect)
       this.requestRender();
-      this.updateFormulaBar();
     } catch (error) {
       console.error("Failed to set currency format:", error);
     }
@@ -651,12 +651,11 @@ export class FormatControls {
         // Apply the format to all cells in selection range
         await this.applyFormatToSelection(result.format);
 
-        // Update display
+        // Update display immediately (data change callback will refresh later)
         this.setDisplayedFormat("CUSTOM");
 
-        // Trigger re-render and formula bar update
+        // Trigger re-render (don't call updateFormulaBar - same reason as handleCategorySelect)
         this.requestRender();
-        this.updateFormulaBar();
       }
 
       this.closeCustomFormatPanel();
@@ -825,12 +824,13 @@ export class FormatControls {
       // Apply format to all cells in selection range
       await this.applyFormatToSelection(format);
 
-      // Update display
+      // Update display immediately (data change callback will refresh later)
       this.setDisplayedFormat(category);
 
-      // Trigger re-render and formula bar update
+      // Trigger re-render (don't call updateFormulaBar - it would overwrite the
+      // format display we just set, and the data change notification will
+      // trigger a full refresh anyway)
       this.requestRender();
-      this.updateFormulaBar();
     } catch (error) {
       console.error("Failed to set cell format:", error);
     }
@@ -867,8 +867,8 @@ export class FormatControls {
     try {
       await this.applyFormatToSelection(format);
       this.setDisplayedFormat(category);
+      // Trigger re-render (don't call updateFormulaBar - same reason as handleCategorySelect)
       this.requestRender();
-      this.updateFormulaBar();
     } catch (error) {
       console.error("Failed to change decimal places:", error);
     }
