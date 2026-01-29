@@ -7,7 +7,7 @@
 // that can be applied, serialized, and synchronized across peers.
 //
 // Key responsibilities:
-// - Define all operation types (cell, column, row, sheet, format)
+// - Define all operation types (cell, column, row, sheet, range)
 // - Provide serialization to/from string (file format) and JSON (network)
 // - Support operation ordering via HLC timestamp comparison
 //
@@ -16,8 +16,8 @@
 // - Column: INSERT, DELETE, MOVE, RESIZE, RENAME
 // - Row: INSERT, DELETE, MOVE, RESIZE (no rename)
 // - Sheet: CREATE, DELETE, RENAME
-// - Format: DEFINE (custom number formats)
-// - Style: DEFINE (cell styles)
+// - Range: ADD, REMOVE, UPDATE_CORNERS, UPDATE_FLAGS, SET_STYLE, SET_FORMAT
+// - Axis: SET_HIDDEN, SET_STYLE, SET_FORMAT
 //
 // Serialization format: "wall.logical.node OP_TYPE target_id payload"
 // JSON format used for WebSocket/WebRTC transport
@@ -74,9 +74,6 @@ enum class OpType : uint8_t {
 
     // Workbook operations
     WORKBOOK_RENAME = 30,  // Rename workbook
-
-    // Format operations
-    FORMAT_DEFINE = 40,  // Define a custom number format
 
     // Named range operations
     NAMED_RANGE_DEFINE = 50,  // Define a named range

@@ -1111,10 +1111,9 @@ S sH3eE4tB "Sheet"
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
 
-    // Legacy custom formats are NOT stored (F lines ignored)
-    // The new system uses content-addressed formats directly on entities
-    EXPECT_FALSE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
-    EXPECT_FALSE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
+    // Legacy F lines are silently ignored - formats are now content-addressed
+    // and stored directly on entities via FormatBuffer
+    EXPECT_NE(result.workbook, nullptr);
 }
 
 TEST(ContentAddressedFormatTest, NoFLinesInOutput) {
@@ -1122,13 +1121,10 @@ TEST(ContentAddressedFormatTest, NoFLinesInOutput) {
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
     wb->addSheet(std::move(sheet));
 
-    // Even if we register custom formats (legacy API), they won't be serialized as F lines
-    wb->registerCustomFormat(ID("cF1aB2cD"), "#,##0.00");
-
     const std::string serialized = serialize(*wb);
 
-    // F lines should NOT appear in output
-    EXPECT_EQ(serialized.find("F cF1aB2cD"), std::string::npos);
+    // F lines should NOT appear in output - formats are now content-addressed
+    EXPECT_EQ(serialized.find("\nF "), std::string::npos);
 }
 
 TEST(ContentAddressedFormatTest, CustomFormatCodeInFormatBuffer) {

@@ -16,7 +16,7 @@
 // - ref: A1 reference string (read-only)
 // - value: number/string/boolean/nil (read/write)
 // - formula: formula string if cell has formula (read-only)
-// - format: format ID string like "FMT_C002" (read/write)
+// - format: format base64 string (content-addressed FormatBuffer) (read/write)
 // - style: style table {bold, italic, underline, bgColor, textColor, ...} (read/write)
 // - dependents: array of cells that depend on this cell
 // - dependencies: array of cells this cell depends on
@@ -33,6 +33,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
@@ -168,13 +169,13 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         return 1;
     }
 
-    // Handle .format property - returns format ID string or nil (read from workbook map)
+    // Handle .format property - returns format base64 string or nil (content-addressed)
     if (strcmp(key, "format") == 0) {
         const Workbook* workbook = getWorkbook(L);
         if (workbook != nullptr) {
-            const ID formatId = workbook->getFormatId(cell->id);
-            if (!formatId.isNull()) {
-                lua_pushstring(L, formatId.toString().c_str());
+            const FormatBuffer* format = workbook->getEntityFormat(cell->id);
+            if (format != nullptr && !format->isEmpty()) {
+                lua_pushstring(L, format->toBase64().c_str());
                 return 1;
             }
         }

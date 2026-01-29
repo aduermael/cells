@@ -102,27 +102,6 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "format_registry",
-    srcs = ["format_registry.cc"],
-    hdrs = ["format_registry.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":id",
-        ":types",
-    ],
-)
-
-cc_test(
-    name = "format_registry_test",
-    srcs = ["format_registry_test.cc"],
-    deps = [
-        ":format_registry",
-        ":id",
-        "@googletest//:gtest_main",
-    ],
-)
-
 cc_test(
     name = "range_index_test",
     srcs = ["range_index_test.cc"],
@@ -319,7 +298,6 @@ cc_library(
         ":axis_index",
         ":dependency_graph",
         ":format_buffer",
-        ":format_registry",
         ":formula_ast",
         ":formula_parser",
         ":formula_serializer",

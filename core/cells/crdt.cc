@@ -321,10 +321,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = internal::applyWorkbookRename(workbook, op);
             break;
 
-        case OpType::FORMAT_DEFINE:
-            result = internal::applyFormatDefine(workbook, op);
-            break;
-
         case OpType::NAMED_RANGE_DEFINE:
             result = internal::applyNamedRangeDefine(workbook, op);
             break;
@@ -526,11 +522,6 @@ Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
     return {hlc, OpType::AXIS_SET_STYLE, axisId, "{\"style\":\"\"}"};
 }
 
-Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::AXIS_SET_FORMAT, axisId, formatId.isNull() ? "" : formatId.toString()};
-}
-
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format) {
     const HLC hlc = workbook.getCurrentHLC();
     const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
@@ -560,11 +551,6 @@ Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::st
 Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::WORKBOOK_RENAME, workbook.id, payload};
-}
-
-Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::FORMAT_DEFINE, formatId, payload};
 }
 
 Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload) {

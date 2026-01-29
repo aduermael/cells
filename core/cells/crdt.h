@@ -134,10 +134,6 @@ Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden)
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style);
 // Clear axis style - payload: {"style":""}
 Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId);
-// Legacy payload: format ID string, or empty string to clear format
-// Prefer using the FormatBuffer overload below for content-addressed formats.
-Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId);
-
 // Generate an AXIS_SET_FORMAT operation using content-addressed FormatBuffer.
 // Payload format: {"format":"<base64-encoded-formatbuffer>"}
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format);
@@ -157,10 +153,6 @@ Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::st
 
 // Generate a WORKBOOK_RENAME operation.
 Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload);
-
-// Generate a FORMAT_DEFINE operation for defining a custom number format.
-// Payload: {"format_id":"...","format_code":"..."}
-Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload);
 
 // Generate a NAMED_RANGE_DEFINE operation for defining a named range.
 // Payload: JSON with named range definition

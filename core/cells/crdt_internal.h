@@ -90,9 +90,6 @@ ApplyResult applySheetRename(Workbook& workbook, const Operation& op);
 // Workbook operations
 ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op);
 
-// Format operations
-ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op);
-
 // Named range operations
 ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op);
 ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op);

@@ -203,11 +203,11 @@ Mirror the style system's approach for computing effective formats at display ti
 
 ### Phase 7: Remove Old Format System
 
-- [ ] 7a: Remove FormatRegistry class
-- [ ] 7b: Remove NumberFormatRegistry (or simplify to just formatting logic)
-- [ ] 7c: Remove FORMAT_DEFINE from operation types
-- [ ] 7d: Remove built-in format ID constants (CUSD_002, FMT_P002, etc.)
-- [ ] 7e: Clean up any remaining format ID references
+- [x] 7a: Remove FormatRegistry class. Deleted format_registry.h, format_registry.cc, format_registry_test.cc. Removed FormatRegistry member and related methods from Workbook (registerCustomFormat, findFormatByCode, hasCustomFormat, getCustomFormatCode, getCustomFormats, getFormatRegistry). Removed legacy _formats map (entity ID → format ID).
+- [x] 7b: NumberFormatRegistry kept for display formatting logic. It handles number-to-string conversion and built-in format definitions, which is still needed.
+- [x] 7c: Remove FORMAT_DEFINE from operation types. Removed from OpType enum, opTypeToString, stringToOpType, applyOperation switch, and removed makeFormatDefineOp/applyFormatDefine functions.
+- [x] 7d: Built-in format ID constants (CUSD_002, FMT_P002, etc.) kept in NumberFormatRegistry for display formatting. These are used to convert numbers to display strings, not for storage.
+- [x] 7e: Clean up remaining format ID references. Updated crdt_cell.cc format inheritance to use FormatBuffer. Updated crdt_axis.cc applyAxisSetFormat to only accept content-addressed formats. Updated luau_types.cc and luau_api.cc. Removed legacy makeAxisSetFormatOp(ID) overload. Fixed serializer_test.cc and workbook_benchmark_test.cc.
 
 ### Phase 8: Testing and Documentation
 

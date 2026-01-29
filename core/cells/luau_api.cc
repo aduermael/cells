@@ -1580,18 +1580,8 @@ int LuauSandbox::luaGetFormats(lua_State* L) {
     addFormat("FMT_T001", "Time - HH:MM:SS");
     addFormat("FMT_T002", "Time - HH:MM");
 
-    // Also list custom formats from the workbook
-    const Workbook* workbook = getWorkbook(L);
-    if (workbook != nullptr) {
-        for (const auto& [fmtId, fmtCode] : workbook->getCustomFormats()) {
-            lua_newtable(L);
-            lua_pushstring(L, fmtId.toString().c_str());
-            lua_setfield(L, -2, "id");
-            lua_pushstring(L, fmtCode.c_str());
-            lua_setfield(L, -2, "description");
-            lua_rawseti(L, -2, idx++);
-        }
-    }
+    // Note: Custom formats are now content-addressed via FormatBuffer.
+    // They are embedded directly on entities and don't need a central registry.
 
     return 1;
 }

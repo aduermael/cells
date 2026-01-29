@@ -171,15 +171,14 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         // Store result value in raw for display (not the formula text)
         cell->value.raw = "";
 
-        // Phase 7: Format inheritance
-        // If cell has GENERAL format, inherit format from referenced cells
-        const ID currentFormatId = workbook.getFormatId(cell->id);
-        const std::string currentFormat = currentFormatId.toString();
-        const bool isGeneralFormat =
-            currentFormat.empty() || currentFormat == "~" || currentFormat == "FMT_GEN0";
+        // Format inheritance for formulas
+        // If cell has no format, inherit format from referenced cells
+        // Uses content-addressed FormatBuffer system
+        const bool hasFormat = workbook.hasEntityFormat(cell->id);
 
-        if (isGeneralFormat && formula->ast != nullptr) {
+        if (!hasFormat && formula->ast != nullptr) {
             // Create a format lookup using workbook-level cell storage
+            // Returns format ID string for backward compatibility with inferFormatFromFormula
             const FormatLookup formatLookup =
                 [&workbook](const std::string& cellIdStr) -> std::string {
                 const ID cellId(cellIdStr);
@@ -187,14 +186,25 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 if (refCell == nullptr) {
                     return "";
                 }
-                return workbook.getFormatId(refCell->id).toString();
+                // Get the content-addressed format and convert to base64 for inference
+                const FormatBuffer* fmt = workbook.getEntityFormat(refCell->id);
+                if (fmt == nullptr || fmt->isEmpty()) {
+                    return "";
+                }
+                // Return the format code for comparison by inferFormatFromFormula
+                return fmt->toFormatCode();
             };
 
-            const std::string inheritedFormat = inferFormatFromFormula(formula->ast, formatLookup);
-            if (!inheritedFormat.empty()) {
-                const ID inheritedFormatId(inheritedFormat);
-                workbook.setFormatId(cell->id, inheritedFormatId);
-                cell->markHasFormat();
+            const std::string inheritedFormatCode =
+                inferFormatFromFormula(formula->ast, formatLookup);
+            if (!inheritedFormatCode.empty()) {
+                // Parse the format code to create a FormatBuffer
+                FormatBuffer inheritedFormat;
+                (void)inheritedFormat.fromFormatCode(inheritedFormatCode);
+                if (!inheritedFormat.isEmpty()) {
+                    workbook.setEntityFormat(cell->id, inheritedFormat);
+                    cell->markHasFormat();
+                }
             }
         }
     } else {
@@ -232,10 +242,9 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
 
     // Parse payload: {"format":"<base64>"} (content-addressed)
     // Empty string clears the format
-    // Also support legacy {"format_id":"..."} for backward compatibility during transition
     const std::string formatBase64 = extractJSONString(op.payload, "format");
     if (!formatBase64.empty()) {
-        // New content-addressed format
+        // Content-addressed format
         auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
         if (!maybeFormat.has_value()) {
             return ApplyResult::INVALID_PAYLOAD;
@@ -257,22 +266,6 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
         // "format" key present but empty - clear format
         workbook.clearEntityFormat(cell->id);
         cell->clearHasFormat();
-        return ApplyResult::SUCCESS;
-    }
-
-    // Legacy format_id support (for backward compatibility during transition)
-    const std::string formatIdStr = extractJSONString(op.payload, "format_id");
-    if (!formatIdStr.empty()) {
-        const ID formatId(formatIdStr);
-        if (formatId.isNull() || formatIdStr == "~") {
-            // Clear format
-            workbook.setFormatId(cell->id, ID{});
-            cell->clearHasFormat();
-        } else {
-            // Set format ID (legacy path)
-            workbook.setFormatId(cell->id, formatId);
-            cell->markHasFormat();
-        }
         return ApplyResult::SUCCESS;
     }
 

@@ -63,7 +63,6 @@ struct SpillInfo;
 struct Range;
 class RangeIndex;
 class SpillIndex;
-class FormatRegistry;
 enum class RangeFlags : uint8_t;
 
 // Collaboration mode for the workbook
@@ -946,46 +945,6 @@ struct Workbook {
     std::unique_ptr<Axis> removeRow(const ID& rowId);
 
     // ========================================================================
-    // Custom formats (CRDT-synced via FormatRegistry)
-    // ========================================================================
-
-    // Register a custom format definition (called by CRDT when applying FORMAT_DEFINE)
-    // Returns true if the format was newly added, false if it already existed
-    bool registerCustomFormat(const ID& formatId, const std::string& formatCode);
-
-    // Find an existing format by code (lookup only, no registration)
-    // Returns the format ID if found, or null ID if not found.
-    // Use this before creating FORMAT_DEFINE operations for deduplication.
-    [[nodiscard]] ID findFormatByCode(const std::string& formatCode) const;
-
-    // Check if a custom format is defined
-    [[nodiscard]] bool hasCustomFormat(const ID& formatId) const;
-
-    // Get a custom format's code (returns empty string if not found)
-    [[nodiscard]] std::string getCustomFormatCode(const ID& formatId) const;
-
-    // Get all custom formats (for bootstrapOpLog and sync)
-    [[nodiscard]] const std::unordered_map<ID, std::string, IDHash>& getCustomFormats() const;
-
-    // Get the format registry for advanced operations (ref counting, etc.)
-    [[nodiscard]] FormatRegistry* getFormatRegistry();
-    [[nodiscard]] const FormatRegistry* getFormatRegistry() const;
-
-    // ========================================================================
-    // Entity format storage (unified: cells, axes, etc.)
-    // ========================================================================
-
-    // Get the format ID for an entity (cell, axis, etc.) - returns null ID if no format
-    [[nodiscard]] ID getFormatId(const ID& entityId) const;
-
-    // Set the format ID for an entity. Returns the old format ID (null if none).
-    // Pass null ID to clear the format (same as clearFormat).
-    ID setFormatId(const ID& entityId, const ID& formatId);
-
-    // Clear the format for an entity. Returns true if the entity had a format.
-    bool clearFormat(const ID& entityId);
-
-    // ========================================================================
     // Entity style storage (content-addressed StyleBuffer)
     // ========================================================================
 
@@ -1186,16 +1145,9 @@ private:
     // Collaboration mode (default: OFFLINE)
     CollabMode _collabMode{CollabMode::OFFLINE};
 
-    // Format registry with deduplication and reference counting
-    // Synced via FORMAT_DEFINE operations
-    std::unique_ptr<FormatRegistry> _formatRegistry;
-
     // ========================================================================
-    // Entity format/style storage
+    // Entity format/style storage (content-addressed)
     // ========================================================================
-
-    // Entity ID -> format ID mapping (cells, axes, or other entities with formats)
-    std::unordered_map<ID, ID, IDHash> _formats;
 
     // Entity ID -> content-addressed StyleBuffer mapping (cells, axes, etc.)
     // Content-addressed: the style data IS its identity

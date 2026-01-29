@@ -410,11 +410,11 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
         EXPECT_LT(duration, 500000) << "Axis resize should be fast";
     }
 
-    // Benchmark CELL_SET_FORMAT operations
+    // Benchmark CELL_SET_FORMAT operations (content-addressed formats)
     {
-        // Register a format first
-        ID formatId = generate_id();
-        workbook_->registerCustomFormat(formatId, "#,##0.00");
+        // Create a FormatBuffer for the benchmark
+        // Content-addressed formats don't need registration
+        const std::string formatBase64 = "AQIC";  // Number format with 2 decimals
 
         auto start = std::chrono::high_resolution_clock::now();
         const int iterations = 1000;
@@ -425,7 +425,7 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
             op.hlc = workbook_->getCurrentHLC();
             op.sheetId = sheet->id;
             op.target_id = cellIds_[i % cellIds_.size()];
-            op.payload = formatId.toString();
+            op.payload = "{\"format\":\"" + formatBase64 + "\"}";
 
             applyOperation(*workbook_, op);
         }

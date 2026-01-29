@@ -30,7 +30,6 @@
 #include <utility>
 
 #include "core/cells/dependency_graph.h"
-#include "core/cells/format_registry.h"
 #include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
@@ -321,7 +320,6 @@ Workbook::Workbook()
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _formatRegistry(std::make_unique<FormatRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
@@ -330,7 +328,6 @@ Workbook::Workbook(const ID& id, std::string name)
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _formatRegistry(std::make_unique<FormatRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::~Workbook() = default;
@@ -666,35 +663,6 @@ std::unique_ptr<Axis> Workbook::removeRow(const ID& rowId) {
     return row;
 }
 
-bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
-    return _formatRegistry->registerFormat(formatId, formatCode);
-}
-
-ID Workbook::findFormatByCode(const std::string& formatCode) const {
-    // Lookup only, no registration - use for deduplication before FORMAT_DEFINE
-    return _formatRegistry->findFormatByCode(formatCode);
-}
-
-bool Workbook::hasCustomFormat(const ID& formatId) const {
-    return _formatRegistry->hasFormat(formatId);
-}
-
-std::string Workbook::getCustomFormatCode(const ID& formatId) const {
-    return _formatRegistry->getFormatCode(formatId);
-}
-
-const std::unordered_map<ID, std::string, IDHash>& Workbook::getCustomFormats() const {
-    return _formatRegistry->getFormats();
-}
-
-FormatRegistry* Workbook::getFormatRegistry() {
-    return _formatRegistry.get();
-}
-
-const FormatRegistry* Workbook::getFormatRegistry() const {
-    return _formatRegistry.get();
-}
-
 // =============================================================================
 // Workbook-level dependency graph
 // =============================================================================
@@ -705,70 +673,6 @@ DependencyGraph* Workbook::getDependencyGraph() {
 
 const DependencyGraph* Workbook::getDependencyGraph() const {
     return _depGraph.get();
-}
-
-// =============================================================================
-// Entity format storage (unified: cells, axes, etc.)
-// =============================================================================
-
-ID Workbook::getFormatId(const ID& entityId) const {
-    auto it = _formats.find(entityId);
-    if (it != _formats.end()) {
-        return it->second;
-    }
-    return {};  // null ID
-}
-
-ID Workbook::setFormatId(const ID& entityId, const ID& formatId) {
-    // Get old format ID for reference counting
-    ID oldFormatId;
-    auto existing = _formats.find(entityId);
-    if (existing != _formats.end()) {
-        oldFormatId = existing->second;
-    }
-
-    // If clearing the format (null ID), remove from map
-    if (formatId.isNull()) {
-        if (existing != _formats.end()) {
-            _formats.erase(existing);
-        }
-    } else {
-        // Set format association
-        _formats[entityId] = formatId;
-    }
-
-    // Update reference counts
-    FormatRegistry* registry = getFormatRegistry();
-    if (registry != nullptr) {
-        // Release old format reference (if any)
-        if (!oldFormatId.isNull()) {
-            registry->release(oldFormatId);
-        }
-        // Add reference to new format (if not null)
-        if (!formatId.isNull()) {
-            registry->addRef(formatId);
-        }
-    }
-
-    return oldFormatId;
-}
-
-bool Workbook::clearFormat(const ID& entityId) {
-    auto it = _formats.find(entityId);
-    if (it == _formats.end()) {
-        return false;
-    }
-
-    // Release reference before erasing
-    const ID formatId = it->second;
-    _formats.erase(it);
-
-    FormatRegistry* registry = getFormatRegistry();
-    if (registry != nullptr && !formatId.isNull()) {
-        registry->release(formatId);
-    }
-
-    return true;
 }
 
 // =============================================================================

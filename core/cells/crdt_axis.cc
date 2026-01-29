@@ -485,17 +485,7 @@ ApplyResult applyAxisSetFormat(Workbook& workbook, const Operation& op) {
         return ApplyResult::SUCCESS;
     }
 
-    // Legacy: Payload is the format ID (or empty string to clear)
-    // Axis formats are stored in workbook._formats map (not in Axis struct)
-    if (op.payload.empty()) {
-        workbook.setFormatId(axis->id, ID{});  // Clear format
-        axis->setHasFormat(false);
-    } else {
-        workbook.setFormatId(axis->id, ID(op.payload));
-        axis->setHasFormat(true);
-    }
-
-    return ApplyResult::SUCCESS;
+    return ApplyResult::INVALID_PAYLOAD;
 }
 
 ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
@@ -740,28 +730,6 @@ ApplyResult applySheetDelete(Workbook& workbook, const Operation& op) {
     }
 
     workbook.removeSheet(op.target_id);
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op) {
-    // Check if this format is already defined
-    if (workbook.hasCustomFormat(op.target_id)) {
-        return ApplyResult::ALREADY_APPLIED;
-    }
-
-    const std::string formatCode = extractJSONString(op.payload, "format_code");
-    if (formatCode.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    // Validate the format code
-    auto validationError = validateFormatCode(formatCode);
-    if (validationError) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    workbook.registerCustomFormat(op.target_id, formatCode);
 
     return ApplyResult::SUCCESS;
 }

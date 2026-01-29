@@ -54,9 +54,6 @@ const char* opTypeToString(OpType type) {
         // Workbook operations
         case OpType::WORKBOOK_RENAME:
             return "WORKBOOK_RENAME";
-        // Format operations
-        case OpType::FORMAT_DEFINE:
-            return "FORMAT_DEFINE";
         // Named range operations
         case OpType::NAMED_RANGE_DEFINE:
             return "NAMED_RANGE_DEFINE";
@@ -103,10 +100,6 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "WORKBOOK_RENAME") {
         return OpType::WORKBOOK_RENAME;
-    }
-    // Format operations
-    if (str == "FORMAT_DEFINE") {
-        return OpType::FORMAT_DEFINE;
     }
     // Named range operations
     if (str == "NAMED_RANGE_DEFINE") {
