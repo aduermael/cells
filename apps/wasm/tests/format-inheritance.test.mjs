@@ -315,8 +315,15 @@ const tests = {
     await clickColumnHeader(ctx.page, 'B');
     await sleep(300);
 
-    const formatLabelAfterReselect = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    let formatLabelAfterReselect = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
     assertEqual(formatLabelAfterReselect, 'Currency', 'Format dropdown should show Currency when re-selecting formatted column');
+
+    // Select an empty cell in the formatted column (B6) and verify it shows Currency
+    await clickCell(ctx.page, 'B6');
+    await sleep(300);
+
+    formatLabelAfterReselect = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabelAfterReselect, 'Currency', 'Format dropdown should show Currency for empty cell in formatted column');
   },
 
   'Row format via toolbar: click header then percent button': async (ctx) => {

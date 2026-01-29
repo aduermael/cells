@@ -229,11 +229,7 @@ export class FormatControls {
     }
 
     const cellData = this.getSelectedCellData();
-    if (!cellData) {
-      // No cell selected - show General
-      this.setDisplayedFormat("GENERAL");
-      return;
-    }
+    const position = this.getSelectedCell();
 
     // Check if selection has mixed formats
     const { start, end } = this.getSelectionRange();
@@ -245,10 +241,62 @@ export class FormatControls {
       }
     }
 
-    // Get format from cell data
-    const formatBase64 = cellData.format || "";
-    const category = await this.getCategoryForFormat(formatBase64);
-    this.setDisplayedFormat(category);
+    // Get format from cell data (if available and has format)
+    const formatBase64 = cellData?.format || "";
+    if (formatBase64) {
+      // Cell has a format (own or inherited from viewport computation)
+      const category = await this.getCategoryForFormat(formatBase64);
+      this.setDisplayedFormat(category);
+
+      // Update currency state if applicable
+      if (category === "CURRENCY" || category === "ACCOUNTING") {
+        const details = await this.dataSource.client.getFormatDetails(formatBase64);
+        if (details.currency) {
+          this.currencyDropdownLabel.textContent = details.currency;
+          this.currencyDropdown.classList.add("active");
+          this.currentCurrency = this.getCurrencyTypeForSymbol(details.currency);
+        }
+      }
+      return;
+    }
+
+    // No cell format - check for inherited format from column/row
+    // Empty cells might not be in the viewport, so check column then row
+    if (position) {
+      // Check column format first (column has lower priority than row in inheritance,
+      // but for empty cells we want to show what format they would get)
+      const colFormat = await this.dataSource.getColumnFormat(position.col);
+      if (colFormat?.category && colFormat.category !== "GENERAL") {
+        const category = colFormat.category as NumberFormatCategory;
+        this.setDisplayedFormat(category);
+
+        if (category === "CURRENCY" || category === "ACCOUNTING") {
+          const symbol = colFormat.currency || "$";
+          this.currencyDropdownLabel.textContent = symbol;
+          this.currencyDropdown.classList.add("active");
+          this.currentCurrency = this.getCurrencyTypeForSymbol(symbol);
+        }
+        return;
+      }
+
+      // Check row format
+      const rowFormat = await this.dataSource.getRowFormat(position.row);
+      if (rowFormat?.category && rowFormat.category !== "GENERAL") {
+        const category = rowFormat.category as NumberFormatCategory;
+        this.setDisplayedFormat(category);
+
+        if (category === "CURRENCY" || category === "ACCOUNTING") {
+          const symbol = rowFormat.currency || "$";
+          this.currencyDropdownLabel.textContent = symbol;
+          this.currencyDropdown.classList.add("active");
+          this.currentCurrency = this.getCurrencyTypeForSymbol(symbol);
+        }
+        return;
+      }
+    }
+
+    // No format found - show General
+    this.setDisplayedFormat("GENERAL");
   }
 
   /**
