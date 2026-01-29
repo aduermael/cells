@@ -768,6 +768,17 @@ export function createComponents(config: ComponentsConfig): Components {
         start: app.selectionStart,
         end: app.selectionEnd,
       }),
+      getSelectedAxis: () => {
+        // Check if a full column is selected (selectedColumn >= 0)
+        if (app.selectedColumn >= 0) {
+          return { type: "column", index: app.selectedColumn };
+        }
+        // Check if a full row is selected (selectedRow >= 0)
+        if (app.selectedRow >= 0) {
+          return { type: "row", index: app.selectedRow };
+        }
+        return null;
+      },
       getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,
       requestRender: render,
     }

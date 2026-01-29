@@ -73,6 +73,8 @@ export interface FormatControlsCallbacks {
   getSelectedCellData: () => CellData | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
+  /** Get the selected axis (column or row header click) */
+  getSelectedAxis: () => { type: "column" | "row"; index: number } | null;
   /** Get cell data at a specific position */
   getCellDataAt: (col: number, row: number) => CellData | null;
   /** Request render after format change */
@@ -128,6 +130,7 @@ export class FormatControls {
   private getSelectedCell: () => Position | null;
   private getSelectedCellData: () => CellData | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
+  private getSelectedAxis: () => { type: "column" | "row"; index: number } | null;
   private getCellDataAt: (col: number, row: number) => CellData | null;
   private requestRender: () => void;
 
@@ -171,6 +174,7 @@ export class FormatControls {
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
     this.getSelectionRange = callbacks.getSelectionRange;
+    this.getSelectedAxis = callbacks.getSelectedAxis;
     this.getCellDataAt = callbacks.getCellDataAt;
     this.requestRender = callbacks.requestRender;
 
@@ -872,9 +876,26 @@ export class FormatControls {
 
   /**
    * Apply a format to all cells in the current selection range.
+   *
+   * Priority for format application:
+   * 1. Column selection (header click) → setColumnFormat (axis-level format)
+   * 2. Row selection (header click) → setRowFormat (axis-level format)
+   * 3. Multi-cell range → setRangeFormat (range-level format)
+   * 4. Single cell → setCellFormatAt (cell-level format)
    */
   private async applyFormatToSelection(format: FormatProperties): Promise<void> {
     if (!this.dataSource) return;
+
+    // Check if a full column or row is selected (header click)
+    const selectedAxis = this.getSelectedAxis();
+    if (selectedAxis) {
+      if (selectedAxis.type === "column") {
+        await this.dataSource.setColumnFormat(selectedAxis.index, format);
+      } else {
+        await this.dataSource.setRowFormat(selectedAxis.index, format);
+      }
+      return;
+    }
 
     const { start, end } = this.getSelectionRange();
     const cell = this.getSelectedCell();
@@ -887,17 +908,13 @@ export class FormatControls {
       return;
     }
 
-    // Apply to all cells in range
+    // Multi-cell range selection - use range format for efficiency
     const minCol = Math.min(start.col, end.col);
     const maxCol = Math.max(start.col, end.col);
     const minRow = Math.min(start.row, end.row);
     const maxRow = Math.max(start.row, end.row);
 
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        await this.dataSource.setCellFormatAt(col, row, format);
-      }
-    }
+    await this.dataSource.setRangeFormat(minCol, minRow, maxCol, maxRow, format);
   }
 
 }
