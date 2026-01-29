@@ -390,6 +390,64 @@ void serializeBorderEdge(std::ostringstream& json, const char* name, const Borde
     json << "}";
 }
 
+// =============================================================================
+// Helper: Compute Edit Value for Formula Bar
+// =============================================================================
+// Excel shows different values in the formula bar depending on the format:
+// - PERCENTAGE: Shows formatted value (e.g., "15%") - user-friendly
+// - CURRENCY/ACCOUNTING: Shows raw number (e.g., "1234.5") - no symbol
+// - DATE/TIME: Shows formatted value (e.g., "12/31/2025") - user-friendly
+// - Others: Same as display value
+//
+// This matches Excel's behavior where users see the raw number for currency
+// (so they can easily edit the amount) but see the formatted value for
+// percentages (so they see "15%" not "0.15").
+
+std::string computeEditValue(double num, const std::string& displayValue, const FormatBuffer& format) {
+    // Check format category to determine what to show in formula bar
+    NumberFormatCategory category = format.getCategory();
+
+    switch (category) {
+        case NumberFormatCategory::CURRENCY:
+        case NumberFormatCategory::ACCOUNTING: {
+            // For currency/accounting, show raw number without formatting
+            // This matches Excel: user sees "1234.5" in formula bar, not "$1,234.50"
+            std::ostringstream numStr;
+            if (std::floor(num) == num && std::abs(num) < 1e15) {
+                numStr << static_cast<long long>(num);
+            } else {
+                numStr << std::setprecision(15) << num;
+                // Remove trailing zeros after decimal
+                std::string result = numStr.str();
+                size_t dot = result.find('.');
+                if (dot != std::string::npos) {
+                    size_t last = result.find_last_not_of('0');
+                    if (last != std::string::npos && last > dot) {
+                        return result.substr(0, last + 1);
+                    } else if (last == dot) {
+                        return result.substr(0, dot);
+                    }
+                }
+                return result;
+            }
+            return numStr.str();
+        }
+
+        case NumberFormatCategory::PERCENTAGE:
+        case NumberFormatCategory::DATE:
+        case NumberFormatCategory::TIME:
+        case NumberFormatCategory::DATE_TIME:
+            // For these formats, show formatted value (user-friendly)
+            // Percentage: "15%" not "0.15"
+            // Date: "12/31/2025" not "45657"
+            return displayValue;
+
+        default:
+            // For other formats (NUMBER, SCIENTIFIC, etc.), show display value
+            return displayValue;
+    }
+}
+
 std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
@@ -649,8 +707,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                         numStr << std::setprecision(15) << num;
                         displayValue = numStr.str();
                     }
-                    // Edit value: use format code formatter for user-friendly edit
-                    editValue = displayValue;  // For now, same as display
+                    // Edit value: depends on format category (currency shows raw, percentage shows formatted)
+                    editValue = computeEditValue(num, displayValue, effectiveFormat.format);
                 } else if (std::floor(num) == num && std::abs(num) < 1e15) {
                     displayValue = std::to_string(static_cast<long long>(num));
                     editValue = displayValue;
@@ -759,8 +817,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                         displayValue = formatted.text;
                         useFormattedValue = true;
                     }
-                    // Edit value same as display for now
-                    editValue = displayValue;
+                    // Edit value: depends on format category (currency shows raw, percentage shows formatted)
+                    editValue = computeEditValue(numValue, displayValue, effectiveFormat.format);
                 }
 
                 if (useFormattedValue) {

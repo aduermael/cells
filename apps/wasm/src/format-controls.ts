@@ -77,8 +77,6 @@ export interface FormatControlsCallbacks {
   getCellDataAt: (col: number, row: number) => CellData | null;
   /** Request render after format change */
   requestRender: () => void;
-  /** Update the formula bar display */
-  updateFormulaBar: () => void;
 }
 
 // =============================================================================
@@ -132,7 +130,6 @@ export class FormatControls {
   private getSelectionRange: () => { start: Position | null; end: Position | null };
   private getCellDataAt: (col: number, row: number) => CellData | null;
   private requestRender: () => void;
-  private updateFormulaBar: () => void;
 
   // =========================================================================
   // State
@@ -176,7 +173,6 @@ export class FormatControls {
     this.getSelectionRange = callbacks.getSelectionRange;
     this.getCellDataAt = callbacks.getCellDataAt;
     this.requestRender = callbacks.requestRender;
-    this.updateFormulaBar = callbacks.updateFormulaBar;
 
     this.setupEventListeners();
 

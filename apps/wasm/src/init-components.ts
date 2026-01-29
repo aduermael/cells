@@ -770,7 +770,6 @@ export function createComponents(config: ComponentsConfig): Components {
       }),
       getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,
       requestRender: render,
-      updateFormulaBar,
     }
   );
   formatControlsRef = formatControls;

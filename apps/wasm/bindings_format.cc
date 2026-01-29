@@ -62,9 +62,22 @@ NumberFormatCategory stringToCategoryInternal(const std::string& str) {
 
 // Parse format JSON into FormatBuffer
 // Accepts: {"category":"NUMBER","decimals":2,"separator":true,"currency":"$","formatCode":"#,##0.00"}
+// Also accepts: {"base64":"..."} to parse from existing base64 format
 // All fields are optional.
 FormatBuffer parseFormatJson(const std::string& json) {
     FormatBuffer format;
+
+    // Check for base64 format first (for copy/paste operations)
+    std::string base64 = extractPayloadField(json, "base64");
+    if (!base64.empty()) {
+        // Parse from base64 and return immediately
+        auto parsed = FormatBuffer::fromBase64(base64);
+        if (parsed.has_value()) {
+            return parsed.value();
+        }
+        // Invalid base64, return empty format
+        return FormatBuffer();
+    }
 
     // Parse category
     std::string category = extractPayloadField(json, "category");

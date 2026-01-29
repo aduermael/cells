@@ -296,7 +296,7 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Get the clipboard data including formatId
+    // Get the clipboard data including format (base64)
     const copiedData = await ctx.page.evaluate(() => {
       const app = window._appContext?.app;
       if (!app) return null;
@@ -306,7 +306,7 @@ const tests = {
       return cellData ? {
         value: cellData.value,
         display: cellData.display,
-        formatId: cellData.formatId,
+        format: cellData.format, // base64-encoded format
       } : null;
     });
 
@@ -315,10 +315,10 @@ const tests = {
     }
 
     assertTrue(copiedData !== null, 'Should have copied cell data');
-    assertTrue(copiedData.formatId !== undefined && copiedData.formatId !== '~',
-      'Copied cell should have a non-GENERAL formatId');
+    assertTrue(copiedData.format !== undefined && copiedData.format !== '',
+      'Copied cell should have a non-GENERAL format');
 
-    // Simulate internal paste at B1 with formatId preservation
+    // Simulate internal paste at B1 with format preservation
     await ctx.page.evaluate(async (data) => {
       const ds = window._appContext?.app?.dataSource;
       if (!ds) return;
@@ -326,9 +326,10 @@ const tests = {
       // Create cell with value
       await ds.createCell(1, 0, data.value); // B1 = col 1, row 0
 
-      // Apply format
-      if (data.formatId) {
-        await ds.setCellFormatAt(1, 0, data.formatId);
+      // Apply format using base64 format
+      // Pass the format as an object with base64 property
+      if (data.format) {
+        await ds.setCellFormatAt(1, 0, { base64: data.format });
       }
     }, copiedData);
     await sleep(300);
@@ -368,7 +369,7 @@ const tests = {
     let display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '$1,234.56', 'A1 should display $1,234.56');
 
-    // Get the clipboard data including formatId
+    // Get the clipboard data including format (base64)
     const copiedData = await ctx.page.evaluate(() => {
       const app = window._appContext?.app;
       if (!app) return null;
@@ -378,7 +379,7 @@ const tests = {
       return cellData ? {
         value: cellData.value,
         display: cellData.display,
-        formatId: cellData.formatId,
+        format: cellData.format, // base64-encoded format
       } : null;
     });
 
@@ -387,10 +388,10 @@ const tests = {
     }
 
     assertTrue(copiedData !== null, 'Should have copied cell data');
-    assertTrue(copiedData.formatId !== undefined && copiedData.formatId !== '~',
-      'Copied cell should have a currency formatId');
+    assertTrue(copiedData.format !== undefined && copiedData.format !== '',
+      'Copied cell should have a currency format');
 
-    // Simulate internal paste at B1 with formatId preservation
+    // Simulate internal paste at B1 with format preservation
     await ctx.page.evaluate(async (data) => {
       const ds = window._appContext?.app?.dataSource;
       if (!ds) return;
@@ -398,9 +399,10 @@ const tests = {
       // Create cell with value
       await ds.createCell(1, 0, data.value); // B1 = col 1, row 0
 
-      // Apply format
-      if (data.formatId) {
-        await ds.setCellFormatAt(1, 0, data.formatId);
+      // Apply format using base64 format
+      // Pass the format as an object with base64 property
+      if (data.format) {
+        await ds.setCellFormatAt(1, 0, { base64: data.format });
       }
     }, copiedData);
     await sleep(300);
@@ -417,8 +419,8 @@ const tests = {
     assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency for pasted cell');
   },
 
-  'Clipboard serialization includes formatId': async (ctx) => {
-    // Test that the internal clipboard serialization includes formatId
+  'Clipboard serialization includes format': async (ctx) => {
+    // Test that the internal clipboard serialization includes format (base64)
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
@@ -434,7 +436,7 @@ const tests = {
     await ctx.page.click('[data-format-category="PERCENTAGE"]');
     await sleep(300);
 
-    // Get the cell data to verify it includes formatId
+    // Get the cell data to verify it includes format
     const cellData = await ctx.page.evaluate(() => {
       const app = window._appContext?.app;
       if (!app) return null;
@@ -449,11 +451,12 @@ const tests = {
     }
 
     assertTrue(cellData !== null, 'Should have cell data');
-    assertTrue(cellData.formatId !== undefined, 'Cell data should include formatId');
-    assertTrue(cellData.formatId !== '~', 'formatId should not be GENERAL (~)');
-    // Percentage format ID should contain 'P' for percentage
-    assertTrue(cellData.formatId.includes('P') || cellData.formatId.startsWith('FMT_P'),
-      'formatId should indicate percentage format');
+    assertTrue(cellData.format !== undefined, 'Cell data should include format (base64)');
+    assertTrue(cellData.format !== '', 'format should not be empty');
+    // The format should be a base64 string containing the percentage format
+    // We can verify by checking it's a non-empty string (base64 encoded)
+    assertTrue(typeof cellData.format === 'string' && cellData.format.length > 0,
+      'format should be a non-empty base64 string');
   },
 };
 

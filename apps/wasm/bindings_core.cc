@@ -39,6 +39,49 @@
 
 namespace cells::wasm {
 
+// =============================================================================
+// Helper: Compute Edit Value for Formula Bar
+// =============================================================================
+// Matches the helper in bindings_viewport.cc. See that file for details.
+// CURRENCY/ACCOUNTING shows raw number, PERCENTAGE/DATE shows formatted value.
+
+static std::string computeEditValueForCore(double num, const std::string& displayValue, const FormatBuffer& format) {
+    NumberFormatCategory category = format.getCategory();
+
+    switch (category) {
+        case NumberFormatCategory::CURRENCY:
+        case NumberFormatCategory::ACCOUNTING: {
+            std::ostringstream numStr;
+            if (std::floor(num) == num && std::abs(num) < 1e15) {
+                numStr << static_cast<long long>(num);
+            } else {
+                numStr << std::setprecision(15) << num;
+                std::string result = numStr.str();
+                size_t dot = result.find('.');
+                if (dot != std::string::npos) {
+                    size_t last = result.find_last_not_of('0');
+                    if (last != std::string::npos && last > dot) {
+                        return result.substr(0, last + 1);
+                    } else if (last == dot) {
+                        return result.substr(0, dot);
+                    }
+                }
+                return result;
+            }
+            return numStr.str();
+        }
+
+        case NumberFormatCategory::PERCENTAGE:
+        case NumberFormatCategory::DATE:
+        case NumberFormatCategory::TIME:
+        case NumberFormatCategory::DATE_TIME:
+            return displayValue;
+
+        default:
+            return displayValue;
+    }
+}
+
 // ============================================================================
 // Constructor / Destructor
 // ============================================================================
@@ -876,6 +919,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
              << "\",\"existed\":true,";
 
         // Compute editValue for formatted numbers (dates, percentages, etc.)
+        // Currency shows raw number in formula bar; percentage shows formatted value
         std::string editValue = existingCell->value.raw;
         const FormatBuffer* cellFormat = _workbook->getEntityFormat(existingCell->id);
         if (existingCell->value.type == CellValueType::NUMBER &&
@@ -883,7 +927,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
             double numValue = existingCell->value.asNumber();
             FormatCodeResult formatted = cells::formatWithCode(numValue, cellFormat->toFormatCode());
             if (formatted.success) {
-                editValue = formatted.text;
+                editValue = computeEditValueForCore(numValue, formatted.text, *cellFormat);
             }
         }
 
