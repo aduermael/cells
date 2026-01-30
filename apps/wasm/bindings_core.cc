@@ -499,21 +499,21 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
 
     std::string colIdStr = cell->colId.toString();
     std::string rowIdStr = cell->rowId.toString();
-    std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+    std::string idSuffix = ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
     std::string payload;
     if (typeChar == 'f') {
         _refConverter.setContext(*sheet);
         std::string uuidFormula = _refConverter.formulaToUuid(value);
-        payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
     } else if (typeChar == 'b') {
-        payload = "{\"type\":\"b\",\"value\":\"" +
+        payload = "{\"t\":\"b\",\"v\":\"" +
                   std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" +
                   idSuffix;
     } else if (typeChar == 'n') {
-        payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+        payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
     } else {
-        payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+        payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
     }
 
     Operation op = makeCellSetOp(*_workbook, cellId, payload);
@@ -553,7 +553,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     std::string colIdStr = cell->colId.toString();
     std::string rowIdStr = cell->rowId.toString();
-    std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+    std::string idSuffix = ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
     std::string payload;
     ID detectedFormatId;
@@ -587,8 +587,8 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
             // Create required cells via CRDT operations (empty cells for references)
             for (const auto& pending : required.cells) {
-                std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                          pending.colId.toString() + "\",\"row_id\":\"" +
+                std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                          pending.colId.toString() + "\",\"row\":\"" +
                                           pending.rowId.toString() + "\"}";
                 Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
@@ -600,39 +600,36 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage
                 std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                payload =
-                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
             } else {
                 // Resolution failed (e.g., sheet not found) - store as error formula
                 // Fall back to string-based conversion for the formula text
                 _refConverter.setContext(*sheet);
                 std::string uuidFormula = _refConverter.formulaToUuid(value);
-                payload =
-                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
             }
         } else {
             // Parse failed - store original formula text (will show as error)
             _refConverter.setContext(*sheet);
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload =
-                "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
         }
     } else if (value == "TRUE" || value == "true") {
-        payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"true\"" + idSuffix;
     } else if (value == "FALSE" || value == "false") {
-        payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"false\"" + idSuffix;
     } else if (value.empty()) {
-        payload = "{\"type\":\"s\",\"value\":\"\"" + idSuffix;
+        payload = "{\"t\":\"s\",\"v\":\"\"" + idSuffix;
     } else {
         ParsedInput parsed = parseUserInput(value);
 
         if (parsed.success && parsed.valueType == CellValueType::NUMBER) {
             std::ostringstream numStr;
             numStr << std::setprecision(15) << parsed.numericValue;
-            payload = "{\"type\":\"n\",\"value\":\"" + numStr.str() + "\"" + idSuffix;
+            payload = "{\"t\":\"n\",\"v\":\"" + numStr.str() + "\"" + idSuffix;
             detectedFormatId = parsed.formatId;
         } else {
-            payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
         }
     }
 
@@ -753,7 +750,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     ID cellId = generate_id();
     std::string idSuffix =
-        ",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
+        ",\"col\":\"" + colId.toString() + "\",\"row\":\"" + rowId.toString() + "\"}";
 
     std::string payload;
     if (!value.empty() && value[0] == '=') {
@@ -785,8 +782,8 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
             // Create required cells via CRDT operations (empty cells for references)
             for (const auto& pending : required.cells) {
-                std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                          pending.colId.toString() + "\",\"row_id\":\"" +
+                std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                          pending.colId.toString() + "\",\"row\":\"" +
                                           pending.rowId.toString() + "\"}";
                 Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
@@ -798,36 +795,33 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage
                 std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                payload =
-                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
             } else {
                 // Resolution failed (e.g., sheet not found) - store as error formula
                 _refConverter.setContext(*sheet);
                 std::string uuidFormula = _refConverter.formulaToUuid(value);
-                payload =
-                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
             }
         } else {
             // Parse failed - store original formula text (will show as error)
             _refConverter.setContext(*sheet);
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload =
-                "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
         }
     } else if (value == "TRUE" || value == "true") {
-        payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"true\"" + idSuffix;
     } else if (value == "FALSE" || value == "false") {
-        payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"false\"" + idSuffix;
     } else if (!value.empty()) {
         char* endptr = nullptr;
         strtod(value.c_str(), &endptr);
         if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
-            payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
         } else {
-            payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
         }
     } else {
-        payload = "{\"type\":\"s\",\"value\":\"\"" + idSuffix;
+        payload = "{\"t\":\"s\",\"v\":\"\"" + idSuffix;
     }
 
     Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
@@ -949,8 +943,8 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     }
 
     ID cellId = generate_id();
-    std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
-                          "\",\"row_id\":\"" + rowId.toString() + "\"}";
+    std::string payload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
+                          "\",\"row\":\"" + rowId.toString() + "\"}";
 
     Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
@@ -1734,10 +1728,10 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     // Create the merge range using the unified Range system with CRDT operation
     ID rangeId = generate_id();
     std::ostringstream payload;
-    payload << "{\"start_col_id\":\"" << startColId.toString() << "\",";
-    payload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
-    payload << "\"end_col_id\":\"" << endColId.toString() << "\",";
-    payload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
+    payload << "{\"startCol\":\"" << startColId.toString() << "\",";
+    payload << "\"startRow\":\"" << startRowId.toString() << "\",";
+    payload << "\"endCol\":\"" << endColId.toString() << "\",";
+    payload << "\"endRow\":\"" << endRowId.toString() << "\",";
     payload << "\"flags\":" << static_cast<int>(RangeFlags::MERGE) << "}";
 
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, payload.str());

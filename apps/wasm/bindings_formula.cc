@@ -271,8 +271,8 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
 
     // Create required cells via CRDT operations (empty cells for references)
     for (const auto& pending : required.cells) {
-        std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                  pending.colId.toString() + "\",\"row_id\":\"" +
+        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                  pending.colId.toString() + "\",\"row\":\"" +
                                   pending.rowId.toString() + "\"}";
         Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
         applyOperation(*_workbook, cellOp);

@@ -275,8 +275,8 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     if (cellId.isNull()) {
         cellId = generate_id();
         cellCreated = true;
-        std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                  colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
+        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                  colId.toString() + "\",\"row\":\"" + rowId.toString() + "\"}";
         Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
         applyOperation(*_workbook, cellOp);
     }
@@ -1435,8 +1435,8 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     if (cellId.isNull()) {
         cellId = generate_id();
         cellCreated = true;
-        std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
-                                  "\",\"row_id\":\"" + rowId.toString() + "\"}";
+        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
+                                  "\",\"row\":\"" + rowId.toString() + "\"}";
         Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
         applyOperation(*_workbook, cellOp);
     }
@@ -1947,10 +1947,10 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // Create the new split range
             ID newRangeId = generate_id();
             std::ostringstream newRangePayload;
-            newRangePayload << "{\"start_col_id\":\"" << rectStartColId.toString() << "\",";
-            newRangePayload << "\"start_row_id\":\"" << rectStartRowId.toString() << "\",";
-            newRangePayload << "\"end_col_id\":\"" << rectEndColId.toString() << "\",";
-            newRangePayload << "\"end_row_id\":\"" << rectEndRowId.toString() << "\",";
+            newRangePayload << "{\"startCol\":\"" << rectStartColId.toString() << "\",";
+            newRangePayload << "\"startRow\":\"" << rectStartRowId.toString() << "\",";
+            newRangePayload << "\"endCol\":\"" << rectEndColId.toString() << "\",";
+            newRangePayload << "\"endRow\":\"" << rectEndRowId.toString() << "\",";
             newRangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
             Operation newRangeOp = makeRangeSetOp(*_workbook, newRangeId, newRangePayload.str());
@@ -1965,10 +1965,10 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     // Create a new Range with RANGE_STYLE flag
     ID rangeId = generate_id();
     std::ostringstream rangePayload;
-    rangePayload << "{\"start_col_id\":\"" << startColId.toString() << "\",";
-    rangePayload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
-    rangePayload << "\"end_col_id\":\"" << endColId.toString() << "\",";
-    rangePayload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
+    rangePayload << "{\"startCol\":\"" << startColId.toString() << "\",";
+    rangePayload << "\"startRow\":\"" << startRowId.toString() << "\",";
+    rangePayload << "\"endCol\":\"" << endColId.toString() << "\",";
+    rangePayload << "\"endRow\":\"" << endRowId.toString() << "\",";
     rangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, rangePayload.str());
@@ -2824,11 +2824,10 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
 
     // Create range insert payload with FORMAT flag
     std::ostringstream insertPayload;
-    insertPayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\""
-                  << ",\"start_col_id\":\"" << startColId.toString() << "\""
-                  << ",\"start_row_id\":\"" << startRowId.toString() << "\""
-                  << ",\"end_col_id\":\"" << endColId.toString() << "\""
-                  << ",\"end_row_id\":\"" << endRowId.toString() << "\""
+    insertPayload << "{\"startCol\":\"" << startColId.toString() << "\""
+                  << ",\"startRow\":\"" << startRowId.toString() << "\""
+                  << ",\"endCol\":\"" << endColId.toString() << "\""
+                  << ",\"endRow\":\"" << endRowId.toString() << "\""
                   << ",\"flags\":" << static_cast<int>(RangeFlags::FORMAT) << "}";
 
     ID rangeId = generate_id();
