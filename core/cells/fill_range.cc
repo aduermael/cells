@@ -20,8 +20,8 @@ namespace {
 std::string buildCellPayload(const std::string& typeChar, const std::string& valueStr,
                              const cells::ID& colId, const cells::ID& rowId) {
     std::ostringstream ss;
-    ss << "{\"type\":\"" << typeChar << "\",\"value\":\"" << valueStr << "\",\"col_id\":\""
-       << colId.toString() << "\",\"row_id\":\"" << rowId.toString() << "\"}";
+    ss << "{\"t\":\"" << typeChar << "\",\"v\":\"" << valueStr << "\",\"col\":\""
+       << colId.toString() << "\",\"row\":\"" << rowId.toString() << "\"}";
     return ss.str();
 }
 
@@ -249,7 +249,7 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                                                ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
                                                "}";
                 const Operation colOp =
-                    makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                    makeColSetOp(*workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*workbook, colOp);
             }
 
@@ -259,17 +259,17 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                                                ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
                                                "}";
                 const Operation rowOp =
-                    makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                    makeRowSetOp(*workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*workbook, rowOp);
             }
 
             // Create required cells via CRDT operations (empty cells for references)
             for (const auto& pending : required.cells) {
-                const std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                                pending.colId.toString() + "\",\"row_id\":\"" +
+                const std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                                pending.colId.toString() + "\",\"row\":\"" +
                                                 pending.rowId.toString() + "\"}";
                 const Operation cellOp =
-                    makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                    makeCellSetOp(*workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*workbook, cellOp);
             }
 
@@ -298,8 +298,8 @@ std::string buildFormulaPayload(const std::string& formula, const cells::ID& col
                                 const cells::ID& rowId) {
     // Note: display field omitted - peers generate display strings from AST locally
     std::ostringstream ss;
-    ss << "{\"type\":\"f\",\"value\":\"" << jsonEscape(formula) << "\",\"col_id\":\""
-       << colId.toString() << "\",\"row_id\":\"" << rowId.toString() << "\"}";
+    ss << "{\"t\":\"f\",\"v\":\"" << jsonEscape(formula) << "\",\"col\":\"" << colId.toString()
+       << "\",\"row\":\"" << rowId.toString() << "\"}";
     return ss.str();
 }
 
@@ -580,7 +580,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 }
 
                 // Always use CRDT operations
-                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
                 applyOperation(*workbook, op);
 
                 cellsFilled++;
@@ -658,7 +658,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 }
 
                 // Always use CRDT operations
-                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
                 applyOperation(*workbook, op);
 
                 cellsFilled++;
@@ -726,7 +726,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 }
 
                 // Always use CRDT operations
-                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
                 applyOperation(*workbook, op);
 
                 cellsFilled++;
@@ -802,7 +802,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 }
 
                 // Always use CRDT operations
-                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
                 applyOperation(*workbook, op);
 
                 cellsFilled++;

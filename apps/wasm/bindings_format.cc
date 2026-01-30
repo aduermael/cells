@@ -245,7 +245,7 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -261,7 +261,7 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -277,7 +277,7 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         cellCreated = true;
         std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
                                   colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
-        Operation cellOp = makeCellSetValueOp(*_workbook, cellId, cellPayload);
+        Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
         applyOperation(*_workbook, cellOp);
     }
 
@@ -1517,7 +1517,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -1529,7 +1529,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -1544,7 +1544,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         cellCreated = true;
         std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
                                   "\",\"row_id\":\"" + rowId.toString() + "\"}";
-        Operation cellOp = makeCellSetValueOp(*_workbook, cellId, cellPayload);
+        Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
         applyOperation(*_workbook, cellOp);
     }
 
@@ -1708,7 +1708,7 @@ std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     std::ostringstream payload;
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
-    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
+    Operation removeOp = makeRangeDeleteOp(*_workbook, range->id, payload.str());
     applyOperation(*_workbook, removeOp);
 
     rebuildViewportIndex();
@@ -1746,7 +1746,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         startColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, startColId, sheet->id, payload);
+        Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1759,7 +1759,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         endColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, endColId, sheet->id, payload);
+        Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1772,7 +1772,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         startRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, startRowId, sheet->id, payload);
+        Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1785,7 +1785,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         endRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, endRowId, sheet->id, payload);
+        Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1853,7 +1853,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             if (mergedStyle.isEmpty()) {
                 std::ostringstream removePayload;
                 removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-                Operation removeOp = makeRangeRemoveOp(*_workbook, existingRange->id, removePayload.str());
+                Operation removeOp = makeRangeDeleteOp(*_workbook, existingRange->id, removePayload.str());
                 applyOperation(*_workbook, removeOp);
 
                 broadcastPendingOperations();
@@ -1977,7 +1977,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // Style is now empty, delete the range
             std::ostringstream removePayload;
             removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-            Operation removeOp = makeRangeRemoveOp(*_workbook, containedOp.rangeId, removePayload.str());
+            Operation removeOp = makeRangeDeleteOp(*_workbook, containedOp.rangeId, removePayload.str());
             applyOperation(*_workbook, removeOp);
         } else {
             // Update the range with the stripped style
@@ -1991,7 +1991,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Delete the old range
         std::ostringstream removePayload;
         removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-        Operation removeOp = makeRangeRemoveOp(*_workbook, splitOp.oldRangeId, removePayload.str());
+        Operation removeOp = makeRangeDeleteOp(*_workbook, splitOp.oldRangeId, removePayload.str());
         applyOperation(*_workbook, removeOp);
 
         // Create new ranges for each split rectangle
@@ -2008,7 +2008,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectStartColId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.minCol) +
                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation op = makeColInsertOp(*_workbook, rectStartColId, sheet->id, payload);
+                Operation op = makeColSetOp(*_workbook, rectStartColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -2021,7 +2021,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectEndColId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) +
                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation op = makeColInsertOp(*_workbook, rectEndColId, sheet->id, payload);
+                Operation op = makeColSetOp(*_workbook, rectEndColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -2034,7 +2034,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectStartRowId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.minRow) +
                                       ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation op = makeRowInsertOp(*_workbook, rectStartRowId, sheet->id, payload);
+                Operation op = makeRowSetOp(*_workbook, rectStartRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -2047,7 +2047,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectEndRowId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) +
                                       ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation op = makeRowInsertOp(*_workbook, rectEndRowId, sheet->id, payload);
+                Operation op = makeRowSetOp(*_workbook, rectEndRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -2060,7 +2060,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             newRangePayload << "\"end_row_id\":\"" << rectEndRowId.toString() << "\",";
             newRangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
-            Operation newRangeOp = makeRangeAddOp(*_workbook, newRangeId, newRangePayload.str());
+            Operation newRangeOp = makeRangeSetOp(*_workbook, newRangeId, newRangePayload.str());
             applyOperation(*_workbook, newRangeOp);
 
             // Apply the preserved style to the new split range
@@ -2078,7 +2078,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     rangePayload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
     rangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
-    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, rangePayload.str());
+    Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, rangePayload.str());
     applyOperation(*_workbook, rangeOp);
 
     // Associate the style with the range
@@ -2436,7 +2436,7 @@ std::string CellsEngine::setColumnStyle(uint32_t colPosition, const std::string&
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -2502,7 +2502,7 @@ std::string CellsEngine::setRowStyle(uint32_t rowPosition, const std::string& st
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -2720,7 +2720,7 @@ std::string CellsEngine::setColumnFormat(uint32_t colPosition, const std::string
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -2770,7 +2770,7 @@ std::string CellsEngine::setRowFormat(uint32_t rowPosition, const std::string& f
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -2883,7 +2883,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         startColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, startColId, sheet->id, payload);
+        Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -2896,7 +2896,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         endColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, endColId, sheet->id, payload);
+        Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -2909,7 +2909,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         startRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, startRowId, sheet->id, payload);
+        Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -2922,7 +2922,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         endRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, endRowId, sheet->id, payload);
+        Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -2939,7 +2939,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
                   << ",\"flags\":" << static_cast<int>(RangeFlags::FORMAT) << "}";
 
     ID rangeId = generate_id();
-    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, insertPayload.str());
+    Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, insertPayload.str());
     applyOperation(*_workbook, rangeOp);
 
     // Set format on the range
@@ -2977,7 +2977,7 @@ std::string CellsEngine::removeRangeFormat(uint32_t col, uint32_t row) {
     std::ostringstream payload;
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
-    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
+    Operation removeOp = makeRangeDeleteOp(*_workbook, range->id, payload.str());
     applyOperation(*_workbook, removeOp);
 
     broadcastPendingOperations();

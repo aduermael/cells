@@ -59,7 +59,7 @@ protected:
 
 TEST_F(CRDTTest, ApplyCellSetValue) {
     // Create an operation to set cell1's value
-    Operation op = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"100"})");
+    Operation op = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"100"})");
 
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
@@ -78,7 +78,7 @@ TEST_F(CRDTTest, ApplyCellClear) {
     EXPECT_EQ(cell->value.type, CellValueType::NUMBER);
 
     // Create and apply clear operation
-    Operation op = makeCellClearOp(*workbook, cell1);
+    Operation op = makeCellDeleteOp(*workbook, cell1);
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
@@ -88,7 +88,7 @@ TEST_F(CRDTTest, ApplyCellClear) {
 }
 
 TEST_F(CRDTTest, DuplicateOperationRejected) {
-    Operation op = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"100"})");
+    Operation op = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"100"})");
 
     ApplyResult result1 = applyOperation(*workbook, op);
     EXPECT_EQ(result1, ApplyResult::SUCCESS);
@@ -102,10 +102,10 @@ TEST_F(CRDTTest, LastWriterWins) {
     // Apply an older operation
     ID node1("Node1111");
     HLC old_hlc(1000, 0, node1);
-    Operation old_op(old_hlc, OpType::CELL_SET_VALUE, cell1, R"({"type":"n","value":"50"})");
+    Operation old_op(old_hlc, OpType::CELL_SET, cell1, R"({"t":"n","v":"50"})");
 
     // Apply a newer operation first
-    Operation new_op = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"100"})");
+    Operation new_op = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"100"})");
     applyOperation(*workbook, new_op);
 
     // Now apply the older operation
@@ -119,8 +119,8 @@ TEST_F(CRDTTest, LastWriterWins) {
 }
 
 TEST_F(CRDTTest, OperationsAddedToOpLog) {
-    Operation op1 = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"100"})");
-    Operation op2 = makeCellSetValueOp(*workbook, cell2, R"({"type":"s","value":"World"})");
+    Operation op1 = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"100"})");
+    Operation op2 = makeCellSetOp(*workbook, cell2, R"({"t":"s","v":"World"})");
 
     applyOperation(*workbook, op1);
     applyOperation(*workbook, op2);
@@ -131,9 +131,9 @@ TEST_F(CRDTTest, OperationsAddedToOpLog) {
 
 TEST_F(CRDTTest, ApplyMultipleOperations) {
     std::vector<Operation> ops;
-    ops.push_back(makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"1"})"));
-    ops.push_back(makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"2"})"));
-    ops.push_back(makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"3"})"));
+    ops.push_back(makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"1"})"));
+    ops.push_back(makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"2"})"));
+    ops.push_back(makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"3"})"));
 
     size_t applied = applyOperations(*workbook, ops);
     EXPECT_EQ(applied, 3);
@@ -146,44 +146,51 @@ TEST_F(CRDTTest, ApplyMultipleOperations) {
 
 TEST_F(CRDTTest, IsSuperseded) {
     // Apply an operation
-    Operation op1 = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"100"})");
+    Operation op1 = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"100"})");
     applyOperation(*workbook, op1);
 
     // Create an older operation
     ID node1("Node1111");
     HLC old_hlc(1000, 0, node1);
-    Operation old_op(old_hlc, OpType::CELL_SET_VALUE, cell1, R"({"type":"n","value":"50"})");
+    Operation old_op(old_hlc, OpType::CELL_SET, cell1, R"({"t":"n","v":"50"})");
 
     EXPECT_TRUE(isSuperseded(*workbook, old_op));
     // op1 has the same HLC as the latest, so it's considered superseded (>= check)
     EXPECT_TRUE(isSuperseded(*workbook, op1));
 
     // A newer operation is not superseded
-    Operation op2 = makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"200"})");
+    Operation op2 = makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"200"})");
     EXPECT_FALSE(isSuperseded(*workbook, op2));  // op2 is newer than what's in OpLog
 }
 
 TEST_F(CRDTTest, InvalidTargetReturnsError) {
+    // Try to create a cell with col/row that don't exist
     ID fake_cell("FAKECELL");
-    Operation op = makeCellSetValueOp(*workbook, fake_cell, R"({"type":"n","value":"100"})");
-    // Manually construct with a non-existent cell ID
+    ID fake_col("FAKECOL");
+    ID fake_row("FAKEROW");
     HLC hlc = workbook->getCurrentHLC();
-    Operation bad_op(hlc, OpType::CELL_SET_VALUE, fake_cell, R"({"type":"n","value":"100"})");
+    std::string payload = R"({"col":")" + fake_col.toString() + R"(","row":")" +
+                          fake_row.toString() + R"(","t":"n","v":"100"})";
+    Operation bad_op(hlc, OpType::CELL_SET, fake_cell, payload);
+    bad_op.sheetId = sheet_id;
 
     ApplyResult result = applyOperation(*workbook, bad_op);
     EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
 }
 
 TEST_F(CRDTTest, InvalidPayloadReturnsError) {
+    // For CELL_SET, invalid payload means trying to create a cell without col/row
     HLC hlc = workbook->getCurrentHLC();
-    Operation bad_op(hlc, OpType::CELL_SET_VALUE, cell1, R"({invalid json})");
+    ID new_cell_id = generate_id();
+    Operation bad_op(hlc, OpType::CELL_SET, new_cell_id, R"({invalid json})");
+    bad_op.sheetId = sheet_id;
 
     ApplyResult result = applyOperation(*workbook, bad_op);
     EXPECT_EQ(result, ApplyResult::INVALID_PAYLOAD);
 }
 
 TEST_F(CRDTTest, SheetRename) {
-    Operation op = makeSheetRenameOp(*workbook, sheet_id, R"({"name":"RenamedSheet"})");
+    Operation op = makeSheetSetOp(*workbook, sheet_id, R"({"name":"RenamedSheet"})");
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
@@ -192,7 +199,7 @@ TEST_F(CRDTTest, SheetRename) {
 }
 
 TEST_F(CRDTTest, AxisResize) {
-    Operation op = makeColResizeOp(*workbook, col1, R"({"size":200})");
+    Operation op = makeColSetOp(*workbook, col1, R"({"size":200})");
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
@@ -208,11 +215,11 @@ TEST_F(CRDTTest, ConcurrentEditsConverge) {
 
     // Node A's edit at time 1000
     HLC hlc_a(1000, 0, node_a);
-    Operation op_a(hlc_a, OpType::CELL_SET_VALUE, cell1, R"({"type":"n","value":"100"})");
+    Operation op_a(hlc_a, OpType::CELL_SET, cell1, R"({"t":"n","v":"100"})");
 
     // Node B's edit at same time 1000 but different node
     HLC hlc_b(1000, 0, node_b);
-    Operation op_b(hlc_b, OpType::CELL_SET_VALUE, cell1, R"({"type":"n","value":"200"})");
+    Operation op_b(hlc_b, OpType::CELL_SET, cell1, R"({"t":"n","v":"200"})");
 
     // Apply in one order
     applyOperation(*workbook, op_a);
@@ -236,11 +243,10 @@ TEST_F(CRDTTest, HLCMonotonicallyIncreases) {
 
 TEST_F(CRDTTest, GetOperationsSinceForSync) {
     // Apply some operations
-    applyOperation(*workbook, makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"1"})"));
+    applyOperation(*workbook, makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"1"})"));
     HLC sync_point = workbook->getOpLog()->getCurrentHLC();
-    applyOperation(*workbook, makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"2"})"));
-    applyOperation(*workbook,
-                   makeCellSetValueOp(*workbook, cell2, R"({"type":"s","value":"test"})"));
+    applyOperation(*workbook, makeCellSetOp(*workbook, cell1, R"({"t":"n","v":"2"})"));
+    applyOperation(*workbook, makeCellSetOp(*workbook, cell2, R"({"t":"s","v":"test"})"));
 
     // Get operations since sync point
     auto ops = workbook->getOpLog()->getOperationsSince(sync_point);
@@ -338,11 +344,11 @@ TEST_F(CRDTConvergenceTest, TwoPeersConvergeOnConcurrentEdits) {
     sheet_b->addCell(std::move(cell2_b));
 
     // Peer A makes an edit to cell1
-    Operation op_a = makeCellSetValueOp(*workbook_a, shared_cell1, R"({"type":"n","value":"100"})");
+    Operation op_a = makeCellSetOp(*workbook_a, shared_cell1, R"({"t":"n","v":"100"})");
     applyOperation(*workbook_a, op_a);
 
     // Peer B makes an edit to cell2 (different cell, same workbook state)
-    Operation op_b = makeCellSetValueOp(*workbook_b, shared_cell2, R"({"type":"n","value":"200"})");
+    Operation op_b = makeCellSetOp(*workbook_b, shared_cell2, R"({"t":"n","v":"200"})");
     applyOperation(*workbook_b, op_b);
 
     // Sync A -> B
@@ -398,8 +404,8 @@ TEST_F(CRDTConvergenceTest, SameCellConcurrentEditsConverge) {
     HLC hlc_a(1000, 0, node_a);
     HLC hlc_b(1000, 0, node_b);
 
-    Operation op_a(hlc_a, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"100"})");
-    Operation op_b(hlc_b, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"200"})");
+    Operation op_a(hlc_a, OpType::CELL_SET, shared_cell, R"({"t":"n","v":"100"})");
+    Operation op_b(hlc_b, OpType::CELL_SET, shared_cell, R"({"t":"n","v":"200"})");
 
     // Apply in different orders on each workbook
     applyOperation(*workbook_a, op_a);
@@ -444,9 +450,9 @@ TEST_F(CRDTConvergenceTest, ThreePeersConverge) {
     HLC hlc_b(1000, 0, node_b);
     HLC hlc_c(1000, 0, node_c);
 
-    Operation op_a(hlc_a, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"100"})");
-    Operation op_b(hlc_b, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"200"})");
-    Operation op_c(hlc_c, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"300"})");
+    Operation op_a(hlc_a, OpType::CELL_SET, shared_cell, R"({"t":"n","v":"100"})");
+    Operation op_b(hlc_b, OpType::CELL_SET, shared_cell, R"({"t":"n","v":"200"})");
+    Operation op_c(hlc_c, OpType::CELL_SET, shared_cell, R"({"t":"n","v":"300"})");
 
     // Apply in different orders on each workbook
     applyOperation(*workbook_a, op_a);
@@ -499,8 +505,8 @@ TEST_F(CRDTConvergenceTest, RapidSequentialEditsPreserveOrder) {
     // Peer A makes rapid sequential edits
     std::vector<Operation> ops;
     for (int i = 1; i <= 10; i++) {
-        Operation op = makeCellSetValueOp(*workbook_a, shared_cell,
-                                          R"({"type":"n","value":")" + std::to_string(i) + R"("})");
+        Operation op = makeCellSetOp(*workbook_a, shared_cell,
+                                     R"({"t":"n","v":")" + std::to_string(i) + R"("})");
         ops.push_back(op);
         applyOperation(*workbook_a, op);
     }
@@ -542,11 +548,11 @@ TEST_F(CRDTConvergenceTest, DifferentCellsConcurrentEdits) {
     }
 
     // Peer A edits cell1
-    Operation op_a = makeCellSetValueOp(*workbook_a, cell1, R"({"type":"n","value":"100"})");
+    Operation op_a = makeCellSetOp(*workbook_a, cell1, R"({"t":"n","v":"100"})");
     applyOperation(*workbook_a, op_a);
 
     // Peer B edits cell2
-    Operation op_b = makeCellSetValueOp(*workbook_b, cell2, R"({"type":"n","value":"200"})");
+    Operation op_b = makeCellSetOp(*workbook_b, cell2, R"({"t":"n","v":"200"})");
     applyOperation(*workbook_b, op_b);
 
     // Sync both ways
@@ -632,13 +638,14 @@ TEST_F(CRDTTest, ApplyCellSetStyle) {
 }
 
 TEST_F(CRDTTest, CellSetStyleNonExistentCell) {
-    // Try to set style on non-existent cell
+    // Try to set style on non-existent cell without col/row (invalid payload for creation)
     ID fakeCell("FakeCelX");
     StyleBuffer styleBuf;
     styleBuf.setBold(true);
     Operation op = makeCellSetStyleOp(*workbook, fakeCell, styleBuf);
     ApplyResult result = applyOperation(*workbook, op);
-    EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
+    // Without col/row, this is INVALID_PAYLOAD (can't create cell without position)
+    EXPECT_EQ(result, ApplyResult::INVALID_PAYLOAD);
 }
 
 // =============================================================================
@@ -821,17 +828,18 @@ TEST_F(RangeAdjustmentTest, DeleteMiddleColumnKeepsRangeUnchanged) {
 }
 
 TEST_F(CRDTTest, FailedOperationNotAddedToOpLog) {
-    // Test that INVALID_TARGET operations don't add to oplog
+    // Test that failed operations don't add to oplog
     workbook->startCollaboration();  // Enable oplog
 
     size_t opCountBefore = workbook->getOpLog()->size();
 
-    // Create an operation targeting a non-existent cell
+    // Create an operation targeting a non-existent cell without col/row
     ID fakeCell = generate_id();
-    Operation op = makeCellSetValueOp(*workbook, fakeCell, R"({"type":"n","value":"42"})");
+    Operation op = makeCellSetOp(*workbook, fakeCell, R"({"t":"n","v":"42"})");
     ApplyResult result = applyOperation(*workbook, op);
 
-    EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
+    // Without col/row, this is INVALID_PAYLOAD (can't create cell without position)
+    EXPECT_EQ(result, ApplyResult::INVALID_PAYLOAD);
 
     // Oplog should NOT have grown (failed operation not added)
     EXPECT_EQ(workbook->getOpLog()->size(), opCountBefore);
@@ -860,12 +868,12 @@ TEST_F(CRDTTest, StyledRangeWithContentAddressedStyles) {
     styleBuf1.setBgColorHex("#ff0000");
 
     ID rangeId1 = generate_id();
-    std::string rangePayload1 = "{\"start_col_id\":\"" + colIds[0].toString() + "\",";
-    rangePayload1 += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
-    rangePayload1 += "\"end_col_id\":\"" + colIds[0].toString() + "\",";
-    rangePayload1 += "\"end_row_id\":\"" + rowIds[0].toString() + "\",";
+    std::string rangePayload1 = "{\"startCol\":\"" + colIds[0].toString() + "\",";
+    rangePayload1 += "\"startRow\":\"" + rowIds[0].toString() + "\",";
+    rangePayload1 += "\"endCol\":\"" + colIds[0].toString() + "\",";
+    rangePayload1 += "\"endRow\":\"" + rowIds[0].toString() + "\",";
     rangePayload1 += "\"flags\":2}";  // STYLE flag
-    Operation rangeOp1 = makeRangeAddOp(*workbook, rangeId1, rangePayload1);
+    Operation rangeOp1 = makeRangeSetOp(*workbook, rangeId1, rangePayload1);
     ApplyResult rangeResult1 = applyOperation(*workbook, rangeOp1);
     EXPECT_EQ(rangeResult1, ApplyResult::SUCCESS);
 
@@ -884,12 +892,12 @@ TEST_F(CRDTTest, StyledRangeWithContentAddressedStyles) {
     styleBuf2.setBgColorHex("#00ff00");
 
     ID rangeId2 = generate_id();
-    std::string rangePayload2 = "{\"start_col_id\":\"" + colIds[1].toString() + "\",";
-    rangePayload2 += "\"start_row_id\":\"" + rowIds[1].toString() + "\",";
-    rangePayload2 += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
-    rangePayload2 += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    std::string rangePayload2 = "{\"startCol\":\"" + colIds[1].toString() + "\",";
+    rangePayload2 += "\"startRow\":\"" + rowIds[1].toString() + "\",";
+    rangePayload2 += "\"endCol\":\"" + colIds[1].toString() + "\",";
+    rangePayload2 += "\"endRow\":\"" + rowIds[1].toString() + "\",";
     rangePayload2 += "\"flags\":2}";  // STYLE flag
-    Operation rangeOp2 = makeRangeAddOp(*workbook, rangeId2, rangePayload2);
+    Operation rangeOp2 = makeRangeSetOp(*workbook, rangeId2, rangePayload2);
     ApplyResult rangeResult2 = applyOperation(*workbook, rangeOp2);
     EXPECT_EQ(rangeResult2, ApplyResult::SUCCESS);
 

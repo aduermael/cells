@@ -341,7 +341,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         const double num = lua_tonumber(L, 2);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.15g", num);
-        payload = R"({"type":"n","value":")" + std::string(buf) + R"(","col":")" + colIdStr +
+        payload = R"({"t":"n","v":")" + std::string(buf) + R"(","col":")" + colIdStr +
                   R"(","row":")" + rowIdStr + R"("})";
     } else if (lua_isstring(L, 2) != 0) {
         const char* str = lua_tostring(L, 2);
@@ -354,8 +354,8 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                 RefConverter conv;
                 conv.setContext(*sheet);
                 const std::string uuidFormula = conv.formulaToUuid(str);
-                payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
-                          colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                          colIdStr + R"(","row":")" + rowIdStr + R"("})";
             } else {
                 // CRDT-compliant resolution: discover and create entities first
                 FormulaResolver resolver(*workbook, *sheet);
@@ -367,7 +367,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                         "{\"pos\":" + std::to_string(pending.position) +
                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
                     const Operation colOp =
-                        makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                        makeColSetOp(*workbook, pending.id, pending.sheetId, colPayload);
                     applyOperation(*workbook, colOp);
                 }
 
@@ -377,17 +377,17 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                         "{\"pos\":" + std::to_string(pending.position) +
                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
                     const Operation rowOp =
-                        makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                        makeRowSetOp(*workbook, pending.id, pending.sheetId, rowPayload);
                     applyOperation(*workbook, rowOp);
                 }
 
                 // Create required cells via CRDT operations (empty cells for references)
                 for (const auto& pending : required.cells) {
-                    const std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                                    pending.colId.toString() + "\",\"row_id\":\"" +
+                    const std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
+                                                    pending.colId.toString() + "\",\"row\":\"" +
                                                     pending.rowId.toString() + "\"}";
                     const Operation cellOp =
-                        makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                        makeCellSetOp(*workbook, pending.id, pending.sheetId, cellPayload);
                     applyOperation(*workbook, cellOp);
                 }
 
@@ -398,13 +398,13 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                     RefConverter conv;
                     conv.setContext(*sheet);
                     const std::string uuidFormula = conv.formulaToUuid(str);
-                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
-                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                    payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
                 } else {
                     // Serialize the resolved AST to UUID format
                     const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
-                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                    payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
 
                     // Add dependencies to the dependency graph
                     DependencyGraph* depGraph = sheet->getDependencyGraph();
@@ -440,13 +440,13 @@ int LuauSandbox::luaCellSet(lua_State* L) {
             }
         } else {
             // Literal string
-            payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
+            payload = R"({"t":"s","v":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
                       R"(","row":")" + rowIdStr + R"("})";
         }
     } else if (lua_isboolean(L, 2) != 0) {
         const bool val = lua_toboolean(L, 2) != 0;
-        payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +
-                  R"(","col":")" + colIdStr + R"(","row":")" + rowIdStr + R"("})";
+        payload = R"({"t":"b","v":")" + std::string(val ? "true" : "false") + R"(","col":")" +
+                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
     } else if (lua_isnil(L, 2) != 0) {
         // Clear the cell - remove from dependency graph first
         DependencyGraph* depGraph = sheet->getDependencyGraph();
@@ -455,7 +455,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
             depGraph->unmarkVolatile(cell->id);
         }
 
-        const Operation op = makeCellClearOp(*workbook, cell->id);
+        const Operation op = makeCellDeleteOp(*workbook, cell->id);
         applyOperation(*workbook, op);
 
         // Trigger recalculation for dependents
@@ -469,7 +469,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     }
 
     // Apply the operation via CRDT
-    const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+    const Operation op = makeCellSetOp(*workbook, cell->id, payload);
     applyOperation(*workbook, op);
 
     // Trigger recalculation: mark dependents dirty and recalculate
@@ -494,7 +494,7 @@ int LuauSandbox::luaDocumentSetTitle(lua_State* L) {
     }
 
     const std::string payload = R"({"name":")" + jsonEscape(title) + R"("})";
-    const Operation op = makeWorkbookRenameOp(*workbook, payload);
+    const Operation op = makeWorkbookSetOp(*workbook, payload);
     applyOperation(*workbook, op);
 
     return 0;
@@ -546,7 +546,7 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
     }
 
     const std::string payload = R"({"size":)" + std::to_string(width) + "}";
-    const Operation op = makeColResizeOp(*workbook, col->id, payload);
+    const Operation op = makeColSetOp(*workbook, col->id, payload);
     applyOperation(*workbook, op);
 
     return 0;
@@ -584,7 +584,7 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
     }
 
     const std::string payload = R"({"size":)" + std::to_string(height) + "}";
-    const Operation op = makeRowResizeOp(*workbook, row->id, payload);
+    const Operation op = makeRowSetOp(*workbook, row->id, payload);
     applyOperation(*workbook, op);
 
     return 0;
@@ -623,7 +623,7 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
     }
 
     const std::string payload = R"({"position":)" + std::to_string(toPos) + "}";
-    const Operation op = makeColMoveOp(*workbook, col->id, payload);
+    const Operation op = makeColSetOp(*workbook, col->id, payload);
     applyOperation(*workbook, op);
 
     return 0;
@@ -1118,7 +1118,7 @@ int LuauSandbox::luaAddSheet(lua_State* L) {
     const std::string payload = R"({"name":")" + jsonEscape(sheetName) + R"("})";
 
     // Apply the operation
-    const Operation op = makeSheetCreateOp(*workbook, sheetId, payload);
+    const Operation op = makeSheetSetOp(*workbook, sheetId, payload);
     applyOperation(*workbook, op);
 
     // Get the created sheet and return it
@@ -1225,7 +1225,7 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
             }
             const Cell* cell = sheet->getCellAt(col->id, row->id);
             if (cell != nullptr) {
-                const Operation op = makeCellClearOp(*workbook, cell->id);
+                const Operation op = makeCellDeleteOp(*workbook, cell->id);
                 applyOperation(*workbook, op);
             }
         }
@@ -1401,7 +1401,7 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
     }
 
     // Apply format to all cells in range
-    const std::string payload = R"({"format":")" + formatBase64 + R"("})";
+    auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
 
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
@@ -1410,8 +1410,13 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
             const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
             const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-            const Operation op = makeCellSetFormatOp(*workbook, cell->id, payload);
-            applyOperation(*workbook, op);
+            if (formatBase64.empty()) {
+                const Operation op = makeCellClearFormatOp(*workbook, cell->id);
+                applyOperation(*workbook, op);
+            } else if (maybeFormat.has_value()) {
+                const Operation op = makeCellSetFormatOp(*workbook, cell->id, *maybeFormat);
+                applyOperation(*workbook, op);
+            }
         }
     }
 
@@ -1452,14 +1457,13 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
 
     // Handle nil - clear style
     if (lua_isnil(L, 2) != 0) {
-        const std::string clearPayload = R"({"style":""})";
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
                 const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
                 const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
                 const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-                const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
+                const Operation op = makeCellClearStyleOp(*workbook, cell->id);
                 applyOperation(*workbook, op);
             }
         }
@@ -1562,14 +1566,13 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
 
     // If style is empty, clear it
     if (style.isEmpty()) {
-        const std::string clearPayload = R"({"style":""})";
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
                 const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
                 const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
                 const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-                const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
+                const Operation op = makeCellClearStyleOp(*workbook, cell->id);
                 applyOperation(*workbook, op);
             }
         }

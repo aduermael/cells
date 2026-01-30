@@ -7,44 +7,40 @@ namespace {
 
 TEST(OpTypeTest, OpTypeToStringAndBack) {
     // Test all operation types
-    EXPECT_STREQ(opTypeToString(OpType::CELL_SET_VALUE), "CELL_SET_VALUE");
-    EXPECT_STREQ(opTypeToString(OpType::CELL_CLEAR), "CELL_CLEAR");
-    EXPECT_STREQ(opTypeToString(OpType::CELL_SET_STYLE), "CELL_SET_STYLE");
-    EXPECT_STREQ(opTypeToString(OpType::COL_INSERT), "COL_INSERT");
+    EXPECT_STREQ(opTypeToString(OpType::CELL_SET), "CELL_SET");
+    EXPECT_STREQ(opTypeToString(OpType::CELL_DELETE), "CELL_DELETE");
+    EXPECT_STREQ(opTypeToString(OpType::COL_SET), "COL_SET");
     EXPECT_STREQ(opTypeToString(OpType::COL_DELETE), "COL_DELETE");
-    EXPECT_STREQ(opTypeToString(OpType::COL_MOVE), "COL_MOVE");
-    EXPECT_STREQ(opTypeToString(OpType::COL_RESIZE), "COL_RESIZE");
-    EXPECT_STREQ(opTypeToString(OpType::COL_RENAME), "COL_RENAME");
-    EXPECT_STREQ(opTypeToString(OpType::ROW_INSERT), "ROW_INSERT");
+    EXPECT_STREQ(opTypeToString(OpType::ROW_SET), "ROW_SET");
     EXPECT_STREQ(opTypeToString(OpType::ROW_DELETE), "ROW_DELETE");
-    EXPECT_STREQ(opTypeToString(OpType::ROW_MOVE), "ROW_MOVE");
-    EXPECT_STREQ(opTypeToString(OpType::ROW_RESIZE), "ROW_RESIZE");
-    EXPECT_STREQ(opTypeToString(OpType::SHEET_CREATE), "SHEET_CREATE");
+    EXPECT_STREQ(opTypeToString(OpType::SHEET_SET), "SHEET_SET");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_DELETE), "SHEET_DELETE");
-    EXPECT_STREQ(opTypeToString(OpType::SHEET_RENAME), "SHEET_RENAME");
+    EXPECT_STREQ(opTypeToString(OpType::WORKBOOK_SET), "WORKBOOK_SET");
+    EXPECT_STREQ(opTypeToString(OpType::NAMED_RANGE_SET), "NAMED_RANGE_SET");
+    EXPECT_STREQ(opTypeToString(OpType::NAMED_RANGE_DELETE), "NAMED_RANGE_DELETE");
+    EXPECT_STREQ(opTypeToString(OpType::RANGE_SET), "RANGE_SET");
+    EXPECT_STREQ(opTypeToString(OpType::RANGE_DELETE), "RANGE_DELETE");
 
     // Test roundtrip
-    EXPECT_EQ(stringToOpType("CELL_SET_VALUE"), OpType::CELL_SET_VALUE);
-    EXPECT_EQ(stringToOpType("CELL_CLEAR"), OpType::CELL_CLEAR);
-    EXPECT_EQ(stringToOpType("CELL_SET_STYLE"), OpType::CELL_SET_STYLE);
-    EXPECT_EQ(stringToOpType("COL_INSERT"), OpType::COL_INSERT);
+    EXPECT_EQ(stringToOpType("CELL_SET"), OpType::CELL_SET);
+    EXPECT_EQ(stringToOpType("CELL_DELETE"), OpType::CELL_DELETE);
+    EXPECT_EQ(stringToOpType("COL_SET"), OpType::COL_SET);
     EXPECT_EQ(stringToOpType("COL_DELETE"), OpType::COL_DELETE);
-    EXPECT_EQ(stringToOpType("COL_MOVE"), OpType::COL_MOVE);
-    EXPECT_EQ(stringToOpType("COL_RESIZE"), OpType::COL_RESIZE);
-    EXPECT_EQ(stringToOpType("COL_RENAME"), OpType::COL_RENAME);
-    EXPECT_EQ(stringToOpType("ROW_INSERT"), OpType::ROW_INSERT);
+    EXPECT_EQ(stringToOpType("ROW_SET"), OpType::ROW_SET);
     EXPECT_EQ(stringToOpType("ROW_DELETE"), OpType::ROW_DELETE);
-    EXPECT_EQ(stringToOpType("ROW_MOVE"), OpType::ROW_MOVE);
-    EXPECT_EQ(stringToOpType("ROW_RESIZE"), OpType::ROW_RESIZE);
-    EXPECT_EQ(stringToOpType("SHEET_CREATE"), OpType::SHEET_CREATE);
+    EXPECT_EQ(stringToOpType("SHEET_SET"), OpType::SHEET_SET);
     EXPECT_EQ(stringToOpType("SHEET_DELETE"), OpType::SHEET_DELETE);
-    EXPECT_EQ(stringToOpType("SHEET_RENAME"), OpType::SHEET_RENAME);
+    EXPECT_EQ(stringToOpType("WORKBOOK_SET"), OpType::WORKBOOK_SET);
+    EXPECT_EQ(stringToOpType("NAMED_RANGE_SET"), OpType::NAMED_RANGE_SET);
+    EXPECT_EQ(stringToOpType("NAMED_RANGE_DELETE"), OpType::NAMED_RANGE_DELETE);
+    EXPECT_EQ(stringToOpType("RANGE_SET"), OpType::RANGE_SET);
+    EXPECT_EQ(stringToOpType("RANGE_DELETE"), OpType::RANGE_DELETE);
 }
 
 TEST(OpTypeTest, StringToOpTypeDefaultsOnInvalid) {
-    EXPECT_EQ(stringToOpType("INVALID"), OpType::CELL_SET_VALUE);
-    EXPECT_EQ(stringToOpType(""), OpType::CELL_SET_VALUE);
-    EXPECT_EQ(stringToOpType("cell_set_value"), OpType::CELL_SET_VALUE);  // Case sensitive
+    EXPECT_EQ(stringToOpType("INVALID"), OpType::CELL_SET);
+    EXPECT_EQ(stringToOpType(""), OpType::CELL_SET);
+    EXPECT_EQ(stringToOpType("cell_set"), OpType::CELL_SET);  // Case sensitive
 }
 
 TEST(OperationTest, DefaultConstructorCreatesNullOperation) {
@@ -52,7 +48,7 @@ TEST(OperationTest, DefaultConstructorCreatesNullOperation) {
     EXPECT_TRUE(op.isNull());
     EXPECT_TRUE(op.hlc.isZero());
     EXPECT_TRUE(op.target_id.isNull());
-    EXPECT_EQ(op.type, OpType::CELL_SET_VALUE);
+    EXPECT_EQ(op.type, OpType::CELL_SET);
     EXPECT_TRUE(op.payload.empty());
 }
 
@@ -61,22 +57,22 @@ TEST(OperationTest, ParameterizedConstructor) {
     HLC hlc(1705312200000, 5, node);
     ID target("nP6kR2mW");
 
-    Operation op(hlc, OpType::CELL_SET_VALUE, target, R"({"type":"n","value":"42"})");
+    Operation op(hlc, OpType::CELL_SET, target, R"({"t":"n","v":"42"})");
 
     EXPECT_FALSE(op.isNull());
     EXPECT_EQ(op.hlc, hlc);
-    EXPECT_EQ(op.type, OpType::CELL_SET_VALUE);
+    EXPECT_EQ(op.type, OpType::CELL_SET);
     EXPECT_EQ(op.target_id.toString(), "nP6kR2mW");
-    EXPECT_EQ(op.payload, R"({"type":"n","value":"42"})");
+    EXPECT_EQ(op.payload, R"({"t":"n","v":"42"})");
 }
 
 TEST(OperationTest, ComparisonBasedOnHLC) {
     ID node("Kj7mXp2Q");
     ID target("nP6kR2mW");
 
-    Operation op1(HLC(1000, 0, node), OpType::CELL_SET_VALUE, target, "{}");
-    Operation op2(HLC(2000, 0, node), OpType::CELL_SET_VALUE, target, "{}");
-    Operation op3(HLC(1000, 1, node), OpType::CELL_SET_VALUE, target, "{}");
+    Operation op1(HLC(1000, 0, node), OpType::CELL_SET, target, "{}");
+    Operation op2(HLC(2000, 0, node), OpType::CELL_SET, target, "{}");
+    Operation op3(HLC(1000, 1, node), OpType::CELL_SET, target, "{}");
 
     EXPECT_LT(op1, op2);
     EXPECT_LT(op1, op3);
@@ -88,12 +84,11 @@ TEST(OperationTest, ToStringAndFromString) {
     HLC hlc(1705312200000, 42, node);
     ID target("nP6kR2mW");
 
-    Operation original(hlc, OpType::CELL_SET_VALUE, target, R"({"type":"n","value":"42"})");
+    Operation original(hlc, OpType::CELL_SET, target, R"({"t":"n","v":"42"})");
 
     std::string str = original.toString();
     // New format includes sheetId field (~ for null ID)
-    EXPECT_EQ(str,
-              R"(1705312200000.42.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW ~ {"type":"n","value":"42"})");
+    EXPECT_EQ(str, R"(1705312200000.42.Kj7mXp2Q CELL_SET nP6kR2mW ~ {"t":"n","v":"42"})");
 
     Operation parsed = Operation::fromString(str);
     EXPECT_EQ(parsed.hlc, original.hlc);
@@ -105,21 +100,19 @@ TEST(OperationTest, ToStringAndFromString) {
 
 TEST(OperationTest, FromStringWithAllOpTypes) {
     std::vector<std::pair<std::string, OpType>> test_cases = {
-        {"1000.0.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW {}", OpType::CELL_SET_VALUE},
-        {"1000.0.Kj7mXp2Q CELL_CLEAR nP6kR2mW {}", OpType::CELL_CLEAR},
-        {"1000.0.Kj7mXp2Q CELL_SET_STYLE nP6kR2mW {}", OpType::CELL_SET_STYLE},
-        {"1000.0.Kj7mXp2Q COL_INSERT nP6kR2mW {}", OpType::COL_INSERT},
+        {"1000.0.Kj7mXp2Q CELL_SET nP6kR2mW {}", OpType::CELL_SET},
+        {"1000.0.Kj7mXp2Q CELL_DELETE nP6kR2mW {}", OpType::CELL_DELETE},
+        {"1000.0.Kj7mXp2Q COL_SET nP6kR2mW {}", OpType::COL_SET},
         {"1000.0.Kj7mXp2Q COL_DELETE nP6kR2mW {}", OpType::COL_DELETE},
-        {"1000.0.Kj7mXp2Q COL_MOVE nP6kR2mW {}", OpType::COL_MOVE},
-        {"1000.0.Kj7mXp2Q COL_RESIZE nP6kR2mW {}", OpType::COL_RESIZE},
-        {"1000.0.Kj7mXp2Q COL_RENAME nP6kR2mW {}", OpType::COL_RENAME},
-        {"1000.0.Kj7mXp2Q ROW_INSERT nP6kR2mW {}", OpType::ROW_INSERT},
+        {"1000.0.Kj7mXp2Q ROW_SET nP6kR2mW {}", OpType::ROW_SET},
         {"1000.0.Kj7mXp2Q ROW_DELETE nP6kR2mW {}", OpType::ROW_DELETE},
-        {"1000.0.Kj7mXp2Q ROW_MOVE nP6kR2mW {}", OpType::ROW_MOVE},
-        {"1000.0.Kj7mXp2Q ROW_RESIZE nP6kR2mW {}", OpType::ROW_RESIZE},
-        {"1000.0.Kj7mXp2Q SHEET_CREATE nP6kR2mW {}", OpType::SHEET_CREATE},
+        {"1000.0.Kj7mXp2Q SHEET_SET nP6kR2mW {}", OpType::SHEET_SET},
         {"1000.0.Kj7mXp2Q SHEET_DELETE nP6kR2mW {}", OpType::SHEET_DELETE},
-        {"1000.0.Kj7mXp2Q SHEET_RENAME nP6kR2mW {}", OpType::SHEET_RENAME},
+        {"1000.0.Kj7mXp2Q WORKBOOK_SET nP6kR2mW {}", OpType::WORKBOOK_SET},
+        {"1000.0.Kj7mXp2Q NAMED_RANGE_SET nP6kR2mW {}", OpType::NAMED_RANGE_SET},
+        {"1000.0.Kj7mXp2Q NAMED_RANGE_DELETE nP6kR2mW {}", OpType::NAMED_RANGE_DELETE},
+        {"1000.0.Kj7mXp2Q RANGE_SET nP6kR2mW {}", OpType::RANGE_SET},
+        {"1000.0.Kj7mXp2Q RANGE_DELETE nP6kR2mW {}", OpType::RANGE_DELETE},
     };
 
     for (const auto& [str, expected_type] : test_cases) {
@@ -134,11 +127,11 @@ TEST(OperationTest, FromStringInvalidFormats) {
     EXPECT_TRUE(op1.isNull());
 
     // Missing target
-    Operation op2 = Operation::fromString("1000.0.Kj7mXp2Q CELL_SET_VALUE");
+    Operation op2 = Operation::fromString("1000.0.Kj7mXp2Q CELL_SET");
     EXPECT_TRUE(op2.isNull());
 
     // Missing payload
-    Operation op3 = Operation::fromString("1000.0.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW");
+    Operation op3 = Operation::fromString("1000.0.Kj7mXp2Q CELL_SET nP6kR2mW");
     EXPECT_TRUE(op3.isNull());
 
     // Empty string
@@ -151,13 +144,13 @@ TEST(OperationTest, ToJSONAndFromJSON) {
     HLC hlc(1705312200000, 42, node);
     ID target("nP6kR2mW");
 
-    Operation original(hlc, OpType::CELL_SET_VALUE, target, R"({"type":"n","value":"42"})");
+    Operation original(hlc, OpType::CELL_SET, target, R"({"t":"n","v":"42"})");
 
     std::string json = original.toJSON();
 
     // Verify JSON structure
     EXPECT_NE(json.find("\"hlc\":\"1705312200000.42.Kj7mXp2Q\""), std::string::npos);
-    EXPECT_NE(json.find("\"op\":\"CELL_SET_VALUE\""), std::string::npos);
+    EXPECT_NE(json.find("\"op\":\"CELL_SET\""), std::string::npos);
     EXPECT_NE(json.find("\"target\":\"nP6kR2mW\""), std::string::npos);
     EXPECT_NE(json.find("\"payload\":"), std::string::npos);
 
@@ -187,8 +180,8 @@ TEST(OperationTest, PayloadWithSpecialCharacters) {
     ID target("nP6kR2mW");
 
     // Test payload with quotes and special characters
-    std::string payload = R"({"value":"Hello \"World\"\nNew line"})";
-    Operation op(hlc, OpType::CELL_SET_VALUE, target, payload);
+    std::string payload = R"({"v":"Hello \"World\"\nNew line"})";
+    Operation op(hlc, OpType::CELL_SET, target, payload);
 
     std::string str = op.toString();
     Operation parsed = Operation::fromString(str);
@@ -201,9 +194,9 @@ TEST(OperationTest, EqualityOperator) {
     HLC hlc(1000, 0, node);
     ID target("nP6kR2mW");
 
-    Operation op1(hlc, OpType::CELL_SET_VALUE, target, "{}");
-    Operation op2(hlc, OpType::CELL_SET_VALUE, target, "{}");
-    Operation op3(hlc, OpType::CELL_CLEAR, target, "{}");  // Different type
+    Operation op1(hlc, OpType::CELL_SET, target, "{}");
+    Operation op2(hlc, OpType::CELL_SET, target, "{}");
+    Operation op3(hlc, OpType::CELL_DELETE, target, "{}");  // Different type
 
     EXPECT_EQ(op1, op2);
     EXPECT_FALSE(op1 == op3);
@@ -217,11 +210,11 @@ TEST(OperationTest, RoundtripPreservesAllFields) {
 
     // Various operations
     test_ops.push_back(
-        Operation(HLC(1000, 0, node), OpType::CELL_SET_VALUE, target, R"({"type":"n","v":42})"));
+        Operation(HLC(1000, 0, node), OpType::CELL_SET, target, R"({"t":"n","v":42})"));
     test_ops.push_back(
-        Operation(HLC(2000, 5, node), OpType::CELL_CLEAR, target, R"({"reason":"user"})"));
+        Operation(HLC(2000, 5, node), OpType::CELL_DELETE, target, R"({"reason":"user"})"));
     test_ops.push_back(
-        Operation(HLC(3000, 10, node), OpType::SHEET_RENAME, target, R"({"name":"Sheet2"})"));
+        Operation(HLC(3000, 10, node), OpType::SHEET_SET, target, R"({"name":"Sheet2"})"));
 
     for (const auto& original : test_ops) {
         // Test toString/fromString roundtrip

@@ -6,15 +6,15 @@
 // Axes define the grid structure - columns and rows have UUIDs, positions, and sizes.
 //
 // Key responsibilities:
-// - Insert/delete/move/resize columns and rows
-// - Apply sheet and workbook operations (create, delete, rename)
-// - Apply format definition operations
-// - Manage position updates when axes are moved or deleted
+// - COL_SET/COL_DELETE: Create/update/delete columns
+// - ROW_SET/ROW_DELETE: Create/update/delete rows
+// - SHEET_SET/SHEET_DELETE: Create/update/delete sheets
+// - WORKBOOK_SET: Update workbook properties
+// - NAMED_RANGE_SET/NAMED_RANGE_DELETE: Manage named ranges
 //
 // Conflict resolution:
-// - Inserts: Interleave by HLC timestamp (lower HLC comes first)
-// - Moves/resizes: Last-Writer-Wins (highest HLC wins)
-// - Delete vs edit: Edit resurrects the entity (no data loss)
+// - SET operations: Last-Writer-Wins (highest HLC wins), creates if doesn't exist
+// - DELETE operations: Edit (SET) resurrects deleted entities (no data loss)
 //
 // =============================================================================
 
@@ -29,71 +29,101 @@
 namespace cells {
 namespace internal {
 
-ApplyResult applyColInsert(Workbook& workbook, const Operation& op) {
-    const int pos = extractJSONInt(op.payload, "pos", -1);
-    const int size = extractJSONInt(op.payload, "size", -1);
+// =============================================================================
+// COL_SET - Create or update column
+// =============================================================================
+// Payload: {"pos":N,"size":N,"name":"...","sty":"base64","fmt":"base64","hidden":bool}
+// All fields optional except pos is required when creating
 
-    if (pos < 0 || size < 0) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    if (workbook.sheets.empty()) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
+ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     // Use sheetId from operation if available, otherwise fall back to first sheet
     Sheet* sheet = nullptr;
     if (!op.sheetId.isNull()) {
         sheet = workbook.getSheet(op.sheetId);
     }
-    if (sheet == nullptr) {
+    if (sheet == nullptr && !workbook.sheets.empty()) {
         sheet = workbook.sheets[0].get();
     }
-
-    if (sheet->getColumn(op.target_id) != nullptr) {
-        return ApplyResult::ALREADY_APPLIED;
-    }
-
-    auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, true);
-    newAxis->position = static_cast<uint32_t>(pos);
-    newAxis->size = static_cast<uint32_t>(size);
-    sheet->addColumn(std::move(newAxis));
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyRowInsert(Workbook& workbook, const Operation& op) {
-    const int pos = extractJSONInt(op.payload, "pos", -1);
-    const int size = extractJSONInt(op.payload, "size", -1);
-
-    if (pos < 0 || size < 0) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    if (workbook.sheets.empty()) {
+    if (sheet == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
 
-    // Use sheetId from operation if available, otherwise fall back to first sheet
-    Sheet* sheet = nullptr;
-    if (!op.sheetId.isNull()) {
-        sheet = workbook.getSheet(op.sheetId);
-    }
-    if (sheet == nullptr) {
-        sheet = workbook.sheets[0].get();
+    Axis* axis = sheet->getColumn(op.target_id);
+    const bool creating = (axis == nullptr);
+
+    if (creating) {
+        // Creating new column - pos is required
+        const int pos = extractJSONInt(op.payload, "pos", -1);
+        if (pos < 0) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+
+        auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, true);
+        newAxis->position = static_cast<uint32_t>(pos);
+        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", 100));
+        axis = newAxis.get();
+        sheet->addColumn(std::move(newAxis));
     }
 
-    if (sheet->getRow(op.target_id) != nullptr) {
-        return ApplyResult::ALREADY_APPLIED;
+    // Check for newer operations
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        return creating ? ApplyResult::SUCCESS : ApplyResult::SUPERSEDED;
     }
 
-    auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
-    newAxis->position = static_cast<uint32_t>(pos);
-    newAxis->size = static_cast<uint32_t>(size);
-    sheet->addRow(std::move(newAxis));
+    // Update properties if provided
+    const int pos = extractJSONInt(op.payload, "pos", -1);
+    if (pos >= 0) {
+        axis->position = static_cast<uint32_t>(pos);
+    }
+
+    const int size = extractJSONInt(op.payload, "size", -1);
+    if (size >= 0) {
+        axis->size = static_cast<uint32_t>(size);
+        sheet->getColumnAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
+    }
+
+    const std::string name = extractJSONString(op.payload, "name");
+    if (!name.empty() || op.payload.find("\"name\":") != std::string::npos) {
+        axis->name = name;
+    }
+
+    const std::string style_str = extractJSONString(op.payload, "sty");
+    if (!style_str.empty()) {
+        auto maybeStyle = StyleBuffer::fromBase64(style_str);
+        if (maybeStyle.has_value() && !maybeStyle->isEmpty()) {
+            workbook.setEntityStyle(axis->id, *maybeStyle);
+            axis->setHasStyle(true);
+        }
+    } else if (op.payload.find("\"sty\":\"\"") != std::string::npos) {
+        workbook.clearEntityStyle(axis->id);
+        axis->setHasStyle(false);
+    }
+
+    const std::string format_str = extractJSONString(op.payload, "fmt");
+    if (!format_str.empty()) {
+        auto maybeFormat = FormatBuffer::fromBase64(format_str);
+        if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
+            workbook.setEntityFormat(axis->id, *maybeFormat);
+            axis->setHasFormat(true);
+        }
+    } else if (op.payload.find("\"fmt\":\"\"") != std::string::npos) {
+        workbook.clearEntityFormat(axis->id);
+        axis->setHasFormat(false);
+    }
+
+    if (op.payload.find("\"hidden\":") != std::string::npos) {
+        const bool hidden = extractJSONBool(op.payload, "hidden", false);
+        axis->setHidden(hidden);
+    }
 
     return ApplyResult::SUCCESS;
 }
+
+// =============================================================================
+// COL_DELETE - Delete column
+// =============================================================================
 
 ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
@@ -108,16 +138,14 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
     }
 
     if (targetSheet == nullptr || axis == nullptr) {
-        // Column doesn't exist - already deleted or never existed
-        return ApplyResult::SUCCESS;
+        return ApplyResult::SUCCESS;  // Already deleted or never existed
     }
 
     // Check for newer operations that resurrect the column
     const OpLog* oplog = workbook.getOpLog();
     const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
-        if (latest.type == OpType::COL_INSERT || latest.type == OpType::COL_RENAME ||
-            latest.type == OpType::COL_RESIZE) {
+        if (latest.type == OpType::COL_SET) {
             return ApplyResult::RESURRECTED;
         }
     }
@@ -125,12 +153,10 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
     // Adjust ranges that have this column as a corner
     const uint32_t deletedPos = axis->position;
     auto getNextColId = [targetSheet, deletedPos](const ID& /*colId*/) -> ID {
-        // Next column is at position + 1
         const Axis* next = targetSheet->getColumnByPosition(deletedPos + 1);
         return next != nullptr ? next->id : ID{};
     };
     auto getPrevColId = [targetSheet, deletedPos](const ID& /*colId*/) -> ID {
-        // Previous column is at position - 1 (guard against underflow)
         if (deletedPos == 0) {
             return {};
         }
@@ -149,7 +175,6 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
         if (result == CornerDeleteResult::INVALIDATED) {
             rangesToRemove.push_back(rangeId);
         } else if (result == CornerDeleteResult::SHRUNK) {
-            // Update the range index with new bounds
             targetSheet->updateRangeIndex(range);
         }
     }
@@ -166,7 +191,6 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
         }
     }
     for (const auto& cellId : cellsToRemove) {
-        // Remove from sheet's position index
         const Cell* cell = workbook.getCell(cellId);
         if (cell) {
             targetSheet->removeCellFromIndex(cellId);
@@ -174,13 +198,102 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
         workbook.removeCell(cellId);
     }
 
-    // Remove the column from sheet tracking
     targetSheet->removeColumnFromIndex(op.target_id);
-    // Remove from workbook storage
     workbook.removeColumn(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
+
+// =============================================================================
+// ROW_SET - Create or update row
+// =============================================================================
+// Payload: {"pos":N,"size":N,"sty":"base64","fmt":"base64","hidden":bool}
+// All fields optional except pos is required when creating
+
+ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
+    // Use sheetId from operation if available, otherwise fall back to first sheet
+    Sheet* sheet = nullptr;
+    if (!op.sheetId.isNull()) {
+        sheet = workbook.getSheet(op.sheetId);
+    }
+    if (sheet == nullptr && !workbook.sheets.empty()) {
+        sheet = workbook.sheets[0].get();
+    }
+    if (sheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    Axis* axis = sheet->getRow(op.target_id);
+    const bool creating = (axis == nullptr);
+
+    if (creating) {
+        // Creating new row - pos is required
+        const int pos = extractJSONInt(op.payload, "pos", -1);
+        if (pos < 0) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+
+        auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
+        newAxis->position = static_cast<uint32_t>(pos);
+        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", 21));
+        axis = newAxis.get();
+        sheet->addRow(std::move(newAxis));
+    }
+
+    // Check for newer operations
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        return creating ? ApplyResult::SUCCESS : ApplyResult::SUPERSEDED;
+    }
+
+    // Update properties if provided
+    const int pos = extractJSONInt(op.payload, "pos", -1);
+    if (pos >= 0) {
+        axis->position = static_cast<uint32_t>(pos);
+    }
+
+    const int size = extractJSONInt(op.payload, "size", -1);
+    if (size >= 0) {
+        axis->size = static_cast<uint32_t>(size);
+        sheet->getRowAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
+    }
+
+    const std::string style_str = extractJSONString(op.payload, "sty");
+    if (!style_str.empty()) {
+        auto maybeStyle = StyleBuffer::fromBase64(style_str);
+        if (maybeStyle.has_value() && !maybeStyle->isEmpty()) {
+            workbook.setEntityStyle(axis->id, *maybeStyle);
+            axis->setHasStyle(true);
+        }
+    } else if (op.payload.find("\"sty\":\"\"") != std::string::npos) {
+        workbook.clearEntityStyle(axis->id);
+        axis->setHasStyle(false);
+    }
+
+    const std::string format_str = extractJSONString(op.payload, "fmt");
+    if (!format_str.empty()) {
+        auto maybeFormat = FormatBuffer::fromBase64(format_str);
+        if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
+            workbook.setEntityFormat(axis->id, *maybeFormat);
+            axis->setHasFormat(true);
+        }
+    } else if (op.payload.find("\"fmt\":\"\"") != std::string::npos) {
+        workbook.clearEntityFormat(axis->id);
+        axis->setHasFormat(false);
+    }
+
+    if (op.payload.find("\"hidden\":") != std::string::npos) {
+        const bool hidden = extractJSONBool(op.payload, "hidden", false);
+        axis->setHidden(hidden);
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
+// =============================================================================
+// ROW_DELETE - Delete row
+// =============================================================================
 
 ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
@@ -195,15 +308,14 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
     }
 
     if (targetSheet == nullptr || axis == nullptr) {
-        // Row doesn't exist - already deleted or never existed
-        return ApplyResult::SUCCESS;
+        return ApplyResult::SUCCESS;  // Already deleted or never existed
     }
 
     // Check for newer operations that resurrect the row
     const OpLog* oplog = workbook.getOpLog();
     const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
-        if (latest.type == OpType::ROW_INSERT || latest.type == OpType::ROW_RESIZE) {
+        if (latest.type == OpType::ROW_SET) {
             return ApplyResult::RESURRECTED;
         }
     }
@@ -211,12 +323,10 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
     // Adjust ranges that have this row as a corner
     const uint32_t deletedPos = axis->position;
     auto getNextRowId = [targetSheet, deletedPos](const ID& /*rowId*/) -> ID {
-        // Next row is at position + 1
         const Axis* next = targetSheet->getRowByPosition(deletedPos + 1);
         return next != nullptr ? next->id : ID{};
     };
     auto getPrevRowId = [targetSheet, deletedPos](const ID& /*rowId*/) -> ID {
-        // Previous row is at position - 1 (guard against underflow)
         if (deletedPos == 0) {
             return {};
         }
@@ -235,7 +345,6 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
         if (result == CornerDeleteResult::INVALIDATED) {
             rangesToRemove.push_back(rangeId);
         } else if (result == CornerDeleteResult::SHRUNK) {
-            // Update the range index with new bounds
             targetSheet->updateRangeIndex(range);
         }
     }
@@ -252,7 +361,6 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
         }
     }
     for (const auto& cellId : cellsToRemove) {
-        // Remove from sheet's position index
         const Cell* cell = workbook.getCell(cellId);
         if (cell) {
             targetSheet->removeCellFromIndex(cellId);
@@ -260,482 +368,102 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
         workbook.removeCell(cellId);
     }
 
-    // Remove the row from sheet tracking
     targetSheet->removeRowFromIndex(op.target_id);
-    // Remove from workbook storage
     workbook.removeRow(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
 
-ApplyResult applyColResize(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-    Sheet* targetSheet = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer resize operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::COL_RESIZE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const std::string size_str = extractSizePayload(op.payload);
-    if (size_str.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
-    axis->size = new_size;
-
-    // Update Sheet's axis index with the new size
-    if (targetSheet != nullptr) {
-        targetSheet->getColumnAxisIndex().resize(op.target_id, new_size);
-    }
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyRowResize(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-    Sheet* targetSheet = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        axis = s->getRow(op.target_id);
-        if (axis != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer resize operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::ROW_RESIZE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const std::string size_str = extractSizePayload(op.payload);
-    if (size_str.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
-    axis->size = new_size;
-
-    // Update Sheet's axis index with the new size
-    if (targetSheet != nullptr) {
-        targetSheet->getRowAxisIndex().resize(op.target_id, new_size);
-    }
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-
-    // Search for axis in all sheets (could be column or row)
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-        axis = s->getRow(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer set_hidden operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::AXIS_SET_HIDDEN && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    // Payload is just "1" (hidden) or "0" (visible)
-    axis->setHidden(op.payload == "1");
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-
-    // Search for axis in all sheets (could be column or row)
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-        axis = s->getRow(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer set_style operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::AXIS_SET_STYLE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    // Parse payload: {"style":"<base64>"} (content-addressed)
-    // Empty string clears the style
-    const std::string styleBase64 = extractJSONString(op.payload, "style");
-    if (styleBase64.empty()) {
-        workbook.clearEntityStyle(axis->id);
-        axis->setHasStyle(false);
-    } else {
-        auto maybeStyle = StyleBuffer::fromBase64(styleBase64);
-        if (!maybeStyle.has_value() || maybeStyle->isEmpty()) {
-            return ApplyResult::INVALID_PAYLOAD;
-        }
-        workbook.setEntityStyle(axis->id, *maybeStyle);
-        axis->setHasStyle(true);
-    }
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyAxisSetFormat(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-
-    // Search for axis in all sheets (could be column or row)
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-        axis = s->getRow(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer set_format operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::AXIS_SET_FORMAT && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    // Try new content-addressed format first: {"format":"<base64>"}
-    const std::string formatBase64 = extractJSONString(op.payload, "format");
-    if (!formatBase64.empty()) {
-        // New content-addressed format
-        auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
-        if (!maybeFormat.has_value()) {
-            return ApplyResult::INVALID_PAYLOAD;
-        }
-        if (maybeFormat->isEmpty()) {
-            // Empty format clears
-            workbook.clearEntityFormat(axis->id);
-            axis->setHasFormat(false);
-        } else {
-            workbook.setEntityFormat(axis->id, *maybeFormat);
-            axis->setHasFormat(true);
-        }
-        return ApplyResult::SUCCESS;
-    }
-
-    // Check for empty format field (explicit clear)
-    if (op.payload.find("\"format\":") != std::string::npos) {
-        // "format" key present but empty - clear format
-        workbook.clearEntityFormat(axis->id);
-        axis->setHasFormat(false);
-        return ApplyResult::SUCCESS;
-    }
-
-    return ApplyResult::INVALID_PAYLOAD;
-}
-
-ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-    const Sheet* targetSheet = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
-
-    if (axis == nullptr || targetSheet == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer move operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::COL_MOVE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const int targetPos = extractJSONInt(op.payload, "targetPos", -1);
-    if (targetPos < 0) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const uint32_t currentPos = axis->position;
-    auto newPos = static_cast<uint32_t>(targetPos);
-
-    if (newPos == currentPos || newPos == currentPos + 1) {
-        return ApplyResult::SUCCESS;
-    }
-
-    if (newPos > currentPos) {
-        newPos = newPos - 1;
-    }
-
-    // Update other columns' positions
-    for (const ID& colId : targetSheet->getColumnIds()) {
-        if (colId == op.target_id) {
-            continue;
-        }
-        Axis* ax = workbook.getColumn(colId);
-        if (!ax) {
-            continue;
-        }
-        if (currentPos < newPos) {
-            if (ax->position > currentPos && ax->position <= newPos) {
-                ax->position--;
-            }
-        } else {
-            if (ax->position >= newPos && ax->position < currentPos) {
-                ax->position++;
-            }
-        }
-    }
-
-    axis->position = newPos;
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyRowMove(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-    const Sheet* targetSheet = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        axis = s->getRow(op.target_id);
-        if (axis != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
-
-    if (axis == nullptr || targetSheet == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer move operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::ROW_MOVE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const int targetPos = extractJSONInt(op.payload, "targetPos", -1);
-    if (targetPos < 0) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const uint32_t currentPos = axis->position;
-    auto newPos = static_cast<uint32_t>(targetPos);
-
-    if (newPos == currentPos || newPos == currentPos + 1) {
-        return ApplyResult::SUCCESS;
-    }
-
-    if (newPos > currentPos) {
-        newPos = newPos - 1;
-    }
-
-    // Update other rows' positions
-    for (const ID& rowId : targetSheet->getRowIds()) {
-        if (rowId == op.target_id) {
-            continue;
-        }
-        Axis* ax = workbook.getRow(rowId);
-        if (!ax) {
-            continue;
-        }
-        if (currentPos < newPos) {
-            if (ax->position > currentPos && ax->position <= newPos) {
-                ax->position--;
-            }
-        } else {
-            if (ax->position >= newPos && ax->position < currentPos) {
-                ax->position++;
-            }
-        }
-    }
-
-    axis->position = newPos;
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyColRename(Workbook& workbook, const Operation& op) {
-    Axis* axis = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        axis = s->getColumn(op.target_id);
-        if (axis != nullptr) {
-            break;
-        }
-    }
-
-    if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer rename operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::COL_RENAME && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const std::string name = extractJSONString(op.payload, "name");
-    axis->name = name;
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op) {
-    if (op.target_id != workbook.id) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer rename operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::WORKBOOK_RENAME && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    const std::string name = extractJSONString(op.payload, "name");
-    if (name.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    workbook.name = name;
-
-    return ApplyResult::SUCCESS;
-}
-
-ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
+// =============================================================================
+// SHEET_SET - Create or update sheet
+// =============================================================================
+// Payload: {"name":"...","pos":N}
+
+ApplyResult applySheetSet(Workbook& workbook, const Operation& op) {
     Sheet* sheet = workbook.getSheet(op.target_id);
-    if (sheet == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
+    const bool creating = (sheet == nullptr);
 
-    // Check for newer rename operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::SHEET_RENAME && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
+    if (creating) {
+        std::string name = extractJSONString(op.payload, "name");
+        if (name.empty()) {
+            name = "Sheet";
         }
+        auto newSheet = std::make_unique<Sheet>(op.target_id, name);
+        workbook.addSheet(std::move(newSheet));
+        sheet = workbook.getSheet(op.target_id);
     }
 
+    // Check for newer operations
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc && !creating) {
+        return ApplyResult::SUPERSEDED;
+    }
+
+    // Update name if provided
     const std::string name = extractJSONString(op.payload, "name");
-    if (name.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
+    if (!name.empty()) {
+        sheet->name = name;
     }
-
-    sheet->name = name;
 
     return ApplyResult::SUCCESS;
 }
 
-ApplyResult applySheetCreate(Workbook& workbook, const Operation& op) {
-    // Check if sheet already exists (idempotent operation)
-    if (workbook.getSheet(op.target_id) != nullptr) {
-        return ApplyResult::ALREADY_APPLIED;
-    }
-
-    std::string name = extractJSONString(op.payload, "name");
-    if (name.empty()) {
-        name = "Sheet";  // Default name if not provided
-    }
-
-    auto sheet = std::make_unique<Sheet>(op.target_id, name);
-    workbook.addSheet(std::move(sheet));
-
-    return ApplyResult::SUCCESS;
-}
+// =============================================================================
+// SHEET_DELETE - Delete sheet
+// =============================================================================
 
 ApplyResult applySheetDelete(Workbook& workbook, const Operation& op) {
     const Sheet* sheet = workbook.getSheet(op.target_id);
     if (sheet == nullptr) {
-        // Sheet doesn't exist - already deleted or never existed
-        return ApplyResult::SUCCESS;
+        return ApplyResult::SUCCESS;  // Already deleted or never existed
     }
 
     // Check for newer operations that resurrect the sheet
     const OpLog* oplog = workbook.getOpLog();
     const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
-        if (latest.type == OpType::SHEET_RENAME || latest.type == OpType::SHEET_CREATE) {
+        if (latest.type == OpType::SHEET_SET) {
             return ApplyResult::RESURRECTED;
         }
     }
 
     workbook.removeSheet(op.target_id);
+    return ApplyResult::SUCCESS;
+}
+
+// =============================================================================
+// WORKBOOK_SET - Update workbook properties
+// =============================================================================
+// Payload: {"name":"..."}
+
+ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op) {
+    if (op.target_id != workbook.id) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::WORKBOOK_SET && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const std::string name = extractJSONString(op.payload, "name");
+    if (!name.empty()) {
+        workbook.name = name;
+    }
 
     return ApplyResult::SUCCESS;
 }
 
-ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op) {
-    // Extract named range properties from JSON payload
+// =============================================================================
+// NAMED_RANGE_SET - Create or update named range
+// =============================================================================
+
+ApplyResult applyNamedRangeSet(Workbook& workbook, const Operation& op) {
     const std::string name = extractJSONString(op.payload, "name");
     if (name.empty()) {
         return ApplyResult::INVALID_PAYLOAD;
@@ -782,23 +510,20 @@ ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op) {
         target.sheetId = ID(targetSheetIdStr);
     }
 
-    // Register the named range
     NamedRangeRegistry* registry = workbook.getNamedRanges();
     if (registry == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
 
     if (scopeStr == "W") {
-        // Workbook scope - overwrite if exists (idempotent)
-        registry->removeWorkbook(name);  // Remove if exists
+        registry->removeWorkbook(name);
         registry->defineWorkbook(name, target);
     } else if (scopeStr == "S") {
-        // Sheet scope
         if (scopeSheetIdStr.empty() || scopeSheetIdStr == "-") {
             return ApplyResult::INVALID_PAYLOAD;
         }
         const ID scopeSheetId(scopeSheetIdStr);
-        registry->removeSheet(name, scopeSheetId);  // Remove if exists
+        registry->removeSheet(name, scopeSheetId);
         registry->defineSheet(name, scopeSheetId, target);
     } else {
         return ApplyResult::INVALID_PAYLOAD;
@@ -807,8 +532,11 @@ ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// =============================================================================
+// NAMED_RANGE_DELETE - Delete named range
+// =============================================================================
+
 ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op) {
-    // Extract deletion key from JSON payload
     const std::string name = extractJSONString(op.payload, "name");
     if (name.empty()) {
         return ApplyResult::INVALID_PAYLOAD;

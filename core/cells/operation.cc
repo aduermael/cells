@@ -9,167 +9,80 @@ namespace cells {
 
 const char* opTypeToString(OpType type) {
     switch (type) {
-        case OpType::CELL_SET_VALUE:
-            return "CELL_SET_VALUE";
-        case OpType::CELL_CLEAR:
-            return "CELL_CLEAR";
-        case OpType::CELL_SET_STYLE:
-            return "CELL_SET_STYLE";
-        case OpType::CELL_SET_FORMAT:
-            return "CELL_SET_FORMAT";
-        // Column operations
-        case OpType::COL_INSERT:
-            return "COL_INSERT";
+        case OpType::CELL_SET:
+            return "CELL_SET";
+        case OpType::CELL_DELETE:
+            return "CELL_DELETE";
+        case OpType::COL_SET:
+            return "COL_SET";
         case OpType::COL_DELETE:
             return "COL_DELETE";
-        case OpType::COL_MOVE:
-            return "COL_MOVE";
-        case OpType::COL_RESIZE:
-            return "COL_RESIZE";
-        case OpType::COL_RENAME:
-            return "COL_RENAME";
-        // Row operations
-        case OpType::ROW_INSERT:
-            return "ROW_INSERT";
+        case OpType::ROW_SET:
+            return "ROW_SET";
         case OpType::ROW_DELETE:
             return "ROW_DELETE";
-        case OpType::ROW_MOVE:
-            return "ROW_MOVE";
-        case OpType::ROW_RESIZE:
-            return "ROW_RESIZE";
-        // Axis operations
-        case OpType::AXIS_SET_HIDDEN:
-            return "AXIS_SET_HIDDEN";
-        case OpType::AXIS_SET_STYLE:
-            return "AXIS_SET_STYLE";
-        case OpType::AXIS_SET_FORMAT:
-            return "AXIS_SET_FORMAT";
-        // Sheet operations
-        case OpType::SHEET_CREATE:
-            return "SHEET_CREATE";
+        case OpType::SHEET_SET:
+            return "SHEET_SET";
         case OpType::SHEET_DELETE:
             return "SHEET_DELETE";
-        case OpType::SHEET_RENAME:
-            return "SHEET_RENAME";
-        // Workbook operations
-        case OpType::WORKBOOK_RENAME:
-            return "WORKBOOK_RENAME";
-        // Named range operations
-        case OpType::NAMED_RANGE_DEFINE:
-            return "NAMED_RANGE_DEFINE";
+        case OpType::WORKBOOK_SET:
+            return "WORKBOOK_SET";
+        case OpType::NAMED_RANGE_SET:
+            return "NAMED_RANGE_SET";
         case OpType::NAMED_RANGE_DELETE:
             return "NAMED_RANGE_DELETE";
-        // Range operations
-        case OpType::RANGE_ADD:
-            return "RANGE_ADD";
-        case OpType::RANGE_REMOVE:
-            return "RANGE_REMOVE";
-        case OpType::RANGE_UPDATE_CORNERS:
-            return "RANGE_UPDATE_CORNERS";
-        case OpType::RANGE_UPDATE_FLAGS:
-            return "RANGE_UPDATE_FLAGS";
-        case OpType::RANGE_SET_STYLE:
-            return "RANGE_SET_STYLE";
-        case OpType::RANGE_SET_FORMAT:
-            return "RANGE_SET_FORMAT";
+        case OpType::RANGE_SET:
+            return "RANGE_SET";
+        case OpType::RANGE_DELETE:
+            return "RANGE_DELETE";
     }
-    return "CELL_SET_VALUE";
+    return "CELL_SET";
 }
 
 OpType stringToOpType(const std::string& str) {
-    if (str == "CELL_SET_VALUE") {
-        return OpType::CELL_SET_VALUE;
+    if (str == "CELL_SET") {
+        return OpType::CELL_SET;
     }
-    if (str == "CELL_CLEAR") {
-        return OpType::CELL_CLEAR;
+    if (str == "CELL_DELETE") {
+        return OpType::CELL_DELETE;
     }
-    if (str == "CELL_SET_STYLE") {
-        return OpType::CELL_SET_STYLE;
-    }
-    if (str == "CELL_SET_FORMAT") {
-        return OpType::CELL_SET_FORMAT;
-    }
-    if (str == "SHEET_CREATE") {
-        return OpType::SHEET_CREATE;
-    }
-    if (str == "SHEET_DELETE") {
-        return OpType::SHEET_DELETE;
-    }
-    if (str == "SHEET_RENAME") {
-        return OpType::SHEET_RENAME;
-    }
-    if (str == "WORKBOOK_RENAME") {
-        return OpType::WORKBOOK_RENAME;
-    }
-    // Named range operations
-    if (str == "NAMED_RANGE_DEFINE") {
-        return OpType::NAMED_RANGE_DEFINE;
-    }
-    if (str == "NAMED_RANGE_DELETE") {
-        return OpType::NAMED_RANGE_DELETE;
-    }
-    // Column operations
-    if (str == "COL_INSERT") {
-        return OpType::COL_INSERT;
+    if (str == "COL_SET") {
+        return OpType::COL_SET;
     }
     if (str == "COL_DELETE") {
         return OpType::COL_DELETE;
     }
-    if (str == "COL_MOVE") {
-        return OpType::COL_MOVE;
-    }
-    if (str == "COL_RESIZE") {
-        return OpType::COL_RESIZE;
-    }
-    if (str == "COL_RENAME") {
-        return OpType::COL_RENAME;
-    }
-    // Row operations
-    if (str == "ROW_INSERT") {
-        return OpType::ROW_INSERT;
+    if (str == "ROW_SET") {
+        return OpType::ROW_SET;
     }
     if (str == "ROW_DELETE") {
         return OpType::ROW_DELETE;
     }
-    if (str == "ROW_MOVE") {
-        return OpType::ROW_MOVE;
+    if (str == "SHEET_SET") {
+        return OpType::SHEET_SET;
     }
-    if (str == "ROW_RESIZE") {
-        return OpType::ROW_RESIZE;
+    if (str == "SHEET_DELETE") {
+        return OpType::SHEET_DELETE;
     }
-    // Axis operations
-    if (str == "AXIS_SET_HIDDEN") {
-        return OpType::AXIS_SET_HIDDEN;
+    if (str == "WORKBOOK_SET") {
+        return OpType::WORKBOOK_SET;
     }
-    if (str == "AXIS_SET_STYLE") {
-        return OpType::AXIS_SET_STYLE;
+    if (str == "NAMED_RANGE_SET") {
+        return OpType::NAMED_RANGE_SET;
     }
-    if (str == "AXIS_SET_FORMAT") {
-        return OpType::AXIS_SET_FORMAT;
+    if (str == "NAMED_RANGE_DELETE") {
+        return OpType::NAMED_RANGE_DELETE;
     }
-    // Range operations
-    if (str == "RANGE_ADD") {
-        return OpType::RANGE_ADD;
+    if (str == "RANGE_SET") {
+        return OpType::RANGE_SET;
     }
-    if (str == "RANGE_REMOVE") {
-        return OpType::RANGE_REMOVE;
+    if (str == "RANGE_DELETE") {
+        return OpType::RANGE_DELETE;
     }
-    if (str == "RANGE_UPDATE_CORNERS") {
-        return OpType::RANGE_UPDATE_CORNERS;
-    }
-    if (str == "RANGE_UPDATE_FLAGS") {
-        return OpType::RANGE_UPDATE_FLAGS;
-    }
-    if (str == "RANGE_SET_STYLE") {
-        return OpType::RANGE_SET_STYLE;
-    }
-    if (str == "RANGE_SET_FORMAT") {
-        return OpType::RANGE_SET_FORMAT;
-    }
-    return OpType::CELL_SET_VALUE;  // Default
+    return OpType::CELL_SET;  // Default
 }
 
-Operation::Operation() : hlc(), type(OpType::CELL_SET_VALUE), target_id(), sheetId(), payload() {}
+Operation::Operation() : hlc(), type(OpType::CELL_SET), target_id(), sheetId(), payload() {}
 
 Operation::Operation(const HLC& hlc, OpType type, const ID& target, std::string payload)
     : hlc(hlc), type(type), target_id(target), sheetId(), payload(std::move(payload)) {}

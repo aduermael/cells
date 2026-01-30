@@ -414,7 +414,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             const double num = lua_tonumber(L, 3);
             char buf[64];
             snprintf(buf, sizeof(buf), "%.15g", num);
-            payload = R"({"type":"n","value":")" + std::string(buf) + R"(","col":")" + colIdStr +
+            payload = R"({"t":"n","v":")" + std::string(buf) + R"(","col":")" + colIdStr +
                       R"(","row":")" + rowIdStr + R"("})";
         } else if (lua_isstring(L, 3) != 0) {
             const char* str = lua_tostring(L, 3);
@@ -427,8 +427,8 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                     RefConverter conv;
                     conv.setContext(*sheet);
                     const std::string uuidFormula = conv.formulaToUuid(str);
-                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
-                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                    payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
                 } else {
                     // CRDT-compliant resolution: discover and create entities first
                     FormulaResolver resolver(*workbook, *sheet);
@@ -442,7 +442,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                                                        std::to_string(pending.position) +
                                                        R"(,"size":100})";  // Default column width
                         const Operation colOp =
-                            makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                            makeColSetOp(*workbook, pending.id, pending.sheetId, colPayload);
                         applyOperation(*workbook, colOp);
                     }
 
@@ -452,17 +452,17 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                                                        std::to_string(pending.position) +
                                                        R"(,"size":21})";  // Default row height
                         const Operation rowOp =
-                            makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                            makeRowSetOp(*workbook, pending.id, pending.sheetId, rowPayload);
                         applyOperation(*workbook, rowOp);
                     }
 
                     // Create required cells via CRDT operations (empty cells for references)
                     for (const auto& pending : required.cells) {
-                        const std::string cellPayload =
-                            R"({"type":"s","value":"","col_id":")" + pending.colId.toString() +
-                            R"(","row_id":")" + pending.rowId.toString() + R"("})";
+                        const std::string cellPayload = R"({"t":"s","v":"","col":")" +
+                                                        pending.colId.toString() + R"(","row":")" +
+                                                        pending.rowId.toString() + R"("})";
                         const Operation cellOp =
-                            makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                            makeCellSetOp(*workbook, pending.id, pending.sheetId, cellPayload);
                         applyOperation(*workbook, cellOp);
                     }
 
@@ -473,15 +473,13 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                         RefConverter conv;
                         conv.setContext(*sheet);
                         const std::string uuidFormula = conv.formulaToUuid(str);
-                        payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
-                                  R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr +
-                                  R"("})";
+                        payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
                     } else {
                         // Serialize the resolved AST to UUID format
                         const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                        payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
-                                  R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr +
-                                  R"("})";
+                        payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
+                                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
 
                         // Add dependencies to the dependency graph
                         DependencyGraph* depGraph = sheet->getDependencyGraph();
@@ -517,13 +515,13 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                 }
             } else {
                 // Literal string
-                payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
+                payload = R"({"t":"s","v":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
                           R"(","row":")" + rowIdStr + R"("})";
             }
         } else if (lua_isboolean(L, 3) != 0) {
             const bool val = lua_toboolean(L, 3) != 0;
-            payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +
-                      R"(","col":")" + colIdStr + R"(","row":")" + rowIdStr + R"("})";
+            payload = R"({"t":"b","v":")" + std::string(val ? "true" : "false") + R"(","col":")" +
+                      colIdStr + R"(","row":")" + rowIdStr + R"("})";
         } else if (lua_isnil(L, 3) != 0) {
             // Clear the cell - remove from dependency graph first
             DependencyGraph* depGraph = sheet->getDependencyGraph();
@@ -532,7 +530,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                 depGraph->unmarkVolatile(cell->id);
             }
 
-            const Operation op = makeCellClearOp(*workbook, cell->id);
+            const Operation op = makeCellDeleteOp(*workbook, cell->id);
             applyOperation(*workbook, op);
 
             // Trigger recalculation for dependents
@@ -546,7 +544,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         }
 
         // Apply the operation via CRDT
-        const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+        const Operation op = makeCellSetOp(*workbook, cell->id, payload);
         applyOperation(*workbook, op);
 
         // Trigger recalculation: mark dependents dirty and recalculate
@@ -615,9 +613,16 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         }
         // nil clears format (empty base64)
 
-        const std::string payload = R"({"format":")" + formatBase64 + R"("})";
-        const Operation op = makeCellSetFormatOp(*workbook, cell->id, payload);
-        applyOperation(*workbook, op);
+        if (formatBase64.empty()) {
+            const Operation op = makeCellClearFormatOp(*workbook, cell->id);
+            applyOperation(*workbook, op);
+        } else {
+            auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
+            if (maybeFormat.has_value()) {
+                const Operation op = makeCellSetFormatOp(*workbook, cell->id, *maybeFormat);
+                applyOperation(*workbook, op);
+            }
+        }
         return 0;
     }
 
@@ -646,8 +651,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
         // Handle nil - clear style
         if (lua_isnil(L, 3) != 0) {
-            const std::string clearPayload = R"({"style":""})";
-            const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
+            const Operation op = makeCellClearStyleOp(*workbook, cell->id);
             applyOperation(*workbook, op);
             return 0;
         }
@@ -764,8 +768,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
         // If style is empty, clear it
         if (style.isEmpty()) {
-            const std::string clearPayload = R"({"style":""})";
-            const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
+            const Operation op = makeCellClearStyleOp(*workbook, cell->id);
             applyOperation(*workbook, op);
             return 0;
         }
@@ -991,7 +994,7 @@ int LuauSandbox::luaSheetNewIndex(lua_State* L) {
 
         // Apply rename operation
         const std::string payload = R"({"name":")" + jsonEscape(newName) + R"("})";
-        const Operation op = makeSheetRenameOp(*workbook, sheet->id, payload);
+        const Operation op = makeSheetSetOp(*workbook, sheet->id, payload);
         applyOperation(*workbook, op);
 
         return 0;

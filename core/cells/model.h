@@ -84,12 +84,12 @@ enum class CollabMode : std::uint8_t {
 // 1. File loading (initial state, no peers yet)
 // 2. Applying operations from peers (the operation itself handles the mutation)
 //
-// To create/modify entities, use the operation helpers in crdt.h:
-// - makeCellSetValueOp() - create or modify a cell
-// - makeDimInsertAxisOp() - create a column or row
-// - makeDimDeleteAxisOp() - delete a column or row
-// - makeDimSetAxisSizeOp() - resize a column or row
-// - makeDimMoveAxisOp() - move a column or row
+// To create/modify entities, use the unified operation helpers in crdt.h:
+// - makeCellSetOp() / makeCellDeleteOp() - create/modify/delete cells
+// - makeColSetOp() / makeColDeleteOp() - create/modify/delete columns
+// - makeRowSetOp() / makeRowDeleteOp() - create/modify/delete rows
+// - makeSheetSetOp() / makeSheetDeleteOp() - create/modify/delete sheets
+// - makeRangeSetOp() / makeRangeDeleteOp() - create/modify/delete ranges
 //
 // Then apply with applyOperation() to both mutate the model AND add to OpLog.
 // =============================================================================

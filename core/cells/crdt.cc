@@ -3,19 +3,20 @@
 // =============================================================================
 //
 // Central dispatcher for CRDT operations and operation creation helpers.
-// This file coordinates the split implementation across crdt_cell.cc and
-// crdt_axis.cc.
+// This file coordinates the split implementation across crdt_cell.cc,
+// crdt_axis.cc, and crdt_range.cc.
 //
 // Key responsibilities:
 // - applyOperation() dispatcher that routes to specific operation handlers
-// - Operation maker functions (makeCellSetValueOp, makeColInsertOp, etc.)
+// - Operation maker functions (makeCellSetOp, makeColSetOp, etc.)
 // - bootstrapOpLog() for generating OpLog from existing workbook state
 // - JSON utility functions used by all crdt_*.cc files
 //
 // Split structure:
 // - crdt.cc: Main entry, dispatch, operation makers, JSON utilities
-// - crdt_cell.cc: Cell operations (set value, set format, clear)
-// - crdt_axis.cc: Axis operations (column/row CRUD, sheet/workbook ops)
+// - crdt_cell.cc: Cell operations (CELL_SET, CELL_DELETE)
+// - crdt_axis.cc: Axis operations (COL_SET, COL_DELETE, ROW_SET, ROW_DELETE, etc.)
+// - crdt_range.cc: Range operations (RANGE_SET, RANGE_DELETE)
 //
 // =============================================================================
 
@@ -201,24 +202,30 @@ int extractJSONInt(const std::string& json, const std::string& key, int defaultV
     return negative ? -value : value;
 }
 
-std::string extractSizePayload(const std::string& payload) {
-    std::string size_str = extractJSONString(payload, "size");
-    if (size_str.empty()) {
-        // Try numeric format
-        size_t pos = payload.find("\"size\":");
-        if (pos != std::string::npos) {
-            pos += 7;  // Skip "size":
-            while (pos < payload.size() && (payload[pos] == ' ' || payload[pos] == '\t')) {
-                pos++;
-            }
-            size_t end = pos;
-            while (end < payload.size() && payload[end] >= '0' && payload[end] <= '9') {
-                end++;
-            }
-            size_str = payload.substr(pos, end - pos);
-        }
+bool extractJSONBool(const std::string& json, const std::string& key, bool defaultValue) {
+    const std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
     }
-    return size_str;
+    pos += searchKey.length();
+
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+
+    if (json.compare(pos, 4, "true") == 0) {
+        return true;
+    }
+    if (json.compare(pos, 5, "false") == 0) {
+        return false;
+    }
+    return defaultValue;
 }
 
 }  // namespace internal
@@ -238,120 +245,57 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
     ApplyResult result = ApplyResult::SUCCESS;
 
     switch (op.type) {
-        case OpType::CELL_SET_VALUE:
-            result = internal::applyCellSetValue(workbook, op);
+        // Cell operations
+        case OpType::CELL_SET:
+            result = internal::applyCellSet(workbook, op);
             break;
-
-        case OpType::CELL_CLEAR:
-            result = internal::applyCellClear(workbook, op);
-            break;
-
-        case OpType::CELL_SET_STYLE:
-            result = internal::applyCellSetStyle(workbook, op);
-            break;
-
-        case OpType::CELL_SET_FORMAT:
-            result = internal::applyCellSetFormat(workbook, op);
+        case OpType::CELL_DELETE:
+            result = internal::applyCellDelete(workbook, op);
             break;
 
         // Column operations
-        case OpType::COL_INSERT:
-            result = internal::applyColInsert(workbook, op);
+        case OpType::COL_SET:
+            result = internal::applyColSet(workbook, op);
             break;
-
         case OpType::COL_DELETE:
             result = internal::applyColDelete(workbook, op);
             break;
 
-        case OpType::COL_MOVE:
-            result = internal::applyColMove(workbook, op);
-            break;
-
-        case OpType::COL_RESIZE:
-            result = internal::applyColResize(workbook, op);
-            break;
-
-        case OpType::COL_RENAME:
-            result = internal::applyColRename(workbook, op);
-            break;
-
         // Row operations
-        case OpType::ROW_INSERT:
-            result = internal::applyRowInsert(workbook, op);
+        case OpType::ROW_SET:
+            result = internal::applyRowSet(workbook, op);
             break;
-
         case OpType::ROW_DELETE:
             result = internal::applyRowDelete(workbook, op);
             break;
 
-        case OpType::ROW_MOVE:
-            result = internal::applyRowMove(workbook, op);
+        // Sheet operations
+        case OpType::SHEET_SET:
+            result = internal::applySheetSet(workbook, op);
             break;
-
-        case OpType::ROW_RESIZE:
-            result = internal::applyRowResize(workbook, op);
-            break;
-
-        // Axis operations
-        case OpType::AXIS_SET_HIDDEN:
-            result = internal::applyAxisSetHidden(workbook, op);
-            break;
-
-        case OpType::AXIS_SET_STYLE:
-            result = internal::applyAxisSetStyle(workbook, op);
-            break;
-
-        case OpType::AXIS_SET_FORMAT:
-            result = internal::applyAxisSetFormat(workbook, op);
-            break;
-
-        case OpType::SHEET_CREATE:
-            result = internal::applySheetCreate(workbook, op);
-            break;
-
         case OpType::SHEET_DELETE:
             result = internal::applySheetDelete(workbook, op);
             break;
 
-        case OpType::SHEET_RENAME:
-            result = internal::applySheetRename(workbook, op);
+        // Workbook operations
+        case OpType::WORKBOOK_SET:
+            result = internal::applyWorkbookSet(workbook, op);
             break;
 
-        case OpType::WORKBOOK_RENAME:
-            result = internal::applyWorkbookRename(workbook, op);
+        // Named range operations
+        case OpType::NAMED_RANGE_SET:
+            result = internal::applyNamedRangeSet(workbook, op);
             break;
-
-        case OpType::NAMED_RANGE_DEFINE:
-            result = internal::applyNamedRangeDefine(workbook, op);
-            break;
-
         case OpType::NAMED_RANGE_DELETE:
             result = internal::applyNamedRangeDelete(workbook, op);
             break;
 
-        // Range operations (unified range system)
-        case OpType::RANGE_ADD:
-            result = internal::applyRangeAdd(workbook, op);
+        // Range operations
+        case OpType::RANGE_SET:
+            result = internal::applyRangeSet(workbook, op);
             break;
-
-        case OpType::RANGE_REMOVE:
-            result = internal::applyRangeRemove(workbook, op);
-            break;
-
-        case OpType::RANGE_UPDATE_CORNERS:
-            result = internal::applyRangeUpdateCorners(workbook, op);
-            break;
-
-        case OpType::RANGE_UPDATE_FLAGS:
-            result = internal::applyRangeUpdateFlags(workbook, op);
-            break;
-
-        case OpType::RANGE_SET_STYLE:
-            result = internal::applyRangeSetStyle(workbook, op);
-            break;
-
-        case OpType::RANGE_SET_FORMAT:
-            result = internal::applyRangeSetFormat(workbook, op);
+        case OpType::RANGE_DELETE:
+            result = internal::applyRangeDelete(workbook, op);
             break;
     }
 
@@ -361,10 +305,8 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         oplog->addOperation(op);
 
         // Periodic pruning for non-collaboration mode
-        // When not collaborating, oplog is only needed for undo/export, so prune periodically
         constexpr size_t PRUNE_THRESHOLD = 100;
         if (!workbook.isCollaborating() && oplog->size() >= PRUNE_THRESHOLD) {
-            // Prune all ops - no peers to sync with
             oplog->clear();
         }
     }
@@ -400,142 +342,57 @@ bool isSuperseded(const Workbook& workbook, const Operation& op) {
 // Operation Makers
 // =============================================================================
 
-Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+Operation makeCellSetOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_VALUE, cellId, payload};
+    return {hlc, OpType::CELL_SET, cellId, payload};
 }
 
-Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
-                             const std::string& payload) {
+Operation makeCellSetOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
+                        const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_VALUE, cellId, sheetId, payload};
+    return {hlc, OpType::CELL_SET, cellId, sheetId, payload};
 }
 
-Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
+Operation makeCellDeleteOp(Workbook& workbook, const ID& cellId) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_CLEAR, cellId, "{}"};
+    return {hlc, OpType::CELL_DELETE, cellId, "{}"};
 }
 
-Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+Operation makeColSetOp(Workbook& workbook, const ID& colId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
+    return {hlc, OpType::COL_SET, colId, payload};
 }
 
-Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format) {
+Operation makeColSetOp(Workbook& workbook, const ID& colId, const ID& sheetId,
+                       const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
-    return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
+    return {hlc, OpType::COL_SET, colId, sheetId, payload};
 }
 
-Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId) {
+Operation makeColDeleteOp(Workbook& workbook, const ID& colId) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_FORMAT, cellId, "{\"format\":\"\"}"};
+    return {hlc, OpType::COL_DELETE, colId, "{}"};
 }
 
-Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+Operation makeRowSetOp(Workbook& workbook, const ID& rowId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_STYLE, cellId, payload};
+    return {hlc, OpType::ROW_SET, rowId, payload};
 }
 
-Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style) {
+Operation makeRowSetOp(Workbook& workbook, const ID& rowId, const ID& sheetId,
+                       const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
-    return {hlc, OpType::CELL_SET_STYLE, cellId, payload};
+    return {hlc, OpType::ROW_SET, rowId, sheetId, payload};
 }
 
-Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId) {
+Operation makeRowDeleteOp(Workbook& workbook, const ID& rowId) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::CELL_SET_STYLE, cellId, "{\"style\":\"\"}"};
+    return {hlc, OpType::ROW_DELETE, rowId, "{}"};
 }
 
-// COL_*/ROW_* operation makers
-Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+Operation makeSheetSetOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_INSERT, axisId, payload};
-}
-
-Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
-                          const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_INSERT, axisId, sheetId, payload};
-}
-
-Operation makeColDeleteOp(Workbook& workbook, const ID& axisId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_DELETE, axisId, "{}"};
-}
-
-Operation makeColResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_RESIZE, axisId, payload};
-}
-
-Operation makeColMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_MOVE, axisId, payload};
-}
-
-Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::COL_RENAME, axisId, payload};
-}
-
-Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::ROW_INSERT, axisId, payload};
-}
-
-Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
-                          const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::ROW_INSERT, axisId, sheetId, payload};
-}
-
-Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::ROW_DELETE, axisId, "{}"};
-}
-
-Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::ROW_RESIZE, axisId, payload};
-}
-
-Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::ROW_MOVE, axisId, payload};
-}
-
-Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::AXIS_SET_HIDDEN, axisId, hidden ? "1" : "0"};
-}
-
-Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style) {
-    const HLC hlc = workbook.getCurrentHLC();
-    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
-    return {hlc, OpType::AXIS_SET_STYLE, axisId, payload};
-}
-
-Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::AXIS_SET_STYLE, axisId, "{\"style\":\"\"}"};
-}
-
-Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format) {
-    const HLC hlc = workbook.getCurrentHLC();
-    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
-    return {hlc, OpType::AXIS_SET_FORMAT, axisId, payload};
-}
-
-Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::AXIS_SET_FORMAT, axisId, "{\"format\":\"\"}"};
-}
-
-Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::SHEET_CREATE, sheetId, payload};
+    return {hlc, OpType::SHEET_SET, sheetId, payload};
 }
 
 Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId) {
@@ -543,86 +400,104 @@ Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId) {
     return {hlc, OpType::SHEET_DELETE, sheetId, "{}"};
 }
 
-Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
+Operation makeWorkbookSetOp(Workbook& workbook, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::SHEET_RENAME, sheetId, payload};
+    return {hlc, OpType::WORKBOOK_SET, workbook.id, payload};
 }
 
-Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload) {
+Operation makeNamedRangeSetOp(Workbook& workbook, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::WORKBOOK_RENAME, workbook.id, payload};
-}
-
-Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    // Use workbook ID as target since named ranges are workbook-level entities
-    return {hlc, OpType::NAMED_RANGE_DEFINE, workbook.id, payload};
+    return {hlc, OpType::NAMED_RANGE_SET, workbook.id, payload};
 }
 
 Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
-    // Use workbook ID as target since named ranges are workbook-level entities
     return {hlc, OpType::NAMED_RANGE_DELETE, workbook.id, payload};
 }
 
+Operation makeRangeSetOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_SET, rangeId, payload};
+}
+
+Operation makeRangeDeleteOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_DELETE, rangeId, payload};
+}
+
 // =============================================================================
-// Range Operations (Unified Range System)
+// Convenience Functions for Style/Format Operations
 // =============================================================================
 
-Operation makeRangeAddOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_ADD, rangeId, payload};
+Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style) {
+    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    return makeCellSetOp(workbook, cellId, payload);
 }
 
-Operation makeRangeRemoveOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_REMOVE, rangeId, payload};
+Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId) {
+    return makeCellSetOp(workbook, cellId, "{\"sty\":\"\"}");
 }
 
-Operation makeRangeUpdateCornersOp(Workbook& workbook, const ID& rangeId,
-                                   const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_UPDATE_CORNERS, rangeId, payload};
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format) {
+    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    return makeCellSetOp(workbook, cellId, payload);
 }
 
-Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId,
-                                 const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_UPDATE_FLAGS, rangeId, payload};
+Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId) {
+    return makeCellSetOp(workbook, cellId, "{\"fmt\":\"\"}");
 }
 
-Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
+Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style) {
+    // Determine if this is a column or row based on workbook storage
+    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    if (workbook.getColumn(axisId) != nullptr) {
+        return makeColSetOp(workbook, axisId, payload);
+    }
+    return makeRowSetOp(workbook, axisId, payload);
+}
+
+Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
+    if (workbook.getColumn(axisId) != nullptr) {
+        return makeColSetOp(workbook, axisId, "{\"sty\":\"\"}");
+    }
+    return makeRowSetOp(workbook, axisId, "{\"sty\":\"\"}");
+}
+
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format) {
+    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    if (workbook.getColumn(axisId) != nullptr) {
+        return makeColSetOp(workbook, axisId, payload);
+    }
+    return makeRowSetOp(workbook, axisId, payload);
+}
+
+Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId) {
+    if (workbook.getColumn(axisId) != nullptr) {
+        return makeColSetOp(workbook, axisId, "{\"fmt\":\"\"}");
+    }
+    return makeRowSetOp(workbook, axisId, "{\"fmt\":\"\"}");
+}
+
+Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden) {
+    const std::string payload = hidden ? "{\"hidden\":true}" : "{\"hidden\":false}";
+    if (workbook.getColumn(axisId) != nullptr) {
+        return makeColSetOp(workbook, axisId, payload);
+    }
+    return makeRowSetOp(workbook, axisId, payload);
 }
 
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style) {
-    const HLC hlc = workbook.getCurrentHLC();
-    // New format: {"style":"<base64>"}
-    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
-    return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
+    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    return makeRangeSetOp(workbook, rangeId, payload);
 }
 
 Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    // Clear format: {"style":""}
-    return {hlc, OpType::RANGE_SET_STYLE, rangeId, "{\"style\":\"\"}"};
-}
-
-Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, payload};
+    return makeRangeSetOp(workbook, rangeId, "{\"sty\":\"\"}");
 }
 
 Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const FormatBuffer& format) {
-    const HLC hlc = workbook.getCurrentHLC();
-    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
-    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, payload};
-}
-
-Operation makeRangeClearFormatOp(Workbook& workbook, const ID& rangeId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, "{\"format\":\"\"}"};
+    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    return makeRangeSetOp(workbook, rangeId, payload);
 }
 
 // =============================================================================
@@ -649,11 +524,30 @@ size_t bootstrapOpLog(Workbook& workbook) {
         std::sort(columns.begin(), columns.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });
 
-        // Generate COL_INSERT operations for columns (in position order)
+        // Generate COL_SET operations for columns (in position order)
         for (const auto& [pos, axis] : columns) {
-            const std::string payload =
-                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size) + "}";
-            const Operation op = makeColInsertOp(workbook, axis->id, payload);
+            std::string payload =
+                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size);
+            if (!axis->name.empty()) {
+                payload += ",\"name\":\"" + internal::jsonEscape(axis->name) + "\"";
+            }
+            if (axis->hasStyle()) {
+                const StyleBuffer* sty = workbook.getEntityStyle(axis->id);
+                if (sty) {
+                    payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+                }
+            }
+            if (axis->hasFormat()) {
+                const FormatBuffer* fmt = workbook.getEntityFormat(axis->id);
+                if (fmt) {
+                    payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+                }
+            }
+            if (axis->hidden()) {
+                payload += ",\"hidden\":true";
+            }
+            payload += "}";
+            const Operation op = makeColSetOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -669,16 +563,32 @@ size_t bootstrapOpLog(Workbook& workbook) {
         std::sort(rows.begin(), rows.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });
 
-        // Generate ROW_INSERT operations for rows (in position order)
+        // Generate ROW_SET operations for rows (in position order)
         for (const auto& [pos, axis] : rows) {
-            const std::string payload =
-                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size) + "}";
-            const Operation op = makeRowInsertOp(workbook, axis->id, payload);
+            std::string payload =
+                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size);
+            if (axis->hasStyle()) {
+                const StyleBuffer* sty = workbook.getEntityStyle(axis->id);
+                if (sty) {
+                    payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+                }
+            }
+            if (axis->hasFormat()) {
+                const FormatBuffer* fmt = workbook.getEntityFormat(axis->id);
+                if (fmt) {
+                    payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+                }
+            }
+            if (axis->hidden()) {
+                payload += ",\"hidden\":true";
+            }
+            payload += "}";
+            const Operation op = makeRowSetOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }
 
-        // Generate CELL_SET_VALUE operations for all cells
+        // Generate CELL_SET operations for all cells
         for (const ID& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
             if (!cell) {
@@ -688,194 +598,75 @@ size_t bootstrapOpLog(Workbook& workbook) {
             // Skip empty cells UNLESS they have a style (styled empty cells need to be synced)
             const bool isEmpty = cell->value.type == CellValueType::STRING &&
                                  cell->value.raw.empty() && cell->formula == nullptr;
-            if (isEmpty && !cell->hasStyle()) {
+            if (isEmpty && !cell->hasStyle() && !cell->hasFormat()) {
                 continue;
             }
 
-            // Build payload based on cell type
-            const std::string colIdStr = cell->colId.toString();
-            const std::string rowIdStr = cell->rowId.toString();
-            std::string idSuffix;
-            idSuffix.reserve(40);
-            idSuffix += ",\"col_id\":\"";
-            idSuffix += colIdStr;
-            idSuffix += "\",\"row_id\":\"";
-            idSuffix += rowIdStr;
-            idSuffix += "\"}";
+            // Build payload
+            std::string payload = "{\"col\":\"" + cell->colId.toString() + "\"";
+            payload += ",\"row\":\"" + cell->rowId.toString() + "\"";
 
-            std::string payload;
             if (cell->isFormula()) {
                 const Formula* formula = cell->getFormula();
                 if (formula != nullptr && formula->ast != nullptr) {
-                    // Generate UUID formula text from AST
                     const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-                    payload = "{\"type\":\"f\",\"value\":\"" + internal::jsonEscape(uuidFormula) +
-                              "\"" + idSuffix;
+                    payload += ",\"t\":\"f\",\"v\":\"" + internal::jsonEscape(uuidFormula) + "\"";
                 } else {
                     continue;  // Skip cells with invalid formulas
                 }
-            } else {
+            } else if (!isEmpty) {
                 const char typeChar = valueTypeToChar(cell->value.type);
-                payload = "{\"type\":\"" + std::string(1, typeChar) + "\",\"value\":\"" +
-                          internal::jsonEscape(cell->value.raw) + "\"" + idSuffix;
+                payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+                payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
             }
 
-            const Operation op = makeCellSetValueOp(workbook, cell->id, payload);
+            if (cell->hasStyle()) {
+                const StyleBuffer* sty = workbook.getEntityStyle(cell->id);
+                if (sty) {
+                    payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+                }
+            }
+            if (cell->hasFormat()) {
+                const FormatBuffer* fmt = workbook.getEntityFormat(cell->id);
+                if (fmt) {
+                    payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+                }
+            }
+
+            payload += "}";
+            const Operation op = makeCellSetOp(workbook, cell->id, payload);
             oplog->addOperation(op);
             count++;
         }
-    }
 
-    // Note: FORMAT_DEFINE operations are no longer needed - formats are content-addressed
-    // and embedded directly in CELL_SET_FORMAT, AXIS_SET_FORMAT, RANGE_SET_FORMAT operations
-
-    // Generate RANGE_ADD operations for all ranges (merge ranges, style ranges, etc.)
-    // This must come AFTER column/row INSERT operations so the axis IDs exist
-    for (const auto& sheet : workbook.sheets) {
+        // Generate RANGE_SET operations for all ranges
         for (const ID& rangeId : sheet->getRangeIds()) {
             const Range* range = workbook.getRange(rangeId);
             if (!range) {
                 continue;
             }
 
-            // Build RANGE_ADD payload (no sheet_id needed - derived from startColId)
-            std::string payload = "{";
-            payload += "\"start_col_id\":\"" + range->startColId.toString() + "\"";
-            payload += ",\"start_row_id\":\"" + range->startRowId.toString() + "\"";
-            payload += ",\"end_col_id\":\"" + range->endColId.toString() + "\"";
-            payload += ",\"end_row_id\":\"" + range->endRowId.toString() + "\"";
+            std::string payload = "{\"startCol\":\"" + range->startColId.toString() + "\"";
+            payload += ",\"startRow\":\"" + range->startRowId.toString() + "\"";
+            payload += ",\"endCol\":\"" + range->endColId.toString() + "\"";
+            payload += ",\"endRow\":\"" + range->endRowId.toString() + "\"";
             payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
-            payload += "}";
 
-            const Operation rangeOp = makeRangeAddOp(workbook, range->id, payload);
-            oplog->addOperation(rangeOp);
-            count++;
-
-            // If this range has a style, generate RANGE_SET_STYLE operation
             if (range->style.has_value()) {
-                const Operation styleOp =
-                    makeRangeSetStyleOp(workbook, range->id, range->style.value());
-                oplog->addOperation(styleOp);
-                count++;
+                payload += ",\"sty\":\"" + range->style->toBase64() + "\"";
             }
-        }
-    }
-
-    // Generate CELL_SET_STYLE operations for cells that have styles
-    for (const auto& sheet : workbook.sheets) {
-        for (const ID& cellId : sheet->getCellIds()) {
-            const Cell* cell = workbook.getCell(cellId);
-            if (!cell || !cell->hasStyle()) {
-                continue;
+            if (range->format.has_value()) {
+                payload += ",\"fmt\":\"" + range->format->toBase64() + "\"";
             }
 
-            const StyleBuffer* entityStyle = workbook.getEntityStyle(cellId);
-            if (entityStyle != nullptr) {
-                const Operation op = makeCellSetStyleOp(workbook, cellId, *entityStyle);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-    }
-
-    // Generate AXIS_SET_STYLE operations for columns and rows that have styles
-    for (const auto& sheet : workbook.sheets) {
-        // Column styles
-        for (const ID& colId : sheet->getColumnIds()) {
-            const Axis* axis = workbook.getColumn(colId);
-            if (!axis || !axis->hasStyle()) {
-                continue;
-            }
-
-            const StyleBuffer* entityStyle = workbook.getEntityStyle(colId);
-            if (entityStyle != nullptr) {
-                const Operation op = makeAxisSetStyleOp(workbook, colId, *entityStyle);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-
-        // Row styles
-        for (const ID& rowId : sheet->getRowIds()) {
-            const Axis* axis = workbook.getRow(rowId);
-            if (!axis || !axis->hasStyle()) {
-                continue;
-            }
-
-            const StyleBuffer* entityStyle = workbook.getEntityStyle(rowId);
-            if (entityStyle != nullptr) {
-                const Operation op = makeAxisSetStyleOp(workbook, rowId, *entityStyle);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-    }
-
-    // Generate CELL_SET_FORMAT operations for cells that have formats
-    for (const auto& sheet : workbook.sheets) {
-        for (const ID& cellId : sheet->getCellIds()) {
-            const Cell* cell = workbook.getCell(cellId);
-            if (!cell || !cell->hasFormat()) {
-                continue;
-            }
-
-            const FormatBuffer* entityFormat = workbook.getEntityFormat(cellId);
-            if (entityFormat != nullptr) {
-                const Operation op = makeCellSetFormatOp(workbook, cellId, *entityFormat);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-    }
-
-    // Generate AXIS_SET_FORMAT operations for columns and rows that have formats
-    for (const auto& sheet : workbook.sheets) {
-        // Column formats
-        for (const ID& colId : sheet->getColumnIds()) {
-            const Axis* axis = workbook.getColumn(colId);
-            if (!axis || !axis->hasFormat()) {
-                continue;
-            }
-
-            const FormatBuffer* entityFormat = workbook.getEntityFormat(colId);
-            if (entityFormat != nullptr) {
-                const Operation op = makeAxisSetFormatOp(workbook, colId, *entityFormat);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-
-        // Row formats
-        for (const ID& rowId : sheet->getRowIds()) {
-            const Axis* axis = workbook.getRow(rowId);
-            if (!axis || !axis->hasFormat()) {
-                continue;
-            }
-
-            const FormatBuffer* entityFormat = workbook.getEntityFormat(rowId);
-            if (entityFormat != nullptr) {
-                const Operation op = makeAxisSetFormatOp(workbook, rowId, *entityFormat);
-                oplog->addOperation(op);
-                count++;
-            }
-        }
-    }
-
-    // Generate RANGE_SET_FORMAT operations for ranges that have formats
-    for (const auto& sheet : workbook.sheets) {
-        for (const ID& rangeId : sheet->getRangeIds()) {
-            const Range* range = workbook.getRange(rangeId);
-            if (!range || !range->format.has_value()) {
-                continue;
-            }
-
-            const Operation op = makeRangeSetFormatOp(workbook, rangeId, range->format.value());
+            payload += "}";
+            const Operation op = makeRangeSetOp(workbook, range->id, payload);
             oplog->addOperation(op);
             count++;
         }
     }
 
-    // Generate NAMED_RANGE_DEFINE operations for all named ranges
+    // Generate NAMED_RANGE_SET operations for all named ranges
     const NamedRangeRegistry* registry = workbook.getNamedRanges();
     if (registry != nullptr) {
         for (const NamedRange* nr : registry->getAll()) {
@@ -920,7 +711,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
                        (target.sheetId.isNull() ? "-" : target.sheetId.toString()) + "\"";
             payload += "}";
 
-            const Operation op = makeNamedRangeDefineOp(workbook, payload);
+            const Operation op = makeNamedRangeSetOp(workbook, payload);
             oplog->addOperation(op);
             count++;
         }

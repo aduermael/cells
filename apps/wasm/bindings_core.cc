@@ -328,7 +328,7 @@ std::string CellsEngine::addSheet(const std::string& name) {
     size_t newIndex = _workbook->sheetCount();
 
     std::string payload = "{\"name\":\"" + jsonEscape(sheetName) + "\"}";
-    Operation op = makeSheetCreateOp(*_workbook, sheetId, payload);
+    Operation op = makeSheetSetOp(*_workbook, sheetId, payload);
     applyOperation(*_workbook, op);
 
     broadcastPendingOperations();
@@ -403,7 +403,7 @@ std::string CellsEngine::renameSheet(int index, const std::string& name) {
     ID sheetId = sheet->id;
 
     std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-    Operation op = makeSheetRenameOp(*_workbook, sheetId, payload);
+    Operation op = makeSheetSetOp(*_workbook, sheetId, payload);
     applyOperation(*_workbook, op);
 
     broadcastPendingOperations();
@@ -516,7 +516,7 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
         payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
     }
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+    Operation op = makeCellSetOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
     broadcastPendingOperations();
@@ -573,7 +573,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
             for (const auto& pending : required.columns) {
                 std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
                                          ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation colOp = makeColInsertOp(*_workbook, pending.id, pending.sheetId, colPayload);
+                Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*_workbook, colOp);
             }
 
@@ -581,7 +581,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
             for (const auto& pending : required.rows) {
                 std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
                                          ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation rowOp = makeRowInsertOp(*_workbook, pending.id, pending.sheetId, rowPayload);
+                Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*_workbook, rowOp);
             }
 
@@ -590,7 +590,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
                 std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
                                           pending.colId.toString() + "\",\"row_id\":\"" +
                                           pending.rowId.toString() + "\"}";
-                Operation cellOp = makeCellSetValueOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+                Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
             }
 
@@ -640,7 +640,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     // If so, the spill master will need to be recalculated after the update
     const ID spillMasterIdBeforeUpdate = sheet->getSpillMaster(cell->colId, cell->rowId);
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
+    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
     // Convert detected format ID to FormatBuffer
@@ -728,7 +728,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, sheet->id, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -743,7 +743,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, sheet->id, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -771,7 +771,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
             for (const auto& pending : required.columns) {
                 std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
                                          ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation colOp = makeColInsertOp(*_workbook, pending.id, pending.sheetId, colPayload);
+                Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*_workbook, colOp);
             }
 
@@ -779,7 +779,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
             for (const auto& pending : required.rows) {
                 std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
                                          ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation rowOp = makeRowInsertOp(*_workbook, pending.id, pending.sheetId, rowPayload);
+                Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*_workbook, rowOp);
             }
 
@@ -788,7 +788,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
                 std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
                                           pending.colId.toString() + "\",\"row_id\":\"" +
                                           pending.rowId.toString() + "\"}";
-                Operation cellOp = makeCellSetValueOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+                Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
             }
 
@@ -830,7 +830,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         payload = "{\"type\":\"s\",\"value\":\"\"" + idSuffix;
     }
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
+    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
 
@@ -886,7 +886,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, sheet->id, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -901,7 +901,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, sheet->id, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -952,7 +952,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
                           "\",\"row_id\":\"" + rowId.toString() + "\"}";
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
+    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
 
@@ -997,7 +997,7 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     const ID colId = cellToDelete->colId;
     const ID rowId = cellToDelete->rowId;
 
-    Operation op = makeCellClearOp(*_workbook, cellId);
+    Operation op = makeCellDeleteOp(*_workbook, cellId);
     applyOperation(*_workbook, op);
 
     broadcastPendingOperations();
@@ -1054,7 +1054,7 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
 
     Cell* cellToDelete = sheet->getCellAt(colId, rowId);
     if (cellToDelete) {
-        Operation op = makeCellClearOp(*_workbook, cellToDelete->id);
+        Operation op = makeCellDeleteOp(*_workbook, cellToDelete->id);
         applyOperation(*_workbook, op);
 
         broadcastPendingOperations();
@@ -1111,7 +1111,7 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
     if (width > 1000) width = 1000;
 
     std::string payload = "{\"size\":" + std::to_string(width) + "}";
-    Operation op = makeColResizeOp(*_workbook, colId, payload);
+    Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
 
@@ -1145,12 +1145,12 @@ std::string CellsEngine::resizeColumnByPos(uint32_t pos, uint32_t width) {
         colCreated = true;
         std::string insertPayload =
             "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(width) + "}";
-        Operation insertOp = makeColInsertOp(*_workbook, colId, insertPayload);
+        Operation insertOp = makeColSetOp(*_workbook, colId, insertPayload);
         applyOperation(*_workbook, insertOp);
         column = sheet->getColumn(colId);
     } else {
         std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
-        Operation resizeOp = makeColResizeOp(*_workbook, colId, resizePayload);
+        Operation resizeOp = makeColSetOp(*_workbook, colId, resizePayload);
         applyOperation(*_workbook, resizeOp);
     }
 
@@ -1191,7 +1191,7 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
     if (height > 500) height = 500;
 
     std::string payload = "{\"size\":" + std::to_string(height) + "}";
-    Operation op = makeRowResizeOp(*_workbook, rowId, payload);
+    Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
 
@@ -1225,12 +1225,12 @@ std::string CellsEngine::resizeRowByPos(uint32_t pos, uint32_t height) {
         rowCreated = true;
         std::string insertPayload =
             "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(height) + "}";
-        Operation insertOp = makeRowInsertOp(*_workbook, rowId, insertPayload);
+        Operation insertOp = makeRowSetOp(*_workbook, rowId, insertPayload);
         applyOperation(*_workbook, insertOp);
         row = sheet->getRow(rowId);
     } else {
         std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
-        Operation resizeOp = makeRowResizeOp(*_workbook, rowId, resizePayload);
+        Operation resizeOp = makeRowSetOp(*_workbook, rowId, resizePayload);
         applyOperation(*_workbook, resizeOp);
     }
 
@@ -1272,7 +1272,7 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     }
 
     std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-    Operation op = makeColRenameOp(*_workbook, colId, payload);
+    Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
 
@@ -1300,17 +1300,17 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         colId = generate_id();
         std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation insertOp = makeColInsertOp(*_workbook, colId, insertPayload);
+        Operation insertOp = makeColSetOp(*_workbook, colId, insertPayload);
         applyOperation(*_workbook, insertOp);
 
         std::string renamePayload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-        Operation renameOp = makeColRenameOp(*_workbook, colId, renamePayload);
+        Operation renameOp = makeColSetOp(*_workbook, colId, renamePayload);
         applyOperation(*_workbook, renameOp);
 
         column = sheet->getColumn(colId);
     } else {
         std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-        Operation op = makeColRenameOp(*_workbook, colId, payload);
+        Operation op = makeColSetOp(*_workbook, colId, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1424,7 +1424,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     }
 
     std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
-    Operation op = makeColMoveOp(*_workbook, colId, payload);
+    Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
 
@@ -1461,7 +1461,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     }
 
     std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
-    Operation op = makeRowMoveOp(*_workbook, rowId, payload);
+    Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
 
@@ -1661,7 +1661,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         startColId = generate_id();
         std::string colPayload = "{\"pos\":" + std::to_string(minCol) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, startColId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, startColId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -1675,7 +1675,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         startRowId = generate_id();
         std::string rowPayload = "{\"pos\":" + std::to_string(minRow) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, startRowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, startRowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -1689,7 +1689,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         endColId = generate_id();
         std::string colPayload = "{\"pos\":" + std::to_string(maxCol) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, endColId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, endColId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -1703,7 +1703,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         endRowId = generate_id();
         std::string rowPayload = "{\"pos\":" + std::to_string(maxRow) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, endRowId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, endRowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -1714,7 +1714,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
             ID newColId = generate_id();
             std::string colPayload = "{\"pos\":" + std::to_string(c) +
                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-            Operation colOp = makeColInsertOp(*_workbook, newColId, colPayload);
+            Operation colOp = makeColSetOp(*_workbook, newColId, colPayload);
             applyOperation(*_workbook, colOp);
         }
     }
@@ -1726,7 +1726,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
             ID newRowId = generate_id();
             std::string rowPayload = "{\"pos\":" + std::to_string(r) +
                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-            Operation rowOp = makeRowInsertOp(*_workbook, newRowId, rowPayload);
+            Operation rowOp = makeRowSetOp(*_workbook, newRowId, rowPayload);
             applyOperation(*_workbook, rowOp);
         }
     }
@@ -1740,7 +1740,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     payload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
     payload << "\"flags\":" << static_cast<int>(RangeFlags::MERGE) << "}";
 
-    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, payload.str());
+    Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, payload.str());
     applyOperation(*_workbook, rangeOp);
 
     rebuildViewportIndex();
@@ -1794,7 +1794,7 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
     std::ostringstream payload;
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
-    Operation removeOp = makeRangeRemoveOp(*_workbook, mergeRange->id, payload.str());
+    Operation removeOp = makeRangeDeleteOp(*_workbook, mergeRange->id, payload.str());
     applyOperation(*_workbook, removeOp);
 
     rebuildViewportIndex();
@@ -1820,7 +1820,7 @@ void CellsEngine::setWorkbookName(const std::string& name) {
 
     std::ostringstream payload;
     payload << "{\"name\":\"" << jsonEscape(name) << "\"}";
-    Operation op = makeWorkbookRenameOp(*_workbook, payload.str());
+    Operation op = makeWorkbookSetOp(*_workbook, payload.str());
     applyOperation(*_workbook, op);
 
     notifyListeners(ChangeType::STRUCTURE_CHANGED);

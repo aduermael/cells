@@ -11,15 +11,20 @@
 // - Provide serialization to/from string (file format) and JSON (network)
 // - Support operation ordering via HLC timestamp comparison
 //
-// Operation categories:
-// - Cell: SET_VALUE, CLEAR, SET_STYLE, SET_FORMAT
-// - Column: INSERT, DELETE, MOVE, RESIZE, RENAME
-// - Row: INSERT, DELETE, MOVE, RESIZE (no rename)
-// - Sheet: CREATE, DELETE, RENAME
-// - Range: ADD, REMOVE, UPDATE_CORNERS, UPDATE_FLAGS, SET_STYLE, SET_FORMAT
-// - Axis: SET_HIDDEN, SET_STYLE, SET_FORMAT
+// Operation types follow the unified SET + DELETE pattern:
+// - SET creates entity if needed, updates only provided properties
+// - DELETE marks entity as deleted (can be resurrected by later SET)
 //
-// Serialization format: "wall.logical.node OP_TYPE target_id payload"
+// Categories:
+// - Cell: CELL_SET, CELL_DELETE
+// - Column: COL_SET, COL_DELETE
+// - Row: ROW_SET, ROW_DELETE
+// - Sheet: SHEET_SET, SHEET_DELETE
+// - Range: RANGE_SET, RANGE_DELETE
+// - Workbook: WORKBOOK_SET
+// - Named Range: NAMED_RANGE_SET, NAMED_RANGE_DELETE
+//
+// Serialization format: "wall.logical.node OP_TYPE target_id sheetId payload"
 // JSON format used for WebSocket/WebRTC transport
 //
 // Dependencies: hlc.h, types.h
@@ -40,59 +45,41 @@
 namespace cells {
 
 // Operation types for CRDT operations on the workbook.
-// Each operation modifies a specific entity (cell, axis, or sheet).
+// Uses unified SET + DELETE pattern for all entity types.
 enum class OpType : uint8_t {
     // Cell operations
-    CELL_SET_VALUE = 0,   // Set cell value (number, string, boolean, formula)
-    CELL_CLEAR = 1,       // Clear cell contents
-    CELL_SET_STYLE = 2,   // Set cell style properties
-    CELL_SET_FORMAT = 3,  // Set cell number format
+    CELL_SET = 0,     // Create/update cell (col, row, t, v, sty, fmt)
+    CELL_DELETE = 1,  // Delete/clear cell
 
     // Column operations
-    COL_INSERT = 10,  // Insert new column
+    COL_SET = 10,     // Create/update column (pos, size, name, sty, fmt, hidden)
     COL_DELETE = 11,  // Delete column
-    COL_MOVE = 12,    // Move column to new position
-    COL_RESIZE = 13,  // Resize column width
-    COL_RENAME = 14,  // Rename column (set name like "A", "Revenue", etc.)
 
     // Row operations
-    ROW_INSERT = 15,  // Insert new row
-    ROW_DELETE = 16,  // Delete row
-    ROW_MOVE = 17,    // Move row to new position
-    ROW_RESIZE = 18,  // Resize row height
-    // Note: ROW_RENAME intentionally omitted - rows cannot be renamed
-
-    // Axis operations (apply to both columns and rows)
-    AXIS_SET_HIDDEN = 19,  // Set axis hidden state
-    AXIS_SET_STYLE = 52,   // Set axis default style
-    AXIS_SET_FORMAT = 53,  // Set axis default format
+    ROW_SET = 20,     // Create/update row (pos, size, sty, fmt, hidden)
+    ROW_DELETE = 21,  // Delete row
 
     // Sheet operations
-    SHEET_CREATE = 20,  // Create new sheet
-    SHEET_DELETE = 21,  // Delete sheet
-    SHEET_RENAME = 22,  // Rename sheet
+    SHEET_SET = 30,     // Create/update sheet (name, pos)
+    SHEET_DELETE = 31,  // Delete sheet
 
     // Workbook operations
-    WORKBOOK_RENAME = 30,  // Rename workbook
+    WORKBOOK_SET = 40,  // Update workbook properties (name)
 
     // Named range operations
-    NAMED_RANGE_DEFINE = 50,  // Define a named range
-    NAMED_RANGE_DELETE = 51,  // Delete a named range
+    NAMED_RANGE_SET = 50,     // Create/update named range
+    NAMED_RANGE_DELETE = 51,  // Delete named range
 
-    // Range operations (unified range system)
-    RANGE_ADD = 60,             // Add a new range
-    RANGE_REMOVE = 61,          // Remove a range by ID
-    RANGE_UPDATE_CORNERS = 62,  // Update range corner IDs (resize)
-    RANGE_UPDATE_FLAGS = 63,    // Update range flags bitmask
-    RANGE_SET_STYLE = 64,       // Set style metadata for a style range
-    RANGE_SET_FORMAT = 65,      // Set format metadata for a format range
+    // Range operations (style/format ranges)
+    RANGE_SET = 60,     // Create/update range (corners, flags, sty, fmt)
+    RANGE_DELETE = 61,  // Delete range
 };
 
 // Convert OpType to string for serialization
 const char* opTypeToString(OpType type);
 
 // Convert string to OpType for deserialization
-// Returns CELL_SET_VALUE as default if not recognized
+// Returns CELL_SET as default if not recognized
 OpType stringToOpType(const std::string& str);
 
 // Operation represents a single CRDT operation on the workbook.

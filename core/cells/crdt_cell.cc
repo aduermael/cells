@@ -6,9 +6,8 @@
 // Cells are the atomic data units that store values, formulas, and formatting.
 //
 // Key responsibilities:
-// - Apply CELL_SET_VALUE operations (numbers, strings, formulas)
-// - Apply CELL_SET_FORMAT operations (number format assignment)
-// - Apply CELL_CLEAR operations (cell deletion)
+// - Apply CELL_SET operations (creates/updates cells with value, style, format)
+// - Apply CELL_DELETE operations (cell deletion)
 // - Handle conflict resolution via Last-Writer-Wins (LWW)
 // - Manage formula dependencies and format inheritance
 //
@@ -61,7 +60,7 @@ static PositionResolver makeWorkbookPositionResolver(Workbook* workbook) {
     };
 }
 
-ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
+ApplyResult applyCellSet(Workbook& workbook, const Operation& op) {
     // Find the target cell from workbook-level storage
     auto result = workbook.findCell(op.target_id);
     Cell* cell = result.cell;
@@ -77,20 +76,20 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         return ApplyResult::SUPERSEDED;
     }
 
-    // Parse payload: {"type":"n","value":"42","col_id":"abc123","row_id":"def456"}
-    const std::string type_str = extractJSONString(op.payload, "type");
-    const std::string value_str = extractJSONString(op.payload, "value");
-    const std::string col_id_str = extractJSONString(op.payload, "col_id");
-    const std::string row_id_str = extractJSONString(op.payload, "row_id");
-
-    if (type_str.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
+    // Parse payload - unified format:
+    // {"col":"colId","row":"rowId","t":"n","v":"42","sty":"base64","fmt":"base64"}
+    // Only include properties being set (sparse updates)
+    const std::string col_id_str = extractJSONString(op.payload, "col");
+    const std::string row_id_str = extractJSONString(op.payload, "row");
+    const std::string type_str = extractJSONString(op.payload, "t");
+    const std::string value_str = extractJSONString(op.payload, "v");
+    const std::string style_str = extractJSONString(op.payload, "sty");
+    const std::string format_str = extractJSONString(op.payload, "fmt");
 
     if (cell == nullptr) {
-        // Cell doesn't exist - create it if we have col_id and row_id
+        // Cell doesn't exist - create it if we have col and row
         if (col_id_str.empty() || row_id_str.empty()) {
-            return ApplyResult::INVALID_TARGET;
+            return ApplyResult::INVALID_PAYLOAD;  // Missing required col/row for cell creation
         }
 
         if (workbook.sheets.empty()) {
@@ -108,7 +107,7 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         const ID colId(col_id_str);
         const ID rowId(row_id_str);
 
-        // Verify the column and row exist (they should have been created by COL_INSERT/ROW_INSERT)
+        // Verify the column and row exist
         if (targetSheet->getColumn(colId) == nullptr || targetSheet->getRow(rowId) == nullptr) {
             return ApplyResult::INVALID_TARGET;
         }
@@ -119,202 +118,122 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         targetSheet->addCell(std::move(newCell));
     }
 
-    // Apply the value based on type
-    const CellValueType type = charToValueType(type_str[0]);
-    cell->value.type = type;
-    cell->value.error = CellError::NONE;
+    // Apply value if type is provided
+    if (!type_str.empty()) {
+        const CellValueType type = charToValueType(type_str[0]);
+        cell->value.type = type;
+        cell->value.error = CellError::NONE;
 
-    if (type == CellValueType::FORMULA) {
-        // For formulas: value_str contains UUID formula, display contains A1 formula (ignored)
-        // Note: display field is ignored - we generate display strings from AST
-
-        // Clear old formula dependencies before setting new formula
-        DependencyGraph* depGraph = workbook.getDependencyGraph();
-        if (depGraph != nullptr) {
-            depGraph->removeFormula(cell->id);
-        }
-
-        // Parse the UUID formula text to create the AST
-        FormulaParser parser(value_str);
-        std::unique_ptr<ASTNode> ast = parser.parse();
-
-        // Create the formula object with AST
-        auto* formula = new Formula();
-        formula->ast = ast.release();
-        formula->dirty = true;
-
-        // Add to dependency graph for recalculation tracking if we have valid AST
-        if (formula->ast != nullptr && targetSheet != nullptr) {
-            DependencyGraph* depGraph = workbook.getDependencyGraph();
-            if (depGraph != nullptr) {
-                // Use workbook-level position resolver to handle cross-sheet range deps
-                // This allows the R-tree to be populated with positions from ANY sheet
-                depGraph->addFormula(cell->id, formula->ast,
-                                     makeWorkbookPositionResolver(&workbook));
-
-                // Track volatile functions
-                if (formula->hasVolatile()) {
-                    depGraph->markVolatile(cell->id);
-                }
-            }
-
-            // NOTE: Cross-sheet dependency tracking via extractCrossSheetRefs() is no longer
-            // needed. With Phase 13 changes, formula storage no longer includes sheet prefixes,
-            // so extractCrossSheetRefs() returns empty. All dependencies (including cross-sheet)
-            // are now tracked through the global dep graph:
-            // - Direct cell refs: via reverseDeps_ (cell ID -> dependent formulas)
-            // - Range refs: via R-tree (positions come from workbook-level axis storage)
-        }
-
-        cell->setFormula(formula);
-
-        // Store result value in raw for display (not the formula text)
-        cell->value.raw = "";
-
-        // Format inheritance for formulas
-        // If cell has no format, inherit format from referenced cells
-        // Uses content-addressed FormatBuffer system
-        const bool hasFormat = workbook.hasEntityFormat(cell->id);
-
-        if (!hasFormat && formula->ast != nullptr) {
-            // Create a format lookup using workbook-level cell storage
-            // Returns format ID string for backward compatibility with inferFormatFromFormula
-            const FormatLookup formatLookup =
-                [&workbook](const std::string& cellIdStr) -> std::string {
-                const ID cellId(cellIdStr);
-                const Cell* refCell = workbook.getCell(cellId);
-                if (refCell == nullptr) {
-                    return "";
-                }
-                // Get the content-addressed format and convert to base64 for inference
-                const FormatBuffer* fmt = workbook.getEntityFormat(refCell->id);
-                if (fmt == nullptr || fmt->isEmpty()) {
-                    return "";
-                }
-                // Return the format code for comparison by inferFormatFromFormula
-                return fmt->toFormatCode();
-            };
-
-            const std::string inheritedFormatCode =
-                inferFormatFromFormula(formula->ast, formatLookup);
-            if (!inheritedFormatCode.empty()) {
-                // Parse the format code to create a FormatBuffer
-                auto maybeFormat = FormatBuffer::fromFormatCode(inheritedFormatCode);
-                if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
-                    workbook.setEntityFormat(cell->id, *maybeFormat);
-                    cell->markHasFormat();
-                }
-            }
-        }
-    } else {
-        // Clear formula if it was a formula cell
-        if (cell->formula != nullptr) {
-            // Remove from dependency graph first
+        if (type == CellValueType::FORMULA) {
+            // Clear old formula dependencies before setting new formula
             DependencyGraph* depGraph = workbook.getDependencyGraph();
             if (depGraph != nullptr) {
                 depGraph->removeFormula(cell->id);
-                depGraph->unmarkVolatile(cell->id);
             }
-            cell->clearFormula();
-        }
-        cell->value.raw = value_str;
-    }
 
-    return ApplyResult::SUCCESS;
-}
+            // Parse the UUID formula text to create the AST
+            FormulaParser parser(value_str);
+            std::unique_ptr<ASTNode> ast = parser.parse();
 
-ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
-    // Find the target cell from workbook-level storage
-    Cell* cell = workbook.getCell(op.target_id);
-    if (cell == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
+            // Create the formula object with AST
+            auto* formula = new Formula();
+            formula->ast = ast.release();
+            formula->dirty = true;
 
-    // Check for newer format operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::CELL_SET_FORMAT && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
+            // Add to dependency graph for recalculation tracking if we have valid AST
+            if (formula->ast != nullptr && targetSheet != nullptr) {
+                DependencyGraph* depGraph = workbook.getDependencyGraph();
+                if (depGraph != nullptr) {
+                    depGraph->addFormula(cell->id, formula->ast,
+                                         makeWorkbookPositionResolver(&workbook));
 
-    // Parse payload: {"format":"<base64>"} (content-addressed)
-    // Empty string clears the format
-    const std::string formatBase64 = extractJSONString(op.payload, "format");
-    if (!formatBase64.empty()) {
-        // Content-addressed format
-        auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
-        if (!maybeFormat.has_value()) {
-            return ApplyResult::INVALID_PAYLOAD;
-        }
-        if (maybeFormat->isEmpty()) {
-            // Empty format clears
-            workbook.clearEntityFormat(cell->id);
-            cell->clearHasFormat();
+                    if (formula->hasVolatile()) {
+                        depGraph->markVolatile(cell->id);
+                    }
+                }
+            }
+
+            cell->setFormula(formula);
+            cell->value.raw = "";
+
+            // Format inheritance for formulas
+            const bool hasFormat = workbook.hasEntityFormat(cell->id);
+            if (!hasFormat && formula->ast != nullptr && format_str.empty()) {
+                const FormatLookup formatLookup =
+                    [&workbook](const std::string& cellIdStr) -> std::string {
+                    const ID cellId(cellIdStr);
+                    const Cell* refCell = workbook.getCell(cellId);
+                    if (refCell == nullptr) {
+                        return "";
+                    }
+                    const FormatBuffer* fmt = workbook.getEntityFormat(refCell->id);
+                    if (fmt == nullptr || fmt->isEmpty()) {
+                        return "";
+                    }
+                    return fmt->toFormatCode();
+                };
+
+                const std::string inheritedFormatCode =
+                    inferFormatFromFormula(formula->ast, formatLookup);
+                if (!inheritedFormatCode.empty()) {
+                    auto maybeFormat = FormatBuffer::fromFormatCode(inheritedFormatCode);
+                    if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
+                        workbook.setEntityFormat(cell->id, *maybeFormat);
+                        cell->markHasFormat();
+                    }
+                }
+            }
         } else {
+            // Clear formula if it was a formula cell
+            if (cell->formula != nullptr) {
+                DependencyGraph* depGraph = workbook.getDependencyGraph();
+                if (depGraph != nullptr) {
+                    depGraph->removeFormula(cell->id);
+                    depGraph->unmarkVolatile(cell->id);
+                }
+                cell->clearFormula();
+            }
+            cell->value.raw = value_str;
+        }
+    }
+
+    // Apply style if provided
+    if (!style_str.empty()) {
+        auto maybeStyle = StyleBuffer::fromBase64(style_str);
+        if (maybeStyle.has_value() && !maybeStyle->isEmpty()) {
+            workbook.setEntityStyle(cell->id, *maybeStyle);
+            cell->markHasStyle();
+        }
+    } else if (op.payload.find("\"sty\":\"\"") != std::string::npos) {
+        // Explicit clear style
+        workbook.clearEntityStyle(cell->id);
+        cell->clearHasStyle();
+    }
+
+    // Apply format if provided
+    if (!format_str.empty()) {
+        auto maybeFormat = FormatBuffer::fromBase64(format_str);
+        if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
             workbook.setEntityFormat(cell->id, *maybeFormat);
             cell->markHasFormat();
         }
-        return ApplyResult::SUCCESS;
-    }
-
-    // Check for empty format field (explicit clear)
-    // Need to distinguish between missing key and empty value
-    if (op.payload.find("\"format\":") != std::string::npos) {
-        // "format" key present but empty - clear format
+    } else if (op.payload.find("\"fmt\":\"\"") != std::string::npos) {
+        // Explicit clear format
         workbook.clearEntityFormat(cell->id);
         cell->clearHasFormat();
-        return ApplyResult::SUCCESS;
-    }
-
-    return ApplyResult::INVALID_PAYLOAD;
-}
-
-ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
-    // Find the target cell from workbook-level storage
-    Cell* cell = workbook.getCell(op.target_id);
-    if (cell == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check for newer style operations
-    const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
-        if (existing.type == OpType::CELL_SET_STYLE && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
-        }
-    }
-
-    // Parse payload: {"style":"<base64>"} (content-addressed)
-    // Empty string clears the style
-    const std::string styleBase64 = extractJSONString(op.payload, "style");
-    if (styleBase64.empty()) {
-        // Clear style
-        workbook.clearEntityStyle(cell->id);
-        cell->clearHasStyle();
-    } else {
-        // Parse and store content-addressed style
-        auto maybeStyle = StyleBuffer::fromBase64(styleBase64);
-        if (!maybeStyle.has_value() || maybeStyle->isEmpty()) {
-            return ApplyResult::INVALID_PAYLOAD;
-        }
-        workbook.setEntityStyle(cell->id, *maybeStyle);
-        cell->markHasStyle();
     }
 
     return ApplyResult::SUCCESS;
 }
 
-ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
+ApplyResult applyCellDelete(Workbook& workbook, const Operation& op) {
     // Find the target cell from workbook-level storage
     auto result = workbook.findCell(op.target_id);
     const Cell* cell = result.cell;
     Sheet* targetSheet = result.sheet;
 
     if (cell == nullptr || targetSheet == nullptr) {
-        // Cell doesn't exist - nothing to clear
+        // Cell doesn't exist - nothing to delete
         // Still return SUCCESS so the operation is recorded in OpLog
         return ApplyResult::SUCCESS;
     }
@@ -324,8 +243,8 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
 
     if (!latest.isNull() && latest.hlc > op.hlc) {
-        // A newer operation exists - if it's an edit, it resurrects
-        if (latest.type == OpType::CELL_SET_VALUE) {
+        // A newer operation exists - if it's a set, it resurrects
+        if (latest.type == OpType::CELL_SET) {
             return ApplyResult::RESURRECTED;
         }
     }

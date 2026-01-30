@@ -12,9 +12,8 @@
 // - Bootstrap OpLog when transitioning to collaboration mode
 //
 // Conflict resolution rules:
-// - Cell value conflicts: Last-Writer-Wins (highest HLC wins)
-// - Axis insert conflicts: Interleave by HLC (lower HLC comes first)
-// - Delete vs edit conflicts: Edit resurrects the entity (no data loss)
+// - SET operations: Last-Writer-Wins (highest HLC wins), creates if needed
+// - DELETE operations: SET resurrects deleted entities (no data loss)
 //
 // Usage pattern:
 // 1. Create operation via make*Op() helper
@@ -50,9 +49,8 @@ enum class ApplyResult : std::uint8_t {
 
 // Apply a CRDT operation to a workbook.
 // Handles conflict resolution using HLC timestamps:
-// - Cell value conflicts: Last-Writer-Wins (higher HLC wins)
-// - Axis insert conflicts: Interleave by HLC (lower HLC comes first)
-// - Delete vs edit conflicts: Edit resurrects (no data loss)
+// - SET operations: Last-Writer-Wins (higher HLC wins)
+// - DELETE vs SET: SET resurrects (no data loss)
 //
 // The operation is added to the OpLog if successful.
 // Returns the result of applying the operation.
@@ -67,161 +65,123 @@ size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops);
 // Used to avoid unnecessary work when receiving old operations.
 bool isSuperseded(const Workbook& workbook, const Operation& op);
 
-// Generate a CELL_SET_VALUE operation for a cell.
-// Creates the operation with current HLC from the workbook.
-// The sheetId version specifies which sheet the cell belongs to.
-Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload);
-Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
-                             const std::string& payload);
+// =============================================================================
+// Cell Operations
+// =============================================================================
 
-// Generate a CELL_CLEAR operation for a cell.
-Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
+// Generate a CELL_SET operation to create/update a cell.
+// Payload: {"col":"colId","row":"rowId","t":"n","v":"42","sty":"base64","fmt":"base64"}
+// All fields optional except col/row required when creating a new cell.
+Operation makeCellSetOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+Operation makeCellSetOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
+                        const std::string& payload);
 
-// Generate a CELL_SET_FORMAT operation to set a cell's number format.
-// Legacy payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
-// Prefer using the FormatBuffer overload below for content-addressed formats.
-Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+// Generate a CELL_DELETE operation to delete a cell.
+Operation makeCellDeleteOp(Workbook& workbook, const ID& cellId);
 
-// Generate a CELL_SET_FORMAT operation using content-addressed FormatBuffer.
-// Payload format: {"format":"<base64-encoded-formatbuffer>"}
-// This is the new format for content-addressed formats.
-// target_id: the cell's UUID
-Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format);
-
-// Generate a CELL_SET_FORMAT operation to clear the format.
-// Payload format: {"format":""}
-Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId);
-
-// Generate a CELL_SET_STYLE operation to set a cell's style from raw JSON payload.
-// Payload: {"style":"<base64>"} or {"style":""} to clear
-// Prefer using the StyleBuffer overload below for type safety.
-Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload);
-
-// Generate a CELL_SET_STYLE operation using content-addressed StyleBuffer.
-// Payload format: {"style":"<base64-encoded-stylebuffer>"}
-// This is the new format for content-addressed styles.
-// target_id: the cell's UUID
+// Convenience: Set/clear cell style (generates CELL_SET with sty field)
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style);
-
-// Generate a CELL_SET_STYLE operation to clear the style.
-// Payload format: {"style":""}
 Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId);
 
-// Column operations
-// The sheetId version specifies which sheet the column belongs to.
-Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
-                          const std::string& payload);
-Operation makeColDeleteOp(Workbook& workbook, const ID& axisId);
-Operation makeColResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-Operation makeColMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+// Convenience: Set/clear cell format (generates CELL_SET with fmt field)
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format);
+Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId);
 
-// Row operations
-// The sheetId version specifies which sheet the row belongs to.
-Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
-                          const std::string& payload);
-Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId);
-Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-// Note: No makeRowRenameOp - rows cannot be renamed
+// =============================================================================
+// Column Operations
+// =============================================================================
 
-// Axis operations (apply to both columns and rows)
-// payload: "1" for hidden, "0" for visible
-Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
-// payload: {"style":"<base64-encoded-stylebuffer>"} for content-addressed styles
+// Generate a COL_SET operation to create/update a column.
+// Payload: {"pos":N,"size":N,"name":"...","sty":"base64","fmt":"base64","hidden":bool}
+// pos is required when creating a new column.
+Operation makeColSetOp(Workbook& workbook, const ID& colId, const std::string& payload);
+Operation makeColSetOp(Workbook& workbook, const ID& colId, const ID& sheetId,
+                       const std::string& payload);
+
+// Generate a COL_DELETE operation to delete a column.
+Operation makeColDeleteOp(Workbook& workbook, const ID& colId);
+
+// Convenience: Set/clear column style (generates COL_SET with sty field)
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style);
-// Clear axis style - payload: {"style":""}
 Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId);
-// Generate an AXIS_SET_FORMAT operation using content-addressed FormatBuffer.
-// Payload format: {"format":"<base64-encoded-formatbuffer>"}
-Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format);
 
-// Generate an AXIS_SET_FORMAT operation to clear the format.
-// Payload format: {"format":""}
+// Convenience: Set/clear column format (generates COL_SET with fmt field)
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format);
 Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId);
 
-// Generate a SHEET_CREATE operation.
-Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
+// Convenience: Set hidden state for column/row
+Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
 
-// Generate a SHEET_DELETE operation.
+// =============================================================================
+// Row Operations
+// =============================================================================
+
+// Generate a ROW_SET operation to create/update a row.
+// Payload: {"pos":N,"size":N,"sty":"base64","fmt":"base64","hidden":bool}
+// pos is required when creating a new row.
+Operation makeRowSetOp(Workbook& workbook, const ID& rowId, const std::string& payload);
+Operation makeRowSetOp(Workbook& workbook, const ID& rowId, const ID& sheetId,
+                       const std::string& payload);
+
+// Generate a ROW_DELETE operation to delete a row.
+Operation makeRowDeleteOp(Workbook& workbook, const ID& rowId);
+
+// =============================================================================
+// Sheet Operations
+// =============================================================================
+
+// Generate a SHEET_SET operation to create/update a sheet.
+// Payload: {"name":"...","pos":N}
+Operation makeSheetSetOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
+
+// Generate a SHEET_DELETE operation to delete a sheet.
 Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId);
 
-// Generate a SHEET_RENAME operation.
-Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
+// =============================================================================
+// Workbook Operations
+// =============================================================================
 
-// Generate a WORKBOOK_RENAME operation.
-Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload);
+// Generate a WORKBOOK_SET operation to update workbook properties.
+// Payload: {"name":"..."}
+Operation makeWorkbookSetOp(Workbook& workbook, const std::string& payload);
 
-// Generate a NAMED_RANGE_DEFINE operation for defining a named range.
-// Payload: JSON with named range definition
-// {"name":"MyRange","scope":"W","scopeSheetId":"-",
-//  "targetType":"CELL","id1":"...","id2":"-","targetSheetId":"..."}
-Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload);
+// =============================================================================
+// Named Range Operations
+// =============================================================================
 
-// Generate a NAMED_RANGE_DELETE operation for deleting a named range.
+// Generate a NAMED_RANGE_SET operation to create/update a named range.
+// Payload: {"name":"MyRange","scope":"W","scopeSheetId":"-",
+//           "targetType":"CELL","id1":"...","id2":"-","targetSheetId":"..."}
+Operation makeNamedRangeSetOp(Workbook& workbook, const std::string& payload);
+
+// Generate a NAMED_RANGE_DELETE operation to delete a named range.
 // Payload: {"name":"MyRange","scope":"W","scopeSheetId":"-"}
 Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload);
 
 // =============================================================================
-// Range Operations (Unified Range System)
+// Range Operations
 // =============================================================================
 
-// Generate a RANGE_ADD operation for adding a new range.
-// Payload: {"sheet_id":"...","start_col_id":"...","start_row_id":"...",
-//           "end_col_id":"...","end_row_id":"...","flags":N}
-// target_id: the range's own UUID
-Operation makeRangeAddOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+// Generate a RANGE_SET operation to create/update a range.
+// Payload: {"startCol":"...","startRow":"...","endCol":"...","endRow":"...",
+//           "flags":N,"sty":"base64","fmt":"base64"}
+// Corner IDs required when creating a new range.
+Operation makeRangeSetOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
 
-// Generate a RANGE_REMOVE operation for removing a range.
-// Payload: {"sheet_id":"..."} - sheet where range exists
-// target_id: the range's UUID
-Operation makeRangeRemoveOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+// Generate a RANGE_DELETE operation to delete a range.
+// Payload: {"sheet":"sheetId"} or empty
+Operation makeRangeDeleteOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
 
-// Generate a RANGE_UPDATE_CORNERS operation for updating range bounds.
-// Payload: {"sheet_id":"...","start_col_id":"...","start_row_id":"...",
-//           "end_col_id":"...","end_row_id":"..."}
-// target_id: the range's UUID
-Operation makeRangeUpdateCornersOp(Workbook& workbook, const ID& rangeId,
-                                   const std::string& payload);
-
-// Generate a RANGE_UPDATE_FLAGS operation for updating range flags.
-// Payload: {"sheet_id":"...","flags":N}
-// target_id: the range's UUID
-Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
-
-// Generate a RANGE_SET_STYLE operation for setting range style metadata.
-// Payload: {"style":"<base64>"} or {"style":""} to clear
-// target_id: the range's UUID
-// For new code, prefer using the StyleBuffer overload below.
-Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
-
-// Generate a RANGE_SET_STYLE operation using content-addressed StyleBuffer.
-// Payload format: {"style":"<base64-encoded-stylebuffer>"}
-// This is the new format for content-addressed styles.
-// target_id: the range's UUID
+// Convenience: Set/clear range style (generates RANGE_SET with sty field)
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style);
-
-// Generate a RANGE_SET_STYLE operation to clear the style.
-// Payload format: {"style":""}
-// target_id: the range's UUID
 Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId);
 
-// Generate a RANGE_SET_FORMAT operation for setting range format metadata.
-// Payload: {"format":"<base64>"} or {"format":""} to clear
-// target_id: the range's UUID
-Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
-
-// Generate a RANGE_SET_FORMAT operation using content-addressed FormatBuffer.
-// Payload format: {"format":"<base64-encoded-formatbuffer>"}
-// target_id: the range's UUID
+// Convenience: Set range format (generates RANGE_SET with fmt field)
 Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const FormatBuffer& format);
 
-// Generate a RANGE_SET_FORMAT operation to clear the format.
-// Payload format: {"format":""}
-// target_id: the range's UUID
-Operation makeRangeClearFormatOp(Workbook& workbook, const ID& rangeId);
+// =============================================================================
+// Bootstrap
+// =============================================================================
 
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.

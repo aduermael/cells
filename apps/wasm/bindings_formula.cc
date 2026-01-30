@@ -254,7 +254,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     for (const auto& pending : required.columns) {
         std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, pending.id, pending.sheetId, colPayload);
+        Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -262,7 +262,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     for (const auto& pending : required.rows) {
         std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, pending.id, pending.sheetId, rowPayload);
+        Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -271,7 +271,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
         std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
                                   pending.colId.toString() + "\",\"row_id\":\"" +
                                   pending.rowId.toString() + "\"}";
-        Operation cellOp = makeCellSetValueOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+        Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
         applyOperation(*_workbook, cellOp);
     }
 

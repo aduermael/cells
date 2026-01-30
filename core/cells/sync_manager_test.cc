@@ -119,7 +119,7 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithSameOpCount) {
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithMoreOps) {
     // A has 0 operations, B has operations
-    Operation op = makeCellSetValueOp(*workbook_b, cell_id, R"({"type":"n","value":"42"})");
+    Operation op = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_b, op);
 
     // A sends hello to B (A has 0 ops)
@@ -137,7 +137,7 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithMoreOps) {
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
     // A has operations, B has 0 operations
-    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"42"})");
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_a, op);
 
     // B sends hello to A
@@ -154,7 +154,7 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
 
 TEST_F(SyncManagerTest, HandleSyncRequest) {
     // A has operations
-    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"42"})");
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_a, op);
 
     // B sends sync-request
@@ -164,13 +164,13 @@ TEST_F(SyncManagerTest, HandleSyncRequest) {
     EXPECT_EQ(result.messages.size(), 1);
     EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
     EXPECT_NE(result.messages[0].json.find("\"operations\":"), std::string::npos);
-    EXPECT_NE(result.messages[0].json.find("CELL_SET_VALUE"), std::string::npos);
+    EXPECT_NE(result.messages[0].json.find("CELL_SET"), std::string::npos);
     EXPECT_FALSE(result.dataModified);  // Sync-request doesn't modify our data
 }
 
 TEST_F(SyncManagerTest, HandleSyncResponse) {
     // Create an operation on A
-    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"99"})");
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"99"})");
     applyOperation(*workbook_a, op);
 
     // Get operations from A as JSON
@@ -195,9 +195,9 @@ TEST_F(SyncManagerTest, HandleSyncResponse) {
 
 TEST_F(SyncManagerTest, HandleOperationsBatch) {
     // Create operations on A
-    Operation op1 = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"1"})");
+    Operation op1 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"1"})");
     applyOperation(*workbook_a, op1);
-    Operation op2 = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"2"})");
+    Operation op2 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"2"})");
     applyOperation(*workbook_a, op2);
 
     // Send as operations batch
@@ -266,7 +266,7 @@ TEST_F(SyncManagerTest, QueueOperationsBroadcast) {
     sync_a->getOutgoingMessages();  // Clear hello
 
     // Add an operation
-    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"42"})");
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_a, op);
 
     // Queue broadcast
@@ -285,7 +285,7 @@ TEST_F(SyncManagerTest, AckUpdatesLastSyncedHLC) {
     sync_a->getOutgoingMessages();  // Clear hello
 
     // Create an operation on A
-    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"100"})");
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"100"})");
     applyOperation(*workbook_a, op);
 
     // A broadcasts to B
@@ -335,9 +335,9 @@ TEST_F(SyncManagerTest, InvalidJSONHandledGracefully) {
 // Test full sync flow between two peers
 TEST_F(SyncManagerTest, FullSyncFlow) {
     // A creates some operations
-    Operation op1 = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"10"})");
+    Operation op1 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"10"})");
     applyOperation(*workbook_a, op1);
-    Operation op2 = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"20"})");
+    Operation op2 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"20"})");
     applyOperation(*workbook_a, op2);
 
     EXPECT_EQ(workbook_a->getOpLog()->size(), 2);

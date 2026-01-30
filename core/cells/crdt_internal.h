@@ -7,8 +7,9 @@
 // used directly by external code. Use applyOperation() from crdt.h instead.
 //
 // The split is organized by entity type:
-// - crdt_cell.cc: Cell operations (set value, set format, clear)
-// - crdt_axis.cc: Axis operations (column/row insert, delete, move, resize)
+// - crdt_cell.cc: Cell operations (CELL_SET, CELL_DELETE)
+// - crdt_axis.cc: Axis operations (COL_SET, COL_DELETE, ROW_SET, ROW_DELETE, SHEET_*, etc)
+// - crdt_range.cc: Range operations (RANGE_SET, RANGE_DELETE)
 // - crdt.cc: Main dispatcher and operation makers
 //
 // =============================================================================
@@ -41,66 +42,75 @@ std::string extractJSONString(const std::string& json, const std::string& key);
 // Extract an integer from JSON for the given key
 int extractJSONInt(const std::string& json, const std::string& key, int defaultValue = -1);
 
-// Helper to extract size from payload (handles both string and numeric formats)
-std::string extractSizePayload(const std::string& payload);
+// Extract a boolean from JSON for the given key
+bool extractJSONBool(const std::string& json, const std::string& key, bool defaultValue = false);
 
 // =============================================================================
 // Cell operations (crdt_cell.cc)
 // =============================================================================
 
-// Apply CELL_SET_VALUE operation
-ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op);
+// Apply CELL_SET operation - creates/updates cell with provided properties
+ApplyResult applyCellSet(Workbook& workbook, const Operation& op);
 
-// Apply CELL_SET_FORMAT operation
-ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op);
-
-// Apply CELL_SET_STYLE operation
-ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op);
-
-// Apply CELL_CLEAR operation
-ApplyResult applyCellClear(Workbook& workbook, const Operation& op);
+// Apply CELL_DELETE operation - deletes cell
+ApplyResult applyCellDelete(Workbook& workbook, const Operation& op);
 
 // =============================================================================
-// Axis operations (crdt_axis.cc)
+// Column operations (crdt_axis.cc)
 // =============================================================================
 
-// Column operations
-ApplyResult applyColInsert(Workbook& workbook, const Operation& op);
+// Apply COL_SET operation - creates/updates column with provided properties
+ApplyResult applyColSet(Workbook& workbook, const Operation& op);
+
+// Apply COL_DELETE operation - deletes column and its cells
 ApplyResult applyColDelete(Workbook& workbook, const Operation& op);
-ApplyResult applyColResize(Workbook& workbook, const Operation& op);
-ApplyResult applyColMove(Workbook& workbook, const Operation& op);
-ApplyResult applyColRename(Workbook& workbook, const Operation& op);
 
-// Row operations
-ApplyResult applyRowInsert(Workbook& workbook, const Operation& op);
+// =============================================================================
+// Row operations (crdt_axis.cc)
+// =============================================================================
+
+// Apply ROW_SET operation - creates/updates row with provided properties
+ApplyResult applyRowSet(Workbook& workbook, const Operation& op);
+
+// Apply ROW_DELETE operation - deletes row and its cells
 ApplyResult applyRowDelete(Workbook& workbook, const Operation& op);
-ApplyResult applyRowResize(Workbook& workbook, const Operation& op);
-ApplyResult applyRowMove(Workbook& workbook, const Operation& op);
 
-// Axis operations (apply to both columns and rows)
-ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op);
-ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op);
-ApplyResult applyAxisSetFormat(Workbook& workbook, const Operation& op);
+// =============================================================================
+// Sheet operations (crdt_axis.cc)
+// =============================================================================
 
-// Sheet operations
-ApplyResult applySheetCreate(Workbook& workbook, const Operation& op);
+// Apply SHEET_SET operation - creates/updates sheet with provided properties
+ApplyResult applySheetSet(Workbook& workbook, const Operation& op);
+
+// Apply SHEET_DELETE operation - deletes sheet
 ApplyResult applySheetDelete(Workbook& workbook, const Operation& op);
-ApplyResult applySheetRename(Workbook& workbook, const Operation& op);
 
-// Workbook operations
-ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op);
+// =============================================================================
+// Workbook operations (crdt_axis.cc)
+// =============================================================================
 
-// Named range operations
-ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op);
+// Apply WORKBOOK_SET operation - updates workbook properties
+ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op);
+
+// =============================================================================
+// Named range operations (crdt_axis.cc)
+// =============================================================================
+
+// Apply NAMED_RANGE_SET operation - creates/updates named range
+ApplyResult applyNamedRangeSet(Workbook& workbook, const Operation& op);
+
+// Apply NAMED_RANGE_DELETE operation - deletes named range
 ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op);
 
-// Range operations (unified range system)
-ApplyResult applyRangeAdd(Workbook& workbook, const Operation& op);
-ApplyResult applyRangeRemove(Workbook& workbook, const Operation& op);
-ApplyResult applyRangeUpdateCorners(Workbook& workbook, const Operation& op);
-ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op);
-ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op);
-ApplyResult applyRangeSetFormat(Workbook& workbook, const Operation& op);
+// =============================================================================
+// Range operations (crdt_range.cc)
+// =============================================================================
+
+// Apply RANGE_SET operation - creates/updates range with provided properties
+ApplyResult applyRangeSet(Workbook& workbook, const Operation& op);
+
+// Apply RANGE_DELETE operation - deletes range
+ApplyResult applyRangeDelete(Workbook& workbook, const Operation& op);
 
 }  // namespace internal
 }  // namespace cells

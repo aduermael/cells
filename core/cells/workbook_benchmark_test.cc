@@ -358,7 +358,7 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
     std::cout << "Sheet size: " << numCols << " columns x " << numRows << " rows" << std::endl;
     std::cout << "Initial cells: " << sheet->cellCount() << std::endl;
 
-    // Benchmark CELL_SET_VALUE operations
+    // Benchmark CELL_SET operations
     {
         auto start = std::chrono::high_resolution_clock::now();
         const int iterations = 1000;
@@ -366,11 +366,11 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
         for (int i = 0; i < iterations; i++) {
             // Create operation to set cell value
             Operation op;
-            op.type = OpType::CELL_SET_VALUE;
+            op.type = OpType::CELL_SET;
             op.hlc = workbook_->getCurrentHLC();
             op.sheetId = sheet->id;
             op.target_id = cellIds_[i % cellIds_.size()];
-            op.payload = std::to_string(i * 1.5);
+            op.payload = "{\"t\":\"n\",\"v\":\"" + std::to_string(i * 1.5) + "\"}";
 
             // Apply operation
             applyOperation(*workbook_, op);
@@ -379,24 +379,24 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-        std::cout << "CELL_SET_VALUE: " << iterations << " ops in " << duration << " us ("
+        std::cout << "CELL_SET: " << iterations << " ops in " << duration << " us ("
                   << (duration * 1000.0 / iterations) << " ns/op)" << std::endl;
 
-        EXPECT_LT(duration, 500000) << "CELL_SET_VALUE should be fast";
+        EXPECT_LT(duration, 500000) << "CELL_SET should be fast";
     }
 
-    // Benchmark COL_RESIZE operations (column resize)
+    // Benchmark COL_SET operations (column resize)
     {
         auto start = std::chrono::high_resolution_clock::now();
         const int iterations = 1000;
 
         for (int i = 0; i < iterations; i++) {
             Operation op;
-            op.type = OpType::COL_RESIZE;
+            op.type = OpType::COL_SET;
             op.hlc = workbook_->getCurrentHLC();
             op.sheetId = sheet->id;
             op.target_id = colIds_[i % numCols];
-            op.payload = std::to_string(100 + (i % 50));  // Vary width
+            op.payload = "{\"size\":" + std::to_string(100 + (i % 50)) + "}";
 
             applyOperation(*workbook_, op);
         }
@@ -404,13 +404,13 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-        std::cout << "COL_RESIZE: " << iterations << " ops in " << duration << " us ("
+        std::cout << "COL_SET: " << iterations << " ops in " << duration << " us ("
                   << (duration * 1000.0 / iterations) << " ns/op)" << std::endl;
 
-        EXPECT_LT(duration, 500000) << "Axis resize should be fast";
+        EXPECT_LT(duration, 500000) << "COL_SET should be fast";
     }
 
-    // Benchmark CELL_SET_FORMAT operations (content-addressed formats)
+    // Benchmark CELL_SET with format (content-addressed formats)
     {
         // Create a FormatBuffer for the benchmark
         // Content-addressed formats don't need registration
@@ -421,11 +421,11 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
 
         for (int i = 0; i < iterations; i++) {
             Operation op;
-            op.type = OpType::CELL_SET_FORMAT;
+            op.type = OpType::CELL_SET;
             op.hlc = workbook_->getCurrentHLC();
             op.sheetId = sheet->id;
             op.target_id = cellIds_[i % cellIds_.size()];
-            op.payload = "{\"format\":\"" + formatBase64 + "\"}";
+            op.payload = "{\"fmt\":\"" + formatBase64 + "\"}";
 
             applyOperation(*workbook_, op);
         }
@@ -433,10 +433,10 @@ TEST_F(WorkbookBenchmarkTest, CRDTOperationPerformance) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-        std::cout << "CELL_SET_FORMAT: " << iterations << " ops in " << duration << " us ("
+        std::cout << "CELL_SET (fmt): " << iterations << " ops in " << duration << " us ("
                   << (duration * 1000.0 / iterations) << " ns/op)" << std::endl;
 
-        EXPECT_LT(duration, 500000) << "Cell format should be fast";
+        EXPECT_LT(duration, 500000) << "CELL_SET with format should be fast";
     }
 }
 

@@ -13,7 +13,7 @@ protected:
 
     Operation makeOp(int64_t wall, uint32_t logical, const ID& target, const std::string& payload) {
         HLC hlc(wall, logical, node);
-        return Operation(hlc, OpType::CELL_SET_VALUE, target, payload);
+        return Operation(hlc, OpType::CELL_SET, target, payload);
     }
 };
 
@@ -135,7 +135,7 @@ TEST_F(OpLogTest, GetLatestOperationForNonexistentEntity) {
 TEST_F(OpLogTest, HasOperation) {
     OpLog log;
     HLC hlc(1000, 0, node);
-    Operation op(hlc, OpType::CELL_SET_VALUE, target1, "{}");
+    Operation op(hlc, OpType::CELL_SET, target1, "{}");
 
     EXPECT_FALSE(log.hasOperation(hlc));
     log.addOperation(op);
