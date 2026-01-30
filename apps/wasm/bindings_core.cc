@@ -1417,10 +1417,42 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
         return "{\"success\":true}";
     }
 
-    std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
+    // Calculate the final position for the moved column
+    // When moving right, we insert before targetPos, so the column ends up at targetPos - 1
+    // When moving left, we insert before targetPos, so the column ends up at targetPos
+    uint32_t finalPos = (currentPos < targetPos) ? targetPos - 1 : targetPos;
+
+    // Shift other columns to make room (using CRDT operations for sync)
+    if (currentPos > targetPos) {
+        // Moving left: shift columns in [targetPos, currentPos) right by 1
+        for (const ID& id : sheet->getColumnIds()) {
+            Axis* col = sheet->getColumn(id);
+            if (col != nullptr && col->id != colId &&
+                col->position >= targetPos && col->position < currentPos) {
+                std::string shiftPayload =
+                    "{\"pos\":" + std::to_string(col->position + 1) + "}";
+                Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
+                applyOperation(*_workbook, shiftOp);
+            }
+        }
+    } else {
+        // Moving right: shift columns in (currentPos, targetPos) left by 1
+        for (const ID& id : sheet->getColumnIds()) {
+            Axis* col = sheet->getColumn(id);
+            if (col != nullptr && col->id != colId &&
+                col->position > currentPos && col->position < targetPos) {
+                std::string shiftPayload =
+                    "{\"pos\":" + std::to_string(col->position - 1) + "}";
+                Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
+                applyOperation(*_workbook, shiftOp);
+            }
+        }
+    }
+
+    // Move the target column to its final position
+    std::string payload = "{\"pos\":" + std::to_string(finalPos) + "}";
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
-
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1454,10 +1486,42 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
         return "{\"success\":true}";
     }
 
-    std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
+    // Calculate the final position for the moved row
+    // When moving down, we insert before targetPos, so the row ends up at targetPos - 1
+    // When moving up, we insert before targetPos, so the row ends up at targetPos
+    uint32_t finalPos = (currentPos < targetPos) ? targetPos - 1 : targetPos;
+
+    // Shift other rows to make room (using CRDT operations for sync)
+    if (currentPos > targetPos) {
+        // Moving up: shift rows in [targetPos, currentPos) down by 1
+        for (const ID& id : sheet->getRowIds()) {
+            Axis* row = sheet->getRow(id);
+            if (row != nullptr && row->id != rowId &&
+                row->position >= targetPos && row->position < currentPos) {
+                std::string shiftPayload =
+                    "{\"pos\":" + std::to_string(row->position + 1) + "}";
+                Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
+                applyOperation(*_workbook, shiftOp);
+            }
+        }
+    } else {
+        // Moving down: shift rows in (currentPos, targetPos) up by 1
+        for (const ID& id : sheet->getRowIds()) {
+            Axis* row = sheet->getRow(id);
+            if (row != nullptr && row->id != rowId &&
+                row->position > currentPos && row->position < targetPos) {
+                std::string shiftPayload =
+                    "{\"pos\":" + std::to_string(row->position - 1) + "}";
+                Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
+                applyOperation(*_workbook, shiftOp);
+            }
+        }
+    }
+
+    // Move the target row to its final position
+    std::string payload = "{\"pos\":" + std::to_string(finalPos) + "}";
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
-
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
