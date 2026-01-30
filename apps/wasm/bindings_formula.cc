@@ -98,6 +98,9 @@ std::string CellsEngine::validateFormula(const std::string& formulaText) {
             case ASTNodeType::ERROR_NODE:
                 typeStr = "Error";
                 break;
+            case ASTNodeType::SPILL_RANGE_REF:
+                typeStr = "SpillRangeRef";
+                break;
         }
         json << "\"" << typeStr << "\"";
     } else {

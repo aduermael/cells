@@ -1077,6 +1077,7 @@ std::unique_ptr<ASTNode> RefConverter::adjustASTReferences(const ASTNode* ast, i
         case ASTNodeType::BOOLEAN_LITERAL:
         case ASTNodeType::NAMED_REF:
         case ASTNodeType::ERROR_NODE:
+        case ASTNodeType::SPILL_RANGE_REF:
             return ast->clone();
     }
 
