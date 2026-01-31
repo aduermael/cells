@@ -308,16 +308,59 @@ try { ... } catch (...) { /* ignore */ }
 ```
 
 ### Files to Audit
-- [ ] 17a: `style_operations_test.cc`
-- [ ] 17b: `format_operations_test.cc`
-- [ ] 17c: `axis_insert_delete_test.cc`
-- [ ] 17d: `axis_move_resize_test.cc`
-- [ ] 17e: `range_boundary_test.cc`
-- [ ] 17f: `merged_cells_test.cc`
-- [ ] 17g: `formula_error_test.cc`
-- [ ] 17h: `formula_data_change_test.cc`
-- [ ] 17i: `cross_sheet_operations_test.cc`
-- [ ] 17j: Any other test files added by this plan
+- [x] 17a: `style_operations_test.cc` - ✅ No forbidden patterns found
+- [x] 17b: `format_operations_test.cc` - ✅ No forbidden patterns found
+- [x] 17c: `axis_insert_delete_test.cc` - ✅ No forbidden patterns found
+- [x] 17d: `axis_move_resize_test.cc` - ✅ No forbidden patterns found
+- [x] 17e: `range_boundary_test.cc` - ✅ No forbidden patterns found
+- [x] 17f: `merged_cells_test.cc` - ✅ No forbidden patterns found
+- [x] 17g: `formula_error_test.cc` - ✅ No forbidden patterns found
+- [x] 17h: `formula_data_change_test.cc` - ✅ No forbidden patterns found
+- [x] 17i: `cross_sheet_operations_test.cc` - ⚠️ See findings below
+- [x] 17j: Other test files - See findings below
+
+### Audit Findings
+
+**Files with `->dirty = true` usage (10 instances in 6 files):**
+
+#### Acceptable: Initialization Pattern (3 files)
+These helper functions create raw formulas outside the normal sheet workflow, mirroring what `Sheet::setCellFormula` does internally:
+- `serializer_test.cc:30` - `createFormula()` helper
+- `xlsx_writer_test.cc:26` - `createFormula()` helper
+- `formula_integration_test.cc:25` - `createFormula()` helper
+
+#### Acceptable: Testing Recalculation Mechanics (1 file)
+- `formula_recalc_test.cc:353` - Tests that volatile functions (NOW) can be manually triggered for re-evaluation
+
+#### Bug Workaround: Named Range Deletion (2 files, 7 instances)
+These tests force `dirty = true` because **named range deletion doesn't mark dependent formulas dirty**:
+
+- `cross_sheet_operations_test.cc`:
+  - Line 1227: After `removeWorkbook("TempName")`
+  - Line 1263: After `removeSheet()` for named range target
+
+- `named_ranges_operations_test.cc`:
+  - Line 733: After `removeWorkbook("TempName")`
+  - Line 767: After `removeWorkbook("TempRange")`
+  - Line 799: After `removeSheet("LocalName", ...)`
+  - Line 844: After rename (delete + recreate)
+  - Line 977: After `removeSheet("Value", ...)`
+
+**Root Cause:** `NamedRangeRegistry::removeWorkbook()` and `removeSheet()` do not mark dependent formulas as dirty. Unlike `Workbook::removeSheet()` which uses the dependency graph to find and mark dependents, the named range registry has no tracking of which formulas reference named ranges by name.
+
+**Why This Is Acceptable For Now:**
+1. The dependency graph resolves named ranges to their underlying cells at tracking time
+2. It doesn't store the named range _name_, only the resolved cell references
+3. Fixing this requires architectural changes (reverse mapping from name → dependent cells)
+4. The tests correctly verify the expected behavior (formula returns #NAME! after deletion)
+5. The `dirty = true` is explicitly commented as "Force re-evaluation"
+
+**Recommendation:** Consider adding Phase 18 in a future plan to implement named range dependency tracking, which would eliminate the need for manual dirty marking in these cases.
+
+### Other Patterns Searched (None Found)
+- ❌ `cell->value = CellValue(...)` - Manual state manipulation: NOT FOUND
+- ❌ Commented-out EXPECT_ macros with "known issue" notes: NOT FOUND
+- ❌ `try { ... } catch (...) { /* ignore */ }` patterns: NOT FOUND
 
 ### Action for Each File
 1. Search for forbidden patterns
@@ -356,3 +399,4 @@ try { ... } catch (...) { /* ignore */ }
 - Phase 9 (9c): `removeSheet` wasn't removing child entities from workbook storage - cells, columns, rows, and ranges belonging to the deleted sheet remained in workbook-level maps (fixed in 9c)
 - Phase 9 (9c): `removeSheet` wasn't marking dependent formulas as dirty - formulas referencing deleted cells would return stale cached values (fixed with transitive dependency marking in 9c)
 - Phase 9 (9c): `evaluateCellRef` and `evaluateRangeRef` would return 0 instead of #REF! when a resolved cellId was not found (cell was deleted) (fixed in 9c)
+- Phase 17 (audit): Named range deletion (`NamedRangeRegistry::removeWorkbook/removeSheet`) doesn't mark dependent formulas dirty - tests use manual `dirty = true` workaround (architectural limitation, not fixed - would require named range → formula dependency tracking)
