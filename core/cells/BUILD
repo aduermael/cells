@@ -375,6 +375,23 @@ cc_test(
 )
 
 cc_test(
+    name = "crdt_conflict_test",
+    srcs = ["crdt_conflict_test.cc"],
+    shard_count = 4,
+    deps = [
+        ":crdt",
+        ":formula_ast",
+        ":hlc",
+        ":id",
+        ":model",
+        ":oplog",
+        ":range",
+        ":style_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "style_operations_test",
     srcs = ["style_operations_test.cc"],
     deps = [

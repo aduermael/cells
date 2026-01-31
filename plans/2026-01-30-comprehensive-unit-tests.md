@@ -248,14 +248,14 @@ New file: `edge_cases_test.cc`
 
 ## Phase 15: CRDT Conflict Resolution Verification
 
-Extend: `crdt_test.cc` (or new `crdt_conflict_test.cc` if too large)
+New file: `crdt_conflict_test.cc` (25 tests total)
 
-- [ ] 15a: Test Last-Writer-Wins for concurrent cell edits
-- [ ] 15b: Test concurrent axis operations resolve deterministically
-- [ ] 15c: Test concurrent range modifications merge correctly
-- [ ] 15d: Test HLC ordering guarantees across peers
-- [ ] 15e: Test operation replay produces identical state
-- [ ] 15f: Test late-joining peer catches up correctly
+- [x] 15a: Test Last-Writer-Wins for concurrent cell edits - 6 tests (higher wall_time wins, higher logical counter wins, node_id breaks tie, order independence, duplicate rejection)
+- [x] 15b: Test concurrent axis operations resolve deterministically - 4 tests (column resize, row resize, column position, hide/show toggle)
+- [x] 15c: Test concurrent range modifications merge correctly - 3 tests (style update LWW, creation with different IDs, delete vs modify LWW)
+- [x] 15d: Test HLC ordering guarantees across peers - 4 tests (monotonic within peer, update on receive, total ordering, causal ordering)
+- [x] 15e: Test operation replay produces identical state - 3 tests (same order, different order, mixed operation types)
+- [x] 15f: Test late-joining peer catches up correctly - 6 tests (receives all operations, operations since HLC, concurrent edits while joining, three peers staggered join, structure creation ops, empty oplog)
 
 ---
 
