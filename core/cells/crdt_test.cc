@@ -208,6 +208,80 @@ TEST_F(CRDTTest, AxisResize) {
     EXPECT_EQ(axis->size, 200);
 }
 
+// Test that getColumnByPosition returns correct column after swapping positions
+// via CRDT COL_SET operations. This catches bugs where _columnIndex is not
+// updated when column positions change.
+TEST_F(CRDTTest, ColumnPositionIndexUpdatedAfterSwap) {
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    // First, set explicit positions for both columns
+    Operation op1 = makeColSetOp(*workbook, col1, R"({"pos":1})");
+    Operation op2 = makeColSetOp(*workbook, col2, R"({"pos":2})");
+    EXPECT_EQ(applyOperation(*workbook, op1), ApplyResult::SUCCESS);
+    EXPECT_EQ(applyOperation(*workbook, op2), ApplyResult::SUCCESS);
+
+    // Verify initial positions
+    EXPECT_EQ(sheet->getColumn(col1)->position, 1);
+    EXPECT_EQ(sheet->getColumn(col2)->position, 2);
+    EXPECT_EQ(sheet->getColumnByPosition(1)->id, col1);
+    EXPECT_EQ(sheet->getColumnByPosition(2)->id, col2);
+
+    // Swap positions: col1 goes to pos 2, col2 goes to pos 1
+    Operation swap1 = makeColSetOp(*workbook, col1, R"({"pos":2})");
+    Operation swap2 = makeColSetOp(*workbook, col2, R"({"pos":1})");
+    EXPECT_EQ(applyOperation(*workbook, swap1), ApplyResult::SUCCESS);
+    EXPECT_EQ(applyOperation(*workbook, swap2), ApplyResult::SUCCESS);
+
+    // Verify positions changed
+    EXPECT_EQ(sheet->getColumn(col1)->position, 2);
+    EXPECT_EQ(sheet->getColumn(col2)->position, 1);
+
+    // CRITICAL: Verify getColumnByPosition returns the correct columns
+    // This is the bug that was fixed - before the fix, these would fail
+    // because _columnIndex was not updated when positions changed via CRDT ops
+    Axis* colAtPos1 = sheet->getColumnByPosition(1);
+    Axis* colAtPos2 = sheet->getColumnByPosition(2);
+    ASSERT_NE(colAtPos1, nullptr);
+    ASSERT_NE(colAtPos2, nullptr);
+    EXPECT_EQ(colAtPos1->id, col2) << "Column at position 1 should be col2 after swap";
+    EXPECT_EQ(colAtPos2->id, col1) << "Column at position 2 should be col1 after swap";
+}
+
+// Same test for rows
+TEST_F(CRDTTest, RowPositionIndexUpdatedAfterSwap) {
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    // First, set explicit positions for both rows
+    Operation op1 = makeRowSetOp(*workbook, row1, R"({"pos":1})");
+    Operation op2 = makeRowSetOp(*workbook, row2, R"({"pos":2})");
+    EXPECT_EQ(applyOperation(*workbook, op1), ApplyResult::SUCCESS);
+    EXPECT_EQ(applyOperation(*workbook, op2), ApplyResult::SUCCESS);
+
+    // Verify initial positions
+    EXPECT_EQ(sheet->getRow(row1)->position, 1);
+    EXPECT_EQ(sheet->getRow(row2)->position, 2);
+    EXPECT_EQ(sheet->getRowByPosition(1)->id, row1);
+    EXPECT_EQ(sheet->getRowByPosition(2)->id, row2);
+
+    // Swap positions: row1 goes to pos 2, row2 goes to pos 1
+    Operation swap1 = makeRowSetOp(*workbook, row1, R"({"pos":2})");
+    Operation swap2 = makeRowSetOp(*workbook, row2, R"({"pos":1})");
+    EXPECT_EQ(applyOperation(*workbook, swap1), ApplyResult::SUCCESS);
+    EXPECT_EQ(applyOperation(*workbook, swap2), ApplyResult::SUCCESS);
+
+    // Verify positions changed
+    EXPECT_EQ(sheet->getRow(row1)->position, 2);
+    EXPECT_EQ(sheet->getRow(row2)->position, 1);
+
+    // CRITICAL: Verify getRowByPosition returns the correct rows
+    Axis* rowAtPos1 = sheet->getRowByPosition(1);
+    Axis* rowAtPos2 = sheet->getRowByPosition(2);
+    ASSERT_NE(rowAtPos1, nullptr);
+    ASSERT_NE(rowAtPos2, nullptr);
+    EXPECT_EQ(rowAtPos1->id, row2) << "Row at position 1 should be row2 after swap";
+    EXPECT_EQ(rowAtPos2->id, row1) << "Row at position 2 should be row1 after swap";
+}
+
 TEST_F(CRDTTest, ConcurrentEditsConverge) {
     // Simulate two nodes making concurrent edits
     ID node_a("NodeAAAA");

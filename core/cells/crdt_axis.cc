@@ -75,7 +75,12 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     // Update properties if provided
     const int pos = extractJSONInt(op.payload, "pos", -1);
     if (pos >= 0) {
-        axis->position = static_cast<uint32_t>(pos);
+        const uint32_t oldPos = axis->position;
+        const uint32_t newPos = static_cast<uint32_t>(pos);
+        axis->position = newPos;
+        if (!creating) {
+            sheet->updateColumnPositionIndex(op.target_id, oldPos, newPos);
+        }
     }
 
     const int size = extractJSONInt(op.payload, "size", -1);
@@ -250,7 +255,12 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
     // Update properties if provided
     const int pos = extractJSONInt(op.payload, "pos", -1);
     if (pos >= 0) {
-        axis->position = static_cast<uint32_t>(pos);
+        const uint32_t oldPos = axis->position;
+        const uint32_t newPos = static_cast<uint32_t>(pos);
+        axis->position = newPos;
+        if (!creating) {
+            sheet->updateRowPositionIndex(op.target_id, oldPos, newPos);
+        }
     }
 
     const int size = extractJSONInt(op.payload, "size", -1);

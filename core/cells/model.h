@@ -466,6 +466,11 @@ struct Sheet {
         const ID& colId);                      // Remove column from sheet tracking (for CRDT ops)
     void removeRowFromIndex(const ID& rowId);  // Remove row from sheet tracking (for CRDT ops)
 
+    // Update position index when a column/row position changes (for CRDT ops)
+    // These update _columnIndex/_rowIndex without shifting other axes
+    void updateColumnPositionIndex(const ID& colId, uint32_t oldPos, uint32_t newPos);
+    void updateRowPositionIndex(const ID& rowId, uint32_t oldPos, uint32_t newPos);
+
     // Count accessors
     [[nodiscard]] size_t columnCount() const { return _columnIds.size(); }
     [[nodiscard]] size_t rowCount() const { return _rowIds.size(); }

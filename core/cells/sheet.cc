@@ -338,6 +338,26 @@ void Sheet::removeRowFromIndex(const ID& rowId) {
     _rowIds.erase(rowId);
 }
 
+void Sheet::updateColumnPositionIndex(const ID& colId, uint32_t oldPos, uint32_t newPos) {
+    // Remove old position mapping (only if it points to this column)
+    auto it = _columnIndex.find(oldPos);
+    if (it != _columnIndex.end() && it->second == colId) {
+        _columnIndex.erase(it);
+    }
+    // Add new position mapping
+    _columnIndex[newPos] = colId;
+}
+
+void Sheet::updateRowPositionIndex(const ID& rowId, uint32_t oldPos, uint32_t newPos) {
+    // Remove old position mapping (only if it points to this row)
+    auto it = _rowIndex.find(oldPos);
+    if (it != _rowIndex.end() && it->second == rowId) {
+        _rowIndex.erase(it);
+    }
+    // Add new position mapping
+    _rowIndex[newPos] = rowId;
+}
+
 Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
     // Check if cell already exists
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
