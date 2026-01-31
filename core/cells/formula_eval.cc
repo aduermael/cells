@@ -121,8 +121,16 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
             // Resolved formula: use findCell since cell UUIDs are globally unique
             auto [foundCell, foundSheet] = ctx.workbook->findCell(cellId);
             if (foundCell) {
+                if (!foundSheet) {
+                    // Cell exists but sheet was deleted - return #REF!
+                    return EvalResult::Error(CellError::REF);
+                }
                 cell = foundCell;
                 targetSheet = foundSheet;
+            } else {
+                // Cell not found - it was deleted
+                // For cross-sheet refs (or any resolved ref), return #REF!
+                return EvalResult::Error(CellError::REF);
             }
         } else if (!node->sheetId.empty()) {
             // Explicit sheet UUID reference (rare case - sheetId without cellId)
@@ -489,8 +497,15 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
         if (!node->topLeft->cellId.empty()) {
             // Resolved formula: find the cell's sheet by UUID
             auto [foundCell, foundSheet] = ctx.workbook->findCell(ID(node->topLeft->cellId));
-            if (foundSheet) {
+            if (foundCell) {
+                if (!foundSheet) {
+                    // Cell exists but sheet was deleted - return #REF!
+                    return EvalResult::Error(CellError::REF);
+                }
                 targetSheet = foundSheet;
+            } else if (!node->topLeft->sheetName.empty()) {
+                // Cell not found and this was a cross-sheet ref - sheet/cell was deleted
+                return EvalResult::Error(CellError::REF);
             }
         } else if (!node->topLeft->sheetId.empty()) {
             // Explicit sheet UUID reference

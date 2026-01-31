@@ -373,10 +373,112 @@ bool Workbook::removeSheet(const ID& sheetId) {
         return false;
     }
 
+    const Sheet* sheet = it->get();
+
+    // Remove all child entities from workbook storage.
+    // The sheet removal CRDT operation cascades to all children - they are
+    // naturally deleted on all peers due to sheet parenting, so we don't need
+    // separate delete operations for each entity.
+
+    // Copy IDs to vectors first to avoid any iterator invalidation issues
+    const std::vector<ID> cellIds = sheet->getCellIds();
+    const std::vector<ID> rangeIds(sheet->getRangeIds().begin(), sheet->getRangeIds().end());
+    const std::vector<ID> columnIds(sheet->getColumnIds().begin(), sheet->getColumnIds().end());
+    const std::vector<ID> rowIds(sheet->getRowIds().begin(), sheet->getRowIds().end());
+
+    // Mark all formulas that depend on cells in this sheet as dirty.
+    // This must happen BEFORE we remove the cells so the dependency graph
+    // is still intact. We use transitive marking - if A depends on B and B
+    // depends on a deleted cell, both A and B should be marked dirty.
+    if (_depGraph) {
+        std::unordered_set<ID, IDHash> markedDirty;
+        std::vector<ID> queue;
+
+        // Start with dependents of all cells being deleted.
+        // Use getDependentsForCell which includes both direct and range deps.
+        for (const ID& cellId : cellIds) {
+            const Cell* cell = getCell(cellId);
+            if (!cell) {
+                continue;
+            }
+
+            // Get position info for R-tree query
+            const Axis* col = getColumn(cell->colId);
+            const Axis* row = getRow(cell->rowId);
+            if (!col || !row) {
+                continue;
+            }
+
+            const std::vector<ID> dependents = _depGraph->getDependentsForCell(
+                cellId, static_cast<int32_t>(col->position), static_cast<int32_t>(row->position));
+
+            for (const ID& depId : dependents) {
+                if (markedDirty.find(depId) == markedDirty.end()) {
+                    queue.push_back(depId);
+                }
+            }
+        }
+
+        // Transitively mark all dependents as dirty
+        while (!queue.empty()) {
+            const ID depId = queue.back();
+            queue.pop_back();
+
+            if (markedDirty.find(depId) != markedDirty.end()) {
+                continue;  // Already processed
+            }
+            markedDirty.insert(depId);
+
+            // Mark this cell's formula as dirty
+            const Cell* const depCell = getCell(depId);
+            if (depCell) {
+                Formula* formula = depCell->getFormula();
+                if (formula) {
+                    formula->dirty = true;
+                }
+
+                // Add cells that depend on this cell to the queue (transitive)
+                // Get position for R-tree query
+                const Axis* col = getColumn(depCell->colId);
+                const Axis* row = getRow(depCell->rowId);
+                if (col && row) {
+                    const std::vector<ID> transitiveDeps =
+                        _depGraph->getDependentsForCell(depId, static_cast<int32_t>(col->position),
+                                                        static_cast<int32_t>(row->position));
+                    for (const ID& transDep : transitiveDeps) {
+                        if (markedDirty.find(transDep) == markedDirty.end()) {
+                            queue.push_back(transDep);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove all cells belonging to this sheet
+    for (const ID& cellId : cellIds) {
+        removeCell(cellId);
+    }
+
+    // Remove all ranges belonging to this sheet
+    for (const ID& rangeId : rangeIds) {
+        removeRange(rangeId);
+    }
+
+    // Remove all columns belonging to this sheet
+    for (const ID& colId : columnIds) {
+        removeColumn(colId);
+    }
+
+    // Remove all rows belonging to this sheet
+    for (const ID& rowId : rowIds) {
+        removeRow(rowId);
+    }
+
     // Remove from index
     _sheetIndex.erase(sheetId);
 
-    // Remove from vector
+    // Remove from vector (this destroys the Sheet object)
     sheets.erase(it);
 
     return true;

@@ -549,5 +549,203 @@ TEST_F(CrossSheetOperationsTest, SheetRename_EvaluationStillWorks) {
     EXPECT_DOUBLE_EQ(b1->value.asNumber(), 77.0);
 }
 
+// =============================================================================
+// 9c: Test Cross-Sheet Reference Becomes #REF! When Target Sheet Deleted
+// =============================================================================
+// When a sheet is deleted, all formulas referencing that sheet should
+// evaluate to #REF! error because the referenced cells no longer exist.
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_SimpleRefBecomesRefError) {
+    // Set up Sheet2!A1 = 42
+    Cell* sheet2A1 = setSheet2Value(0, 0, 42.0);
+    ID sheet2A1Id = sheet2A1->id;
+
+    // Create formula on Sheet1!B1 = =Sheet2!A1
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    // Check the AST has the cellId
+    ASSERT_NE(b1->getFormula(), nullptr);
+    ASSERT_NE(b1->getFormula()->ast, nullptr);
+
+    // Verify formula works initially
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result1.isNumber());
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 42.0);
+
+    // Verify Sheet2!A1 cell exists in workbook before delete
+    EXPECT_NE(workbook->getCell(sheet2A1Id), nullptr);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    bool removed = workbook->removeSheet(sheet2Id);
+    EXPECT_TRUE(removed);
+    sheet2 = nullptr;  // Invalidate pointer
+
+    // Verify Sheet2!A1 cell was removed from workbook
+    EXPECT_EQ(workbook->getCell(sheet2A1Id), nullptr);
+
+    // Re-evaluate formula - should now be #REF!
+    // The removeSheet operation should have marked dependent formulas as dirty
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_MultipleRefsAllBecomeRefError) {
+    // Set up Sheet2 values
+    setSheet2Value(0, 0, 10.0);  // A1
+    setSheet2Value(0, 1, 20.0);  // A2
+
+    // Create formula with multiple cross-sheet refs
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1+Sheet2!A2");
+    ASSERT_NE(b1, nullptr);
+
+    // Verify formula works initially
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 30.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Formula should be #REF!
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_MixedRefsOnlyDeletedBecomesRefError) {
+    // Set up Sheet1!A1 = 5, Sheet2!A1 = 10
+    setSheet1Value(0, 0, 5.0);
+    setSheet2Value(0, 0, 10.0);
+
+    // Create formula: =A1 + Sheet2!A1 (mixed local and cross-sheet)
+    Cell* b1 = setSheet1Formula(1, 0, "=A1+Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    // Verify formula works initially
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 15.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Formula should be #REF! (error from Sheet2!A1 propagates)
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_RangeRefBecomesRefError) {
+    // Set up Sheet2 values
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula with range: =SUM(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    // Verify formula works initially
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 6.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Formula should be #REF!
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_ChainedFormulasAllBecomeRefError) {
+    // Chain: Sheet2!A1 -> Sheet1!B1 -> Sheet1!C1
+    setSheet2Value(0, 0, 100.0);
+
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    Cell* c1 = setSheet1Formula(2, 0, "=B1*2");
+    ASSERT_NE(c1, nullptr);
+
+    // Verify chain works initially
+    EvalResult resultB1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(resultB1.getNumber(), 100.0);
+
+    EvalResult resultC1 = evaluateCell(sheet1, c1);
+    EXPECT_DOUBLE_EQ(resultC1.getNumber(), 200.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // B1 should be #REF! directly
+    EvalResult result2B1 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2B1.isError());
+    EXPECT_EQ(result2B1.getError(), CellError::REF);
+
+    // C1 should propagate the #REF! error
+    EvalResult result2C1 = evaluateCell(sheet1, c1);
+    EXPECT_TRUE(result2C1.isError());
+    EXPECT_EQ(result2C1.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_RecalculatesCorrectlyAfterDelete) {
+    // Set up Sheet2!A1 = 50
+    setSheet2Value(0, 0, 50.0);
+
+    // Create formula
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    // Evaluate and store in cell
+    evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 50.0);
+
+    // Delete Sheet2 - this should mark dependent formulas as dirty
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Recalculate - formula should already be dirty from sheet deletion
+    recalculate(workbook.get(), {b1->id});
+
+    // Cell should now have #REF! error
+    EXPECT_TRUE(b1->value.type == CellValueType::ERROR ||
+                b1->value.type == CellValueType::FORMULA_ERROR);
+    EXPECT_EQ(b1->value.error, CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, SheetDelete_AbsoluteRefBecomesRefError) {
+    // Set up Sheet2!B2 = 77
+    setSheet2Value(1, 1, 77.0);
+
+    // Create formula with absolute reference
+    Cell* a1 = setSheet1Formula(0, 0, "=Sheet2!$B$2");
+    ASSERT_NE(a1, nullptr);
+
+    // Verify formula works initially
+    EvalResult result1 = evaluateCell(sheet1, a1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 77.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Formula should be #REF!
+    EvalResult result2 = evaluateCell(sheet1, a1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
 }  // namespace
 }  // namespace cells

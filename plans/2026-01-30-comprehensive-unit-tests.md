@@ -151,58 +151,16 @@ New file: `formula_data_change_test.cc`
 
 New file: `cross_sheet_operations_test.cc`
 
-**Status: IN PROGRESS - Bug discovered, requires engine fix (see Phase 16)**
-
-### Completed Tests (16 tests)
+### Completed Tests
 - [x] 9a: Test cross-sheet formula references (Sheet2!A1) - 9 tests
-- [x] 9b: Test cross-sheet reference display updates when target sheet renamed - 6 tests
-  - Display correctly shows new sheet name after rename
-  - However, evaluation is broken (see bug below)
+- [x] 9b: Test cross-sheet reference display updates when target sheet renamed - 7 tests (includes evaluation verification after Phase 16 fix)
+- [x] 9c: Test cross-sheet reference becomes #REF! when target sheet deleted - 7 tests
+  - Tests exposed two engine bugs that were fixed:
+    1. `removeSheet` wasn't removing child entities (cells, columns, rows, ranges) from workbook storage
+    2. `removeSheet` wasn't marking dependent formulas as dirty (using transitive marking via dependency graph)
+  - Also fixed `evaluateCellRef` and `evaluateRangeRef` to return #REF! when resolved cellId is not found
 
-### Bug Discovered: Sheet Rename Breaks Formula Evaluation
-
-**File:** `core/cells/formula_eval.cc` lines 112-136
-
-**Root Cause Analysis:**
-
-When a formula like `=Sheet2!A1` is parsed and resolved:
-1. Parser stores `sheetName = "Sheet2"` in the AST
-2. Resolver stores `cellId = <UUID>` but does NOT clear `sheetName`
-3. Resolver comment (lines 162-165) states: "Cell UUIDs are globally unique, so the cell can be looked up directly via workbook.findCell()"
-
-But during evaluation (`evaluateCellRef`), the priority order is wrong:
-```cpp
-if (!node->sheetId.empty()) {
-    // Use sheetId (UUID) - CORRECT
-} else if (!node->sheetName.empty()) {
-    // Use sheetName (name lookup) - BUG: triggers for resolved formulas!
-} else {
-    // Use findCell(cellId) - CORRECT but never reached
-}
-```
-
-Since `sheetName` is preserved from parsing (not cleared by resolver), evaluation uses name lookup instead of UUID lookup. When the sheet is renamed, `getSheetByName("Sheet2")` returns nullptr, causing #REF! error.
-
-**Expected Behavior:** Sheet renames should have ZERO impact on formula evaluation because everything should be UUID-based.
-
-**Fix Required:** In `formula_eval.cc`, the evaluation should prioritize `cellId` (when available) over `sheetName`:
-```cpp
-if (!node->cellId.empty()) {
-    // Resolved formula: use findCell (UUID is globally unique)
-    auto [foundCell, foundSheet] = ctx.workbook->findCell(cellId);
-    ...
-} else if (!node->sheetId.empty()) {
-    // Explicit sheet UUID reference
-    ...
-} else if (!node->sheetName.empty()) {
-    // Unresolved formula: use name lookup
-    ...
-}
-```
-
-### Remaining Steps (blocked on Phase 16)
-- [ ] 9b-fix: Re-test sheet rename after engine fix - evaluation should work
-- [ ] 9c: Test cross-sheet reference becomes #REF! when target sheet deleted
+### Remaining Steps
 - [ ] 9d: Test cross-sheet range references
 - [ ] 9e: Test cross-sheet named range references
 - [ ] 9f: Test copying formulas between sheets updates references correctly
@@ -386,4 +344,7 @@ try { ... } catch (...) { /* ignore */ }
 **Total New Tests:** ~300-370
 
 **Bugs Discovered:**
-- Phase 9: Cross-sheet evaluation uses `sheetName` instead of `cellId` for resolved formulas, breaking sheet rename
+- Phase 9 (9a/9b): Cross-sheet evaluation uses `sheetName` instead of `cellId` for resolved formulas, breaking sheet rename (fixed in Phase 16)
+- Phase 9 (9c): `removeSheet` wasn't removing child entities from workbook storage - cells, columns, rows, and ranges belonging to the deleted sheet remained in workbook-level maps (fixed in 9c)
+- Phase 9 (9c): `removeSheet` wasn't marking dependent formulas as dirty - formulas referencing deleted cells would return stale cached values (fixed with transitive dependency marking in 9c)
+- Phase 9 (9c): `evaluateCellRef` and `evaluateRangeRef` would return 0 instead of #REF! when a resolved cellId was not found (cell was deleted) (fixed in 9c)
