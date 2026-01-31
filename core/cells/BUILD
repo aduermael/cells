@@ -372,6 +372,18 @@ cc_test(
 )
 
 cc_test(
+    name = "style_operations_test",
+    srcs = ["style_operations_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":range",
+        ":style_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "crdt_range_test",
     srcs = ["crdt_range_test.cc"],
     deps = [

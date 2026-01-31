@@ -8,12 +8,12 @@ This plan systematically expands unit test coverage for all supported operations
 
 New file: `style_operations_test.cc`
 
-- [ ] 1a: Test applying styles to individual cells via CELL_SET
-- [ ] 1b: Test applying styles to columns/rows via COL_SET/ROW_SET
-- [ ] 1c: Test applying styles to ranges via RANGE_SET with STYLE flag
-- [ ] 1d: Test style inheritance hierarchy (cell > range > row > column > sheet)
-- [ ] 1e: Test concurrent style changes from multiple peers (CRDT convergence)
-- [ ] 1f: Test all style properties (bold, italic, underline, strikethrough, font, size, colors, alignment, borders)
+- [x] 1a: Test applying styles to individual cells via CELL_SET (7 tests)
+- [x] 1b: Test applying styles to columns/rows via COL_SET/ROW_SET (5 tests)
+- [x] 1c: Test applying styles to ranges via RANGE_SET with STYLE flag (3 tests)
+- [x] 1d: Test style inheritance hierarchy (cell > range > row > column > sheet) (5 tests)
+- [x] 1e: Test concurrent style changes from multiple peers (CRDT convergence) (4 tests)
+- [x] 1f: Test all style properties (bold, italic, underline, strikethrough, font, size, colors, alignment, borders) (27 tests)
 
 ---
 
