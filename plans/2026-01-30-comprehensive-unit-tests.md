@@ -65,13 +65,13 @@ New file: `axis_move_resize_test.cc`
 
 New file: `range_boundary_test.cc`
 
-- [ ] 5a: Test range expands when column inserted inside range
-- [ ] 5b: Test range expands when row inserted inside range
-- [ ] 5c: Test range shrinks when column deleted from inside range
-- [ ] 5d: Test range shrinks when row deleted from inside range
-- [ ] 5e: Test range survives when boundary axis deleted (moves to next)
-- [ ] 5f: Test range deleted when all axes removed
-- [ ] 5g: Test all range flags during boundary changes (MERGE, STYLE, FORMAT, etc.)
+- [x] 5a: Test range expands when column inserted inside range (6 tests)
+- [x] 5b: Test range expands when row inserted inside range (6 tests)
+- [x] 5c: Test range shrinks when column deleted from inside range (5 tests)
+- [x] 5d: Test range shrinks when row deleted from inside range (5 tests)
+- [x] 5e: Test range survives when boundary axis deleted (moves to next) (5 tests)
+- [x] 5f: Test range deleted when all axes removed (7 tests)
+- [x] 5g: Test all range flags during boundary changes (MERGE, STYLE, FORMAT, etc.) (12 tests + 5 edge case tests)
 
 ---
 

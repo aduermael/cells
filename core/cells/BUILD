@@ -437,6 +437,17 @@ cc_test(
 )
 
 cc_test(
+    name = "range_boundary_test",
+    srcs = ["range_boundary_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":range",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "sync_formula_test",
     srcs = ["sync_formula_test.cc"],
     deps = [
