@@ -747,5 +747,303 @@ TEST_F(CrossSheetOperationsTest, SheetDelete_AbsoluteRefBecomesRefError) {
     EXPECT_EQ(result2.getError(), CellError::REF);
 }
 
+// =============================================================================
+// 9d: Test Cross-Sheet Range References
+// =============================================================================
+// Tests cross-sheet range references (Sheet2!A1:C3) including SUM, AVERAGE, MIN,
+// MAX, COUNT operations, recalculation, and multi-dimensional ranges.
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_SumFunction) {
+    // Set up Sheet2!A1:A3 = 1, 2, 3
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula on Sheet1!B1 = =SUM(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 6.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_AverageFunction) {
+    // Set up Sheet2!A1:A4 = 10, 20, 30, 40
+    setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    setSheet2Value(0, 2, 30.0);
+    setSheet2Value(0, 3, 40.0);
+
+    // Create formula on Sheet1!B1 = =AVERAGE(Sheet2!A1:A4)
+    Cell* b1 = setSheet1Formula(1, 0, "=AVERAGE(Sheet2!A1:A4)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 25.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_MinFunction) {
+    // Set up Sheet2!A1:A3 with mixed values
+    setSheet2Value(0, 0, 100.0);
+    setSheet2Value(0, 1, 5.0);
+    setSheet2Value(0, 2, 50.0);
+
+    // Create formula on Sheet1!B1 = =MIN(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=MIN(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_MaxFunction) {
+    // Set up Sheet2!A1:A3 with mixed values
+    setSheet2Value(0, 0, 15.0);
+    setSheet2Value(0, 1, 99.0);
+    setSheet2Value(0, 2, 42.0);
+
+    // Create formula on Sheet1!B1 = =MAX(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=MAX(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 99.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_CountFunction) {
+    // Set up Sheet2!A1:A5 with mix of numbers and empty cells
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    // A3 is empty
+    setSheet2Value(0, 3, 4.0);
+    setSheet2Value(0, 4, 5.0);
+
+    // Create formula on Sheet1!B1 = =COUNT(Sheet2!A1:A5)
+    Cell* b1 = setSheet1Formula(1, 0, "=COUNT(Sheet2!A1:A5)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 4.0);  // 4 numbers
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_MultiColumnRange) {
+    // Set up 2x3 range on Sheet2 (A1:B3)
+    // A1=1, B1=2
+    // A2=3, B2=4
+    // A3=5, B3=6
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(1, 0, 2.0);
+    setSheet2Value(0, 1, 3.0);
+    setSheet2Value(1, 1, 4.0);
+    setSheet2Value(0, 2, 5.0);
+    setSheet2Value(1, 2, 6.0);
+
+    // Create formula on Sheet1!C1 = =SUM(Sheet2!A1:B3)
+    Cell* c1 = setSheet1Formula(2, 0, "=SUM(Sheet2!A1:B3)");
+    ASSERT_NE(c1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, c1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 21.0);  // 1+2+3+4+5+6
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_MultiColumnAverage) {
+    // Set up 3x2 range on Sheet2 (A1:C2)
+    // A1=10, B1=20, C1=30
+    // A2=40, B2=50, C2=60
+    setSheet2Value(0, 0, 10.0);
+    setSheet2Value(1, 0, 20.0);
+    setSheet2Value(2, 0, 30.0);
+    setSheet2Value(0, 1, 40.0);
+    setSheet2Value(1, 1, 50.0);
+    setSheet2Value(2, 1, 60.0);
+
+    // Create formula on Sheet1!D1 = =AVERAGE(Sheet2!A1:C2)
+    Cell* d1 = setSheet1Formula(3, 0, "=AVERAGE(Sheet2!A1:C2)");
+    ASSERT_NE(d1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, d1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 35.0);  // (10+20+30+40+50+60)/6 = 210/6 = 35
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_RecalculatesWhenSourceChanges) {
+    // Set up Sheet2!A1:A3 = 1, 2, 3
+    Cell* a1 = setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula on Sheet1!B1 = =SUM(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 6.0);
+
+    // Change Sheet2!A1 to 100
+    a1->value = CellValue(100.0);
+
+    // Recalculate
+    recalculate(workbook.get(), {a1->id});
+
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 105.0);  // 100+2+3
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_DisplayUpdatesOnSheetRename) {
+    // Set up Sheet2!A1:A3
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    // Verify initial display
+    std::string display1 = getFormulaDisplay(sheet1, b1);
+    EXPECT_EQ(display1, "=SUM(Sheet2!A1:A3)");
+
+    // Rename Sheet2
+    sheet2->name = "DataSheet";
+
+    // Display should update
+    std::string display2 = getFormulaDisplay(sheet1, b1);
+    EXPECT_EQ(display2, "=SUM(DataSheet!A1:A3)");
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_EvaluationStillWorksAfterRename) {
+    // Set up Sheet2!A1:A3 = 10, 20, 30
+    setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    setSheet2Value(0, 2, 30.0);
+
+    // Create formula
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 60.0);
+
+    // Rename Sheet2
+    sheet2->name = "RenamedSheet";
+
+    // Evaluation should still work (UUID-based)
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result2.getNumber(), 60.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_BecomesRefErrorWhenSheetDeleted) {
+    // Set up Sheet2!A1:A3
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 6.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Formula should be #REF!
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_AbsoluteRange) {
+    // Set up Sheet2!A1:A3 = 5, 10, 15
+    setSheet2Value(0, 0, 5.0);
+    setSheet2Value(0, 1, 10.0);
+    setSheet2Value(0, 2, 15.0);
+
+    // Create formula with absolute references
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!$A$1:$A$3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 30.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_QuotedSheetNameWithSpaces) {
+    // Rename Sheet2 to have spaces
+    sheet2->name = "Sales Data";
+
+    // Set up values
+    setSheet2Value(0, 0, 100.0);
+    setSheet2Value(0, 1, 200.0);
+    setSheet2Value(0, 2, 300.0);
+
+    // Create formula with quoted sheet name
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM('Sales Data'!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 600.0);
+
+    // Verify display
+    std::string display = getFormulaDisplay(sheet1, b1);
+    EXPECT_EQ(display, "=SUM('Sales Data'!A1:A3)");
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_MixedLocalAndCrossSheetRanges) {
+    // Set up local values on Sheet1!A1:A2
+    setSheet1Value(0, 0, 10.0);
+    setSheet1Value(0, 1, 20.0);
+
+    // Set up cross-sheet values on Sheet2!A1:A2
+    setSheet2Value(0, 0, 100.0);
+    setSheet2Value(0, 1, 200.0);
+
+    // Create formula with both local and cross-sheet ranges
+    Cell* c1 = setSheet1Formula(2, 0, "=SUM(A1:A2)+SUM(Sheet2!A1:A2)");
+    ASSERT_NE(c1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, c1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 330.0);  // (10+20) + (100+200)
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_EmptyRangeReturnsZeroForSum) {
+    // Don't set any values on Sheet2 - all cells are empty
+
+    // Create formula referencing empty range
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetRange_PartiallyFilledRange) {
+    // Set only some values in the range
+    setSheet2Value(0, 0, 10.0);  // A1
+    // A2 is empty
+    setSheet2Value(0, 2, 30.0);  // A3
+    // A4 is empty
+    setSheet2Value(0, 4, 50.0);  // A5
+
+    // Create formula
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A5)");
+    ASSERT_NE(b1, nullptr);
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 90.0);  // 10+30+50
+}
+
 }  // namespace
 }  // namespace cells

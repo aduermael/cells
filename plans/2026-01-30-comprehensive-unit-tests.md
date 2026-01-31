@@ -161,7 +161,7 @@ New file: `cross_sheet_operations_test.cc`
   - Also fixed `evaluateCellRef` and `evaluateRangeRef` to return #REF! when resolved cellId is not found
 
 ### Remaining Steps
-- [ ] 9d: Test cross-sheet range references
+- [x] 9d: Test cross-sheet range references - 17 tests covering SUM/AVERAGE/MIN/MAX/COUNT functions, multi-column ranges, recalculation, sheet rename, sheet delete, and edge cases
 - [ ] 9e: Test cross-sheet named range references
 - [ ] 9f: Test copying formulas between sheets updates references correctly
 - [ ] 9g: Test concurrent cross-sheet edits from multiple peers
