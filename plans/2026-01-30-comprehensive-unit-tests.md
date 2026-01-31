@@ -190,13 +190,13 @@ New file: `named_ranges_operations_test.cc`
 
 New file: `cell_type_coercion_test.cc`
 
-- [ ] 11a: Test number stored in text-formatted cell
-- [ ] 11b: Test text stored in number-formatted cell
-- [ ] 11c: Test boolean stored in various format types
-- [ ] 11d: Test date/time value coercion
-- [ ] 11e: Test formula referencing mixed types
-- [ ] 11f: Test VALUE(), TEXT(), NUMBERVALUE() coercion functions
-- [ ] 11g: Test implicit coercion in arithmetic operations
+- [x] 11a: Test number stored in text-formatted cell - 7 tests (numeric strings, implicit coercion, scientific notation, etc.)
+- [x] 11b: Test text stored in number-formatted cell - 6 tests (text in number context, concat, empty string handling)
+- [x] 11c: Test boolean stored in various format types - 8 tests (boolean coercion to number/string, in SUM/AVERAGE)
+- [x] 11d: Test date/time value coercion - 5 tests (date serial arithmetic, time serial, date+time combined)
+- [x] 11e: Test formula referencing mixed types - 8 tests (SUM/COUNT/COUNTA/AVERAGE/MIN/MAX with mixed types, error propagation)
+- [x] 11f: Test VALUE(), TEXT(), NUMBERVALUE() coercion functions - 9 tests (VALUE with currency/percentage/invalid, TEXT with formats)
+- [x] 11g: Test implicit coercion in arithmetic operations - 21 tests (add/multiply/divide with numbers/booleans/strings, comparisons, edge cases)
 
 ---
 
