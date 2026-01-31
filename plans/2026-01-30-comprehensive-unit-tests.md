@@ -177,12 +177,12 @@ New file: `cross_sheet_operations_test.cc`
 New file: `named_ranges_operations_test.cc`
 
 - [x] 10a: Test creating workbook-scoped named ranges - 4 tests (cell reference, range reference, cross-sheet access, multi-column range)
-- [ ] 10b: Test creating sheet-scoped named ranges
-- [ ] 10c: Test named range in formulas (=SUM(MyRange))
-- [ ] 10d: Test named range boundaries update on insert/delete
-- [ ] 10e: Test named range deletion causes #NAME? in formulas
-- [ ] 10f: Test renaming named ranges updates formula display
-- [ ] 10g: Test scope precedence (sheet scope overrides workbook scope)
+- [x] 10b: Test creating sheet-scoped named ranges - 3 tests (cell reference, not accessible from other sheet, same name different sheets)
+- [x] 10c: Test named range in formulas (=SUM(MyRange)) - 7 tests (SUM, AVERAGE, MIN, MAX, COUNT, mixed with cell refs, arithmetic expressions)
+- [x] 10d: Test named range boundaries update on insert/delete - 5 tests (insert column, insert row, delete cell, delete middle cell, delete both boundaries)
+- [x] 10e: Test named range deletion causes #NAME? in formulas - 3 tests (workbook-scoped cell, workbook-scoped range, sheet-scoped)
+- [x] 10f: Test renaming named ranges updates formula display - 3 tests (rename workbook-scoped, display shows name, display in function)
+- [x] 10g: Test scope precedence (sheet scope overrides workbook scope) - 4 tests (sheet shadows workbook, workbook visible from other sheet, remove sheet falls back, range references)
 
 ---
 
