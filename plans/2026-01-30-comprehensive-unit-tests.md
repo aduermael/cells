@@ -48,13 +48,13 @@ New file: `axis_insert_delete_test.cc`
 
 New file: `axis_move_resize_test.cc`
 
-- [ ] 4a: Test column move (position swap) with formula reference updates
-- [ ] 4b: Test row move (position swap) with formula reference updates
-- [ ] 4c: Test column resize preserving cell data
-- [ ] 4d: Test row resize preserving cell data
-- [ ] 4e: Test moving axis that is part of a range boundary
-- [ ] 4f: Test concurrent move operations from multiple peers
-- [ ] 4g: Test axis hidden/shown toggle with formula visibility
+- [x] 4a: Test column move (position swap) with formula reference updates (7 tests)
+- [x] 4b: Test row move (position swap) with formula reference updates (7 tests)
+- [x] 4c: Test column resize preserving cell data (5 tests)
+- [x] 4d: Test row resize preserving cell data (5 tests)
+- [x] 4e: Test moving axis that is part of a range boundary (4 tests)
+- [x] 4f: Test concurrent move operations from multiple peers (6 tests)
+- [x] 4g: Test axis hidden/shown toggle with formula visibility (10 tests)
 
 ---
 

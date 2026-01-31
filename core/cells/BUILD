@@ -423,6 +423,20 @@ cc_test(
 )
 
 cc_test(
+    name = "axis_move_resize_test",
+    srcs = ["axis_move_resize_test.cc"],
+    deps = [
+        ":crdt",
+        ":formula_display",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":range",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "sync_formula_test",
     srcs = ["sync_formula_test.cc"],
     deps = [
