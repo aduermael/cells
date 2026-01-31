@@ -1061,6 +1061,24 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "cross_sheet_operations_test",
+    srcs = ["cross_sheet_operations_test.cc"],
+    shard_count = 4,
+    deps = [
+        ":crdt",
+        ":formula_display",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":formula_serializer",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "fill_range",
     srcs = ["fill_range.cc"],

@@ -6,6 +6,35 @@ This plan systematically expands unit test coverage for all supported operations
 
 ---
 
+## Testing Philosophy
+
+**The purpose of unit tests is to discover bugs, not to document limitations.**
+
+### Core Principles
+
+1. **No Workarounds in Tests**: Tests must NEVER use workarounds that hide engine issues. Examples of forbidden patterns:
+   - Setting `formula->dirty = true` to force re-evaluation
+   - Manually calling internal functions to "fix up" state
+   - Skipping assertions because "the engine doesn't support this yet"
+   - Catching and ignoring errors that should not occur
+
+2. **Tests Reflect Reality**: If a test fails, either:
+   - The test expectation is wrong (fix the test)
+   - The engine has a bug (fix the engine)
+   - Never add workarounds to make a failing test pass
+
+3. **Bugs Surface Fixes**: When tests reveal bugs:
+   - Document the bug clearly in the plan
+   - Create a dedicated phase to fix the bug if needed
+   - Fix the engine, then verify the test passes naturally
+
+4. **UUID-Based Architecture**: Everything should be indexed by UUID:
+   - Sheets are identified by UUID, not name
+   - Renaming a sheet should only update the name-to-UUID index
+   - Sheet renames must have ZERO impact on formula resolution or evaluation
+
+---
+
 ## Phase 1: Style Operations Testing
 
 New file: `style_operations_test.cc`
@@ -122,8 +151,57 @@ New file: `formula_data_change_test.cc`
 
 New file: `cross_sheet_operations_test.cc`
 
-- [ ] 9a: Test cross-sheet formula references (Sheet2!A1)
-- [ ] 9b: Test cross-sheet reference updates when target sheet renamed
+**Status: IN PROGRESS - Bug discovered, requires engine fix (see Phase 16)**
+
+### Completed Tests (16 tests)
+- [x] 9a: Test cross-sheet formula references (Sheet2!A1) - 9 tests
+- [x] 9b: Test cross-sheet reference display updates when target sheet renamed - 6 tests
+  - Display correctly shows new sheet name after rename
+  - However, evaluation is broken (see bug below)
+
+### Bug Discovered: Sheet Rename Breaks Formula Evaluation
+
+**File:** `core/cells/formula_eval.cc` lines 112-136
+
+**Root Cause Analysis:**
+
+When a formula like `=Sheet2!A1` is parsed and resolved:
+1. Parser stores `sheetName = "Sheet2"` in the AST
+2. Resolver stores `cellId = <UUID>` but does NOT clear `sheetName`
+3. Resolver comment (lines 162-165) states: "Cell UUIDs are globally unique, so the cell can be looked up directly via workbook.findCell()"
+
+But during evaluation (`evaluateCellRef`), the priority order is wrong:
+```cpp
+if (!node->sheetId.empty()) {
+    // Use sheetId (UUID) - CORRECT
+} else if (!node->sheetName.empty()) {
+    // Use sheetName (name lookup) - BUG: triggers for resolved formulas!
+} else {
+    // Use findCell(cellId) - CORRECT but never reached
+}
+```
+
+Since `sheetName` is preserved from parsing (not cleared by resolver), evaluation uses name lookup instead of UUID lookup. When the sheet is renamed, `getSheetByName("Sheet2")` returns nullptr, causing #REF! error.
+
+**Expected Behavior:** Sheet renames should have ZERO impact on formula evaluation because everything should be UUID-based.
+
+**Fix Required:** In `formula_eval.cc`, the evaluation should prioritize `cellId` (when available) over `sheetName`:
+```cpp
+if (!node->cellId.empty()) {
+    // Resolved formula: use findCell (UUID is globally unique)
+    auto [foundCell, foundSheet] = ctx.workbook->findCell(cellId);
+    ...
+} else if (!node->sheetId.empty()) {
+    // Explicit sheet UUID reference
+    ...
+} else if (!node->sheetName.empty()) {
+    // Unresolved formula: use name lookup
+    ...
+}
+```
+
+### Remaining Steps (blocked on Phase 16)
+- [ ] 9b-fix: Re-test sheet rename after engine fix - evaluation should work
 - [ ] 9c: Test cross-sheet reference becomes #REF! when target sheet deleted
 - [ ] 9d: Test cross-sheet range references
 - [ ] 9e: Test cross-sheet named range references
@@ -215,6 +293,71 @@ Extend: `crdt_test.cc` (or new `crdt_conflict_test.cc` if too large)
 
 ---
 
+## Phase 16: Fix Cross-Sheet Evaluation Bug
+
+**Priority: HIGH** - This bug breaks fundamental UUID-based architecture guarantees.
+
+Files to modify:
+- `core/cells/formula_eval.cc`
+
+### Bug Summary
+Sheet renames break formula evaluation because `evaluateCellRef()` checks `sheetName` (from parsing) before checking `cellId` (from resolution). The fix is to prioritize `cellId` for resolved formulas.
+
+### Steps
+- [ ] 16a: Fix `evaluateCellRef()` in `formula_eval.cc` to check `cellId` first
+- [ ] 16b: Fix `evaluateRangeRef()` similarly (uses topLeft/bottomRight cell refs)
+- [ ] 16c: Verify all 16 existing cross-sheet tests pass without workarounds
+- [ ] 16d: Remove the temporary `SheetRename_FormulaBecomesRefError` test (it documents the bug, not correct behavior)
+- [ ] 16e: Add proper test: `SheetRename_EvaluationStillWorks` that passes naturally
+- [ ] 16f: Run full test suite to ensure no regressions
+
+### Verification
+After this phase:
+- Renaming a sheet must have ZERO impact on formula evaluation
+- All cross-sheet formulas must resolve via UUID, not name
+- The display system already works correctly (it uses `findCell` properly)
+
+---
+
+## Phase 17: Audit All Tests for Workarounds
+
+**Purpose:** Ensure no tests added in this plan contain workarounds that hide engine bugs.
+
+### Forbidden Patterns to Search For
+```cpp
+// Pattern 1: Forcing dirty flag
+formula->dirty = true;
+
+// Pattern 2: Manual state manipulation
+cell->value = CellValue(...);  // Before evaluation to "fix" state
+
+// Pattern 3: Ignoring expected failures
+// EXPECT_... commented out with "known issue" notes
+
+// Pattern 4: Try-catch hiding errors
+try { ... } catch (...) { /* ignore */ }
+```
+
+### Files to Audit
+- [ ] 17a: `style_operations_test.cc`
+- [ ] 17b: `format_operations_test.cc`
+- [ ] 17c: `axis_insert_delete_test.cc`
+- [ ] 17d: `axis_move_resize_test.cc`
+- [ ] 17e: `range_boundary_test.cc`
+- [ ] 17f: `merged_cells_test.cc`
+- [ ] 17g: `formula_error_test.cc`
+- [ ] 17h: `formula_data_change_test.cc`
+- [ ] 17i: `cross_sheet_operations_test.cc`
+- [ ] 17j: Any other test files added by this plan
+
+### Action for Each File
+1. Search for forbidden patterns
+2. If found: determine if it's hiding a bug
+3. If hiding a bug: create issue/phase to fix the engine
+4. Remove the workaround and let the test fail until engine is fixed
+
+---
+
 ## Summary
 
 | Phase | Focus Area | New/Extended File | Est. Tests |
@@ -234,5 +377,10 @@ Extend: `crdt_test.cc` (or new `crdt_conflict_test.cc` if too large)
 | 13 | Op Sequences | operation_sequence_test.cc | 15-20 |
 | 14 | Edge Cases | edge_cases_test.cc | 25-30 |
 | 15 | CRDT Conflicts | crdt_conflict_test.cc | 20-25 |
+| **16** | **Fix Cross-Sheet Bug** | **formula_eval.cc** | **Engine fix** |
+| **17** | **Audit for Workarounds** | **All test files** | **Audit** |
 
 **Total New Tests:** ~300-370
+
+**Bugs Discovered:**
+- Phase 9: Cross-sheet evaluation uses `sheetName` instead of `cellId` for resolved formulas, breaking sheet rename
