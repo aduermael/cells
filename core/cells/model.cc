@@ -313,7 +313,9 @@ Workbook::Workbook()
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _depGraph(std::make_unique<DependencyGraph>()) {}
+      _depGraph(std::make_unique<DependencyGraph>()) {
+    setupNamedRangeRemovalCallback();
+}
 
 Workbook::Workbook(const ID& id, std::string name)
     : id(id),
@@ -321,9 +323,39 @@ Workbook::Workbook(const ID& id, std::string name)
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _depGraph(std::make_unique<DependencyGraph>()) {}
+      _depGraph(std::make_unique<DependencyGraph>()) {
+    setupNamedRangeRemovalCallback();
+}
 
 Workbook::~Workbook() = default;
+
+void Workbook::setupNamedRangeRemovalCallback() {
+    _namedRanges->setRemovalCallback(
+        [this](const std::string& name, NamedRangeScope scope, const ID& sheetId) {
+            if (!_depGraph) {
+                return;
+            }
+
+            // Get dependent cell IDs based on scope
+            std::vector<ID> dependents;
+            if (scope == NamedRangeScope::WORKBOOK) {
+                dependents = _depGraph->getDependentsForWorkbookNamedRange(name);
+            } else {
+                dependents = _depGraph->getDependentsForSheetNamedRange(name, sheetId);
+            }
+
+            // Mark each dependent formula as dirty
+            for (const ID& cellId : dependents) {
+                const Cell* cell = getCell(cellId);
+                if (cell) {
+                    Formula* formula = cell->getFormula();
+                    if (formula) {
+                        formula->dirty = true;
+                    }
+                }
+            }
+        });
+}
 
 Sheet* Workbook::getSheet(const ID& sheetId) {
     auto it = _sheetIndex.find(sheetId);

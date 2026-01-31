@@ -1214,6 +1214,9 @@ private:
     // Helper for building composite position keys
     static std::string makePositionKey(const ID& colId, const ID& rowId);
 
+    // Set up callback to mark dependent formulas dirty when named ranges are removed
+    void setupNamedRangeRemovalCallback();
+
     // ========================================================================
     // Workbook-level range storage (primary storage)
     // ========================================================================

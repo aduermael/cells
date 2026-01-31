@@ -726,11 +726,14 @@ TEST_F(NamedRangesOperationsTest, DeletedName_CausesNameError) {
     EvalResult result1 = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 50.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Delete the named range
     workbook->getNamedRanges()->removeWorkbook("TempName");
 
-    // Force re-evaluation by marking dirty
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Should now return #NAME! error
     EvalResult result2 = evaluate(b1->getFormula()->ast, ctx);
@@ -760,11 +763,14 @@ TEST_F(NamedRangesOperationsTest, DeletedName_RangeReference) {
     EvalResult result1 = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 60.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Delete the named range
     workbook->getNamedRanges()->removeWorkbook("TempRange");
 
-    // Force re-evaluation
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Should now return #NAME! error
     EvalResult result2 = evaluate(b1->getFormula()->ast, ctx);
@@ -792,11 +798,14 @@ TEST_F(NamedRangesOperationsTest, DeletedSheetScopedName_CausesNameError) {
     EvalResult result1 = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 100.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Delete the sheet-scoped named range
     workbook->getNamedRanges()->removeSheet("LocalName", sheet1->id);
 
-    // Force re-evaluation
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Should now return #NAME! error
     EvalResult result2 = evaluate(b1->getFormula()->ast, ctx);
@@ -826,9 +835,15 @@ TEST_F(NamedRangesOperationsTest, RenameWorkbookScoped_FormulaDisplayUpdates) {
     std::string display1 = getFormulaDisplay(sheet1, b1);
     EXPECT_EQ(display1, "=OldName");
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // "Rename" by removing old and adding new with same target
     workbook->getNamedRanges()->removeWorkbook("OldName");
     workbook->getNamedRanges()->defineWorkbook("NewName", target);
+
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Note: The formula AST still has "OldName" stored in it.
     // Formula display would show "OldName" unless we re-parse.
@@ -841,7 +856,6 @@ TEST_F(NamedRangesOperationsTest, RenameWorkbookScoped_FormulaDisplayUpdates) {
     ctx.sheet = sheet1;
     ctx.workbook = workbook.get();
     ctx.namedRanges = workbook->getNamedRanges();
-    b1->getFormula()->dirty = true;
     EvalResult result = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_TRUE(result.isError());
     EXPECT_EQ(result.getError(), CellError::NAME);
@@ -970,11 +984,14 @@ TEST_F(NamedRangesOperationsTest, ScopePrecedence_RemoveSheetScopedFallsBackToWo
     EvalResult result1 = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 200.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Remove sheet-scoped name
     workbook->getNamedRanges()->removeSheet("Value", sheet1->id);
 
-    // Force re-evaluation
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Now workbook-scoped should be visible
     EvalResult result2 = evaluate(b1->getFormula()->ast, ctx);
@@ -1009,6 +1026,180 @@ TEST_F(NamedRangesOperationsTest, ScopePrecedence_RangeReferences) {
     // Sheet-scoped takes precedence, should sum to 300
     EvalResult result = evaluate(b1->getFormula()->ast, ctx);
     EXPECT_DOUBLE_EQ(result.getNumber(), 300.0);
+}
+
+// =============================================================================
+// Named Range Automatic Dirty Marking Tests
+// =============================================================================
+// These tests verify that deleting a named range automatically marks all
+// dependent formulas as dirty, eliminating the need for manual dirty marking.
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_WorkbookScope_SingleFormula) {
+    // Set up A1 = 42
+    Cell* a1 = setSheet1Value(0, 0, 42.0);
+
+    auto target = NamedRangeTarget::cell(a1->id, sheet1->id);
+    workbook->getNamedRanges()->defineWorkbook("TestValue", target);
+
+    // Create formula =TestValue
+    Cell* b1 = setSheet1Formula(1, 0, "=TestValue");
+    ASSERT_NE(b1, nullptr);
+
+    // Manually clear dirty flag
+    b1->getFormula()->dirty = false;
+
+    // Delete the named range
+    workbook->getNamedRanges()->removeWorkbook("TestValue");
+
+    // Formula should be automatically marked dirty
+    EXPECT_TRUE(b1->getFormula()->dirty);
+}
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_WorkbookScope_MultipleFormulas) {
+    // Set up A1 = 10
+    Cell* a1 = setSheet1Value(0, 0, 10.0);
+
+    auto target = NamedRangeTarget::cell(a1->id, sheet1->id);
+    workbook->getNamedRanges()->defineWorkbook("SharedName", target);
+
+    // Create multiple formulas referencing the same named range
+    Cell* b1 = setSheet1Formula(1, 0, "=SharedName");
+    Cell* b2 = setSheet1Formula(1, 1, "=SharedName+1");
+    Cell* b3 = setSheet1Formula(1, 2, "=SUM(SharedName,A1)");
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(b2, nullptr);
+    ASSERT_NE(b3, nullptr);
+
+    // Clear dirty flags
+    b1->getFormula()->dirty = false;
+    b2->getFormula()->dirty = false;
+    b3->getFormula()->dirty = false;
+
+    // Delete the named range
+    workbook->getNamedRanges()->removeWorkbook("SharedName");
+
+    // All formulas should be automatically marked dirty
+    EXPECT_TRUE(b1->getFormula()->dirty);
+    EXPECT_TRUE(b2->getFormula()->dirty);
+    EXPECT_TRUE(b3->getFormula()->dirty);
+}
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_SheetScope_OnlyAffectsCorrectSheet) {
+    // Create Sheet2
+    auto sheet2 = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    workbook->addSheet(std::move(sheet2));
+    Sheet* sheet2Ptr = workbook->getSheetByIndex(1);
+    ASSERT_NE(sheet2Ptr, nullptr);
+
+    // Set up cells
+    Cell* a1_sheet1 = setSheet1Value(0, 0, 100.0);
+    Axis* col2 = sheet2Ptr->getOrCreateColumnByPosition(0);
+    Axis* row2 = sheet2Ptr->getOrCreateRowByPosition(0);
+    Cell* a1_sheet2 = sheet2Ptr->getOrCreateCellAt(col2->id, row2->id);
+    a1_sheet2->value = CellValue(200.0);
+
+    // Create sheet-scoped named range on Sheet1 only
+    auto target = NamedRangeTarget::cell(a1_sheet1->id, sheet1->id);
+    workbook->getNamedRanges()->defineSheet("LocalName", sheet1->id, target);
+
+    // Create formula on Sheet1 referencing LocalName
+    Cell* b1_sheet1 = setSheet1Formula(1, 0, "=LocalName");
+    ASSERT_NE(b1_sheet1, nullptr);
+
+    // Create formula on Sheet2 (won't see LocalName, would get #NAME!)
+    // But we can't easily create a formula on another sheet with this helper
+    // So just test Sheet1 formula
+
+    // Clear dirty flag
+    b1_sheet1->getFormula()->dirty = false;
+
+    // Delete the sheet-scoped named range
+    workbook->getNamedRanges()->removeSheet("LocalName", sheet1->id);
+
+    // Formula on Sheet1 should be marked dirty
+    EXPECT_TRUE(b1_sheet1->getFormula()->dirty);
+}
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_RangeReference) {
+    // Set up A1:A3 = 10, 20, 30
+    Cell* topLeft = setSheet1Value(0, 0, 10.0);
+    setSheet1Value(0, 1, 20.0);
+    Cell* bottomRight = setSheet1Value(0, 2, 30.0);
+
+    auto target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet1->id);
+    workbook->getNamedRanges()->defineWorkbook("DataRange", target);
+
+    // Create formula =SUM(DataRange)
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(DataRange)");
+    ASSERT_NE(b1, nullptr);
+
+    // Clear dirty flag
+    b1->getFormula()->dirty = false;
+
+    // Delete the named range
+    workbook->getNamedRanges()->removeWorkbook("DataRange");
+
+    // Formula should be automatically marked dirty
+    EXPECT_TRUE(b1->getFormula()->dirty);
+}
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_RemoveAllForSheet) {
+    // Set up values
+    Cell* a1 = setSheet1Value(0, 0, 10.0);
+    Cell* a2 = setSheet1Value(0, 1, 20.0);
+
+    // Create multiple sheet-scoped named ranges
+    auto target1 = NamedRangeTarget::cell(a1->id, sheet1->id);
+    auto target2 = NamedRangeTarget::cell(a2->id, sheet1->id);
+    workbook->getNamedRanges()->defineSheet("Name1", sheet1->id, target1);
+    workbook->getNamedRanges()->defineSheet("Name2", sheet1->id, target2);
+
+    // Create formulas referencing each
+    Cell* b1 = setSheet1Formula(1, 0, "=Name1");
+    Cell* b2 = setSheet1Formula(1, 1, "=Name2");
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(b2, nullptr);
+
+    // Clear dirty flags
+    b1->getFormula()->dirty = false;
+    b2->getFormula()->dirty = false;
+
+    // Remove all named ranges for Sheet1
+    workbook->getNamedRanges()->removeAllForSheet(sheet1->id);
+
+    // Both formulas should be automatically marked dirty
+    EXPECT_TRUE(b1->getFormula()->dirty);
+    EXPECT_TRUE(b2->getFormula()->dirty);
+}
+
+TEST_F(NamedRangesOperationsTest, AutomaticDirtyMarking_NoEffectOnUnrelatedFormulas) {
+    // Set up values
+    Cell* a1 = setSheet1Value(0, 0, 10.0);
+    setSheet1Value(0, 1, 20.0);  // A2 used in formula below
+
+    // Create named range pointing to A1
+    auto target = NamedRangeTarget::cell(a1->id, sheet1->id);
+    workbook->getNamedRanges()->defineWorkbook("UsedName", target);
+
+    // Create formula referencing the named range
+    Cell* b1 = setSheet1Formula(1, 0, "=UsedName");
+    ASSERT_NE(b1, nullptr);
+
+    // Create formula NOT referencing any named range
+    Cell* b2 = setSheet1Formula(1, 1, "=A2+1");
+    ASSERT_NE(b2, nullptr);
+
+    // Clear dirty flags
+    b1->getFormula()->dirty = false;
+    b2->getFormula()->dirty = false;
+
+    // Delete the named range
+    workbook->getNamedRanges()->removeWorkbook("UsedName");
+
+    // Only b1 should be marked dirty (uses the named range)
+    EXPECT_TRUE(b1->getFormula()->dirty);
+    // b2 should NOT be marked dirty (doesn't use any named range)
+    EXPECT_FALSE(b2->getFormula()->dirty);
 }
 
 }  // namespace

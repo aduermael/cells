@@ -125,6 +125,19 @@ public:
     // Check if a cell is volatile
     [[nodiscard]] bool isVolatile(const ID& cellId) const;
 
+    // ========================================================================
+    // Named Range Dependency Tracking
+    // ========================================================================
+
+    // Get cells that depend on a workbook-scoped named range
+    // Returns cell IDs that reference this name and resolved to workbook scope
+    [[nodiscard]] std::vector<ID> getDependentsForWorkbookNamedRange(const std::string& name) const;
+
+    // Get cells that depend on a sheet-scoped named range
+    // Returns cell IDs that reference this name and resolved to sheet scope
+    [[nodiscard]] std::vector<ID> getDependentsForSheetNamedRange(const std::string& name,
+                                                                  const ID& sheetId) const;
+
     // Detect circular reference starting from a cell
     // Returns the cycle path if found, empty vector if no cycle
     [[nodiscard]] std::vector<ID> detectCycle(const ID& startCellId) const;
@@ -163,6 +176,22 @@ private:
 
     // Set of cells containing volatile functions
     std::unordered_set<ID> volatileCells_;
+
+    // ========================================================================
+    // Named Range Dependency Tracking
+    // ========================================================================
+    //
+    // Maps named range keys to dependent cell IDs.
+    // For workbook scope: key = name
+    // For sheet scope: key = "sheetId:name" (same format as NamedRangeRegistry)
+    //
+    // This enables marking dependent formulas dirty when a named range is
+    // deleted or renamed.
+    std::unordered_map<std::string, std::unordered_set<ID, IDHash>> namedRangeDependents_;
+
+    // Reverse mapping: cell ID -> named range keys it depends on
+    // Used for cleanup in removeFormula()
+    std::unordered_map<ID, std::vector<std::string>, IDHash> cellNamedRangeDeps_;
 
     // Helper to convert column position to column coordinate
     // Position is 0-indexed, stored in Axis

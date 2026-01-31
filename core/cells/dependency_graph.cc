@@ -21,6 +21,12 @@ public:
     ReferenceExtractor(const NamedRangeRegistry* registry, const ID& sheetId)
         : namedRegistry_(registry), sheetId_(sheetId) {}
 
+    // Get the named range keys that were resolved during extraction
+    // Keys are in the format: name (for workbook scope) or "sheetId:name" (for sheet scope)
+    [[nodiscard]] const std::vector<std::string>& getNamedRangeKeys() const {
+        return namedRangeKeys_;
+    }
+
     void extract(const ASTNode* node, std::vector<DependencyRef>& refs, int depth = 0) {
         if (!node) {
             return;
@@ -144,6 +150,16 @@ public:
                     auto* namedRef = static_cast<const NamedRefNode*>(node);
                     const NamedRange* range = namedRegistry_->resolve(namedRef->name, sheetId_);
                     if (range) {
+                        // Record the named range key for dependency tracking
+                        // This allows us to mark formulas dirty when the named range is deleted
+                        if (range->scope == NamedRangeScope::WORKBOOK) {
+                            namedRangeKeys_.push_back(namedRef->name);
+                        } else {
+                            // Sheet-scoped: use "sheetId:name" format
+                            namedRangeKeys_.push_back(range->scopeSheetId.toString() + ":" +
+                                                      namedRef->name);
+                        }
+
                         // Convert the named range target to DependencyRef
                         DependencyRef info;
                         info.sourceStart = static_cast<int32_t>(namedRef->position.start);
@@ -243,6 +259,7 @@ public:
 private:
     const NamedRangeRegistry* namedRegistry_ = nullptr;
     ID sheetId_;
+    std::vector<std::string> namedRangeKeys_;
 };
 
 }  // namespace
@@ -275,6 +292,15 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast,
 
     // Store for direct lookup
     dependencies_[cellId] = refs;
+
+    // Store named range dependencies (for marking dirty when named range is deleted)
+    const auto& namedRangeKeys = extractor.getNamedRangeKeys();
+    if (!namedRangeKeys.empty()) {
+        cellNamedRangeDeps_[cellId] = namedRangeKeys;
+        for (const auto& key : namedRangeKeys) {
+            namedRangeDependents_[key].insert(cellId);
+        }
+    }
 
     // Populate reverse index for O(1) getDependents() lookups
     // and R-tree for range queries
@@ -365,6 +391,22 @@ void DependencyGraph::removeFormula(const ID& cellId) {
                 }
             }
         }
+    }
+
+    // Clean up named range dependencies
+    auto namedIt = cellNamedRangeDeps_.find(cellId);
+    if (namedIt != cellNamedRangeDeps_.end()) {
+        for (const auto& key : namedIt->second) {
+            auto rangeIt = namedRangeDependents_.find(key);
+            if (rangeIt != namedRangeDependents_.end()) {
+                rangeIt->second.erase(cellId);
+                // Clean up empty sets to save memory
+                if (rangeIt->second.empty()) {
+                    namedRangeDependents_.erase(rangeIt);
+                }
+            }
+        }
+        cellNamedRangeDeps_.erase(namedIt);
     }
 
     // Remove from dependencies
@@ -599,6 +641,8 @@ void DependencyGraph::clear() {
     reverseDeps_.clear();
     cellRects_.clear();
     volatileCells_.clear();
+    namedRangeDependents_.clear();
+    cellNamedRangeDeps_.clear();
 }
 
 void DependencyGraph::rebuildRTree(const PositionResolver& resolver) {
@@ -672,6 +716,33 @@ void DependencyGraph::rebuildRTree(const PositionResolver& resolver) {
 
 int32_t DependencyGraph::positionToCoord(uint32_t position) {
     return static_cast<int32_t>(position);
+}
+
+std::vector<ID> DependencyGraph::getDependentsForWorkbookNamedRange(const std::string& name) const {
+    std::vector<ID> result;
+    auto it = namedRangeDependents_.find(name);
+    if (it != namedRangeDependents_.end()) {
+        result.reserve(it->second.size());
+        for (const auto& id : it->second) {
+            result.push_back(id);
+        }
+    }
+    return result;
+}
+
+std::vector<ID> DependencyGraph::getDependentsForSheetNamedRange(const std::string& name,
+                                                                 const ID& sheetId) const {
+    std::vector<ID> result;
+    // Use the same key format as NamedRangeRegistry: "sheetId:name"
+    const std::string key = sheetId.toString() + ":" + name;
+    auto it = namedRangeDependents_.find(key);
+    if (it != namedRangeDependents_.end()) {
+        result.reserve(it->second.size());
+        for (const auto& id : it->second) {
+            result.push_back(id);
+        }
+    }
+    return result;
 }
 
 }  // namespace cells

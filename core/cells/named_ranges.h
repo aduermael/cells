@@ -1,8 +1,10 @@
 #ifndef CELLS_NAMED_RANGES_H_
 #define CELLS_NAMED_RANGES_H_
 
+#include <functional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -63,12 +65,24 @@ struct NamedRange {
     NamedRangeTarget target;  // What the name refers to
 };
 
+// Callback type for named range removal notifications
+// Parameters: name, scope, sheetId (only valid for SHEET scope)
+using NamedRangeRemovalCallback =
+    std::function<void(const std::string& name, NamedRangeScope scope, const ID& sheetId)>;
+
 // Registry for named ranges
 // Supports both workbook-scoped (global) and sheet-scoped (local) names
 // Sheet-scoped names shadow workbook-scoped names when resolving
 class NamedRangeRegistry {
 public:
     NamedRangeRegistry() = default;
+
+    // Set a callback to be invoked when a named range is removed
+    // The callback receives the name, scope, and sheetId (for sheet-scoped ranges)
+    // Used by Workbook to mark dependent formulas dirty
+    void setRemovalCallback(NamedRangeRemovalCallback callback) {
+        _removalCallback = std::move(callback);
+    }
 
     // Define a workbook-scoped named range (global)
     // Returns false if a workbook-scoped name with this name already exists
@@ -119,6 +133,9 @@ private:
 
     // Sheet-scoped named ranges (sheetId:name -> NamedRange)
     std::unordered_map<std::string, NamedRange> _sheetScoped;
+
+    // Callback invoked when a named range is removed
+    NamedRangeRemovalCallback _removalCallback;
 };
 
 }  // namespace cells

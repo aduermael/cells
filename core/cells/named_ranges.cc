@@ -77,6 +77,12 @@ bool NamedRangeRegistry::removeWorkbook(const std::string& name) {
     if (it == _workbookScoped.end()) {
         return false;
     }
+
+    // Notify callback before removal so dependent formulas can be marked dirty
+    if (_removalCallback) {
+        _removalCallback(name, NamedRangeScope::WORKBOOK, ID());
+    }
+
     _workbookScoped.erase(it);
     return true;
 }
@@ -91,6 +97,12 @@ bool NamedRangeRegistry::removeSheet(const std::string& name, const ID& sheetId)
     if (it == _sheetScoped.end()) {
         return false;
     }
+
+    // Notify callback before removal so dependent formulas can be marked dirty
+    if (_removalCallback) {
+        _removalCallback(name, NamedRangeScope::SHEET, sheetId);
+    }
+
     _sheetScoped.erase(it);
     return true;
 }
@@ -102,15 +114,22 @@ void NamedRangeRegistry::removeAllForSheet(const ID& sheetId) {
 
     const std::string prefix = sheetId.toString() + ":";
 
-    // Collect keys to remove (can't modify map while iterating)
-    std::vector<std::string> keysToRemove;
-    for (const auto& [key, _] : _sheetScoped) {
+    // Collect keys and names to remove (can't modify map while iterating)
+    std::vector<std::pair<std::string, std::string>> toRemove;  // (key, name)
+    for (const auto& [key, nr] : _sheetScoped) {
         if (key.compare(0, prefix.size(), prefix) == 0) {
-            keysToRemove.push_back(key);
+            toRemove.emplace_back(key, nr.name);
         }
     }
 
-    for (const auto& key : keysToRemove) {
+    // Notify callback for each removal
+    if (_removalCallback) {
+        for (const auto& [key, name] : toRemove) {
+            _removalCallback(name, NamedRangeScope::SHEET, sheetId);
+        }
+    }
+
+    for (const auto& [key, name] : toRemove) {
         _sheetScoped.erase(key);
     }
 }

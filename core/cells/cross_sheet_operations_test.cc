@@ -1220,11 +1220,14 @@ TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_DeletedNameCausesNameError
     EvalResult result1 = evaluateCell(sheet1, b1);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 50.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Delete the named range
     workbook->getNamedRanges()->removeWorkbook("TempName");
 
-    // Force re-evaluation by marking dirty
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty by the named range removal callback
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Formula should return #NAME! error
     EvalResult result2 = evaluateCell(sheet1, b1);
@@ -1254,13 +1257,17 @@ TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_SheetDeleteCausesRefError)
     EvalResult result1 = evaluateCell(sheet1, b1);
     EXPECT_DOUBLE_EQ(result1.getNumber(), 33.0);
 
+    // Mark formula as not dirty to verify automatic dirty marking
+    b1->getFormula()->dirty = false;
+
     // Delete Sheet2
     ID sheet2Id = sheet2->id;
     workbook->removeSheet(sheet2Id);
     sheet2 = nullptr;
 
-    // Force re-evaluation
-    b1->getFormula()->dirty = true;
+    // Formula should be automatically marked dirty when sheet is deleted
+    // (via transitive dependency marking in removeSheet)
+    EXPECT_TRUE(b1->getFormula()->dirty);
 
     // Formula should return #REF! error (target cell no longer exists)
     EvalResult result2 = evaluateCell(sheet1, b1);
