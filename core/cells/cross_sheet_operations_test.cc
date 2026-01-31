@@ -1548,5 +1548,244 @@ TEST_F(CrossSheetOperationsTest, CopyFormula_EvaluationAfterAdjustment) {
     EXPECT_DOUBLE_EQ(result.getNumber(), 20.0);
 }
 
+// =============================================================================
+// 9g: Test Concurrent Cross-Sheet Edits from Multiple Peers
+// =============================================================================
+// Tests CRDT convergence behavior when multiple peers are making cross-sheet
+// edits simultaneously. Verifies that formulas referencing other sheets correctly
+// recalculate when remote operations modify referenced cells.
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_CellValueConverges) {
+    // Two peers editing the same cell on Sheet2 - last writer wins
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1 = 100
+    Cell* sheet2A1 = setSheet2Value(0, 0, 100.0);
+
+    // Generate node IDs for two peers
+    ID peer1NodeId = generate_id();
+    ID peer2NodeId = generate_id();
+
+    // Peer 1 (earlier timestamp) sets Sheet2!A1 = 50
+    Operation op1 = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"50"})");
+    op1.hlc = HLC(1000, 0, peer1NodeId);
+
+    // Peer 2 (later timestamp) sets Sheet2!A1 = 200
+    Operation op2 = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"200"})");
+    op2.hlc = HLC(2000, 0, peer2NodeId);
+
+    // Apply in reverse chronological order (later first)
+    applyOperation(*workbook, op2);
+    EXPECT_DOUBLE_EQ(sheet2A1->value.asNumber(), 200.0);
+
+    // Apply earlier operation - should be rejected (superseded)
+    ApplyResult result = applyOperation(*workbook, op1);
+    EXPECT_EQ(result, ApplyResult::SUPERSEDED);
+
+    // Value should still be 200 (last writer wins)
+    EXPECT_DOUBLE_EQ(sheet2A1->value.asNumber(), 200.0);
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_FormulaRecalculates) {
+    // Formula on Sheet1 references Sheet2 cell that is modified by remote peer
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1 = 100
+    Cell* sheet2A1 = setSheet2Value(0, 0, 100.0);
+
+    // Create formula on Sheet1!B1 = =Sheet2!A1
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    // Evaluate - should get 100
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 100.0);
+
+    // Remote peer changes Sheet2!A1 to 500
+    Operation op = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"500"})");
+    applyOperation(*workbook, op);
+
+    // Recalculate dependent formulas (in real app, bindings layer does this)
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    // Verify the formula cell now shows 500
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 500.0);
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_RangeFormulaRecalculates) {
+    // SUM formula on Sheet1 referencing Sheet2 range that is modified
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1:A3 = 10, 20, 30
+    Cell* a1 = setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    setSheet2Value(0, 2, 30.0);
+
+    // Create formula on Sheet1!B1 = =SUM(Sheet2!A1:A3)
+    Cell* b1 = setSheet1Formula(1, 0, "=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(b1, nullptr);
+
+    // Evaluate - should get 60
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 60.0);
+
+    // Remote peer changes Sheet2!A1 to 100
+    Operation op = makeCellSetOp(*workbook, a1->id, sheet2->id, R"({"t":"n","v":"100"})");
+    applyOperation(*workbook, op);
+
+    // Recalculate dependent formulas
+    recalculate(workbook.get(), {a1->id});
+
+    // Formula should recalculate to 100 + 20 + 30 = 150
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 150.0);
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_SheetRenamePreservesFormula) {
+    // Remote peer renames Sheet2 - formula should still work via UUID
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1 = 77
+    setSheet2Value(0, 0, 77.0);
+
+    // Create formula on Sheet1!B1 = =Sheet2!A1
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(b1, nullptr);
+
+    // Evaluate - should get 77
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 77.0);
+
+    // Remote peer renames Sheet2 to "DataSheet" via CRDT operation
+    Operation renameOp = makeSheetSetOp(*workbook, sheet2->id, R"({"name":"DataSheet"})");
+    applyOperation(*workbook, renameOp);
+
+    // Verify sheet was renamed
+    EXPECT_EQ(sheet2->name, "DataSheet");
+
+    // Formula should still evaluate correctly (UUID-based)
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result2.getNumber(), 77.0);
+
+    // Display should show new sheet name
+    std::string display = getFormulaDisplay(sheet1, b1);
+    EXPECT_EQ(display, "=DataSheet!A1");
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_MultipleFormulasDifferentSheets) {
+    // Multiple formulas on Sheet1 referencing Sheet2, all updated by one op
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1 = 10
+    Cell* sheet2A1 = setSheet2Value(0, 0, 10.0);
+
+    // Create multiple formulas on Sheet1 that reference Sheet2!A1
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");      // Direct ref
+    Cell* c1 = setSheet1Formula(2, 0, "=Sheet2!A1*2");    // With multiplication
+    Cell* d1 = setSheet1Formula(3, 0, "=Sheet2!A1+100");  // With addition
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(c1, nullptr);
+    ASSERT_NE(d1, nullptr);
+
+    // Evaluate all - B1=10, C1=20, D1=110
+    evaluateCell(sheet1, b1);
+    evaluateCell(sheet1, c1);
+    evaluateCell(sheet1, d1);
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(c1->value.asNumber(), 20.0);
+    EXPECT_DOUBLE_EQ(d1->value.asNumber(), 110.0);
+
+    // Remote peer changes Sheet2!A1 to 50
+    Operation op = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"50"})");
+    applyOperation(*workbook, op);
+
+    // Recalculate all dependent formulas
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    // All formulas should recalculate: B1=50, C1=100, D1=150
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 50.0);
+    EXPECT_DOUBLE_EQ(c1->value.asNumber(), 100.0);
+    EXPECT_DOUBLE_EQ(d1->value.asNumber(), 150.0);
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_ChainAcrossSheets) {
+    // Chain: Sheet2!A1 -> Sheet1!B1 -> Sheet1!C1
+    // Modification to Sheet2!A1 should propagate through the chain
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet2!A1 = 5
+    Cell* sheet2A1 = setSheet2Value(0, 0, 5.0);
+
+    // Create formula chain: B1 = Sheet2!A1, C1 = B1*3
+    Cell* b1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    Cell* c1 = setSheet1Formula(2, 0, "=B1*3");
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(c1, nullptr);
+
+    // Evaluate - B1=5, C1=15
+    evaluateCell(sheet1, b1);
+    evaluateCell(sheet1, c1);
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 5.0);
+    EXPECT_DOUBLE_EQ(c1->value.asNumber(), 15.0);
+
+    // Remote peer changes Sheet2!A1 to 20
+    Operation op = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"20"})");
+    applyOperation(*workbook, op);
+
+    // Recalculate - should propagate through the chain
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    // Both formulas should recalculate: B1=20, C1=60
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 20.0);
+    EXPECT_DOUBLE_EQ(c1->value.asNumber(), 60.0);
+}
+
+TEST_F(CrossSheetOperationsTest, ConcurrentCrossSheetEdit_BidirectionalReferences) {
+    // Sheet1 references Sheet2, Sheet2 references Sheet1 (not circular)
+    workbook->setNodeId(generate_id());
+
+    // Set up Sheet1!A1 = 10, Sheet2!A1 = 20
+    Cell* sheet1A1 = setSheet1Value(0, 0, 10.0);
+    Cell* sheet2A1 = setSheet2Value(0, 0, 20.0);
+
+    // Sheet1!B1 = Sheet2!A1 (references Sheet2)
+    Cell* sheet1B1 = setSheet1Formula(1, 0, "=Sheet2!A1");
+    ASSERT_NE(sheet1B1, nullptr);
+
+    // Sheet2!B1 = Sheet1!A1 (references Sheet1)
+    FormulaParser parser("=Sheet1!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet2);
+    resolver.resolve(ast.get());
+
+    Cell* sheet2B1 = sheet2->getOrCreateCellAt(sheet2ColIds[1], sheet2RowIds[0]);
+    sheet2->setCellFormula(sheet2B1->id, "=Sheet1!A1", ast.release());
+
+    // Evaluate
+    evaluateCell(sheet1, sheet1B1);
+    evaluateCell(sheet2, sheet2B1);
+    EXPECT_DOUBLE_EQ(sheet1B1->value.asNumber(), 20.0);  // Sheet2!A1
+    EXPECT_DOUBLE_EQ(sheet2B1->value.asNumber(), 10.0);  // Sheet1!A1
+
+    // Remote peer modifies Sheet1!A1 to 100
+    Operation op1 = makeCellSetOp(*workbook, sheet1A1->id, sheet1->id, R"({"t":"n","v":"100"})");
+    applyOperation(*workbook, op1);
+    recalculate(workbook.get(), {sheet1A1->id});
+
+    // Sheet2!B1 should update to 100, Sheet1!B1 unchanged
+    EXPECT_DOUBLE_EQ(sheet2B1->value.asNumber(), 100.0);
+    EXPECT_DOUBLE_EQ(sheet1B1->value.asNumber(), 20.0);  // Still 20
+
+    // Remote peer modifies Sheet2!A1 to 200
+    Operation op2 = makeCellSetOp(*workbook, sheet2A1->id, sheet2->id, R"({"t":"n","v":"200"})");
+    applyOperation(*workbook, op2);
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    // Sheet1!B1 should update to 200, Sheet2!B1 unchanged
+    EXPECT_DOUBLE_EQ(sheet1B1->value.asNumber(), 200.0);
+    EXPECT_DOUBLE_EQ(sheet2B1->value.asNumber(), 100.0);  // Still 100
+}
+
 }  // namespace
 }  // namespace cells
