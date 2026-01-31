@@ -42,6 +42,7 @@ cc_library(
 cc_test(
     name = "format_buffer_test",
     srcs = ["format_buffer_test.cc"],
+    shard_count = 4,
     deps = [
         ":format_buffer",
         ":number_format",
@@ -215,6 +216,7 @@ cc_library(
 cc_test(
     name = "input_parser_test",
     srcs = ["input_parser_test.cc"],
+    shard_count = 4,
     deps = [
         ":input_parser",
         "@googletest//:gtest_main",
@@ -239,6 +241,7 @@ cc_library(
 cc_test(
     name = "number_formatter_test",
     srcs = ["number_formatter_test.cc"],
+    shard_count = 4,
     deps = [
         ":input_parser",
         ":number_formatter",
@@ -444,6 +447,7 @@ cc_test(
     name = "serializer_test",
     srcs = ["serializer_test.cc"],
     data = ["//testdata:sample_zcd_files"],
+    shard_count = 4,
     deps = [
         ":formula_eval",
         ":formula_recalc",
@@ -677,6 +681,7 @@ cc_library(
 cc_test(
     name = "formula_lexer_test",
     srcs = ["formula_lexer_test.cc"],
+    shard_count = 4,
     deps = [
         ":formula_lexer",
         "@googletest//:gtest_main",
@@ -714,6 +719,7 @@ cc_library(
 cc_test(
     name = "formula_parser_test",
     srcs = ["formula_parser_test.cc"],
+    shard_count = 4,
     deps = [
         ":formula_parser",
         "@googletest//:gtest_main",
@@ -801,6 +807,7 @@ cc_test(
 cc_test(
     name = "formula_integration_test",
     srcs = ["formula_integration_test.cc"],
+    shard_count = 4,
     deps = [
         ":dependency_graph",
         ":formula_ast",
@@ -912,6 +919,7 @@ cc_library(
 cc_test(
     name = "formula_eval_test",
     srcs = ["formula_eval_test.cc"],
+    shard_count = 4,
     deps = [
         ":formula_eval",
         ":formula_parser",
@@ -925,6 +933,7 @@ cc_test(
 cc_test(
     name = "formula_functions_test",
     srcs = ["formula_functions_test.cc"],
+    shard_count = 8,
     deps = [
         ":formula_eval",
         ":formula_parser",
@@ -1019,6 +1028,7 @@ cc_library(
 cc_test(
     name = "luau_sandbox_test",
     srcs = ["luau_sandbox_test.cc"],
+    shard_count = 4,
     deps = [
         ":id",
         ":luau_sandbox",

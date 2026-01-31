@@ -26,6 +26,7 @@ exports_files([
 cc_test(
     name = "fn_array_test",
     srcs = ["fn_array_test.cc"],
+    shard_count = 4,
     deps = [
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",
