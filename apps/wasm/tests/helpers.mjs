@@ -215,7 +215,8 @@ export async function doubleClickCell(page, cellRef) {
 export async function typeInCell(page, text) {
   // The cell editor should be active after clicking
   // Use delay between key presses to ensure all characters are captured
-  await page.keyboard.type(text, { delay: 50 });
+  // Increased from 50ms to 75ms to reduce flakiness under system load
+  await page.keyboard.type(text, { delay: 75 });
 }
 
 /**
@@ -243,8 +244,9 @@ export async function setCellValue(page, cellRef, value) {
   // Small delay to ensure cell is selected and ready for input
   await sleep(100);
   await typeInCell(page, value);
-  // Small delay before confirming to ensure all characters are processed
-  await sleep(100);
+  // Increased delay before confirming to ensure all characters are processed
+  // This helps prevent flakiness when system is under load
+  await sleep(150);
   await confirmEdit(page);
 }
 
