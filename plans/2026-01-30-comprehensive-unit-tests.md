@@ -221,12 +221,12 @@ New file: `spill_operations_test.cc`
 
 New file: `operation_sequence_test.cc`
 
-- [ ] 13a: Test rapid insert/delete/move sequences maintain consistency
-- [ ] 13b: Test style + format + value changes in single operation batch
-- [ ] 13c: Test concurrent operations from 3+ peers converge correctly
-- [ ] 13d: Test undo/redo style operation sequences (if supported)
-- [ ] 13e: Test copy-paste operation sequences with formulas
-- [ ] 13f: Test fill operation sequences (fill down, fill right)
+- [x] 13a: Test rapid insert/delete/move sequences maintain consistency - 8 tests
+- [x] 13b: Test style + format + value changes in single operation batch - 5 tests
+- [x] 13c: Test concurrent operations from 3+ peers converge correctly - 5 tests
+- [x] 13d: Test undo/redo style operation sequences (if supported) - SKIPPED (undo/redo not implemented)
+- [x] 13e: Test copy-paste operation sequences with formulas - 6 tests
+- [x] 13f: Test fill operation sequences (fill down, fill right) - 8 tests
 
 ---
 

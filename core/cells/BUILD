@@ -1132,6 +1132,27 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "operation_sequence_test",
+    srcs = ["operation_sequence_test.cc"],
+    shard_count = 4,
+    deps = [
+        ":crdt",
+        ":dependency_graph",
+        ":fill_range",
+        ":formula_display",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        ":number_format",
+        ":style_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "fill_range",
     srcs = ["fill_range.cc"],
