@@ -108,13 +108,13 @@ New file: `formula_error_test.cc`
 
 New file: `formula_data_change_test.cc`
 
-- [ ] 8a: Test formula recalculates when direct dependency changes
-- [ ] 8b: Test formula recalculates when indirect dependency changes (chain)
-- [ ] 8c: Test formula recalculates when cell format changes affect type coercion
-- [ ] 8d: Test formula recalculates when referenced cell deleted then recreated
-- [ ] 8e: Test shared formula group recalculates correctly
-- [ ] 8f: Test array formula spill recalculates on source change
-- [ ] 8g: Test circular reference detection remains stable during changes
+- [x] 8a: Test formula recalculates when direct dependency changes (9 tests)
+- [x] 8b: Test formula recalculates when indirect dependency changes (chain) (7 tests)
+- [x] 8c: Test formula recalculates when cell format changes affect type coercion (3 tests)
+- [x] 8d: Test formula recalculates when referenced cell deleted then recreated (4 tests)
+- [x] 8e: Test shared formula group recalculates correctly (3 tests)
+- [x] 8f: Test array formula spill recalculates on source change (3 tests)
+- [x] 8g: Test circular reference detection remains stable during changes (7 tests + 4 edge case tests)
 
 ---
 
