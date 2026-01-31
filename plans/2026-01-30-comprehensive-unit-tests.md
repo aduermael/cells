@@ -79,13 +79,13 @@ New file: `range_boundary_test.cc`
 
 New file: `merged_cells_test.cc`
 
-- [ ] 6a: Test creating merged cell ranges
-- [ ] 6b: Test merged cell anchor (top-left) holds value, others empty
-- [ ] 6c: Test inserting column/row inside merged range (expands merge)
-- [ ] 6d: Test deleting column/row inside merged range (shrinks merge)
-- [ ] 6e: Test formulas referencing merged cells (return anchor value)
-- [ ] 6f: Test unmerging cells preserves anchor value
-- [ ] 6g: Test concurrent merge operations from multiple peers
+- [x] 6a: Test creating merged cell ranges (8 tests)
+- [x] 6b: Test merged cell anchor (top-left) holds value, others empty (7 tests)
+- [x] 6c: Test inserting column/row inside merged range (expands merge) (4 tests)
+- [x] 6d: Test deleting column/row inside merged range (shrinks merge) (8 tests)
+- [x] 6e: Test formulas referencing merged cells (return anchor value) (4 tests)
+- [x] 6f: Test unmerging cells preserves anchor value (4 tests)
+- [x] 6g: Test concurrent merge operations from multiple peers (7 tests + 4 edge case tests)
 
 ---
 
