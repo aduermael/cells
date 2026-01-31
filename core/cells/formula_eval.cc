@@ -1264,12 +1264,17 @@ static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx) {
     // Get the target sheet (if specified)
     Sheet* targetSheet = ctx.sheet;
     if (!namedRange->target.sheetId.isNull() && ctx.workbook) {
-        // Named range targets a specific sheet
+        // Named range targets a specific sheet - must find it or return #REF!
+        targetSheet = nullptr;  // Reset since we're looking for a specific sheet
         for (const auto& s : ctx.workbook->sheets) {
             if (s->id == namedRange->target.sheetId) {
                 targetSheet = s.get();
                 break;
             }
+        }
+        if (!targetSheet) {
+            // Target sheet was deleted - return #REF!
+            return EvalResult::Error(CellError::REF);
         }
     }
 
@@ -1381,7 +1386,14 @@ static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx) {
                 std::swap(startRowPos, endRowPos);
             }
 
-            return EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
+            // For cross-sheet named ranges, we need to store the target sheet
+            // so that collectRangeValues can iterate on the correct sheet
+            EvalResult rangeResult =
+                EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
+            if (targetSheet != ctx.sheet) {
+                rangeResult.targetSheet = targetSheet;
+            }
+            return rangeResult;
         }
 
         case NamedRangeTarget::Type::COLUMN: {

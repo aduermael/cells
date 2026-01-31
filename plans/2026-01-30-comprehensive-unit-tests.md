@@ -162,7 +162,11 @@ New file: `cross_sheet_operations_test.cc`
 
 ### Remaining Steps
 - [x] 9d: Test cross-sheet range references - 17 tests covering SUM/AVERAGE/MIN/MAX/COUNT functions, multi-column ranges, recalculation, sheet rename, sheet delete, and edge cases
-- [ ] 9e: Test cross-sheet named range references
+- [x] 9e: Test cross-sheet named range references - 10 tests covering workbook-scoped named ranges pointing to other sheets, SUM/AVERAGE functions, recalculation, sheet rename, sheet/named-range delete, multi-column ranges, and usage from multiple sheets
+  - Fixed 3 engine bugs discovered by tests:
+    1. `evaluateNamedRef()` didn't set `targetSheet` on range results for cross-sheet ranges
+    2. `Sheet::setCellFormula()` didn't pass named range registry to dependency graph
+    3. `evaluateNamedRef()` didn't return #REF! when target sheet was deleted
 - [ ] 9f: Test copying formulas between sheets updates references correctly
 - [ ] 9g: Test concurrent cross-sheet edits from multiple peers
 

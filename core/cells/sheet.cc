@@ -847,10 +847,17 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* form
 
     // Add to dependency graph (AST should already be resolved)
     // Use workbook-level position resolver to handle cross-sheet range deps
+    // Pass named range registry for resolving named range dependencies
     DependencyGraph* depGraph = getDependencyGraph();
     Workbook* workbook = getWorkbook();
     if (ast != nullptr && depGraph != nullptr && workbook != nullptr) {
-        depGraph->addFormula(cellId, ast, makeWorkbookPositionResolver(workbook));
+        const NamedRangeRegistry* namedRanges = workbook->getNamedRanges();
+        if (namedRanges) {
+            depGraph->addFormula(cellId, ast, makeWorkbookPositionResolver(workbook), namedRanges,
+                                 id);
+        } else {
+            depGraph->addFormula(cellId, ast, makeWorkbookPositionResolver(workbook));
+        }
 
         // Track volatile functions
         if (formula->hasVolatile()) {

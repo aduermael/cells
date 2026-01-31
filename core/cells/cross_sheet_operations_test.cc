@@ -12,6 +12,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/named_ranges.h"
 
 #include "gtest/gtest.h"
 
@@ -1043,6 +1044,308 @@ TEST_F(CrossSheetOperationsTest, CrossSheetRange_PartiallyFilledRange) {
     EvalResult result = evaluateCell(sheet1, b1);
     EXPECT_TRUE(result.isNumber());
     EXPECT_DOUBLE_EQ(result.getNumber(), 90.0);  // 10+30+50
+}
+
+// =============================================================================
+// 9e: Test Cross-Sheet Named Range References
+// =============================================================================
+// Tests named ranges that reference cells on other sheets, including workbook-scoped
+// named ranges used from different sheets, evaluation, recalculation, and error cases.
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_WorkbookScopedCellReference) {
+    // Set up Sheet2!A1 = 42
+    Cell* sheet2A1 = setSheet2Value(0, 0, 42.0);
+
+    // Create workbook-scoped named range "MyValue" pointing to Sheet2!A1
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("MyValue", target);
+
+    // Create formula on Sheet1!B1 = =MyValue
+    FormulaParser parser("=MyValue");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolveResult.success) << resolveResult.errorMessage;
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=MyValue", ast.release());
+
+    // Evaluate
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 42.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_WorkbookScopedRangeReference) {
+    // Set up Sheet2!A1:A3 = 10, 20, 30
+    Cell* topLeft = setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    Cell* bottomRight = setSheet2Value(0, 2, 30.0);
+
+    // Create workbook-scoped named range "DataRange" pointing to Sheet2!A1:A3
+    auto target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("DataRange", target);
+
+    // Create formula on Sheet1!B1 = =SUM(DataRange)
+    FormulaParser parser("=SUM(DataRange)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolveResult.success) << resolveResult.errorMessage;
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=SUM(DataRange)", ast.release());
+
+    // Evaluate
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 60.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_AverageFunction) {
+    // Set up Sheet2!A1:A4 = 10, 20, 30, 40
+    Cell* topLeft = setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    setSheet2Value(0, 2, 30.0);
+    Cell* bottomRight = setSheet2Value(0, 3, 40.0);
+
+    // Create named range
+    auto target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("Values", target);
+
+    // Create formula = =AVERAGE(Values)
+    FormulaParser parser("=AVERAGE(Values)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolveResult.success) << resolveResult.errorMessage;
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=AVERAGE(Values)", ast.release());
+
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 25.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_RecalculatesWhenSourceChanges) {
+    // Set up Sheet2!A1 = 100
+    Cell* sheet2A1 = setSheet2Value(0, 0, 100.0);
+
+    // Create named range pointing to Sheet2!A1
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("Source", target);
+
+    // Create formula
+    FormulaParser parser("=Source*2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=Source*2", ast.release());
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 200.0);
+
+    // Change the source value
+    sheet2A1->value = CellValue(50.0);
+
+    // Recalculate
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 100.0);  // 50*2
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_StillWorksAfterSheetRename) {
+    // Named ranges use UUIDs internally, so sheet renames have no impact
+
+    // Set up Sheet2!A1 = 77
+    Cell* sheet2A1 = setSheet2Value(0, 0, 77.0);
+
+    // Create named range
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("CrossRef", target);
+
+    // Create formula
+    FormulaParser parser("=CrossRef");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=CrossRef", ast.release());
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 77.0);
+
+    // Rename Sheet2
+    sheet2->name = "RenamedData";
+
+    // Formula should still work - UUIDs don't change
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result2.getNumber(), 77.0);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_DeletedNameCausesNameError) {
+    // Set up Sheet2!A1 = 50
+    Cell* sheet2A1 = setSheet2Value(0, 0, 50.0);
+
+    // Create named range
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("TempName", target);
+
+    // Create formula
+    FormulaParser parser("=TempName");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=TempName", ast.release());
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 50.0);
+
+    // Delete the named range
+    workbook->getNamedRanges()->removeWorkbook("TempName");
+
+    // Force re-evaluation by marking dirty
+    b1->getFormula()->dirty = true;
+
+    // Formula should return #NAME! error
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::NAME);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_SheetDeleteCausesRefError) {
+    // Set up Sheet2!A1 = 33
+    Cell* sheet2A1 = setSheet2Value(0, 0, 33.0);
+
+    // Create named range pointing to Sheet2!A1
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("CellOnSheet2", target);
+
+    // Create formula
+    FormulaParser parser("=CellOnSheet2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=CellOnSheet2", ast.release());
+
+    EvalResult result1 = evaluateCell(sheet1, b1);
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 33.0);
+
+    // Delete Sheet2
+    ID sheet2Id = sheet2->id;
+    workbook->removeSheet(sheet2Id);
+    sheet2 = nullptr;
+
+    // Force re-evaluation
+    b1->getFormula()->dirty = true;
+
+    // Formula should return #REF! error (target cell no longer exists)
+    EvalResult result2 = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result2.isError());
+    EXPECT_EQ(result2.getError(), CellError::REF);
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_MultiColumnRange) {
+    // Set up Sheet2 2x2 range: A1=1, B1=2, A2=3, B2=4
+    Cell* topLeft = setSheet2Value(0, 0, 1.0);
+    setSheet2Value(1, 0, 2.0);
+    setSheet2Value(0, 1, 3.0);
+    Cell* bottomRight = setSheet2Value(1, 1, 4.0);
+
+    // Create named range for Sheet2!A1:B2
+    auto target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("Matrix", target);
+
+    // Create formula = =SUM(Matrix)
+    FormulaParser parser("=SUM(Matrix)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    Cell* c1 = sheet1->getOrCreateCellAt(sheet1ColIds[2], sheet1RowIds[0]);
+    sheet1->setCellFormula(c1->id, "=SUM(Matrix)", ast.release());
+
+    EvalResult result = evaluateCell(sheet1, c1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 10.0);  // 1+2+3+4
+}
+
+TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_UsedFromMultipleSheets) {
+    // Create a third sheet
+    workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet3"));
+    Sheet* sheet3 = workbook->getSheetByIndex(2);
+    ASSERT_NE(sheet3, nullptr);
+
+    // Create columns and rows on Sheet3
+    ID sheet3ColIds[10];
+    ID sheet3RowIds[10];
+    for (uint32_t i = 0; i < 10; i++) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        col->name = Sheet::positionToColumnName(i);
+        sheet3ColIds[i] = col->id;
+        sheet3->addColumn(std::move(col));
+    }
+    for (uint32_t i = 0; i < 10; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        sheet3RowIds[i] = row->id;
+        sheet3->addRow(std::move(row));
+    }
+
+    // Set up Sheet2!A1 = 99
+    Cell* sheet2A1 = setSheet2Value(0, 0, 99.0);
+
+    // Create workbook-scoped named range
+    auto target = NamedRangeTarget::cell(sheet2A1->id, sheet2->id);
+    workbook->getNamedRanges()->defineWorkbook("SharedValue", target);
+
+    // Create formula on Sheet1 using the named range
+    FormulaParser parser1("=SharedValue");
+    auto ast1 = parser1.parse();
+    FormulaResolver resolver1(*workbook, *sheet1, workbook->getNamedRanges());
+    resolver1.resolve(ast1.get());
+    Cell* sheet1B1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(sheet1B1->id, "=SharedValue", ast1.release());
+
+    // Create formula on Sheet3 using the same named range
+    FormulaParser parser3("=SharedValue");
+    auto ast3 = parser3.parse();
+    FormulaResolver resolver3(*workbook, *sheet3, workbook->getNamedRanges());
+    resolver3.resolve(ast3.get());
+    Cell* sheet3A1 = sheet3->getOrCreateCellAt(sheet3ColIds[0], sheet3RowIds[0]);
+    sheet3->setCellFormula(sheet3A1->id, "=SharedValue", ast3.release());
+
+    // Both should evaluate to the same value
+    EvalResult result1 = evaluateCell(sheet1, sheet1B1);
+    EvalResult result3 = evaluateCell(sheet3, sheet3A1);
+
+    EXPECT_DOUBLE_EQ(result1.getNumber(), 99.0);
+    EXPECT_DOUBLE_EQ(result3.getNumber(), 99.0);
 }
 
 }  // namespace
