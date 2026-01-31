@@ -23,6 +23,7 @@
 
 #include "core/cells/model.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -89,21 +90,13 @@ bool containsVolatileFunctionImpl(const ASTNode* ast) {
 
 CellValue::CellValue() : raw(), type(CellValueType::STRING), error(CellError::NONE) {}
 
-CellValue::CellValue(double number)
-    : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
-    // Remove trailing zeros for cleaner representation
-    // e.g., "30.000000" -> "30", "3.140000" -> "3.14"
-    size_t const dot = raw.find('.');
-    if (dot != std::string::npos) {
-        size_t const last = raw.find_last_not_of('0');
-        if (last != std::string::npos && last >= dot) {
-            raw = raw.substr(0, last + 1);
-        }
-        // Remove trailing dot if all decimals were zeros
-        if (!raw.empty() && raw.back() == '.') {
-            raw.pop_back();
-        }
-    }
+CellValue::CellValue(double number) : type(CellValueType::NUMBER), error(CellError::NONE) {
+    // Use %.17g for full double precision (17 significant digits needed for round-trip)
+    // This preserves small numbers like 1e-15 that std::to_string would round to 0
+    // The 'g' format automatically uses shortest representation (fixed or scientific)
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.17g", number);
+    raw = buf;
 }
 
 CellValue::CellValue(std::string str)

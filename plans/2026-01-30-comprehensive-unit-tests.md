@@ -234,14 +234,15 @@ New file: `operation_sequence_test.cc`
 
 New file: `edge_cases_test.cc`
 
-- [ ] 14a: Test operations on first column (A / position 0)
-- [ ] 14b: Test operations on first row (1 / position 0)
-- [ ] 14c: Test operations at large positions (column ZZ, row 10000)
-- [ ] 14d: Test empty cell references in formulas
-- [ ] 14e: Test very long text values
-- [ ] 14f: Test very large and very small numbers
-- [ ] 14g: Test formula with maximum nesting depth
-- [ ] 14h: Test range spanning entire columns/rows
+- [x] 14a: Test operations on first column (A / position 0) - 7 tests (set value, formula, range sum, delete, insert before, style, cross-ref)
+- [x] 14b: Test operations on first row (1 / position 0) - 7 tests (set value, formula, range sum, delete, insert before, style, cross-ref)
+- [x] 14c: Test operations at large positions (column ZZ, row 10000) - 7 tests (large column/row positions, cell at large position, column name conversions)
+- [x] 14d: Test empty cell references in formulas - 9 tests (arithmetic, SUM, AVERAGE, COUNT, COUNTA, multiplication, division, concatenation, IF)
+- [x] 14e: Test very long text values - 8 tests (storage, concatenation, LEN, LEFT, RIGHT, MID, Unicode, empty string)
+- [x] 14f: Test very large and very small numbers - 13 tests (large/small/negative numbers, max double, min positive, arithmetic, overflow, underflow, NaN, infinity)
+  - **Bug fixed:** `CellValue(double)` constructor used `std::to_string()` which only has ~6 decimal digit precision. Very small numbers like 1e-15 were being rounded to 0. Fixed to use `snprintf("%.17g")` for full IEEE 754 double precision.
+- [x] 14g: Test formula with maximum nesting depth - 6 tests (nested parentheses, nested functions, nested IF, formula chain, complex arithmetic, multiple arguments)
+- [x] 14h: Test range spanning entire columns/rows - 8 tests (sum column, sum row, count, max, min, average, multi-column/row range, empty range)
 
 ---
 
