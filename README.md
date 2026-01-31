@@ -13,10 +13,10 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 44,903 |
+| C++ | 45,004 |
 | TypeScript | 23,659 |
 | CSS | 2,706 |
-| Starlark | 1,911 |
+| Starlark | 1,947 |
 | JavaScript | 1,680 |
 | Go | 1,363 |
 | Shell | 1,168 |
@@ -27,7 +27,7 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 41,394 |
+| C++ | 42,844 |
 | JavaScript | 13,606 |
 | Go | 315 |
 
@@ -35,20 +35,20 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Type | Lines |
 |------|------:|
-| Markdown | 19,444 |
-| Inline Comments | 19,315 |
+| Markdown | 19,533 |
+| Inline Comments | 19,355 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 3386 |
+| Unit (C++) | 3481 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
 | E2E (Puppeteer) | 384 |
-| **Total** | **3813** |
+| **Total** | **3908** |
 
-- **Commits**: 1515
+- **Commits**: 1521
 - **WASM Module**: 5.14 MB
 - **Total Web Bundle**: 7.23 MB
 
