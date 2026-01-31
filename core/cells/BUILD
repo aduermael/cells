@@ -1075,6 +1075,7 @@ cc_test(
         ":formula_serializer",
         ":id",
         ":model",
+        ":ref_converter",
         "@googletest//:gtest_main",
     ],
 )

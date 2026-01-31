@@ -167,7 +167,7 @@ New file: `cross_sheet_operations_test.cc`
     1. `evaluateNamedRef()` didn't set `targetSheet` on range results for cross-sheet ranges
     2. `Sheet::setCellFormula()` didn't pass named range registry to dependency graph
     3. `evaluateNamedRef()` didn't return #REF! when target sheet was deleted
-- [ ] 9f: Test copying formulas between sheets updates references correctly
+- [x] 9f: Test copying formulas between sheets updates references correctly - 9 tests covering cross-sheet ref preservation during adjustment, range refs, absolute refs not adjusted, mixed absolute/relative, mixed local/cross-sheet refs, negative offsets becoming #REF!, and evaluation after adjustment
 - [ ] 9g: Test concurrent cross-sheet edits from multiple peers
 
 ---

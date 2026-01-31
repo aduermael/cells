@@ -13,6 +13,7 @@
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/ref_converter.h"
 
 #include "gtest/gtest.h"
 
@@ -1346,6 +1347,205 @@ TEST_F(CrossSheetOperationsTest, CrossSheetNamedRange_UsedFromMultipleSheets) {
 
     EXPECT_DOUBLE_EQ(result1.getNumber(), 99.0);
     EXPECT_DOUBLE_EQ(result3.getNumber(), 99.0);
+}
+
+// =============================================================================
+// 9f: Test Copying Formulas Between Sheets Updates References Correctly
+// =============================================================================
+// Tests that when formulas are copied/adjusted between sheets, cross-sheet
+// references are preserved while relative references are properly adjusted.
+// Uses RefConverter::adjustASTReferences to simulate copy operations.
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_CrossSheetRefPreservedDuringAdjustment) {
+    // When adjusting a formula that contains a cross-sheet reference,
+    // the cross-sheet reference should be preserved (sheetName remains)
+    // even as relative row/col positions are adjusted.
+
+    // Set up Sheet2!A1 = 100
+    setSheet2Value(0, 0, 100.0);
+
+    // Create a formula: =Sheet2!A1
+    FormulaParser parser("=Sheet2!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by row offset +2 (simulating copy down 2 rows)
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 0, 2);
+    ASSERT_NE(adjusted, nullptr);
+
+    // The adjusted AST should have =Sheet2!A3 (row shifted from 1 to 3)
+    ASSERT_EQ(adjusted->type, ASTNodeType::CELL_REF);
+    auto* cellRef = static_cast<CellRefNode*>(adjusted.get());
+    EXPECT_EQ(cellRef->sheetName, "Sheet2");  // Sheet name preserved
+    EXPECT_EQ(cellRef->column, "A");
+    EXPECT_EQ(cellRef->row, 3);  // Row adjusted from 1 to 3
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_CrossSheetRangeRefPreserved) {
+    // Set up Sheet2!A1:A3
+    setSheet2Value(0, 0, 1.0);
+    setSheet2Value(0, 1, 2.0);
+    setSheet2Value(0, 2, 3.0);
+
+    // Create formula: =SUM(Sheet2!A1:A3)
+    FormulaParser parser("=SUM(Sheet2!A1:A3)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by row offset +1
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 0, 1);
+    ASSERT_NE(adjusted, nullptr);
+
+    // The range should become Sheet2!A2:A4
+    ASSERT_EQ(adjusted->type, ASTNodeType::FUNCTION_CALL);
+    auto* funcCall = static_cast<FunctionCallNode*>(adjusted.get());
+    ASSERT_EQ(funcCall->args.size(), 1);
+    ASSERT_EQ(funcCall->args[0]->type, ASTNodeType::RANGE_REF);
+
+    auto* rangeRef = static_cast<RangeRefNode*>(funcCall->args[0].get());
+    EXPECT_EQ(rangeRef->topLeft->sheetName, "Sheet2");
+    EXPECT_EQ(rangeRef->topLeft->row, 2);      // Adjusted from 1
+    EXPECT_EQ(rangeRef->bottomRight->row, 4);  // Adjusted from 3
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_AbsoluteCrossSheetRefNotAdjusted) {
+    // Absolute references should not be adjusted during copy
+
+    // Create formula: =Sheet2!$A$1
+    FormulaParser parser("=Sheet2!$A$1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by row offset +5 and col offset +3
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 3, 5);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Absolute refs should remain unchanged
+    ASSERT_EQ(adjusted->type, ASTNodeType::CELL_REF);
+    auto* cellRef = static_cast<CellRefNode*>(adjusted.get());
+    EXPECT_EQ(cellRef->sheetName, "Sheet2");
+    EXPECT_EQ(cellRef->column, "A");  // Still A (absolute)
+    EXPECT_EQ(cellRef->row, 1);       // Still 1 (absolute)
+    EXPECT_TRUE(cellRef->colAbsolute);
+    EXPECT_TRUE(cellRef->rowAbsolute);
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_MixedAbsoluteRelativeCrossSheetRef) {
+    // Mixed absolute/relative: $A1 (absolute col, relative row)
+
+    // Create formula: =Sheet2!$A1
+    FormulaParser parser("=Sheet2!$A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by col offset +2, row offset +3
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 2, 3);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Column should stay A (absolute), row should become 4 (relative)
+    ASSERT_EQ(adjusted->type, ASTNodeType::CELL_REF);
+    auto* cellRef = static_cast<CellRefNode*>(adjusted.get());
+    EXPECT_EQ(cellRef->sheetName, "Sheet2");
+    EXPECT_EQ(cellRef->column, "A");  // Still A (absolute col)
+    EXPECT_EQ(cellRef->row, 4);       // Adjusted from 1 to 4 (relative row)
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_MixedLocalAndCrossSheetRefs) {
+    // Formula with both local ref and cross-sheet ref
+
+    // Create formula: =A1+Sheet2!B1
+    FormulaParser parser("=A1+Sheet2!B1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by row offset +2
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 0, 2);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Should become =A3+Sheet2!B3
+    ASSERT_EQ(adjusted->type, ASTNodeType::BINARY_OP);
+    auto* binOp = static_cast<BinaryOpNode*>(adjusted.get());
+
+    // Left operand: local A1 -> A3
+    ASSERT_EQ(binOp->left->type, ASTNodeType::CELL_REF);
+    auto* leftRef = static_cast<CellRefNode*>(binOp->left.get());
+    EXPECT_TRUE(leftRef->sheetName.empty());  // Local ref
+    EXPECT_EQ(leftRef->column, "A");
+    EXPECT_EQ(leftRef->row, 3);
+
+    // Right operand: Sheet2!B1 -> Sheet2!B3
+    ASSERT_EQ(binOp->right->type, ASTNodeType::CELL_REF);
+    auto* rightRef = static_cast<CellRefNode*>(binOp->right.get());
+    EXPECT_EQ(rightRef->sheetName, "Sheet2");  // Cross-sheet preserved
+    EXPECT_EQ(rightRef->column, "B");
+    EXPECT_EQ(rightRef->row, 3);
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_NegativeRowBecomesRefError) {
+    // When adjusting would result in negative row, should return #REF! error
+
+    // Create formula: =Sheet2!A1
+    FormulaParser parser("=Sheet2!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by row offset -2 (would make row = -1, invalid)
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 0, -2);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Should become an error node
+    EXPECT_EQ(adjusted->type, ASTNodeType::ERROR_NODE);
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_NegativeColBecomesRefError) {
+    // When adjusting would result in negative column, should return #REF! error
+
+    // Create formula: =Sheet2!A1
+    FormulaParser parser("=Sheet2!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Adjust by col offset -1 (would make col = -1, invalid since A=0)
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), -1, 0);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Should become an error node
+    EXPECT_EQ(adjusted->type, ASTNodeType::ERROR_NODE);
+}
+
+TEST_F(CrossSheetOperationsTest, CopyFormula_EvaluationAfterAdjustment) {
+    // Verify the adjusted formula actually evaluates correctly
+
+    // Set up Sheet2 values: A1=10, A2=20, A3=30
+    setSheet2Value(0, 0, 10.0);
+    setSheet2Value(0, 1, 20.0);
+    setSheet2Value(0, 2, 30.0);
+
+    // Create formula: =Sheet2!A1 and adjust to =Sheet2!A2
+    FormulaParser parser("=Sheet2!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Resolve against sheet1
+    FormulaResolver resolver(*workbook, *sheet1);
+    resolver.resolve(ast.get());
+
+    // Adjust by row offset +1
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 0, 1);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Re-resolve the adjusted formula
+    FormulaResolver resolver2(*workbook, *sheet1);
+    resolver2.resolve(adjusted.get());
+
+    // Create a cell and set the adjusted formula
+    Cell* b1 = sheet1->getOrCreateCellAt(sheet1ColIds[1], sheet1RowIds[0]);
+    sheet1->setCellFormula(b1->id, "=Sheet2!A2", adjusted.release());
+
+    // Evaluate - should get 20 (Sheet2!A2)
+    EvalResult result = evaluateCell(sheet1, b1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 20.0);
 }
 
 }  // namespace
