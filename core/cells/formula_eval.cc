@@ -110,28 +110,31 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
     Cell* cell = nullptr;
 
     if (ctx.workbook) {
-        // Try sheetId first (UUID-based storage), then fall back to sheetName (A1 notation)
-        if (!node->sheetId.empty()) {
-            targetSheet = ctx.workbook->getSheetById(ID(node->sheetId));
-            if (!targetSheet) {
-                // Referenced sheet doesn't exist
-                return EvalResult::Error(CellError::REF);
-            }
-            cell = targetSheet->getCell(cellId);
-        } else if (!node->sheetName.empty()) {
-            targetSheet = ctx.workbook->getSheetByName(node->sheetName);
-            if (!targetSheet) {
-                // Referenced sheet doesn't exist
-                return EvalResult::Error(CellError::REF);
-            }
-            cell = targetSheet->getCell(cellId);
-        } else {
-            // No explicit sheet reference - search all sheets for the cell
-            // This supports the simplified formula storage where only cellId is stored
+        // Priority order for resolved formulas:
+        // 1. cellId (UUID) - Cell UUIDs are globally unique, so we can find across all sheets
+        // 2. sheetId (UUID) - Explicit sheet reference by UUID
+        // 3. sheetName (name) - Unresolved formula fallback (A1 notation before resolution)
+        //
+        // The resolver stores cellId but doesn't clear sheetName from parsing, so we MUST
+        // check cellId first to avoid name-based lookups that break when sheets are renamed.
+        if (!cellId.isNull()) {
+            // Resolved formula: use findCell since cell UUIDs are globally unique
             auto [foundCell, foundSheet] = ctx.workbook->findCell(cellId);
             if (foundCell) {
                 cell = foundCell;
                 targetSheet = foundSheet;
+            }
+        } else if (!node->sheetId.empty()) {
+            // Explicit sheet UUID reference (rare case - sheetId without cellId)
+            targetSheet = ctx.workbook->getSheetById(ID(node->sheetId));
+            if (!targetSheet) {
+                return EvalResult::Error(CellError::REF);
+            }
+        } else if (!node->sheetName.empty()) {
+            // Unresolved formula: use name lookup as last resort
+            targetSheet = ctx.workbook->getSheetByName(node->sheetName);
+            if (!targetSheet) {
+                return EvalResult::Error(CellError::REF);
             }
         }
     }
@@ -477,25 +480,29 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
     }
 
     // Determine the target sheet (may be different for cross-sheet refs)
+    // Priority order for resolved formulas:
+    // 1. cellId (UUID) - Cell UUIDs are globally unique
+    // 2. sheetId (UUID) - Explicit sheet reference by UUID
+    // 3. sheetName (name) - Unresolved formula fallback
     Sheet* targetSheet = ctx.sheet;
     if (ctx.workbook) {
-        // Check topLeft for sheet reference (both cells should reference the same sheet)
-        if (!node->topLeft->sheetId.empty()) {
+        if (!node->topLeft->cellId.empty()) {
+            // Resolved formula: find the cell's sheet by UUID
+            auto [foundCell, foundSheet] = ctx.workbook->findCell(ID(node->topLeft->cellId));
+            if (foundSheet) {
+                targetSheet = foundSheet;
+            }
+        } else if (!node->topLeft->sheetId.empty()) {
+            // Explicit sheet UUID reference
             targetSheet = ctx.workbook->getSheetById(ID(node->topLeft->sheetId));
             if (!targetSheet) {
                 return EvalResult::Error(CellError::REF);
             }
         } else if (!node->topLeft->sheetName.empty()) {
+            // Unresolved formula: use name lookup as last resort
             targetSheet = ctx.workbook->getSheetByName(node->topLeft->sheetName);
             if (!targetSheet) {
                 return EvalResult::Error(CellError::REF);
-            }
-        } else if (!node->topLeft->cellId.empty()) {
-            // No explicit sheet - search all sheets for the cell
-            // This supports simplified formula storage with only cellId
-            auto [foundCell, foundSheet] = ctx.workbook->findCell(ID(node->topLeft->cellId));
-            if (foundSheet) {
-                targetSheet = foundSheet;
             }
         }
     }

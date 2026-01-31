@@ -522,19 +522,10 @@ TEST_F(CrossSheetOperationsTest, SheetRename_FromSpacesToNoSpaces) {
     EXPECT_EQ(display2, "=Data!A1");
 }
 
-TEST_F(CrossSheetOperationsTest, SheetRename_RecalculationShouldWork) {
-    // BUG: This test documents a bug in formula_eval.cc
-    // See plan Phase 16 for details and fix.
-    //
-    // Expected behavior: Sheet renames should have ZERO impact on formula
-    // evaluation because everything should be UUID-based.
-    //
-    // Actual behavior: Formula returns #REF! error because evaluateCellRef()
-    // checks sheetName (from parsing) before checking cellId (from resolution).
-    // When sheet is renamed, getSheetByName("Sheet2") returns nullptr.
-    //
-    // This test will FAIL after the bug is fixed (which is correct).
-    // After Phase 16, replace this test with one that expects 77.0.
+TEST_F(CrossSheetOperationsTest, SheetRename_EvaluationStillWorks) {
+    // Sheet renames have ZERO impact on formula evaluation because
+    // everything is UUID-based. The evaluator checks cellId first
+    // (which is globally unique) before falling back to sheetName.
 
     // Set up Sheet2!A1 = 10
     Cell* source = setSheet2Value(0, 0, 10.0);
@@ -550,14 +541,12 @@ TEST_F(CrossSheetOperationsTest, SheetRename_RecalculationShouldWork) {
     // Rename sheet
     sheet2->name = "Renamed";
 
-    // Change source value and recalculate (natural way to trigger re-evaluation)
+    // Change source value and recalculate
     source->value = CellValue(77.0);
     recalculate(workbook.get(), {source->id});
 
-    // BUG: Currently returns #REF! error instead of 77.0
-    // After fix, this should be: EXPECT_DOUBLE_EQ(b1->value.asNumber(), 77.0);
-    EXPECT_TRUE(b1->value.type == CellValueType::FORMULA_ERROR);
-    EXPECT_EQ(b1->value.error, CellError::REF);
+    // Formula should still evaluate correctly after rename
+    EXPECT_DOUBLE_EQ(b1->value.asNumber(), 77.0);
 }
 
 }  // namespace

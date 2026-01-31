@@ -304,12 +304,15 @@ Files to modify:
 Sheet renames break formula evaluation because `evaluateCellRef()` checks `sheetName` (from parsing) before checking `cellId` (from resolution). The fix is to prioritize `cellId` for resolved formulas.
 
 ### Steps
-- [ ] 16a: Fix `evaluateCellRef()` in `formula_eval.cc` to check `cellId` first
-- [ ] 16b: Fix `evaluateRangeRef()` similarly (uses topLeft/bottomRight cell refs)
-- [ ] 16c: Verify all 16 existing cross-sheet tests pass without workarounds
-- [ ] 16d: Remove the temporary `SheetRename_FormulaBecomesRefError` test (it documents the bug, not correct behavior)
-- [ ] 16e: Add proper test: `SheetRename_EvaluationStillWorks` that passes naturally
-- [ ] 16f: Run full test suite to ensure no regressions
+- [x] 16a: Fix `evaluateCellRef()` in `formula_eval.cc` to check `cellId` first
+  - Changed priority order: cellId (UUID) → sheetId → sheetName (fallback)
+- [x] 16b: Fix `evaluateRangeRef()` similarly (uses topLeft/bottomRight cell refs)
+  - Same priority change for range reference evaluation
+- [x] 16c: Verify all 16 existing cross-sheet tests pass without workarounds
+- [x] 16d: Remove the temporary `SheetRename_FormulaBecomesRefError` test (it documents the bug, not correct behavior)
+- [x] 16e: Add proper test: `SheetRename_EvaluationStillWorks` that passes naturally
+  - Renamed and updated test to verify 77.0 result after sheet rename
+- [x] 16f: Run full test suite to ensure no regressions (66 unit tests, 331 E2E tests pass)
 
 ### Verification
 After this phase:
