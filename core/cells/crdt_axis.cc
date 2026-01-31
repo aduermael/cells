@@ -76,7 +76,7 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     const int pos = extractJSONInt(op.payload, "pos", -1);
     if (pos >= 0) {
         const uint32_t oldPos = axis->position;
-        const uint32_t newPos = static_cast<uint32_t>(pos);
+        const auto newPos = static_cast<uint32_t>(pos);
         axis->position = newPos;
         if (!creating) {
             sheet->updateColumnPositionIndex(op.target_id, oldPos, newPos);
@@ -256,7 +256,7 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
     const int pos = extractJSONInt(op.payload, "pos", -1);
     if (pos >= 0) {
         const uint32_t oldPos = axis->position;
-        const uint32_t newPos = static_cast<uint32_t>(pos);
+        const auto newPos = static_cast<uint32_t>(pos);
         axis->position = newPos;
         if (!creating) {
             sheet->updateRowPositionIndex(op.target_id, oldPos, newPos);

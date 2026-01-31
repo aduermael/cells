@@ -2,6 +2,8 @@
 
 This plan systematically expands unit test coverage for all supported operations. Each phase focuses on a specific domain, adding tests and fixing any bugs surfaced. Tests will be split into separate files when they exceed ~800 lines.
 
+**Important:** All checks (`bazel run :check`) must pass at the end of each phase. This includes unit tests, linting (clang-tidy), type-checking, and formatting. If pre-existing issues are discovered, fix them as part of the phase.
+
 ---
 
 ## Phase 1: Style Operations Testing
@@ -55,6 +57,7 @@ New file: `axis_move_resize_test.cc`
 - [x] 4e: Test moving axis that is part of a range boundary (4 tests)
 - [x] 4f: Test concurrent move operations from multiple peers (6 tests)
 - [x] 4g: Test axis hidden/shown toggle with formula visibility (10 tests)
+- [x] Fix: Pre-existing clang-tidy `modernize-use-auto` errors in `crdt_axis.cc`
 
 ---
 
