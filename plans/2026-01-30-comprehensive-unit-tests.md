@@ -176,7 +176,7 @@ New file: `cross_sheet_operations_test.cc`
 
 New file: `named_ranges_operations_test.cc`
 
-- [ ] 10a: Test creating workbook-scoped named ranges
+- [x] 10a: Test creating workbook-scoped named ranges - 4 tests (cell reference, range reference, cross-sheet access, multi-column range)
 - [ ] 10b: Test creating sheet-scoped named ranges
 - [ ] 10c: Test named range in formulas (=SUM(MyRange))
 - [ ] 10d: Test named range boundaries update on insert/delete
