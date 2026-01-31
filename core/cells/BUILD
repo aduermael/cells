@@ -1032,6 +1032,20 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "formula_error_test",
+    srcs = ["formula_error_test.cc"],
+    shard_count = 4,
+    deps = [
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "fill_range",
     srcs = ["fill_range.cc"],

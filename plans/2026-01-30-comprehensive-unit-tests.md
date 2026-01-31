@@ -93,14 +93,14 @@ New file: `merged_cells_test.cc`
 
 New file: `formula_error_test.cc`
 
-- [ ] 7a: Test #VALUE! error from incompatible types (text in math operation)
-- [ ] 7b: Test #REF! error from deleted reference
-- [ ] 7c: Test #DIV/0! error from division by zero
-- [ ] 7d: Test #NAME? error from unknown function/named range
-- [ ] 7e: Test #NUM! error from invalid numeric operations
-- [ ] 7f: Test #N/A error from lookup failures
-- [ ] 7g: Test error propagation through formula chains
-- [ ] 7h: Test formula recovery after fixing source cell (auto-recalculate)
+- [x] 7a: Test #VALUE! error from incompatible types (text in math operation) (10 tests)
+- [x] 7b: Test #REF! error from deleted reference (6 tests)
+- [x] 7c: Test #DIV/0! error from division by zero (7 tests)
+- [x] 7d: Test #NAME? error from unknown function/named range (5 tests)
+- [x] 7e: Test #NUM! error from invalid numeric operations (6 tests)
+- [x] 7f: Test #N/A error from lookup failures (7 tests)
+- [x] 7g: Test error propagation through formula chains (12 tests)
+- [x] 7h: Test formula recovery after fixing source cell (auto-recalculate) (6 tests + 5 edge case tests = 11 tests)
 
 ---
 
