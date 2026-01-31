@@ -34,13 +34,13 @@ New file: `format_operations_test.cc`
 
 New file: `axis_insert_delete_test.cc`
 
-- [ ] 3a: Test column insert at beginning, middle, end positions
-- [ ] 3b: Test row insert at beginning, middle, end positions
-- [ ] 3c: Test column delete with cell cascade cleanup
-- [ ] 3d: Test row delete with cell cascade cleanup
-- [ ] 3e: Test insert/delete effects on formula references (should update A1 references)
-- [ ] 3f: Test insert/delete effects on range boundaries (expand/shrink)
-- [ ] 3g: Test concurrent insert/delete from multiple peers
+- [x] 3a: Test column insert at beginning, middle, end positions (8 tests)
+- [x] 3b: Test row insert at beginning, middle, end positions (8 tests)
+- [x] 3c: Test column delete with cell cascade cleanup (8 tests)
+- [x] 3d: Test row delete with cell cascade cleanup (8 tests)
+- [x] 3e: Test insert/delete effects on formula references (4 tests)
+- [x] 3f: Test insert/delete effects on range boundaries (10 tests)
+- [x] 3g: Test concurrent insert/delete from multiple peers (9 tests)
 
 ---
 
