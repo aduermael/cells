@@ -370,6 +370,87 @@ These tests force `dirty = true` because **named range deletion doesn't mark dep
 
 ---
 
+## Phase 18: Named Range Dependency Tracking (Future)
+
+**Priority:** LOW - Architectural improvement, not a critical bug
+**Status:** NOT STARTED
+
+### Problem Statement
+
+When a named range is deleted via `NamedRangeRegistry::removeWorkbook()` or `removeSheet()`, formulas that reference the named range are not automatically marked dirty. This means:
+
+1. The formula continues to use its cached value until something else triggers re-evaluation
+2. Tests must manually set `formula->dirty = true` to verify the expected #NAME! error behavior
+3. In production, users might see stale values after deleting a named range
+
+### Root Cause Analysis
+
+The dependency graph (`DependencyGraph`) resolves named ranges at tracking time:
+
+```cpp
+// In dependency_graph.cc - ReferenceExtractor::extract()
+case ASTNodeType::NAMED_REF: {
+    const NamedRange* range = namedRegistry_->resolve(namedRef->name, sheetId_);
+    if (range) {
+        // Converts to underlying CELL or RANGE dependency
+        // The named range NAME is not stored, only the resolved cell IDs
+    }
+}
+```
+
+This means:
+- `=MyRange` is tracked as a dependency on cell `A1:B5` (whatever MyRange resolves to)
+- The string "MyRange" is NOT stored in the dependency graph
+- When "MyRange" is deleted, there's no way to find formulas that reference it by name
+
+### Proposed Solution
+
+Add a reverse mapping from named range names to dependent formula cell IDs.
+
+#### Option A: Extend DependencyGraph (Recommended)
+
+Files to modify:
+- `core/cells/dependency_graph.h`
+- `core/cells/dependency_graph.cc`
+- `core/cells/named_ranges.h`
+- `core/cells/named_ranges.cc`
+
+Steps:
+- [ ] 18a: Add `namedRangeDependents_` map to DependencyGraph: `std::unordered_map<std::string, std::unordered_set<ID, IDHash>>`
+- [ ] 18b: In `addFormula()`, when processing NAMED_REF nodes, also record the name → cellId mapping
+- [ ] 18c: In `removeFormula()`, clean up named range dependencies
+- [ ] 18d: Add `getDependentsForNamedRange(const std::string& name)` method
+- [ ] 18e: Modify `NamedRangeRegistry` to accept a DependencyGraph pointer and call `getDependentsForNamedRange()` + mark dirty on removal
+- [ ] 18f: Update tests to remove manual `dirty = true` workarounds (7 instances in 2 files)
+- [ ] 18g: Add dedicated tests for named range deletion triggering automatic recalculation
+
+#### Option B: Store in NamedRangeRegistry
+
+Alternative approach - store dependents directly in the named range registry:
+- Pros: Simpler, all named range logic in one place
+- Cons: Duplicates some dependency tracking logic, harder to keep in sync
+
+#### Complexity Considerations
+
+1. **Scope handling**: Sheet-scoped names can shadow workbook-scoped names, so the mapping needs to account for `(name, sheetId)` pairs
+2. **Rename handling**: Renaming a named range should transfer dependencies to the new name
+3. **CRDT operations**: Named range operations come through CRDT, so dirty marking must happen at the right point in the apply flow
+
+### Affected Tests (to update after fix)
+
+Once this is implemented, remove the manual `dirty = true` from:
+- `cross_sheet_operations_test.cc`: Lines 1227, 1263
+- `named_ranges_operations_test.cc`: Lines 733, 767, 799, 844, 977
+
+### Verification
+
+After this phase:
+- Deleting a named range automatically marks all dependent formulas dirty
+- Re-evaluating those formulas returns #NAME! without manual intervention
+- No tests require `formula->dirty = true` workarounds for named range scenarios
+
+---
+
 ## Summary
 
 | Phase | Focus Area | New/Extended File | Est. Tests |
@@ -391,6 +472,7 @@ These tests force `dirty = true` because **named range deletion doesn't mark dep
 | 15 | CRDT Conflicts | crdt_conflict_test.cc | 20-25 |
 | **16** | **Fix Cross-Sheet Bug** | **formula_eval.cc** | **Engine fix** |
 | **17** | **Audit for Workarounds** | **All test files** | **Audit** |
+| **18** | **Named Range Dependencies** | **dependency_graph.cc, named_ranges.cc** | **Engine fix (future)** |
 
 **Total New Tests:** ~300-370
 
@@ -399,4 +481,4 @@ These tests force `dirty = true` because **named range deletion doesn't mark dep
 - Phase 9 (9c): `removeSheet` wasn't removing child entities from workbook storage - cells, columns, rows, and ranges belonging to the deleted sheet remained in workbook-level maps (fixed in 9c)
 - Phase 9 (9c): `removeSheet` wasn't marking dependent formulas as dirty - formulas referencing deleted cells would return stale cached values (fixed with transitive dependency marking in 9c)
 - Phase 9 (9c): `evaluateCellRef` and `evaluateRangeRef` would return 0 instead of #REF! when a resolved cellId was not found (cell was deleted) (fixed in 9c)
-- Phase 17 (audit): Named range deletion (`NamedRangeRegistry::removeWorkbook/removeSheet`) doesn't mark dependent formulas dirty - tests use manual `dirty = true` workaround (architectural limitation, not fixed - would require named range → formula dependency tracking)
+- Phase 17 (audit): Named range deletion (`NamedRangeRegistry::removeWorkbook/removeSheet`) doesn't mark dependent formulas dirty - tests use manual `dirty = true` workaround (architectural limitation, fix planned in Phase 18)
