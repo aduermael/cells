@@ -204,13 +204,16 @@ New file: `cell_type_coercion_test.cc`
 
 New file: `spill_operations_test.cc`
 
-- [ ] 12a: Test array formula creates spill range
-- [ ] 12b: Test spill blocked by existing data (shows #SPILL!)
-- [ ] 12c: Test spill range updates when array size changes
-- [ ] 12d: Test inserting rows/columns in spill range
-- [ ] 12e: Test deleting rows/columns in spill range
-- [ ] 12f: Test overlapping spill ranges detection
-- [ ] 12g: Test spill master cell deletion clears spill range
+- [x] 12a: Test array formula creates spill range - 7 tests (SEQUENCE vertical/horizontal/2D, UNIQUE, SORT, FILTER, TRANSPOSE)
+- [x] 12b: Test spill blocked by existing data (shows #SPILL!) - 5 tests (blocked by value/formula/string/2D, not blocked by same spill)
+- [x] 12c: Test spill range updates when array size changes - 6 tests (expands, shrinks, changes shape, becomes blocked/unblocked, to single value)
+- [x] 12d: Test inserting rows/columns in spill range - 2 tests (insert row/column clears spill for recalculation)
+- [x] 12e: Test deleting rows/columns in spill range - 3 tests (delete row/column clears spill, delete master cell row)
+- [x] 12f: Test overlapping spill ranges detection - 4 tests (non-overlapping, blocked by first spill, adjacent spills, horizontal non-overlapping)
+- [x] 12g: Test spill master cell deletion clears spill range - 3 tests (delete master clears spill, clear formula removes spill, clear all removes multiple)
+- [x] Additional tests: Spill reference (A1#) tests - 2 tests, edge cases - 4 tests (empty array, single element, sheet edge, mixed types, position reservation)
+
+**Note:** Spill references (A1#) return ranges, but range iteration currently only looks at actual Cell objects. Spilled values (stored in SpillInfo) are virtual and don't create Cell objects. This is a known limitation documented in the tests.
 
 ---
 

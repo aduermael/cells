@@ -1116,6 +1116,22 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "spill_operations_test",
+    srcs = ["spill_operations_test.cc"],
+    shard_count = 4,
+    deps = [
+        ":dependency_graph",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "fill_range",
     srcs = ["fill_range.cc"],
