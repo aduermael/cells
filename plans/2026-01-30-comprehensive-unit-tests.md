@@ -21,12 +21,12 @@ New file: `style_operations_test.cc`
 
 New file: `format_operations_test.cc`
 
-- [ ] 2a: Test applying formats to individual cells via CELL_SET
-- [ ] 2b: Test applying formats to columns/rows via COL_SET/ROW_SET
-- [ ] 2c: Test applying formats to ranges via RANGE_SET with FORMAT flag
-- [ ] 2d: Test format inheritance hierarchy (cell > range > row > column)
-- [ ] 2e: Test all format categories (number, currency, percentage, date, time, text, custom)
-- [ ] 2f: Test format display rendering for edge cases (large numbers, negative, zero, text in number cells)
+- [x] 2a: Test applying formats to individual cells via CELL_SET (7 tests)
+- [x] 2b: Test applying formats to columns/rows via COL_SET/ROW_SET (5 tests)
+- [x] 2c: Test applying formats to ranges via RANGE_SET with FORMAT flag (3 tests)
+- [x] 2d: Test format inheritance hierarchy (cell > range > row > column) (5 tests)
+- [x] 2e: Test all format categories (number, currency, percentage, date, time, text, custom) (17 tests)
+- [x] 2f: Test format display rendering for edge cases (large numbers, negative, zero, text in number cells) (17 tests + 4 CRDT convergence tests = 21 tests)
 
 ---
 

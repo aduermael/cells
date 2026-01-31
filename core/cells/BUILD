@@ -387,6 +387,20 @@ cc_test(
 )
 
 cc_test(
+    name = "format_operations_test",
+    srcs = ["format_operations_test.cc"],
+    deps = [
+        ":crdt",
+        ":format_buffer",
+        ":id",
+        ":number_format",
+        ":number_formatter",
+        ":range",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "crdt_range_test",
     srcs = ["crdt_range_test.cc"],
     deps = [
