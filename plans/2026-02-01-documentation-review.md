@@ -49,10 +49,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Check API examples match current code → ✓
   - Ensure platform support is accurate → ✓ web/apple/native all verified
 
-- [ ] 2f: Review and update `docs/rendering.md`
-  - Verify rendering pipeline description
-  - Check constants match code
-  - Ensure viewport indexing section is current
+- [x] 2f: Review and update `docs/rendering.md`
+  - Verify rendering pipeline description → ✓ comprehensive
+  - Check constants match code → ✓ verified against grid-constants.ts
+  - Ensure viewport indexing section is current → ✓ all source files verified
 
 - [ ] 2g: Review and update `docs/type-system.md`
   - Update implementation status if changed
