@@ -61,6 +61,8 @@ const COLLECTIONS = {
     'dropdown-positioning.test.mjs',
     // Phase 5: Dropdown frame tests
     'dropdown-frame.test.mjs',
+    // Fill handle auto-commit test
+    'fill-auto-commit.test.mjs',
   ],
   collab: [
     'collab.test.mjs',

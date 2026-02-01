@@ -38,7 +38,7 @@ if (cellEditor.isEditing()) {
 Since `confirmEditing()` is async, the fill drag setup should happen in a `.then()` callback or after awaiting.
 
 ## Phase 2: Add E2E Test
-- [ ] 2a: Create E2E test for fill handle with uncommitted cell value
+- [x] 2a: Create E2E test for fill handle with uncommitted cell value. Added `fill-auto-commit.test.mjs` with 3 tests: numeric value fill, text value fill, and formula fill. Registered in test-parallel.mjs.
 
 Create `apps/wasm/tests/fill-auto-commit.test.mjs` that tests:
 1. Select cell A1
