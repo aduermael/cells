@@ -1,16 +1,22 @@
 # Cells
 
-A modern spreadsheet engine with real-time collaboration, Excel compatibility, and powerful CLI tools.
+A modern spreadsheet engine—use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
 
 **[Try the Live Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
 
 ## What is Cells?
 
-Cells is a spreadsheet engine that runs entirely in your browser. It combines the familiarity of Excel with modern features:
+Cells is a spreadsheet engine that works two ways:
 
+1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export, no account required.
+2. **Headless CLI** — Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
+
+Both share the same core engine, so formulas and files work identically across environments.
+
+**Key features:**
 - **Real-time collaboration** - Edit together with P2P sync (no server required for document data)
 - **Excel compatible** - Import and export .xlsx files seamlessly
-- **CLI tools** - Convert, inspect, and sync spreadsheets from the command line
+- **Fully scriptable** - Automate with Luau scripts (Python, VBA, and TypeScript support planned)
 - **Git-friendly** - Text-based file format that diffs cleanly
 
 ## Quick Start
@@ -62,6 +68,11 @@ bazel run :cli
 - Format conversion: `xlsx <-> zcd`
 - File inspection and validation
 - Headless spreadsheet operations
+
+### Scripting
+- **Luau** - Full scripting support with access to the cell engine API
+- Automate data transformations, generate reports, run calculations
+- **Coming soon:** Python, VBA, and TypeScript bindings
 
 ## Architecture
 
