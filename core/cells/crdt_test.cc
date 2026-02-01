@@ -1,6 +1,8 @@
 #include "core/cells/crdt.h"
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/id.h"
+#include "core/cells/number_format.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
 
@@ -1171,6 +1173,365 @@ TEST_F(SizeSetFlagTest, RowBootstrapOpLogBehavior) {
     }
     EXPECT_TRUE(foundRow1) << "ROW_SET operation for row1 should be in OpLog";
     EXPECT_TRUE(foundRow2) << "ROW_SET operation for row2 should be in OpLog";
+}
+
+// =============================================================================
+// Full-State SET Operation Tests for Resurrection Correctness
+// =============================================================================
+// Tests that SET operations include all entity properties (full-state) so that
+// operations are self-sufficient for resurrection. This is critical for CRDT
+// correctness when operations arrive out of order:
+//
+// Example scenario:
+// 1. Peer A: DELETE cell at t=1000
+// 2. Peer B: SET cell (value + style) at t=2000
+// 3. On Peer C, DELETE arrives first, then SET
+//
+// With full-state SET, the cell is correctly resurrected with all properties.
+// With sparse SET (only changed properties), style would be lost.
+
+class FullStateOperationTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
+        workbook->setNodeId(generate_id());
+
+        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        sheetId = sheet->id;
+        sheet->setWorkbook(workbook.get());
+
+        // Create column and row
+        colId = generate_id();
+        rowId = generate_id();
+        auto col = std::make_unique<Axis>(colId, true);
+        col->position = 0;
+        col->size = 100;
+        col->setSizeSet(true);  // Explicitly set size
+        auto row = std::make_unique<Axis>(rowId, false);
+        row->position = 0;
+        row->size = 25;
+        row->setSizeSet(true);  // Explicitly set size
+        sheet->addColumn(std::move(col));
+        sheet->addRow(std::move(row));
+
+        // Create a cell with value
+        cellId = generate_id();
+        auto cell = std::make_unique<Cell>(cellId, colId, rowId);
+        cell->value = CellValue(42.0);
+        sheet->addCell(std::move(cell));
+
+        workbook->addSheet(std::move(sheet));
+    }
+
+    std::unique_ptr<Workbook> workbook;
+    ID sheetId;
+    ID colId, rowId;
+    ID cellId;
+};
+
+TEST_F(FullStateOperationTest, CellSetStyleOpIncludesValue) {
+    // First, verify the cell has a value
+    Cell* cell = workbook->getCell(cellId);
+    ASSERT_NE(cell, nullptr);
+    EXPECT_EQ(cell->value.asNumber(), 42.0);
+
+    // Create a style operation
+    StyleBuffer style;
+    style.setBold(true);
+    style.setBgColorHex("#ff0000");
+    Operation op = makeCellSetStyleOp(*workbook, cellId, style);
+
+    // Verify payload contains value information for resurrection
+    EXPECT_NE(op.payload.find("\"t\":\"n\""), std::string::npos)
+        << "Style op payload should include value type: " << op.payload;
+    EXPECT_NE(op.payload.find("\"v\":\"42"), std::string::npos)
+        << "Style op payload should include value: " << op.payload;
+    EXPECT_NE(op.payload.find("\"col\":\"" + colId.toString() + "\""), std::string::npos)
+        << "Style op payload should include colId: " << op.payload;
+    EXPECT_NE(op.payload.find("\"row\":\"" + rowId.toString() + "\""), std::string::npos)
+        << "Style op payload should include rowId: " << op.payload;
+}
+
+TEST_F(FullStateOperationTest, CellSetFormatOpIncludesValueAndStyle) {
+    // First, set a style on the cell
+    StyleBuffer style;
+    style.setBold(true);
+    Operation styleOp = makeCellSetStyleOp(*workbook, cellId, style);
+    applyOperation(*workbook, styleOp);
+
+    // Verify style was set
+    Cell* cell = workbook->getCell(cellId);
+    ASSERT_NE(cell, nullptr);
+    EXPECT_TRUE(cell->hasStyle());
+
+    // Now create a format operation
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::CURRENCY);
+    Operation formatOp = makeCellSetFormatOp(*workbook, cellId, format);
+
+    // Verify payload contains both value AND style for resurrection
+    EXPECT_NE(formatOp.payload.find("\"t\":\"n\""), std::string::npos)
+        << "Format op payload should include value type: " << formatOp.payload;
+    EXPECT_NE(formatOp.payload.find("\"sty\":\""), std::string::npos)
+        << "Format op payload should include existing style: " << formatOp.payload;
+    EXPECT_NE(formatOp.payload.find("\"fmt\":\""), std::string::npos)
+        << "Format op payload should include new format: " << formatOp.payload;
+}
+
+TEST_F(FullStateOperationTest, CellClearStyleOpPreservesValue) {
+    // First, set a style and format on the cell
+    StyleBuffer style;
+    style.setBold(true);
+    Operation styleOp = makeCellSetStyleOp(*workbook, cellId, style);
+    applyOperation(*workbook, styleOp);
+
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::PERCENTAGE);
+    Operation formatOp = makeCellSetFormatOp(*workbook, cellId, format);
+    applyOperation(*workbook, formatOp);
+
+    // Create a clear style operation
+    Operation clearOp = makeCellClearStyleOp(*workbook, cellId);
+
+    // Verify payload contains value and format (preserving them)
+    EXPECT_NE(clearOp.payload.find("\"t\":\"n\""), std::string::npos)
+        << "Clear style op should include value: " << clearOp.payload;
+    EXPECT_NE(clearOp.payload.find("\"fmt\":\""), std::string::npos)
+        << "Clear style op should include format: " << clearOp.payload;
+    EXPECT_NE(clearOp.payload.find("\"sty\":\"\""), std::string::npos)
+        << "Clear style op should have empty style: " << clearOp.payload;
+}
+
+TEST_F(FullStateOperationTest, AxisSetStyleOpIncludesAllProperties) {
+    // First, set hidden and size on the column
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Axis* col = sheet->getColumn(colId);
+    ASSERT_NE(col, nullptr);
+    col->setHidden(true);
+    col->name = "MyColumn";
+
+    // Also set a format on the column
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::NUMBER);
+    Operation formatOp = makeAxisSetFormatOp(*workbook, colId, format);
+    applyOperation(*workbook, formatOp);
+
+    // Now create a style operation
+    StyleBuffer style;
+    style.setBold(true);
+    Operation styleOp = makeAxisSetStyleOp(*workbook, colId, style);
+
+    // Verify payload includes all axis properties
+    EXPECT_NE(styleOp.payload.find("\"pos\":"), std::string::npos)
+        << "Axis style op should include position: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"size\":"), std::string::npos)
+        << "Axis style op should include size (if sizeSet): " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"hidden\":true"), std::string::npos)
+        << "Axis style op should include hidden state: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"name\":\"MyColumn\""), std::string::npos)
+        << "Axis style op should include name: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"fmt\":\""), std::string::npos)
+        << "Axis style op should include existing format: " << styleOp.payload;
+}
+
+TEST_F(FullStateOperationTest, AxisSetHiddenOpIncludesAllProperties) {
+    // Set up axis with style and format
+    StyleBuffer style;
+    style.setBgColorHex("#00ff00");
+    Operation styleOp = makeAxisSetStyleOp(*workbook, colId, style);
+    applyOperation(*workbook, styleOp);
+
+    // Now create a set hidden operation
+    Operation hiddenOp = makeAxisSetHiddenOp(*workbook, colId, true);
+
+    // Verify payload includes all axis properties
+    EXPECT_NE(hiddenOp.payload.find("\"pos\":"), std::string::npos)
+        << "Axis hidden op should include position: " << hiddenOp.payload;
+    EXPECT_NE(hiddenOp.payload.find("\"sty\":\""), std::string::npos)
+        << "Axis hidden op should include existing style: " << hiddenOp.payload;
+    EXPECT_NE(hiddenOp.payload.find("\"hidden\":true"), std::string::npos)
+        << "Axis hidden op should include hidden=true: " << hiddenOp.payload;
+}
+
+TEST_F(FullStateOperationTest, RangeSetStyleOpIncludesAllProperties) {
+    // Create a range first
+    ID rangeId = generate_id();
+    std::string createPayload = "{\"startCol\":\"" + colId.toString() + "\",";
+    createPayload += "\"startRow\":\"" + rowId.toString() + "\",";
+    createPayload += "\"endCol\":\"" + colId.toString() + "\",";
+    createPayload += "\"endRow\":\"" + rowId.toString() + "\",";
+    createPayload += "\"flags\":3}";  // MERGE | STYLE flags
+    Operation createOp = makeRangeSetOp(*workbook, rangeId, createPayload);
+    applyOperation(*workbook, createOp);
+
+    // Set a format on the range
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::DATE);
+    Operation formatOp = makeRangeSetFormatOp(*workbook, rangeId, format);
+    applyOperation(*workbook, formatOp);
+
+    // Now create a style operation
+    StyleBuffer style;
+    style.setBold(true);
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, style);
+
+    // Verify payload includes all range properties for resurrection
+    EXPECT_NE(styleOp.payload.find("\"startCol\":\"" + colId.toString() + "\""), std::string::npos)
+        << "Range style op should include startCol: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"endCol\":\"" + colId.toString() + "\""), std::string::npos)
+        << "Range style op should include endCol: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"flags\":"), std::string::npos)
+        << "Range style op should include flags: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"fmt\":\""), std::string::npos)
+        << "Range style op should include existing format: " << styleOp.payload;
+    EXPECT_NE(styleOp.payload.find("\"sty\":\""), std::string::npos)
+        << "Range style op should include new style: " << styleOp.payload;
+}
+
+TEST_F(FullStateOperationTest, RangeClearStyleOpPreservesFormat) {
+    // Create a range with both style and format
+    ID rangeId = generate_id();
+    std::string createPayload = "{\"startCol\":\"" + colId.toString() + "\",";
+    createPayload += "\"startRow\":\"" + rowId.toString() + "\",";
+    createPayload += "\"endCol\":\"" + colId.toString() + "\",";
+    createPayload += "\"endRow\":\"" + rowId.toString() + "\",";
+    createPayload += "\"flags\":2}";  // STYLE flag
+    Operation createOp = makeRangeSetOp(*workbook, rangeId, createPayload);
+    applyOperation(*workbook, createOp);
+
+    StyleBuffer style;
+    style.setBold(true);
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, style);
+    applyOperation(*workbook, styleOp);
+
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::TIME);
+    Operation formatOp = makeRangeSetFormatOp(*workbook, rangeId, format);
+    applyOperation(*workbook, formatOp);
+
+    // Now create a clear style operation
+    Operation clearOp = makeRangeClearStyleOp(*workbook, rangeId);
+
+    // Verify payload preserves format
+    EXPECT_NE(clearOp.payload.find("\"fmt\":\""), std::string::npos)
+        << "Range clear style op should preserve format: " << clearOp.payload;
+    EXPECT_NE(clearOp.payload.find("\"sty\":\"\""), std::string::npos)
+        << "Range clear style op should have empty style: " << clearOp.payload;
+    EXPECT_NE(clearOp.payload.find("\"flags\":"), std::string::npos)
+        << "Range clear style op should include flags: " << clearOp.payload;
+}
+
+// Test resurrection scenario: The full-state payload contains all info needed
+// to resurrect a cell even when operations arrive out of order.
+TEST_F(FullStateOperationTest, CellResurrectionWithFullState) {
+    // First set up the cell with style and format to capture a full-state payload
+    StyleBuffer style;
+    style.setBold(true);
+    style.setBgColorHex("#ff0000");
+    Operation styleOp = makeCellSetStyleOp(*workbook, cellId, style);
+    applyOperation(*workbook, styleOp);
+
+    FormatBuffer format;
+    format.setCategory(NumberFormatCategory::CURRENCY);
+    Operation formatOp = makeCellSetFormatOp(*workbook, cellId, format);
+    applyOperation(*workbook, formatOp);
+
+    // Capture the full-state payload - this is what a peer would send
+    std::string fullStatePayload = formatOp.payload;
+
+    // Now create a fresh workbook to simulate a peer receiving operations out of order
+    auto peer = std::make_unique<Workbook>(generate_id(), "PeerWorkbook");
+    peer->setNodeId(generate_id());
+
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(peer.get());
+
+    // Create matching column and row in the peer
+    auto col = std::make_unique<Axis>(colId, true);
+    col->position = 0;
+    col->size = 100;
+    col->setSizeSet(true);
+    auto row = std::make_unique<Axis>(rowId, false);
+    row->position = 0;
+    row->size = 25;
+    row->setSizeSet(true);
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+
+    peer->addSheet(std::move(sheet));
+
+    // Scenario: Peer receives DELETE first (t=1000), then SET (t=2000)
+    // With LWW semantics, SET wins and should resurrect the cell with full state
+    ID node1("Node1111");
+    HLC deleteHlc(1000, 0, node1);
+    HLC setHlc(2000, 0, node1);
+
+    Operation deleteOp(deleteHlc, OpType::CELL_DELETE, cellId, "{}");
+    Operation setOp(setHlc, OpType::CELL_SET, cellId, fullStatePayload);
+
+    // On the peer, DELETE arrives first
+    // Since cell doesn't exist, delete is a no-op but adds to oplog
+    ApplyResult deleteResult = applyOperation(*peer, deleteOp);
+    // Cell was never created, so nothing to delete - this returns SUCCESS (idempotent)
+    EXPECT_TRUE(deleteResult == ApplyResult::SUCCESS || deleteResult == ApplyResult::INVALID_TARGET);
+    EXPECT_EQ(peer->getCell(cellId), nullptr);
+
+    // Now SET arrives - this creates/resurrects the cell with full state
+    ApplyResult setResult = applyOperation(*peer, setOp);
+    EXPECT_TRUE(setResult == ApplyResult::SUCCESS || setResult == ApplyResult::RESURRECTED);
+
+    // Verify cell was created with all properties from the full-state payload
+    Cell* cell = peer->getCell(cellId);
+    ASSERT_NE(cell, nullptr) << "Cell should be created from full-state SET";
+    EXPECT_EQ(cell->value.asNumber(), 42.0) << "Value should be restored";
+    EXPECT_TRUE(cell->hasStyle()) << "Style should be present";
+    EXPECT_TRUE(cell->hasFormat()) << "Format should be present";
+
+    const StyleBuffer* restoredStyle = peer->getEntityStyle(cellId);
+    ASSERT_NE(restoredStyle, nullptr);
+    EXPECT_TRUE(restoredStyle->getBold());
+
+    const FormatBuffer* restoredFormat = peer->getEntityFormat(cellId);
+    ASSERT_NE(restoredFormat, nullptr);
+    EXPECT_EQ(restoredFormat->getCategory(), NumberFormatCategory::CURRENCY);
+}
+
+// Test that a sparse SET (without full state) would lose properties
+// This documents the problem we're solving with full-state operations
+TEST_F(FullStateOperationTest, SparseSetLosesPropertiesOnResurrection) {
+    // Capture a SPARSE payload (only the changed property) - this is what we DON'T want
+    std::string sparsePayload = "{\"t\":\"n\",\"v\":\"42\",\"col\":\"" + colId.toString() +
+                                "\",\"row\":\"" + rowId.toString() + "\"}";
+
+    // Create a fresh peer workbook
+    auto peer = std::make_unique<Workbook>(generate_id(), "PeerWorkbook");
+    peer->setNodeId(generate_id());
+
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(peer.get());
+
+    auto col = std::make_unique<Axis>(colId, true);
+    col->position = 0;
+    auto row = std::make_unique<Axis>(rowId, false);
+    row->position = 0;
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+
+    peer->addSheet(std::move(sheet));
+
+    // Apply the sparse SET operation
+    ID node1("Node1111");
+    HLC hlc(1000, 0, node1);
+    Operation setOp(hlc, OpType::CELL_SET, cellId, sparsePayload);
+
+    applyOperation(*peer, setOp);
+
+    // Cell is created but WITHOUT style and format
+    Cell* cell = peer->getCell(cellId);
+    ASSERT_NE(cell, nullptr);
+    EXPECT_EQ(cell->value.asNumber(), 42.0);
+    EXPECT_FALSE(cell->hasStyle()) << "Sparse SET does NOT include style";
+    EXPECT_FALSE(cell->hasFormat()) << "Sparse SET does NOT include format";
 }
 
 }  // namespace

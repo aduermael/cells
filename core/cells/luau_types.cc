@@ -410,12 +410,31 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
         // Build payload based on value type (same logic as luaCellSet)
         std::string payload;
+
+        // Helper to append existing style/format for full-state resurrection correctness
+        auto appendStyleFormat = [&payload, &workbook, &cell]() {
+            if (cell->hasStyle()) {
+                const StyleBuffer* sty = workbook->getEntityStyle(cell->id);
+                if (sty) {
+                    payload += R"(,"sty":")" + sty->toBase64() + R"(")";
+                }
+            }
+            if (cell->hasFormat()) {
+                const FormatBuffer* fmt = workbook->getEntityFormat(cell->id);
+                if (fmt) {
+                    payload += R"(,"fmt":")" + fmt->toBase64() + R"(")";
+                }
+            }
+        };
+
         if (lua_isnumber(L, 3) != 0) {
             const double num = lua_tonumber(L, 3);
             char buf[64];
             snprintf(buf, sizeof(buf), "%.15g", num);
             payload = R"({"t":"n","v":")" + std::string(buf) + R"(","col":")" + colIdStr +
-                      R"(","row":")" + rowIdStr + R"("})";
+                      R"(","row":")" + rowIdStr + R"(")";
+            appendStyleFormat();
+            payload += "}";
         } else if (lua_isstring(L, 3) != 0) {
             const char* str = lua_tostring(L, 3);
             if (str[0] == '=') {
@@ -428,7 +447,9 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                     conv.setContext(*sheet);
                     const std::string uuidFormula = conv.formulaToUuid(str);
                     payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                              colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                    appendStyleFormat();
+                    payload += "}";
                 } else {
                     // CRDT-compliant resolution: discover and create entities first
                     FormulaResolver resolver(*workbook, *sheet);
@@ -474,12 +495,16 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                         conv.setContext(*sheet);
                         const std::string uuidFormula = conv.formulaToUuid(str);
                         payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                                  colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                        appendStyleFormat();
+                        payload += "}";
                     } else {
                         // Serialize the resolved AST to UUID format
                         const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
                         payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                                  colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                        appendStyleFormat();
+                        payload += "}";
 
                         // Add dependencies to the dependency graph
                         DependencyGraph* depGraph = sheet->getDependencyGraph();

@@ -499,22 +499,40 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
 
     std::string colIdStr = cell->colId.toString();
     std::string rowIdStr = cell->rowId.toString();
-    std::string idSuffix = ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
+    // Build full-state payload for resurrection correctness
+    // Include style/format so operations are self-sufficient when arriving out of order
     std::string payload;
     if (typeChar == 'f') {
         _refConverter.setContext(*sheet);
         std::string uuidFormula = _refConverter.formulaToUuid(value);
-        payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
     } else if (typeChar == 'b') {
         payload = "{\"t\":\"b\",\"v\":\"" +
-                  std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" +
-                  idSuffix;
+                  std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"";
     } else if (typeChar == 'n') {
-        payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
+        payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"";
     } else {
-        payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
+        payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"";
     }
+
+    // Add existing style if present (full-state for resurrection)
+    if (cell->hasStyle()) {
+        const StyleBuffer* sty = _workbook->getEntityStyle(cell->id);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+
+    // Add existing format if present (full-state for resurrection)
+    if (cell->hasFormat()) {
+        const FormatBuffer* fmt = _workbook->getEntityFormat(cell->id);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+
+    payload += ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
     Operation op = makeCellSetOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
@@ -553,8 +571,9 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     std::string colIdStr = cell->colId.toString();
     std::string rowIdStr = cell->rowId.toString();
-    std::string idSuffix = ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
+    // Build full-state payload for resurrection correctness
+    // Include style/format so operations are self-sufficient when arriving out of order
     std::string payload;
     ID detectedFormatId;
 
@@ -600,38 +619,56 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage
                 std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
             } else {
                 // Resolution failed (e.g., sheet not found) - store as error formula
                 // Fall back to string-based conversion for the formula text
                 _refConverter.setContext(*sheet);
                 std::string uuidFormula = _refConverter.formulaToUuid(value);
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
             }
         } else {
             // Parse failed - store original formula text (will show as error)
             _refConverter.setContext(*sheet);
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
         }
     } else if (value == "TRUE" || value == "true") {
-        payload = "{\"t\":\"b\",\"v\":\"true\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"true\"";
     } else if (value == "FALSE" || value == "false") {
-        payload = "{\"t\":\"b\",\"v\":\"false\"" + idSuffix;
+        payload = "{\"t\":\"b\",\"v\":\"false\"";
     } else if (value.empty()) {
-        payload = "{\"t\":\"s\",\"v\":\"\"" + idSuffix;
+        payload = "{\"t\":\"s\",\"v\":\"\"";
     } else {
         ParsedInput parsed = parseUserInput(value);
 
         if (parsed.success && parsed.valueType == CellValueType::NUMBER) {
             std::ostringstream numStr;
             numStr << std::setprecision(15) << parsed.numericValue;
-            payload = "{\"t\":\"n\",\"v\":\"" + numStr.str() + "\"" + idSuffix;
+            payload = "{\"t\":\"n\",\"v\":\"" + numStr.str() + "\"";
             detectedFormatId = parsed.formatId;
         } else {
-            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"";
         }
     }
+
+    // Add existing style if present (full-state for resurrection)
+    if (cell->hasStyle()) {
+        const StyleBuffer* sty = _workbook->getEntityStyle(cell->id);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+
+    // Add existing format if present (full-state for resurrection)
+    if (cell->hasFormat()) {
+        const FormatBuffer* fmt = _workbook->getEntityFormat(cell->id);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+
+    payload += ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
 
     // Check if this cell's position is part of a spill range BEFORE updating
     // If so, the spill master will need to be recalculated after the update
@@ -1104,10 +1141,32 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
     if (width < 20) width = 20;
     if (width > 1000) width = 1000;
 
-    std::string payload = "{\"size\":" + std::to_string(width) + "}";
+    // Build full-state payload for resurrection correctness
+    std::string payload = "{\"pos\":" + std::to_string(colAxis->position);
+    payload += ",\"size\":" + std::to_string(width);
+    if (!colAxis->name.empty()) {
+        payload += ",\"name\":\"" + jsonEscape(colAxis->name) + "\"";
+    }
+    if (colAxis->hasStyle()) {
+        const StyleBuffer* sty = _workbook->getEntityStyle(colId);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+    if (colAxis->hasFormat()) {
+        const FormatBuffer* fmt = _workbook->getEntityFormat(colId);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+    if (colAxis->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+    payload += "}";
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
 
     _viewportIndex.onAxisResized(colId, true, width);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1137,17 +1196,41 @@ std::string CellsEngine::resizeColumnByPos(uint32_t pos, uint32_t width) {
     if (!column) {
         colId = generate_id();
         colCreated = true;
+        // New column - no existing state to preserve
         std::string insertPayload =
             "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(width) + "}";
         Operation insertOp = makeColSetOp(*_workbook, colId, insertPayload);
         applyOperation(*_workbook, insertOp);
         column = sheet->getColumn(colId);
     } else {
-        std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
+        // Build full-state payload for resurrection correctness
+        std::string resizePayload = "{\"pos\":" + std::to_string(column->position);
+        resizePayload += ",\"size\":" + std::to_string(width);
+        if (!column->name.empty()) {
+            resizePayload += ",\"name\":\"" + jsonEscape(column->name) + "\"";
+        }
+        if (column->hasStyle()) {
+            const StyleBuffer* sty = _workbook->getEntityStyle(colId);
+            if (sty) {
+                resizePayload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (column->hasFormat()) {
+            const FormatBuffer* fmt = _workbook->getEntityFormat(colId);
+            if (fmt) {
+                resizePayload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        if (column->hidden()) {
+            resizePayload += ",\"hidden\":true";
+        }
+        resizePayload += "}";
         Operation resizeOp = makeColSetOp(*_workbook, colId, resizePayload);
         applyOperation(*_workbook, resizeOp);
     }
 
+
+    broadcastPendingOperations();
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, pos, width);
@@ -1184,10 +1267,29 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
     if (height < 10) height = 10;
     if (height > 500) height = 500;
 
-    std::string payload = "{\"size\":" + std::to_string(height) + "}";
+    // Build full-state payload for resurrection correctness
+    std::string payload = "{\"pos\":" + std::to_string(rowAxis->position);
+    payload += ",\"size\":" + std::to_string(height);
+    if (rowAxis->hasStyle()) {
+        const StyleBuffer* sty = _workbook->getEntityStyle(rowId);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+    if (rowAxis->hasFormat()) {
+        const FormatBuffer* fmt = _workbook->getEntityFormat(rowId);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+    if (rowAxis->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+    payload += "}";
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
 
     _viewportIndex.onAxisResized(rowId, false, height);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1217,17 +1319,38 @@ std::string CellsEngine::resizeRowByPos(uint32_t pos, uint32_t height) {
     if (!row) {
         rowId = generate_id();
         rowCreated = true;
+        // New row - no existing state to preserve
         std::string insertPayload =
             "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(height) + "}";
         Operation insertOp = makeRowSetOp(*_workbook, rowId, insertPayload);
         applyOperation(*_workbook, insertOp);
         row = sheet->getRow(rowId);
     } else {
-        std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
+        // Build full-state payload for resurrection correctness
+        std::string resizePayload = "{\"pos\":" + std::to_string(row->position);
+        resizePayload += ",\"size\":" + std::to_string(height);
+        if (row->hasStyle()) {
+            const StyleBuffer* sty = _workbook->getEntityStyle(rowId);
+            if (sty) {
+                resizePayload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (row->hasFormat()) {
+            const FormatBuffer* fmt = _workbook->getEntityFormat(rowId);
+            if (fmt) {
+                resizePayload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        if (row->hidden()) {
+            resizePayload += ",\"hidden\":true";
+        }
+        resizePayload += "}";
         Operation resizeOp = makeRowSetOp(*_workbook, rowId, resizePayload);
         applyOperation(*_workbook, resizeOp);
     }
 
+
+    broadcastPendingOperations();
 
     if (rowCreated) {
         _viewportIndex.onAxisInserted(rowId, false, pos, height);
@@ -1265,7 +1388,28 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
         return "{\"error\":\"Column not found\"}";
     }
 
-    std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+    // Build full-state payload for resurrection correctness
+    std::string payload = "{\"pos\":" + std::to_string(colAxis->position);
+    if (colAxis->sizeSet()) {
+        payload += ",\"size\":" + std::to_string(colAxis->size);
+    }
+    payload += ",\"name\":\"" + jsonEscape(name) + "\"";
+    if (colAxis->hasStyle()) {
+        const StyleBuffer* sty = _workbook->getEntityStyle(colId);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+    if (colAxis->hasFormat()) {
+        const FormatBuffer* fmt = _workbook->getEntityFormat(colId);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+    if (colAxis->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+    payload += "}";
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
@@ -1303,7 +1447,28 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
 
         column = sheet->getColumn(colId);
     } else {
-        std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+        // Build full-state payload for resurrection correctness
+        std::string payload = "{\"pos\":" + std::to_string(column->position);
+        if (column->sizeSet()) {
+            payload += ",\"size\":" + std::to_string(column->size);
+        }
+        payload += ",\"name\":\"" + jsonEscape(name) + "\"";
+        if (column->hasStyle()) {
+            const StyleBuffer* sty = _workbook->getEntityStyle(colId);
+            if (sty) {
+                payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (column->hasFormat()) {
+            const FormatBuffer* fmt = _workbook->getEntityFormat(colId);
+            if (fmt) {
+                payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        if (column->hidden()) {
+            payload += ",\"hidden\":true";
+        }
+        payload += "}";
         Operation op = makeColSetOp(*_workbook, colId, payload);
         applyOperation(*_workbook, op);
     }
@@ -1422,6 +1587,30 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     // When moving left, we insert before targetPos, so the column ends up at targetPos
     uint32_t finalPos = (currentPos < targetPos) ? targetPos - 1 : targetPos;
 
+    // Helper to build full-state column payload
+    auto buildColPayload = [this](Axis* col, uint32_t newPos) {
+        std::string p = "{\"pos\":" + std::to_string(newPos);
+        if (col->sizeSet()) {
+            p += ",\"size\":" + std::to_string(col->size);
+        }
+        if (!col->name.empty()) {
+            p += ",\"name\":\"" + jsonEscape(col->name) + "\"";
+        }
+        if (col->hasStyle()) {
+            const StyleBuffer* sty = _workbook->getEntityStyle(col->id);
+            if (sty) p += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+        if (col->hasFormat()) {
+            const FormatBuffer* fmt = _workbook->getEntityFormat(col->id);
+            if (fmt) p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+        if (col->hidden()) {
+            p += ",\"hidden\":true";
+        }
+        p += "}";
+        return p;
+    };
+
     // Shift other columns to make room (using CRDT operations for sync)
     if (currentPos > targetPos) {
         // Moving left: shift columns in [targetPos, currentPos) right by 1
@@ -1429,8 +1618,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
             Axis* col = sheet->getColumn(id);
             if (col != nullptr && col->id != colId &&
                 col->position >= targetPos && col->position < currentPos) {
-                std::string shiftPayload =
-                    "{\"pos\":" + std::to_string(col->position + 1) + "}";
+                std::string shiftPayload = buildColPayload(col, col->position + 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
             }
@@ -1441,8 +1629,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
             Axis* col = sheet->getColumn(id);
             if (col != nullptr && col->id != colId &&
                 col->position > currentPos && col->position < targetPos) {
-                std::string shiftPayload =
-                    "{\"pos\":" + std::to_string(col->position - 1) + "}";
+                std::string shiftPayload = buildColPayload(col, col->position - 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
             }
@@ -1450,7 +1637,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     }
 
     // Move the target column to its final position
-    std::string payload = "{\"pos\":" + std::to_string(finalPos) + "}";
+    std::string payload = buildColPayload(colAxis, finalPos);
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
@@ -1491,6 +1678,27 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     // When moving up, we insert before targetPos, so the row ends up at targetPos
     uint32_t finalPos = (currentPos < targetPos) ? targetPos - 1 : targetPos;
 
+    // Helper to build full-state row payload
+    auto buildRowPayload = [this](Axis* row, uint32_t newPos) {
+        std::string p = "{\"pos\":" + std::to_string(newPos);
+        if (row->sizeSet()) {
+            p += ",\"size\":" + std::to_string(row->size);
+        }
+        if (row->hasStyle()) {
+            const StyleBuffer* sty = _workbook->getEntityStyle(row->id);
+            if (sty) p += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+        if (row->hasFormat()) {
+            const FormatBuffer* fmt = _workbook->getEntityFormat(row->id);
+            if (fmt) p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+        if (row->hidden()) {
+            p += ",\"hidden\":true";
+        }
+        p += "}";
+        return p;
+    };
+
     // Shift other rows to make room (using CRDT operations for sync)
     if (currentPos > targetPos) {
         // Moving up: shift rows in [targetPos, currentPos) down by 1
@@ -1498,8 +1706,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
             Axis* row = sheet->getRow(id);
             if (row != nullptr && row->id != rowId &&
                 row->position >= targetPos && row->position < currentPos) {
-                std::string shiftPayload =
-                    "{\"pos\":" + std::to_string(row->position + 1) + "}";
+                std::string shiftPayload = buildRowPayload(row, row->position + 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
             }
@@ -1510,8 +1717,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
             Axis* row = sheet->getRow(id);
             if (row != nullptr && row->id != rowId &&
                 row->position > currentPos && row->position < targetPos) {
-                std::string shiftPayload =
-                    "{\"pos\":" + std::to_string(row->position - 1) + "}";
+                std::string shiftPayload = buildRowPayload(row, row->position - 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
             }
@@ -1519,7 +1725,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     }
 
     // Move the target row to its final position
-    std::string payload = "{\"pos\":" + std::to_string(finalPos) + "}";
+    std::string payload = buildRowPayload(rowAxis, finalPos);
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 

@@ -112,12 +112,28 @@ std::string CellsEngine::applyRemoteOperation(const std::string& opJson) {
 
     ApplyResult result = applyOperation(*_workbook, op);
 
+    // Determine notification type based on operation type
+    // Axis and sheet operations need STRUCTURE_CHANGED so viewport gets refreshed
+    auto getNotificationType = [](OpType type) -> ChangeType {
+        switch (type) {
+            case OpType::COL_SET:
+            case OpType::COL_DELETE:
+            case OpType::ROW_SET:
+            case OpType::ROW_DELETE:
+            case OpType::SHEET_SET:
+            case OpType::SHEET_DELETE:
+                return ChangeType::STRUCTURE_CHANGED;
+            default:
+                return ChangeType::CELL_CHANGED;
+        }
+    };
+
     std::string resultStr;
     switch (result) {
         case ApplyResult::SUCCESS:
             resultStr = "success";
             rebuildViewportIndex();
-            notifyListeners(ChangeType::CELL_CHANGED);
+            notifyListeners(getNotificationType(op.type));
             break;
         case ApplyResult::ALREADY_APPLIED:
             resultStr = "already_applied";
@@ -134,7 +150,7 @@ std::string CellsEngine::applyRemoteOperation(const std::string& opJson) {
         case ApplyResult::RESURRECTED:
             resultStr = "resurrected";
             rebuildViewportIndex();
-            notifyListeners(ChangeType::CELL_CHANGED);
+            notifyListeners(getNotificationType(op.type));
             break;
     }
 
@@ -207,11 +223,29 @@ std::string CellsEngine::applyRemoteOperations(const std::string& opsJson) {
         }
     }
 
+    // Check if any operations affect structure (axes, sheets)
+    bool hasStructureOps = false;
+    for (const auto& op : ops) {
+        switch (op.type) {
+            case OpType::COL_SET:
+            case OpType::COL_DELETE:
+            case OpType::ROW_SET:
+            case OpType::ROW_DELETE:
+            case OpType::SHEET_SET:
+            case OpType::SHEET_DELETE:
+                hasStructureOps = true;
+                break;
+            default:
+                break;
+        }
+        if (hasStructureOps) break;
+    }
+
     size_t applied = applyOperations(*_workbook, ops);
 
     if (applied > 0) {
         rebuildViewportIndex();
-        notifyListeners(ChangeType::CELL_CHANGED);
+        notifyListeners(hasStructureOps ? ChangeType::STRUCTURE_CHANGED : ChangeType::CELL_CHANGED);
     }
 
     std::ostringstream json;

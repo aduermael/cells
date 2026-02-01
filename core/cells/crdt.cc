@@ -430,73 +430,390 @@ Operation makeRangeDeleteOp(Workbook& workbook, const ID& rangeId, const std::st
 // =============================================================================
 
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style) {
-    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    // Build full-state payload for resurrection correctness
+    // Include all current cell properties so this operation is self-sufficient
+    const Cell* cell = workbook.getCell(cellId);
+    if (!cell) {
+        // Cell doesn't exist, just set style (will fail at apply time)
+        const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+        return makeCellSetOp(workbook, cellId, payload);
+    }
+
+    std::string payload = "{\"col\":\"" + cell->colId.toString() + "\"";
+    payload += ",\"row\":\"" + cell->rowId.toString() + "\"";
+
+    // Include value/formula
+    if (cell->isFormula()) {
+        const Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->ast != nullptr) {
+            const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+            payload += ",\"t\":\"f\",\"v\":\"" + internal::jsonEscape(uuidFormula) + "\"";
+        }
+    } else {
+        const bool isEmpty = cell->value.type == CellValueType::STRING && cell->value.raw.empty();
+        if (!isEmpty) {
+            const char typeChar = valueTypeToChar(cell->value.type);
+            payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+            payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
+        }
+    }
+
+    // Include new style
+    payload += ",\"sty\":\"" + style.toBase64() + "\"";
+
+    // Include existing format if present
+    if (cell->hasFormat()) {
+        const FormatBuffer* fmt = workbook.getEntityFormat(cellId);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+
+    payload += "}";
     return makeCellSetOp(workbook, cellId, payload);
 }
 
 Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId) {
-    return makeCellSetOp(workbook, cellId, "{\"sty\":\"\"}");
+    // Build full-state payload for resurrection correctness
+    const Cell* cell = workbook.getCell(cellId);
+    if (!cell) {
+        return makeCellSetOp(workbook, cellId, "{\"sty\":\"\"}");
+    }
+
+    std::string payload = "{\"col\":\"" + cell->colId.toString() + "\"";
+    payload += ",\"row\":\"" + cell->rowId.toString() + "\"";
+
+    // Include value/formula
+    if (cell->isFormula()) {
+        const Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->ast != nullptr) {
+            const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+            payload += ",\"t\":\"f\",\"v\":\"" + internal::jsonEscape(uuidFormula) + "\"";
+        }
+    } else {
+        const bool isEmpty = cell->value.type == CellValueType::STRING && cell->value.raw.empty();
+        if (!isEmpty) {
+            const char typeChar = valueTypeToChar(cell->value.type);
+            payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+            payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
+        }
+    }
+
+    // Clear style (empty string)
+    payload += ",\"sty\":\"\"";
+
+    // Include existing format if present
+    if (cell->hasFormat()) {
+        const FormatBuffer* fmt = workbook.getEntityFormat(cellId);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+
+    payload += "}";
+    return makeCellSetOp(workbook, cellId, payload);
 }
 
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format) {
-    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    // Build full-state payload for resurrection correctness
+    const Cell* cell = workbook.getCell(cellId);
+    if (!cell) {
+        const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+        return makeCellSetOp(workbook, cellId, payload);
+    }
+
+    std::string payload = "{\"col\":\"" + cell->colId.toString() + "\"";
+    payload += ",\"row\":\"" + cell->rowId.toString() + "\"";
+
+    // Include value/formula
+    if (cell->isFormula()) {
+        const Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->ast != nullptr) {
+            const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+            payload += ",\"t\":\"f\",\"v\":\"" + internal::jsonEscape(uuidFormula) + "\"";
+        }
+    } else {
+        const bool isEmpty = cell->value.type == CellValueType::STRING && cell->value.raw.empty();
+        if (!isEmpty) {
+            const char typeChar = valueTypeToChar(cell->value.type);
+            payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+            payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
+        }
+    }
+
+    // Include existing style if present
+    if (cell->hasStyle()) {
+        const StyleBuffer* sty = workbook.getEntityStyle(cellId);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+
+    // Include new format
+    payload += ",\"fmt\":\"" + format.toBase64() + "\"";
+
+    payload += "}";
     return makeCellSetOp(workbook, cellId, payload);
 }
 
 Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId) {
-    return makeCellSetOp(workbook, cellId, "{\"fmt\":\"\"}");
+    // Build full-state payload for resurrection correctness
+    const Cell* cell = workbook.getCell(cellId);
+    if (!cell) {
+        return makeCellSetOp(workbook, cellId, "{\"fmt\":\"\"}");
+    }
+
+    std::string payload = "{\"col\":\"" + cell->colId.toString() + "\"";
+    payload += ",\"row\":\"" + cell->rowId.toString() + "\"";
+
+    // Include value/formula
+    if (cell->isFormula()) {
+        const Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->ast != nullptr) {
+            const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+            payload += ",\"t\":\"f\",\"v\":\"" + internal::jsonEscape(uuidFormula) + "\"";
+        }
+    } else {
+        const bool isEmpty = cell->value.type == CellValueType::STRING && cell->value.raw.empty();
+        if (!isEmpty) {
+            const char typeChar = valueTypeToChar(cell->value.type);
+            payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+            payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
+        }
+    }
+
+    // Include existing style if present
+    if (cell->hasStyle()) {
+        const StyleBuffer* sty = workbook.getEntityStyle(cellId);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+
+    // Clear format (empty string)
+    payload += ",\"fmt\":\"\"";
+
+    payload += "}";
+    return makeCellSetOp(workbook, cellId, payload);
 }
 
+// Helper to build full-state axis payload
+namespace {
+std::string buildFullAxisPayload(Workbook& workbook, const Axis* axis, const StyleBuffer* newStyle,
+                                 const FormatBuffer* newFormat, const bool* newHidden) {
+    std::string payload = "{\"pos\":" + std::to_string(axis->position);
+
+    // Only include size if explicitly set (sizeSet=true)
+    if (axis->sizeSet()) {
+        payload += ",\"size\":" + std::to_string(axis->size);
+    }
+
+    if (!axis->name.empty()) {
+        payload += ",\"name\":\"" + internal::jsonEscape(axis->name) + "\"";
+    }
+
+    // Style: use new style if provided, otherwise include existing
+    if (newStyle != nullptr) {
+        if (newStyle->isEmpty()) {
+            // Empty style signals clear - use empty string
+            payload += ",\"sty\":\"\"";
+        } else {
+            payload += ",\"sty\":\"" + newStyle->toBase64() + "\"";
+        }
+    } else if (axis->hasStyle()) {
+        const StyleBuffer* sty = workbook.getEntityStyle(axis->id);
+        if (sty) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+
+    // Format: use new format if provided, otherwise include existing
+    if (newFormat != nullptr) {
+        if (newFormat->isEmpty()) {
+            // Empty format signals clear - use empty string
+            payload += ",\"fmt\":\"\"";
+        } else {
+            payload += ",\"fmt\":\"" + newFormat->toBase64() + "\"";
+        }
+    } else if (axis->hasFormat()) {
+        const FormatBuffer* fmt = workbook.getEntityFormat(axis->id);
+        if (fmt) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+
+    // Hidden: use new value if provided, otherwise include existing
+    if (newHidden != nullptr) {
+        payload += *newHidden ? ",\"hidden\":true" : ",\"hidden\":false";
+    } else if (axis->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+
+    payload += "}";
+    return payload;
+}
+}  // namespace
+
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style) {
-    // Determine if this is a column or row based on workbook storage
-    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
-    if (workbook.getColumn(axisId) != nullptr) {
+    // Build full-state payload for resurrection correctness
+    const Axis* axis = workbook.getColumn(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, &style, nullptr, nullptr);
         return makeColSetOp(workbook, axisId, payload);
     }
-    return makeRowSetOp(workbook, axisId, payload);
+
+    axis = workbook.getRow(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, &style, nullptr, nullptr);
+        return makeRowSetOp(workbook, axisId, payload);
+    }
+
+    // Axis doesn't exist, fall back to sparse payload
+    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    return makeColSetOp(workbook, axisId, payload);
 }
 
 Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
-    if (workbook.getColumn(axisId) != nullptr) {
-        return makeColSetOp(workbook, axisId, "{\"sty\":\"\"}");
+    // Build full-state payload with empty style
+    const StyleBuffer emptyStyle;
+    const Axis* axis = workbook.getColumn(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
+        return makeColSetOp(workbook, axisId, payload);
     }
-    return makeRowSetOp(workbook, axisId, "{\"sty\":\"\"}");
+
+    axis = workbook.getRow(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
+        return makeRowSetOp(workbook, axisId, payload);
+    }
+
+    return makeColSetOp(workbook, axisId, "{\"sty\":\"\"}");
 }
 
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format) {
-    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
-    if (workbook.getColumn(axisId) != nullptr) {
+    // Build full-state payload for resurrection correctness
+    const Axis* axis = workbook.getColumn(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &format, nullptr);
         return makeColSetOp(workbook, axisId, payload);
     }
-    return makeRowSetOp(workbook, axisId, payload);
+
+    axis = workbook.getRow(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &format, nullptr);
+        return makeRowSetOp(workbook, axisId, payload);
+    }
+
+    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    return makeColSetOp(workbook, axisId, payload);
 }
 
 Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId) {
-    if (workbook.getColumn(axisId) != nullptr) {
-        return makeColSetOp(workbook, axisId, "{\"fmt\":\"\"}");
+    // Build full-state payload with empty format
+    const FormatBuffer emptyFormat;
+    const Axis* axis = workbook.getColumn(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
+        return makeColSetOp(workbook, axisId, payload);
     }
-    return makeRowSetOp(workbook, axisId, "{\"fmt\":\"\"}");
+
+    axis = workbook.getRow(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
+        return makeRowSetOp(workbook, axisId, payload);
+    }
+
+    return makeColSetOp(workbook, axisId, "{\"fmt\":\"\"}");
 }
 
 Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden) {
-    const std::string payload = hidden ? "{\"hidden\":true}" : "{\"hidden\":false}";
-    if (workbook.getColumn(axisId) != nullptr) {
+    // Build full-state payload for resurrection correctness
+    const Axis* axis = workbook.getColumn(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, nullptr, &hidden);
         return makeColSetOp(workbook, axisId, payload);
     }
-    return makeRowSetOp(workbook, axisId, payload);
+
+    axis = workbook.getRow(axisId);
+    if (axis != nullptr) {
+        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, nullptr, &hidden);
+        return makeRowSetOp(workbook, axisId, payload);
+    }
+
+    const std::string payload = hidden ? "{\"hidden\":true}" : "{\"hidden\":false}";
+    return makeColSetOp(workbook, axisId, payload);
 }
 
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style) {
-    const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+    // Build full-state payload for resurrection correctness
+    const Range* range = workbook.getRange(rangeId);
+    if (!range) {
+        const std::string payload = "{\"sty\":\"" + style.toBase64() + "\"}";
+        return makeRangeSetOp(workbook, rangeId, payload);
+    }
+
+    std::string payload = "{\"startCol\":\"" + range->startColId.toString() + "\"";
+    payload += ",\"startRow\":\"" + range->startRowId.toString() + "\"";
+    payload += ",\"endCol\":\"" + range->endColId.toString() + "\"";
+    payload += ",\"endRow\":\"" + range->endRowId.toString() + "\"";
+    payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
+    payload += ",\"sty\":\"" + style.toBase64() + "\"";
+
+    // Include existing format if present
+    if (range->format.has_value()) {
+        payload += ",\"fmt\":\"" + range->format->toBase64() + "\"";
+    }
+
+    payload += "}";
     return makeRangeSetOp(workbook, rangeId, payload);
 }
 
 Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId) {
-    return makeRangeSetOp(workbook, rangeId, "{\"sty\":\"\"}");
+    // Build full-state payload with empty style
+    const Range* range = workbook.getRange(rangeId);
+    if (!range) {
+        return makeRangeSetOp(workbook, rangeId, "{\"sty\":\"\"}");
+    }
+
+    std::string payload = "{\"startCol\":\"" + range->startColId.toString() + "\"";
+    payload += ",\"startRow\":\"" + range->startRowId.toString() + "\"";
+    payload += ",\"endCol\":\"" + range->endColId.toString() + "\"";
+    payload += ",\"endRow\":\"" + range->endRowId.toString() + "\"";
+    payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
+    payload += ",\"sty\":\"\"";
+
+    // Include existing format if present
+    if (range->format.has_value()) {
+        payload += ",\"fmt\":\"" + range->format->toBase64() + "\"";
+    }
+
+    payload += "}";
+    return makeRangeSetOp(workbook, rangeId, payload);
 }
 
 Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const FormatBuffer& format) {
-    const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+    // Build full-state payload for resurrection correctness
+    const Range* range = workbook.getRange(rangeId);
+    if (!range) {
+        const std::string payload = "{\"fmt\":\"" + format.toBase64() + "\"}";
+        return makeRangeSetOp(workbook, rangeId, payload);
+    }
+
+    std::string payload = "{\"startCol\":\"" + range->startColId.toString() + "\"";
+    payload += ",\"startRow\":\"" + range->startRowId.toString() + "\"";
+    payload += ",\"endCol\":\"" + range->endColId.toString() + "\"";
+    payload += ",\"endRow\":\"" + range->endRowId.toString() + "\"";
+    payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
+
+    // Include existing style if present
+    if (range->style.has_value()) {
+        payload += ",\"sty\":\"" + range->style->toBase64() + "\"";
+    }
+
+    payload += ",\"fmt\":\"" + format.toBase64() + "\"";
+
+    payload += "}";
     return makeRangeSetOp(workbook, rangeId, payload);
 }
 

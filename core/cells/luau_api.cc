@@ -337,12 +337,30 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     const std::string colIdStr = col->id.toString();
     const std::string rowIdStr = row->id.toString();
 
+    // Helper to append existing style/format for full-state resurrection correctness
+    auto appendStyleFormat = [&payload, &workbook, &cell]() {
+        if (cell->hasStyle()) {
+            const StyleBuffer* sty = workbook->getEntityStyle(cell->id);
+            if (sty) {
+                payload += R"(,"sty":")" + sty->toBase64() + R"(")";
+            }
+        }
+        if (cell->hasFormat()) {
+            const FormatBuffer* fmt = workbook->getEntityFormat(cell->id);
+            if (fmt) {
+                payload += R"(,"fmt":")" + fmt->toBase64() + R"(")";
+            }
+        }
+    };
+
     if (lua_isnumber(L, 2) != 0) {
         const double num = lua_tonumber(L, 2);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.15g", num);
         payload = R"({"t":"n","v":")" + std::string(buf) + R"(","col":")" + colIdStr +
-                  R"(","row":")" + rowIdStr + R"("})";
+                  R"(","row":")" + rowIdStr + R"(")";
+        appendStyleFormat();
+        payload += "}";
     } else if (lua_isstring(L, 2) != 0) {
         const char* str = lua_tostring(L, 2);
         if (str[0] == '=') {
@@ -355,7 +373,9 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                 conv.setContext(*sheet);
                 const std::string uuidFormula = conv.formulaToUuid(str);
                 payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                          colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                          colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                appendStyleFormat();
+                payload += "}";
             } else {
                 // CRDT-compliant resolution: discover and create entities first
                 FormulaResolver resolver(*workbook, *sheet);
@@ -399,12 +419,16 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                     conv.setContext(*sheet);
                     const std::string uuidFormula = conv.formulaToUuid(str);
                     payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                              colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                    appendStyleFormat();
+                    payload += "}";
                 } else {
                     // Serialize the resolved AST to UUID format
                     const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
                     payload = R"({"t":"f","v":")" + jsonEscape(uuidFormula) + R"(","col":")" +
-                              colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                              colIdStr + R"(","row":")" + rowIdStr + R"(")";
+                    appendStyleFormat();
+                    payload += "}";
 
                     // Add dependencies to the dependency graph
                     DependencyGraph* depGraph = sheet->getDependencyGraph();
@@ -441,12 +465,16 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         } else {
             // Literal string
             payload = R"({"t":"s","v":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
-                      R"(","row":")" + rowIdStr + R"("})";
+                      R"(","row":")" + rowIdStr + R"(")";
+            appendStyleFormat();
+            payload += "}";
         }
     } else if (lua_isboolean(L, 2) != 0) {
         const bool val = lua_toboolean(L, 2) != 0;
         payload = R"({"t":"b","v":")" + std::string(val ? "true" : "false") + R"(","col":")" +
-                  colIdStr + R"(","row":")" + rowIdStr + R"("})";
+                  colIdStr + R"(","row":")" + rowIdStr + R"(")";
+        appendStyleFormat();
+        payload += "}";
     } else if (lua_isnil(L, 2) != 0) {
         // Clear the cell - remove from dependency graph first
         DependencyGraph* depGraph = sheet->getDependencyGraph();
