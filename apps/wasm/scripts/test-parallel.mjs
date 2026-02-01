@@ -63,12 +63,15 @@ const COLLECTIONS = {
     'dropdown-frame.test.mjs',
     // Fill handle auto-commit test
     'fill-auto-commit.test.mjs',
+    // CRDT resurrection tests
+    'collab-resurrection.test.mjs',
   ],
   collab: [
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
     'collab-style-sync.test.mjs',
+    'collab-resurrection.test.mjs',
   ],
 };
 
