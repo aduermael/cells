@@ -2,38 +2,54 @@
 
 ## Problem
 
-When creating columns/rows with default sizes, the CRDT operations include the size field unnecessarily:
+When creating columns/rows, the CRDT operations always include the size field:
 
 ```
 O 1769967510272.0.83Weacis COL_SET mCIDLa29 {"pos":1,"size":100}
 O 1769967510273.0.83Weacis ROW_SET R9zR53NN {"pos":1,"size":24}
 ```
 
-Should be:
-```
-O 1769967510272.0.83Weacis COL_SET mCIDLa29 {"pos":1}
-O 1769967510273.0.83Weacis ROW_SET R9zR53NN {"pos":1}
-```
+This conflates two different semantics:
+1. **Unset size** - "use your local default" (could differ per client)
+2. **Explicitly set to 100** - "this is 100, all clients must use 100"
 
-The size field should only be included when it differs from the default.
+### Example Scenario
 
-### Additional Issue
+- User A has default column width = 100
+- User B has default column width = 200
+- User A creates a column (no explicit size) → should show as 100 for A, 200 for B
+- User A explicitly sets width to 100 → should show as 100 for both A and B
 
-There's an inconsistency in default row height:
-- `types.h`: `DEFAULT_ROW_HEIGHT = 24`
-- `crdt_axis.cc` line 243: defaults to `21` when size field is missing
+### Solution
 
-## Phase 1: Fix Default Row Height Inconsistency
+Add a `SIZE_SET` flag to `AxisFlags` (bit 4 is available) to track whether size was explicitly set.
 
-- [ ] 1a: Update `crdt_axis.cc` to use `DEFAULT_ROW_HEIGHT` constant instead of hardcoded 21
+## Phase 1: Add SIZE_SET Flag to AxisFlags
 
-## Phase 2: Omit Default Sizes in Operation Generation
+- [ ] 1a: Add `SIZE_SET = 1 << 4` to `AxisFlags` enum in `model.h`
+- [ ] 1b: Add `sizeSet()` and `setSizeSet(bool)` accessor methods to `Axis` struct
+- [ ] 1c: Fix inconsistent default row height in `crdt_axis.cc` (uses 21, should use `DEFAULT_ROW_HEIGHT` = 24)
 
-- [ ] 2a: Update `luau_api.cc` to omit size field when creating columns/rows (lines 366-381)
-- [ ] 2b: Update `fill_range.cc` to omit size field when creating columns/rows (lines 247-264)
-- [ ] 2c: Update `crdt.cc` `bootstrapOpLog()` to only include size when non-default (lines 528-569)
+## Phase 2: Update CRDT Operation Generation
 
-## Phase 3: Add Tests
+- [ ] 2a: Update `luau_api.cc` to not include size when creating axes (size not explicitly set)
+- [ ] 2b: Update `fill_range.cc` to not include size when creating axes (size not explicitly set)
+- [ ] 2c: Update `crdt.cc` `bootstrapOpLog()` to only include size when `sizeSet()` is true
 
-- [ ] 3a: Add unit tests verifying default sizes are omitted from operation payloads
-- [ ] 3b: Add tests verifying non-default sizes are still included
+## Phase 3: Update CRDT Operation Application
+
+- [ ] 3a: Update `crdt_axis.cc` `applyColSet()` to set `SIZE_SET` flag when payload contains "size"
+- [ ] 3b: Update `crdt_axis.cc` `applyRowSet()` to set `SIZE_SET` flag when payload contains "size"
+
+## Phase 4: Update Resize Operations
+
+- [ ] 4a: Ensure column/row resize UI operations set the `SIZE_SET` flag
+- [ ] 4b: Ensure resize CRDT operations always include size (since it's explicit)
+
+## Phase 5: Add Tests
+
+- [ ] 5a: Test that newly created axes have `sizeSet() == false`
+- [ ] 5b: Test that explicitly resized axes have `sizeSet() == true`
+- [ ] 5c: Test that CRDT payloads omit size when `sizeSet() == false`
+- [ ] 5d: Test that CRDT payloads include size when `sizeSet() == true`
+- [ ] 5e: Test cross-client scenario: unset size uses local default, explicit size propagates
