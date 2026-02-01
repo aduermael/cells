@@ -44,10 +44,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Check line prefix documentation matches implementation → ✓ verified against parser.cc
   - Ensure examples are accurate → ✓
 
-- [ ] 2e: Review and update `docs/networking.md`
-  - Verify implementation status table
-  - Check API examples match current code
-  - Ensure platform support is accurate
+- [x] 2e: Review and update `docs/networking.md`
+  - Verify implementation status table → ✓ all source files exist
+  - Check API examples match current code → ✓
+  - Ensure platform support is accurate → ✓ web/apple/native all verified
 
 - [ ] 2f: Review and update `docs/rendering.md`
   - Verify rendering pipeline description
