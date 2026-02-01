@@ -10,7 +10,7 @@ Review and improve all documentation for accuracy and clarity. The main README s
 
 ## Phase 1: Rewrite Main README
 
-- [ ] 1a: Rewrite README.md with new structure:
+- [x] 1a: Rewrite README.md with new structure:
   - **Opening pitch**: What is Cells? A modern spreadsheet engine with CLI tools and a web UI
   - **Key features section**: Highlight what makes it special (real-time collaboration, Excel compatibility, CLI tools, web UI)
   - **Screenshots/demo section**: Link to live demo or add screenshot placeholder
