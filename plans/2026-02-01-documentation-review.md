@@ -39,10 +39,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Check implementation status → ✓ all marked implemented
   - Ensure examples are current → ✓
 
-- [ ] 2d: Review and update `docs/persistence.md`
-  - Verify file format specification is current
-  - Check line prefix documentation matches implementation
-  - Ensure examples are accurate
+- [x] 2d: Review and update `docs/persistence.md`
+  - Verify file format specification is current → ✓
+  - Check line prefix documentation matches implementation → ✓ verified against parser.cc
+  - Ensure examples are accurate → ✓
 
 - [ ] 2e: Review and update `docs/networking.md`
   - Verify implementation status table
