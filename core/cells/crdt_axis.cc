@@ -242,7 +242,8 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
 
         auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
         newAxis->position = static_cast<uint32_t>(pos);
-        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", DEFAULT_ROW_HEIGHT));
+        newAxis->size =
+            static_cast<uint32_t>(extractJSONInt(op.payload, "size", DEFAULT_ROW_HEIGHT));
         axis = newAxis.get();
         sheet->addRow(std::move(newAxis));
     }

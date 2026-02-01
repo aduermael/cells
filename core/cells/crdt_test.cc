@@ -1473,7 +1473,8 @@ TEST_F(FullStateOperationTest, CellResurrectionWithFullState) {
     // Since cell doesn't exist, delete is a no-op but adds to oplog
     ApplyResult deleteResult = applyOperation(*peer, deleteOp);
     // Cell was never created, so nothing to delete - this returns SUCCESS (idempotent)
-    EXPECT_TRUE(deleteResult == ApplyResult::SUCCESS || deleteResult == ApplyResult::INVALID_TARGET);
+    EXPECT_TRUE(deleteResult == ApplyResult::SUCCESS ||
+                deleteResult == ApplyResult::INVALID_TARGET);
     EXPECT_EQ(peer->getCell(cellId), nullptr);
 
     // Now SET arrives - this creates/resurrects the cell with full state

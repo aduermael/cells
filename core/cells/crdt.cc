@@ -678,13 +678,15 @@ Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
     const StyleBuffer emptyStyle;
     const Axis* axis = workbook.getColumn(axisId);
     if (axis != nullptr) {
-        const std::string payload = buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
+        const std::string payload =
+            buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
         return makeColSetOp(workbook, axisId, payload);
     }
 
     axis = workbook.getRow(axisId);
     if (axis != nullptr) {
-        const std::string payload = buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
+        const std::string payload =
+            buildFullAxisPayload(workbook, axis, &emptyStyle, nullptr, nullptr);
         return makeRowSetOp(workbook, axisId, payload);
     }
 
@@ -714,13 +716,15 @@ Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId) {
     const FormatBuffer emptyFormat;
     const Axis* axis = workbook.getColumn(axisId);
     if (axis != nullptr) {
-        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
+        const std::string payload =
+            buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
         return makeColSetOp(workbook, axisId, payload);
     }
 
     axis = workbook.getRow(axisId);
     if (axis != nullptr) {
-        const std::string payload = buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
+        const std::string payload =
+            buildFullAxisPayload(workbook, axis, nullptr, &emptyFormat, nullptr);
         return makeRowSetOp(workbook, axisId, payload);
     }
 
