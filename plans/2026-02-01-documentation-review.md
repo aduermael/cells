@@ -24,10 +24,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
 
 ## Phase 2: Review Individual Docs
 
-- [ ] 2a: Review and update `docs/data-model.md`
-  - Remove outdated "doubly-linked dimensions" references if present
-  - Verify position-based ordering explanation is accurate
-  - Ensure Order Statistic Tree description is current
+- [x] 2a: Review and update `docs/data-model.md`
+  - Remove outdated "doubly-linked dimensions" references if present → none found
+  - Verify position-based ordering explanation is accurate → verified against model.h (Axis.position field)
+  - Ensure Order Statistic Tree description is current → verified against ostree.h, viewport_index.h
 
 - [ ] 2b: Review and update `docs/crdt.md`
   - Verify operation types are current
