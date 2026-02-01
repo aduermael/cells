@@ -997,5 +997,181 @@ TEST_F(CRDTTest, StyledRangeWithContentAddressedStyles) {
     EXPECT_GE(rangesAtPos1.size(), 1);
 }
 
+// =============================================================================
+// SIZE_SET Flag Tests
+// =============================================================================
+// Tests for the SIZE_SET flag which distinguishes between:
+// - Unset size: "use your local default" (sizeSet=false)
+// - Explicitly set size: "this exact size must be used" (sizeSet=true)
+
+class SizeSetFlagTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
+        workbook->setNodeId(generate_id());
+
+        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        sheetId = sheet->id;
+        workbook->addSheet(std::move(sheet));
+    }
+
+    std::unique_ptr<Workbook> workbook;
+    ID sheetId;
+};
+
+TEST_F(SizeSetFlagTest, NewlyCreatedAxisWithoutSizeHasSizeSetFalse) {
+    // Create a column without size in payload
+    ID colId = generate_id();
+    std::string payload = "{\"pos\":0}";
+    Operation op = makeColSetOp(*workbook, colId, sheetId, payload);
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Axis* col = sheet->getColumn(colId);
+    ASSERT_NE(col, nullptr);
+    EXPECT_FALSE(col->sizeSet()) << "Axis created without size should have sizeSet=false";
+    EXPECT_EQ(col->size, DEFAULT_COLUMN_WIDTH) << "Axis should use default size";
+}
+
+TEST_F(SizeSetFlagTest, NewlyCreatedRowWithoutSizeHasSizeSetFalse) {
+    // Create a row without size in payload
+    ID rowId = generate_id();
+    std::string payload = "{\"pos\":0}";
+    Operation op = makeRowSetOp(*workbook, rowId, sheetId, payload);
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Axis* row = sheet->getRow(rowId);
+    ASSERT_NE(row, nullptr);
+    EXPECT_FALSE(row->sizeSet()) << "Axis created without size should have sizeSet=false";
+    EXPECT_EQ(row->size, DEFAULT_ROW_HEIGHT) << "Axis should use default size";
+}
+
+TEST_F(SizeSetFlagTest, ExplicitlyResizedAxisHasSizeSetTrue) {
+    // Create a column first
+    ID colId = generate_id();
+    std::string createPayload = "{\"pos\":0}";
+    Operation createOp = makeColSetOp(*workbook, colId, sheetId, createPayload);
+    applyOperation(*workbook, createOp);
+
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Axis* col = sheet->getColumn(colId);
+    ASSERT_NE(col, nullptr);
+    EXPECT_FALSE(col->sizeSet()) << "Initial creation should have sizeSet=false";
+
+    // Now resize explicitly
+    std::string resizePayload = "{\"size\":200}";
+    Operation resizeOp = makeColSetOp(*workbook, colId, resizePayload);
+    ApplyResult result = applyOperation(*workbook, resizeOp);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    EXPECT_TRUE(col->sizeSet()) << "After explicit resize, sizeSet should be true";
+    EXPECT_EQ(col->size, 200) << "Size should be the explicitly set value";
+}
+
+TEST_F(SizeSetFlagTest, CreatedWithExplicitSizeHasSizeSetTrue) {
+    // Create a column WITH size in payload
+    ID colId = generate_id();
+    std::string payload = "{\"pos\":0,\"size\":150}";
+    Operation op = makeColSetOp(*workbook, colId, sheetId, payload);
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Axis* col = sheet->getColumn(colId);
+    ASSERT_NE(col, nullptr);
+    EXPECT_TRUE(col->sizeSet()) << "Axis created with explicit size should have sizeSet=true";
+    EXPECT_EQ(col->size, 150) << "Size should be the explicitly set value";
+}
+
+TEST_F(SizeSetFlagTest, BootstrapOpLogOmitsSizeWhenNotSet) {
+    // Create a column without explicit size
+    ID colId = generate_id();
+    std::string payload = "{\"pos\":0}";
+    Operation op = makeColSetOp(*workbook, colId, sheetId, payload);
+    applyOperation(*workbook, op);
+
+    // Bootstrap the OpLog
+    bootstrapOpLog(*workbook);
+
+    // Find the COL_SET operation for our column
+    const OpLog* oplog = workbook->getOpLog();
+    bool found = false;
+    for (const auto& oper : oplog->getAllOperations()) {
+        if (oper.type == OpType::COL_SET && oper.target_id == colId) {
+            found = true;
+            // The payload should NOT contain "size" since sizeSet is false
+            EXPECT_EQ(oper.payload.find("\"size\""), std::string::npos)
+                << "Payload should not contain size when sizeSet=false: " << oper.payload;
+            break;
+        }
+    }
+    EXPECT_TRUE(found) << "COL_SET operation should be in OpLog";
+}
+
+TEST_F(SizeSetFlagTest, BootstrapOpLogIncludesSizeWhenSet) {
+    // Create a column WITH explicit size
+    ID colId = generate_id();
+    std::string payload = "{\"pos\":0,\"size\":150}";
+    Operation op = makeColSetOp(*workbook, colId, sheetId, payload);
+    applyOperation(*workbook, op);
+
+    // Bootstrap the OpLog
+    bootstrapOpLog(*workbook);
+
+    // Find the COL_SET operation for our column
+    const OpLog* oplog = workbook->getOpLog();
+    bool found = false;
+    for (const auto& oper : oplog->getAllOperations()) {
+        if (oper.type == OpType::COL_SET && oper.target_id == colId) {
+            found = true;
+            // The payload SHOULD contain "size" since sizeSet is true
+            EXPECT_NE(oper.payload.find("\"size\":150"), std::string::npos)
+                << "Payload should contain size:150 when sizeSet=true: " << oper.payload;
+            break;
+        }
+    }
+    EXPECT_TRUE(found) << "COL_SET operation should be in OpLog";
+}
+
+TEST_F(SizeSetFlagTest, RowBootstrapOpLogBehavior) {
+    // Create a row without explicit size
+    ID rowId1 = generate_id();
+    std::string payload1 = "{\"pos\":0}";
+    Operation op1 = makeRowSetOp(*workbook, rowId1, sheetId, payload1);
+    applyOperation(*workbook, op1);
+
+    // Create a row WITH explicit size
+    ID rowId2 = generate_id();
+    std::string payload2 = "{\"pos\":1,\"size\":50}";
+    Operation op2 = makeRowSetOp(*workbook, rowId2, sheetId, payload2);
+    applyOperation(*workbook, op2);
+
+    // Bootstrap the OpLog
+    bootstrapOpLog(*workbook);
+
+    const OpLog* oplog = workbook->getOpLog();
+    bool foundRow1 = false;
+    bool foundRow2 = false;
+
+    for (const auto& oper : oplog->getAllOperations()) {
+        if (oper.type == OpType::ROW_SET) {
+            if (oper.target_id == rowId1) {
+                foundRow1 = true;
+                EXPECT_EQ(oper.payload.find("\"size\""), std::string::npos)
+                    << "Row1 payload should NOT contain size: " << oper.payload;
+            } else if (oper.target_id == rowId2) {
+                foundRow2 = true;
+                EXPECT_NE(oper.payload.find("\"size\":50"), std::string::npos)
+                    << "Row2 payload should contain size:50: " << oper.payload;
+            }
+        }
+    }
+    EXPECT_TRUE(foundRow1) << "ROW_SET operation for row1 should be in OpLog";
+    EXPECT_TRUE(foundRow2) << "ROW_SET operation for row2 should be in OpLog";
+}
+
 }  // namespace
 }  // namespace cells

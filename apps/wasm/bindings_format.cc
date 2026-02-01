@@ -243,8 +243,8 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     if (colId.isNull()) {
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -259,8 +259,8 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     if (rowId.isNull()) {
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -1408,8 +1408,8 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     if (colId.isNull()) {
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -1420,8 +1420,8 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     if (rowId.isNull()) {
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -1637,8 +1637,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     }
     if (startColId.isNull()) {
         startColId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -1650,8 +1650,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     }
     if (endColId.isNull()) {
         endColId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -1663,8 +1663,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     }
     if (startRowId.isNull()) {
         startRowId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -1676,8 +1676,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     }
     if (endRowId.isNull()) {
         endRowId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -1899,8 +1899,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             }
             if (rectStartColId.isNull()) {
                 rectStartColId = generate_id();
-                std::string payload = "{\"pos\":" + std::to_string(rect.minCol) +
-                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                // Note: size is omitted to use local default (sizeSet=false)
+                std::string payload = "{\"pos\":" + std::to_string(rect.minCol) + "}";
                 Operation op = makeColSetOp(*_workbook, rectStartColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
@@ -1912,8 +1912,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             }
             if (rectEndColId.isNull()) {
                 rectEndColId = generate_id();
-                std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) +
-                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                // Note: size is omitted to use local default (sizeSet=false)
+                std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) + "}";
                 Operation op = makeColSetOp(*_workbook, rectEndColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
@@ -1925,8 +1925,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             }
             if (rectStartRowId.isNull()) {
                 rectStartRowId = generate_id();
-                std::string payload = "{\"pos\":" + std::to_string(rect.minRow) +
-                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                // Note: size is omitted to use local default (sizeSet=false)
+                std::string payload = "{\"pos\":" + std::to_string(rect.minRow) + "}";
                 Operation op = makeRowSetOp(*_workbook, rectStartRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
@@ -1938,8 +1938,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             }
             if (rectEndRowId.isNull()) {
                 rectEndRowId = generate_id();
-                std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) +
-                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                // Note: size is omitted to use local default (sizeSet=false)
+                std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) + "}";
                 Operation op = makeRowSetOp(*_workbook, rectEndRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
@@ -2327,8 +2327,8 @@ std::string CellsEngine::setColumnStyle(uint32_t colPosition, const std::string&
         // Create column if it doesn't exist
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -2393,8 +2393,8 @@ std::string CellsEngine::setRowStyle(uint32_t rowPosition, const std::string& st
         // Create row if it doesn't exist
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -2611,8 +2611,8 @@ std::string CellsEngine::setColumnFormat(uint32_t colPosition, const std::string
         // Create column if it doesn't exist
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -2661,8 +2661,8 @@ std::string CellsEngine::setRowFormat(uint32_t rowPosition, const std::string& f
         // Create row if it doesn't exist
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -2774,8 +2774,8 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
     }
     if (startColId.isNull()) {
         startColId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -2787,8 +2787,8 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
     }
     if (endColId.isNull()) {
         endColId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -2800,8 +2800,8 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
     }
     if (startRowId.isNull()) {
         startRowId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
@@ -2813,8 +2813,8 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
     }
     if (endRowId.isNull()) {
         endRowId = generate_id();
-        std::string payload =
-            "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string payload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }

@@ -526,8 +526,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
         // Generate COL_SET operations for columns (in position order)
         for (const auto& [pos, axis] : columns) {
-            std::string payload =
-                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size);
+            std::string payload = "{\"pos\":" + std::to_string(pos);
+            // Only include size if explicitly set (sizeSet=true)
+            if (axis->sizeSet()) {
+                payload += ",\"size\":" + std::to_string(axis->size);
+            }
             if (!axis->name.empty()) {
                 payload += ",\"name\":\"" + internal::jsonEscape(axis->name) + "\"";
             }
@@ -565,8 +568,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
         // Generate ROW_SET operations for rows (in position order)
         for (const auto& [pos, axis] : rows) {
-            std::string payload =
-                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size);
+            std::string payload = "{\"pos\":" + std::to_string(pos);
+            // Only include size if explicitly set (sizeSet=true)
+            if (axis->sizeSet()) {
+                payload += ",\"size\":" + std::to_string(axis->size);
+            }
             if (axis->hasStyle()) {
                 const StyleBuffer* sty = workbook.getEntityStyle(axis->id);
                 if (sty) {

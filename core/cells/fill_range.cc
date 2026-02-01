@@ -244,20 +244,18 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
             const RequiredEntities required = resolver.getRequiredEntities(adjustedAST.get());
 
             // Create required columns via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.columns) {
-                const std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                               ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
-                                               "}";
+                const std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 const Operation colOp =
                     makeColSetOp(*workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*workbook, colOp);
             }
 
             // Create required rows via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.rows) {
-                const std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                               ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
-                                               "}";
+                const std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 const Operation rowOp =
                     makeRowSetOp(*workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*workbook, rowOp);

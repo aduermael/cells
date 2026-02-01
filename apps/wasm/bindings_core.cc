@@ -570,17 +570,17 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
             RequiredEntities required = resolver.getRequiredEntities(ast.get());
 
             // Create required columns via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.columns) {
-                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*_workbook, colOp);
             }
 
             // Create required rows via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.rows) {
-                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*_workbook, rowOp);
             }
@@ -723,8 +723,8 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
     if (colId.isNull()) {
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -738,8 +738,8 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
     if (rowId.isNull()) {
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -765,17 +765,17 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
             RequiredEntities required = resolver.getRequiredEntities(ast.get());
 
             // Create required columns via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.columns) {
-                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
                 applyOperation(*_workbook, colOp);
             }
 
             // Create required rows via CRDT operations
+            // Note: size is omitted to use local default (sizeSet=false)
             for (const auto& pending : required.rows) {
-                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
                 Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
                 applyOperation(*_workbook, rowOp);
             }
@@ -878,8 +878,8 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     if (colId.isNull()) {
         colId = generate_id();
         colCreated = true;
-        std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -893,8 +893,8 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     if (rowId.isNull()) {
         rowId = generate_id();
         rowCreated = true;
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -1717,8 +1717,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     }
     if (startColId.isNull()) {
         startColId = generate_id();
-        std::string colPayload = "{\"pos\":" + std::to_string(minCol) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation colOp = makeColSetOp(*_workbook, startColId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -1731,8 +1731,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     }
     if (startRowId.isNull()) {
         startRowId = generate_id();
-        std::string rowPayload = "{\"pos\":" + std::to_string(minRow) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, startRowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -1745,8 +1745,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     }
     if (endColId.isNull()) {
         endColId = generate_id();
-        std::string colPayload = "{\"pos\":" + std::to_string(maxCol) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string colPayload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation colOp = makeColSetOp(*_workbook, endColId, colPayload);
         applyOperation(*_workbook, colOp);
     }
@@ -1759,8 +1759,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     }
     if (endRowId.isNull()) {
         endRowId = generate_id();
-        std::string rowPayload = "{\"pos\":" + std::to_string(maxRow) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        // Note: size is omitted to use local default (sizeSet=false)
+        std::string rowPayload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, endRowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
@@ -1770,8 +1770,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         Axis* colAxis = sheet->getColumnByPosition(c);
         if (colAxis == nullptr) {
             ID newColId = generate_id();
-            std::string colPayload = "{\"pos\":" + std::to_string(c) +
-                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            // Note: size is omitted to use local default (sizeSet=false)
+            std::string colPayload = "{\"pos\":" + std::to_string(c) + "}";
             Operation colOp = makeColSetOp(*_workbook, newColId, colPayload);
             applyOperation(*_workbook, colOp);
         }
@@ -1782,8 +1782,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         Axis* rowAxis = sheet->getRowByPosition(r);
         if (rowAxis == nullptr) {
             ID newRowId = generate_id();
-            std::string rowPayload = "{\"pos\":" + std::to_string(r) +
-                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+            // Note: size is omitted to use local default (sizeSet=false)
+            std::string rowPayload = "{\"pos\":" + std::to_string(r) + "}";
             Operation rowOp = makeRowSetOp(*_workbook, newRowId, rowPayload);
             applyOperation(*_workbook, rowOp);
         }

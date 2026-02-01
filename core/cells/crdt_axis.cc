@@ -60,7 +60,8 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
 
         auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, true);
         newAxis->position = static_cast<uint32_t>(pos);
-        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", 100));
+        newAxis->size =
+            static_cast<uint32_t>(extractJSONInt(op.payload, "size", DEFAULT_COLUMN_WIDTH));
         axis = newAxis.get();
         sheet->addColumn(std::move(newAxis));
     }
@@ -86,6 +87,7 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     const int size = extractJSONInt(op.payload, "size", -1);
     if (size >= 0) {
         axis->size = static_cast<uint32_t>(size);
+        axis->setSizeSet(true);  // Mark as explicitly set
         sheet->getColumnAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
     }
 
@@ -240,7 +242,7 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
 
         auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
         newAxis->position = static_cast<uint32_t>(pos);
-        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", 21));
+        newAxis->size = static_cast<uint32_t>(extractJSONInt(op.payload, "size", DEFAULT_ROW_HEIGHT));
         axis = newAxis.get();
         sheet->addRow(std::move(newAxis));
     }
@@ -266,6 +268,7 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
     const int size = extractJSONInt(op.payload, "size", -1);
     if (size >= 0) {
         axis->size = static_cast<uint32_t>(size);
+        axis->setSizeSet(true);  // Mark as explicitly set
         sheet->getRowAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
     }
 

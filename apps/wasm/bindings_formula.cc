@@ -254,17 +254,17 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     RequiredEntities required = resolver.getRequiredEntities(ast.get());
 
     // Create required columns via CRDT operations
+    // Note: size is omitted to use local default (sizeSet=false)
     for (const auto& pending : required.columns) {
-        std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
         Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
     // Create required rows via CRDT operations
+    // Note: size is omitted to use local default (sizeSet=false)
     for (const auto& pending : required.rows) {
-        std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
-                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }

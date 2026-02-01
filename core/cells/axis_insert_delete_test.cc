@@ -256,10 +256,10 @@ TEST_F(AxisInsertDeleteTest, InsertRowWithDefaultSize) {
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
-    // Verify row has default size (21)
+    // Verify row has default size (DEFAULT_ROW_HEIGHT = 24)
     Axis* newRow = sheet_ptr->getRow(newRowId);
     ASSERT_NE(newRow, nullptr);
-    EXPECT_EQ(newRow->size, 21);
+    EXPECT_EQ(newRow->size, DEFAULT_ROW_HEIGHT);
 }
 
 TEST_F(AxisInsertDeleteTest, InsertRowMissingPositionFails) {
