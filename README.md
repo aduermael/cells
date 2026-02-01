@@ -2,7 +2,7 @@
 
 A modern spreadsheet engine with real-time collaboration, Excel compatibility, and powerful CLI tools.
 
-**[Try the Live Demo](https://cells.example.com)** | [Documentation](./docs/)
+**[Try the Live Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
 
 ## What is Cells?
 
