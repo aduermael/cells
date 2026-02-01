@@ -80,11 +80,36 @@ bazel run :cli
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │              Persistence Layer                      │
-│         .zcd (text) or .xlsx (binary)              │
+│   Native: .zcd  │  Import/Export: .xlsx, .csv      │
 └─────────────────────────────────────────────────────┘
 ```
 
 The engine compiles to WebAssembly for the browser and native code for the CLI. All mutations go through CRDT operations, making collaboration a first-class feature rather than an afterthought.
+
+### ZCD File Format
+
+Cells uses its own text-based format (`.zcd`) designed for Git-friendly persistence and CRDT collaboration. Key features:
+
+- **One entity per line** - Editing a cell changes exactly one line, making diffs minimal
+- **8-character base62 IDs** - Compact UUIDs (218 trillion combinations) for cells, columns, rows
+- **Content-addressed styles** - Styles and formats stored as base64 hashes, deduplicated automatically
+- **CRDT operation log** - Full history for sync and conflict resolution
+
+Example (a simple 2×2 sheet with A1=42, B1="hello"):
+
+```
+#zcd v1
+D Qx7mXp2L "Budget"
+
+S bF3hL8mN "Sheet1"
+C kR7pN2wQ 0
+C vT5mK9xL 1
+R jH4sW8nF 0
+X nP6kR2mW kR7pN2wQ jH4sW8nF n 42
+X hT8sL4xQ vT5mK9xL jH4sW8nF s "hello"
+```
+
+See [docs/persistence.md](./docs/persistence.md) for the full specification.
 
 For detailed architecture documentation, see [docs/](./docs/).
 
