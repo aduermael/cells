@@ -8,7 +8,7 @@ A modern spreadsheet engine—use it as a **browser-based alternative to Excel/G
 
 Cells is a spreadsheet engine that works two ways:
 
-1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export, no account required.
+1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
 2. **Headless CLI** — Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
 
 Both share the same core engine, so formulas and files work identically across environments.
@@ -16,7 +16,7 @@ Both share the same core engine, so formulas and files work identically across e
 **Key features:**
 - **Real-time collaboration** - Edit together with P2P sync (no server required for document data)
 - **Excel compatible** - Import and export .xlsx files seamlessly
-- **Fully scriptable** - Automate with Luau scripts (Python, VBA, and TypeScript support planned)
+- **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
 - **Git-friendly** - Text-based file format that diffs cleanly
 
 ## Quick Start
@@ -65,12 +65,12 @@ bazel run :cli
 - Drag-and-drop XLSX import
 
 ### CLI Tools
-- Format conversion: `xlsx <-> zcd`
+- Format conversion: `xlsx <-> zcd <-> csv`
 - File inspection and validation
 - Headless spreadsheet operations
 
 ### Scripting
-- **Luau** - Full scripting support with access to the cell engine API
+- **[Luau](https://luau.org)** - Full scripting support with access to the cell engine API
 - Automate data transformations, generate reports, run calculations
 - **Coming soon:** Python, VBA, and TypeScript bindings
 
@@ -99,14 +99,11 @@ The engine compiles to WebAssembly for the browser and native code for the CLI. 
 
 ### ZCD File Format
 
-Cells uses its own text-based format (`.zcd`) designed for Git-friendly persistence and CRDT collaboration. Key features:
+Cells uses its own text-based format (`.zcd`) designed for Git-friendly persistence and CRDT collaboration:
 
-- **One entity per line** - Editing a cell changes exactly one line, making diffs minimal
-- **8-character base62 IDs** - Compact UUIDs (218 trillion combinations) for cells, columns, rows
-- **Content-addressed styles** - Styles and formats stored as base64 hashes, deduplicated automatically
-- **CRDT operation log** - Full history for sync and conflict resolution
-
-Example (a simple 2×2 sheet with A1=42, B1="hello"):
+- **One entity per line** - Editing a cell changes exactly one line, minimal diffs
+- **Content-addressed styles** - Styles/formats stored as base64 hashes, auto-deduplicated
+- **CRDT operation log** - Full edit history for sync and conflict resolution
 
 ```
 #zcd v1
@@ -116,8 +113,12 @@ S bF3hL8mN "Sheet1"
 C kR7pN2wQ 0
 C vT5mK9xL 1
 R jH4sW8nF 0
-X nP6kR2mW kR7pN2wQ jH4sW8nF n 42
-X hT8sL4xQ vT5mK9xL jH4sW8nF s "hello"
+X nP6kR2mW kR7pN2wQ jH4sW8nF n 42 fmt:IyMjLDA=
+X hT8sL4xQ vT5mK9xL jH4sW8nF s "hello" sty:Ym9sZDox
+
+#oplog
+O 1706000001:0:abc CellSet nP6kR2mW n 42
+O 1706000002:0:abc CellSet hT8sL4xQ s "hello"
 ```
 
 See [docs/persistence.md](./docs/persistence.md) for the full specification.
