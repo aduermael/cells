@@ -20,7 +20,7 @@ This architectural constraint ensures:
 | Component | Status | Source Files |
 |-----------|--------|--------------|
 | Hybrid Logical Clock | Implemented | `core/cells/hlc.h`, `hlc.cc` |
-| CRDT operations | Implemented | `core/cells/crdt.h`, `crdt.cc`, `crdt_*.cc` |
+| CRDT operations | Implemented | `core/cells/crdt.h`, `crdt.cc`, `crdt_cell.cc`, `crdt_axis.cc`, `crdt_range.cc` |
 | Operation types | Implemented | `core/cells/operation.h`, `operation.cc` |
 | Operation log (OpLog) | Implemented | `core/cells/oplog.h`, `oplog.cc` |
 | Sync manager | Implemented | `core/cells/sync_manager.h`, `sync_manager.cc` |
@@ -80,78 +80,57 @@ Comparison: wall_time → logical → node_id (lexicographic)
 
 ## Operation Types
 
+Operations follow a unified **SET + DELETE** pattern:
+- **SET** creates the entity if it doesn't exist, updates only the properties provided in the payload
+- **DELETE** marks the entity as deleted (can be resurrected by a later SET)
+
 ### Cell Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `CELL_SET_VALUE` | 0 | Set cell value/formula |
-| `CELL_CLEAR` | 1 | Clear cell contents |
-| `CELL_SET_STYLE` | 2 | Set cell style properties |
-| `CELL_SET_FORMAT` | 3 | Set cell number format |
+| `CELL_SET` | 0 | Create/update cell (col, row, type, value, style, format) |
+| `CELL_DELETE` | 1 | Delete/clear cell |
 
 ### Column Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `COL_INSERT` | 10 | Insert new column |
+| `COL_SET` | 10 | Create/update column (position, size, name, style, format, hidden) |
 | `COL_DELETE` | 11 | Delete column |
-| `COL_MOVE` | 12 | Move column to new position |
-| `COL_RESIZE` | 13 | Resize column width |
-| `COL_RENAME` | 14 | Rename column |
 
 ### Row Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `ROW_INSERT` | 15 | Insert new row |
-| `ROW_DELETE` | 16 | Delete row |
-| `ROW_MOVE` | 17 | Move row to new position |
-| `ROW_RESIZE` | 18 | Resize row height |
-
-### Axis Operations (both columns and rows)
-
-| Operation | Code | Description |
-|-----------|------|-------------|
-| `AXIS_SET_HIDDEN` | 19 | Set axis hidden state |
-| `AXIS_SET_STYLE` | 52 | Set axis default style |
-| `AXIS_SET_FORMAT` | 53 | Set axis default format |
+| `ROW_SET` | 20 | Create/update row (position, size, style, format, hidden) |
+| `ROW_DELETE` | 21 | Delete row |
 
 ### Sheet Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `SHEET_CREATE` | 20 | Create new sheet |
-| `SHEET_DELETE` | 21 | Delete sheet |
-| `SHEET_RENAME` | 22 | Rename sheet |
+| `SHEET_SET` | 30 | Create/update sheet (name, position) |
+| `SHEET_DELETE` | 31 | Delete sheet |
 
 ### Workbook Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `WORKBOOK_RENAME` | 30 | Rename workbook |
-
-### Format Operations
-
-| Operation | Code | Description |
-|-----------|------|-------------|
-| `FORMAT_DEFINE` | 40 | Define a custom number format |
+| `WORKBOOK_SET` | 40 | Update workbook properties (name) |
 
 ### Named Range Operations
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `NAMED_RANGE_DEFINE` | 50 | Define a named range |
-| `NAMED_RANGE_DELETE` | 51 | Delete a named range |
+| `NAMED_RANGE_SET` | 50 | Create/update named range |
+| `NAMED_RANGE_DELETE` | 51 | Delete named range |
 
-### Range Operations (unified range system)
+### Range Operations (style/format ranges)
 
 | Operation | Code | Description |
 |-----------|------|-------------|
-| `RANGE_ADD` | 60 | Add a new range |
-| `RANGE_REMOVE` | 61 | Remove a range by ID |
-| `RANGE_UPDATE_CORNERS` | 62 | Update range corner IDs (resize) |
-| `RANGE_UPDATE_FLAGS` | 63 | Update range flags bitmask |
-| `RANGE_SET_STYLE` | 64 | Set style metadata for a style range |
+| `RANGE_SET` | 60 | Create/update range (corners, flags, style, format) |
+| `RANGE_DELETE` | 61 | Delete range
 
 ## Conflict Resolution Rules
 

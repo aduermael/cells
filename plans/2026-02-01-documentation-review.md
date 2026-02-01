@@ -29,10 +29,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Verify position-based ordering explanation is accurate → verified against model.h (Axis.position field)
   - Ensure Order Statistic Tree description is current → verified against ostree.h, viewport_index.h
 
-- [ ] 2b: Review and update `docs/crdt.md`
-  - Verify operation types are current
-  - Check implementation status table
-  - Ensure examples match current API
+- [x] 2b: Review and update `docs/crdt.md`
+  - Verify operation types are current → Updated to unified SET+DELETE pattern
+  - Check implementation status table → Updated source file list
+  - Ensure examples match current API → ✓
 
 - [ ] 2c: Review and update `docs/formula-engine.md`
   - Verify function count (83) is accurate
