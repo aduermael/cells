@@ -1,6 +1,6 @@
-# CRDT Resurrection E2E Test Suite
+# CRDT Full-State SET Operations & Resurrection Tests
 
-Create dedicated E2E collaboration tests for CRDT resurrection scenarios - where a DELETE operation arrives before/after a SET operation, and the entity should be resurrected based on LWW (Last-Writer-Wins) semantics.
+Implement full-state SET operations for CRDT to ensure resurrection correctness, then verify with dedicated E2E tests.
 
 ## Background
 
@@ -12,48 +12,42 @@ In a distributed system with eventual consistency, operations can arrive out of 
 2. **Peer B**: SET cell with value+style at t=2000
 3. **Arrival order on Peer C**: DELETE arrives first, then SET
 
-With LWW semantics, the SET (t=2000) should win, resurrecting the cell with its properties.
+With LWW semantics, the SET (t=2000) should win, resurrecting the cell with all its properties.
 
-### Current Implementation Concern
+### Current Issue: Sparse Updates Lose Properties
 
-The current sparse update approach only includes changed properties in SET operations:
-- `CELL_SET {t: "n", v: "100"}` - only value, no style
-- If a resurrecting SET doesn't include style/format, those properties may be lost
+The current sparse update approach only includes changed properties:
+- `CELL_SET {t: "n", v: "100"}` - only value, no style/format
+- If a resurrecting SET doesn't include style/format, those properties are **lost**
 
-This test suite will:
-1. Document current resurrection behavior
-2. Identify property loss scenarios
-3. Provide regression tests for future fixes
+### Solution: Full-State SET Operations
 
-## Phase 1: E2E Test Infrastructure
+Every SET operation includes all current properties of the entity:
+- `CELL_SET {col, row, t, v, sty, fmt}` - always complete
+- Self-sufficient operations that can correctly resurrect entities
+- Content-addressed styles/formats keep payloads compact (~4-80 extra chars)
 
-- [ ] 1a: Create `collab-resurrection.test.mjs` with test harness setup
-- [ ] 1b: Add helper functions for simulating out-of-order operations
+## Phase 1: Full-State CELL_SET
 
-## Phase 2: Cell Resurrection Tests
+- [ ] 1a: Update `makeCellSetOp` to always include current style/format
+- [ ] 1b: Update `bootstrapOpLog` cell serialization (should already be full-state)
+- [ ] 1c: Add unit test verifying CELL_SET payloads include all properties
 
-- [ ] 2a: Test basic cell resurrection (SET after DELETE, same peer)
-- [ ] 2b: Test cell resurrection with style preservation
-- [ ] 2c: Test cell resurrection with format preservation
-- [ ] 2d: Test concurrent DELETE and SET from different peers (network delay simulation)
+## Phase 2: Full-State Axis SET
 
-## Phase 3: Axis Resurrection Tests
+- [ ] 2a: Update `makeColSetOp` to include all axis properties (pos, size if set, style, format, hidden)
+- [ ] 2b: Update `makeRowSetOp` similarly
+- [ ] 2c: Add unit tests for axis SET payload completeness
 
-- [ ] 3a: Test column resurrection after delete
-- [ ] 3b: Test row resurrection after delete
-- [ ] 3c: Test axis resurrection preserves size/hidden/style properties
+## Phase 3: Full-State Range SET
 
-## Phase 4: Range Resurrection Tests
+- [ ] 3a: Update `makeRangeSetOp` to always include corners, flags, style, format
+- [ ] 3b: Add unit test for range SET payload completeness
 
-- [ ] 4a: Test styled range resurrection after delete
-- [ ] 4b: Test range resurrection preserves corner references and flags
+## Phase 4: E2E Resurrection Test Suite
 
-## Phase 5: Complex Resurrection Scenarios
-
-- [ ] 5a: Test formula cell resurrection (formula + dependencies)
-- [ ] 5b: Test cascading resurrection (delete col, resurrect cell in that col)
-- [ ] 5c: Test multi-entity resurrection ordering
-
-## Expected Findings
-
-This test suite will help determine if the current sparse-update approach causes property loss during resurrection, informing the decision on whether to switch to full-state SET operations.
+- [ ] 4a: Create `collab-resurrection.test.mjs` with test harness
+- [ ] 4b: Test cell resurrection preserves value + style + format
+- [ ] 4c: Test axis resurrection preserves size/hidden/style
+- [ ] 4d: Test range resurrection preserves all properties
+- [ ] 4e: Test formula cell resurrection with dependencies
