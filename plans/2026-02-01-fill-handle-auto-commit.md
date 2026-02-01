@@ -7,7 +7,7 @@ When a user is typing a value in a cell and then tries to use the fill handle to
 Modify the fill handle click handler in `mouse-events.ts` to check if the cell editor is active and commit the edit before initiating the fill drag. This matches the pattern already used for other operations like column resize.
 
 ## Phase 1: Fix Fill Handle to Auto-Commit Edit
-- [ ] 1a: Modify fill handle click handler to check for active editing and commit before fill drag
+- [x] 1a: Modify fill handle click handler to check for active editing and commit before fill drag. Added `startFillDrag` callback pattern matching the cell selection approach - checks for cell editing or formula bar editing and commits asynchronously before starting the fill drag operation.
 
 The fix location is in `apps/wasm/src/mouse-events.ts` around line 800-819 in the fill handle click handler. The handler currently starts fill drag without checking if editing is in progress:
 

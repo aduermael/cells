@@ -803,16 +803,27 @@ export class MouseEventHandlers {
             const { getSelectionEnd, setIsFillDragging } = this.config;
             const selEnd = getSelectionEnd();
             if (selStart && selEnd) {
-                setIsFillDragging(true);
-                this.fillDragOriginalBounds = {
-                    minCol: Math.min(selStart.col, selEnd.col),
-                    maxCol: Math.max(selStart.col, selEnd.col),
-                    minRow: Math.min(selStart.row, selEnd.row),
-                    maxRow: Math.max(selStart.row, selEnd.row),
+                const startFillDrag = () => {
+                    setIsFillDragging(true);
+                    this.fillDragOriginalBounds = {
+                        minCol: Math.min(selStart.col, selEnd.col),
+                        maxCol: Math.max(selStart.col, selEnd.col),
+                        minRow: Math.min(selStart.row, selEnd.row),
+                        maxRow: Math.max(selStart.row, selEnd.row),
+                    };
+                    this.fillDragStartX = x;
+                    this.fillDragStartY = y;
+                    canvas.style.cursor = "crosshair";
                 };
-                this.fillDragStartX = x;
-                this.fillDragStartY = y;
-                canvas.style.cursor = "crosshair";
+
+                // Commit any active editing before starting fill drag
+                if (cellEditor.isEditing()) {
+                    cellEditor.confirmEditing().then(startFillDrag);
+                } else if (uiStateMachine.isInState("FORMULA_BAR_EDITING")) {
+                    commitFormulaBarEdit().then(startFillDrag);
+                } else {
+                    startFillDrag();
+                }
             }
             e.preventDefault();
             return;
