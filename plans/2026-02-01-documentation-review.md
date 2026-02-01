@@ -54,9 +54,9 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Check constants match code → ✓ verified against grid-constants.ts
   - Ensure viewport indexing section is current → ✓ all source files verified
 
-- [ ] 2g: Review and update `docs/type-system.md`
-  - Update implementation status if changed
-  - Verify cell value types are accurate
+- [x] 2g: Review and update `docs/type-system.md`
+  - Update implementation status if changed → removed outdated date
+  - Verify cell value types are accurate → ✓ matches types.h
 
 ## Phase 3: Cleanup & Consistency
 

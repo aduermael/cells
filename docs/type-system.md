@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-**Current state (January 2025):** Basic cell value types only.
+**Current state:** Basic cell value types only.
 
 | Component | Status |
 |-----------|--------|
@@ -60,7 +60,7 @@ The following types are implemented in `core/cells/types.h`:
 | `DATE_TIME` | `t` | ISO 8601 datetime (2024-01-15T10:30:00Z) |
 | `FORMULA` | `f` | Formula expression (=A1+B1) |
 
-Empty cells have no entry in the OSTree (null by absence).
+Empty cells have no entry in the cell storage (null by absence).
 
 Formula result types (`FORMULA_NUMBER`, `FORMULA_STRING`, etc.) are used internally to track both "this is a formula" and "the computed result type" but serialize as `f` in the file format.
 
