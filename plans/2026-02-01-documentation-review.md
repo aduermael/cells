@@ -34,10 +34,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - Check implementation status table → Updated source file list
   - Ensure examples match current API → ✓
 
-- [ ] 2c: Review and update `docs/formula-engine.md`
-  - Verify function count (83) is accurate
-  - Check implementation status
-  - Ensure examples are current
+- [x] 2c: Review and update `docs/formula-engine.md`
+  - Verify function count (83) is accurate → ✓ confirmed via registerFunction grep
+  - Check implementation status → ✓ all marked implemented
+  - Ensure examples are current → ✓
 
 - [ ] 2d: Review and update `docs/persistence.md`
   - Verify file format specification is current
