@@ -9,6 +9,9 @@ A modern spreadsheet engine—use it as a **browser-based alternative to Excel/G
 Cells is a spreadsheet engine that works two ways:
 
 1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
+
+   ![Cells Web App Demo](./docs/img/demo.gif)
+
 2. **Headless CLI** — Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
 
 Both share the same core engine, so formulas and files work identically across environments.
