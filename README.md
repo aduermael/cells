@@ -2,7 +2,7 @@
 
 A modern spreadsheet engine—use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
 
-**[Try the Live Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
+**[Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
 
 ## What is Cells?
 
@@ -159,6 +159,12 @@ O 1769998921630.0.atyBEwwf CELL_SET 1MvyBXyr {"t":"f","v":"=~~XO5lD1Nh*10","col"
 See [docs/persistence.md](./docs/persistence.md) for the full specification.
 
 For detailed architecture documentation, see [docs/](./docs/).
+
+## AI Agents
+
+A basic agent integration is available—provide an Anthropic API key and the agent can generate and execute Luau code to manipulate the spreadsheet.
+
+**Note:** The current implementation is a prototype. The planned architecture will have agents run in their own app instances, communicating via CRDT operations—just like human collaborators. This ensures consistent conflict-free collaboration whether edits come from humans or AI.
 
 ## Requirements
 
