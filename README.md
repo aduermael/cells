@@ -26,7 +26,7 @@ Both share the same core engine, so formulas and files work identically across e
 - **Real-time collaboration** - Edit together with P2P sync
 - **Excel compatible** - Import and export .xlsx files seamlessly
 - **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
-- **Git-friendly** - Text-based file format that diffs cleanly
+- **Git-friendly** - [Text-based file format](#collaboration--zcd-format-) that diffs cleanly
 
 ## Quick Start
 
