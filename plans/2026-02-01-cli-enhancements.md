@@ -10,7 +10,7 @@ Enhance the CLI with three capabilities:
 When converting XLSX to CSV, formulas are currently exported as-is (computed values from XLSX). Add `--eval` to recalculate formulas using the Cells calculation engine before export.
 
 - [x] 1a: Add `evaluate_formulas` bool to `Options` struct in `options.h`
-- [ ] 1b: Add `--eval` argument parsing in `parse_args()` in `main.cc`
+- [x] 1b: Add `--eval` argument parsing in `parse_args()` in `main.cc`
 - [ ] 1c: Implement formula evaluation in converter before CSV write
 - [ ] 1d: Add unit tests for `--eval` flag
 

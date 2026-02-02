@@ -65,6 +65,9 @@ void print_usage(const char* program_name) {
               << "  -v                  Verbose output\n"
               << "  --time              Show processing time\n"
               << "\n"
+              << "Processing Options:\n"
+              << "  --eval              Evaluate formulas before export (use calc engine)\n"
+              << "\n"
               << "Info:\n"
               << "  -I, --info          Show file information (no conversion)\n"
               << "  --version           Show version\n"
@@ -191,6 +194,10 @@ bool parse_args(int argc, char* argv[], Options& opts) {
         }
         if (arg == "--time") {
             opts.output.show_time = true;
+            continue;
+        }
+        if (arg == "--eval") {
+            opts.evaluate_formulas = true;
             continue;
         }
         // Positional argument (output file)
