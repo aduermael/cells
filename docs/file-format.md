@@ -21,18 +21,19 @@
 
 Current version: **v1**
 
-Files begin with a version header:
+Files may optionally begin with a version header comment:
 ```
 #zcd v1
 ```
+
+This is recommended for human readability but not required by the parser (any line starting with `#` is treated as a comment).
 
 ## Document Structure
 
 A ZCD file contains the following sections in order:
 
 ```
-#zcd v1                               # Version header
-D <doc-id> "<name>"                   # Document declaration
+D <doc-id> "<name>"                   # Document declaration (required)
 N "<name>" <scope> <scope-sheet-id> <target-type> <target-data>  # Named ranges (optional)
 
 S <sheet-id> "<name>"                 # Sheet declaration
@@ -40,9 +41,9 @@ V <key:value...>                      # Sheet view properties (optional)
 C <id> <position> [props...]          # Column definitions
 R <id> <position> [props...]          # Row definitions
 X <id> <col> <row> <type> <value> [props...]  # Cell definitions
-RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>] [fmt:<base64>]  # Range definitions
+RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [fmt:<base64>] [sty:<base64>]  # Range definitions
 
-#oplog                                # Operation log section
+#oplog                                # Operation log section marker
 O <hlc> <op-type> <target-id> <payload>
 ```
 
@@ -232,13 +233,14 @@ fmt:ERoBCCMgQkFOQU5B
 
 Defines a range spanning multiple cells. Ranges can serve multiple purposes based on their flags.
 
-**Format:** `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]`
+**Format:** `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [fmt:<base64>] [sty:<base64>]`
 
 **Fields:**
 - `id`: 8-character base62 range identifier
 - `start_col`, `start_row`: Column/row IDs of top-left corner
 - `end_col`, `end_row`: Column/row IDs of bottom-right corner
 - `flags`: Range flags bitmap (see below)
+- `fmt:<base64>`: Optional content-addressed number format (see [Content-Addressed Number Formats](#content-addressed-number-formats))
 - `sty:<base64>`: Optional content-addressed style (see [Content-Addressed Styles](#content-addressed-styles))
 
 **Range Flags:**
@@ -252,13 +254,15 @@ Defines a range spanning multiple cells. Ranges can serve multiple purposes base
 | 16 | NAMED | Is a named range |
 | 32 | PRINT_AREA | Defines print area |
 | 64 | FILTER | Has auto-filter |
+| 128 | FORMAT | Has number format (content-addressed FormatBuffer) |
 
-Flags can be combined (e.g., `3` = MERGE + STYLE).
+Flags can be combined (e.g., `3` = MERGE + STYLE, `130` = STYLE + FORMAT).
 
 **Examples:**
 ```
 RG rGfH3jK2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 2 sty:BECA+78k
 RG rMerge01 cC5fG6hJ rC5fG6hJ cD7hJ8kL rE9kL0mN 1
+RG rFmt001 cA1bC2dE rA1bC2dE cB3dE4fG rC5fG6hJ 130 fmt:BAQC sty:BEAB
 ```
 
 ## Content-Addressed Styles
@@ -458,14 +462,15 @@ IDs are generated randomly and are immutable once assigned. They provide stable 
 
 ## Section Markers
 
-Lines beginning with `#` are section markers or comments:
+Lines beginning with `#` are comments. Some common conventions:
 
 | Marker | Purpose |
 |--------|---------|
-| `#zcd v1` | File format version header (required, first line) |
+| `#zcd v1` | Format version (optional, recommended for readability) |
 | `#oplog` | Start of operation log section |
+| `#cols`, `#rows`, `#cells` | Section dividers (optional, for human readability) |
 
-Any other line starting with `#` is treated as a comment and ignored. The parser recognizes lines by their prefix character (`D`, `F`, `N`, `S`, `V`, `C`, `R`, `X`, `RG`, `O`), so section markers for columns, rows, cells, and ranges are not required.
+The parser recognizes lines by their prefix character (`D`, `N`, `S`, `V`, `C`, `R`, `X`, `RG`, `O`), so section markers are purely for human readability and not required.
 
 ## Operation Log
 
@@ -489,58 +494,44 @@ Format: `<wall_time>.<logical>.<node_id>`
 
 ### Operation Types
 
+Operations use a unified SET/DELETE pattern. Each SET operation creates or updates an entity with all its properties in a single operation.
+
 | Type | Code | Description |
 |------|------|-------------|
 | **Cell Operations** | | |
-| `CELL_SET_VALUE` | 0 | Set cell value |
-| `CELL_CLEAR` | 1 | Clear cell contents |
-| `CELL_SET_STYLE` | 2 | Set cell style (content-addressed) |
-| `CELL_SET_FORMAT` | 3 | Set cell number format |
+| `CELL_SET` | 0 | Create/update cell (col, row, type, value, style, format) |
+| `CELL_DELETE` | 1 | Delete/clear cell |
 | **Column Operations** | | |
-| `COL_INSERT` | 10 | Insert new column |
+| `COL_SET` | 10 | Create/update column (position, size, name, style, format, hidden) |
 | `COL_DELETE` | 11 | Delete column |
-| `COL_MOVE` | 12 | Move column to new position |
-| `COL_RESIZE` | 13 | Resize column width |
-| `COL_RENAME` | 14 | Rename column |
 | **Row Operations** | | |
-| `ROW_INSERT` | 15 | Insert new row |
-| `ROW_DELETE` | 16 | Delete row |
-| `ROW_MOVE` | 17 | Move row to new position |
-| `ROW_RESIZE` | 18 | Resize row height |
-| **Axis Operations** | | |
-| `AXIS_SET_HIDDEN` | 19 | Set axis hidden state |
-| `AXIS_SET_STYLE` | 52 | Set axis default style (content-addressed) |
-| `AXIS_SET_FORMAT` | 53 | Set axis default format (content-addressed) |
+| `ROW_SET` | 20 | Create/update row (position, size, style, format, hidden) |
+| `ROW_DELETE` | 21 | Delete row |
 | **Sheet Operations** | | |
-| `SHEET_CREATE` | 20 | Create new sheet |
-| `SHEET_DELETE` | 21 | Delete sheet |
-| `SHEET_RENAME` | 22 | Rename sheet |
+| `SHEET_SET` | 30 | Create/update sheet (name, position) |
+| `SHEET_DELETE` | 31 | Delete sheet |
 | **Workbook Operations** | | |
-| `WORKBOOK_RENAME` | 30 | Rename workbook |
+| `WORKBOOK_SET` | 40 | Update workbook properties (name) |
 | **Named Range Operations** | | |
-| `NAMED_RANGE_DEFINE` | 50 | Define a named range |
-| `NAMED_RANGE_DELETE` | 51 | Delete a named range |
+| `NAMED_RANGE_SET` | 50 | Create/update named range |
+| `NAMED_RANGE_DELETE` | 51 | Delete named range |
 | **Range Operations** | | |
-| `RANGE_ADD` | 60 | Add a new range |
-| `RANGE_REMOVE` | 61 | Remove a range by ID |
-| `RANGE_UPDATE_CORNERS` | 62 | Update range corners (resize) |
-| `RANGE_UPDATE_FLAGS` | 63 | Update range flags bitmask |
-| `RANGE_SET_STYLE` | 64 | Set range style (content-addressed) |
-| `RANGE_SET_FORMAT` | 65 | Set range number format (content-addressed) |
+| `RANGE_SET` | 60 | Create/update range (corners, flags, style, format) |
+| `RANGE_DELETE` | 61 | Delete range
 
 ### Example
 
 ```
 #oplog
-O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
-O 1705312200001.0.N3f8hJ2w CELL_SET_VALUE hT8sL4xQ {"type":"s","value":"Hello"}
-O 1705312200002.0.N3f8hJ2w CELL_SET_STYLE xA1bC2dE {"style":"BEAB"}
-O 1705312200003.0.N3f8hJ2w CELL_SET_FORMAT xA1bC2dE {"format":"BAQC"}
-O 1705312200004.0.N3f8hJ2w RANGE_SET_STYLE rGfH3jK2 {"style":"BECA+78k"}
-O 1705312200005.0.N3f8hJ2w RANGE_SET_FORMAT rGfH3jK2 {"format":"DwIC+AEk"}
+O 1705312200000.0.N3f8hJ2w CELL_SET nP6kR2mW {"col":"kR7pN2wQ","row":"jH4sW8nF","t":"n","v":"42"}
+O 1705312200001.0.N3f8hJ2w CELL_SET hT8sL4xQ {"col":"kR7pN2wQ","row":"qM2kL5pR","t":"s","v":"Hello"}
+O 1705312200002.0.N3f8hJ2w CELL_SET xA1bC2dE {"col":"cA1bC2dE","row":"rA1bC2dE","t":"n","v":"10","sty":"BEAB"}
+O 1705312200003.0.N3f8hJ2w COL_SET cA1bC2dE {"pos":0,"size":120,"fmt":"BAQC"}
+O 1705312200004.0.N3f8hJ2w RANGE_SET rGfH3jK2 {"sc":"cA1","sr":"rA1","ec":"cB3","er":"rB3","flags":2,"sty":"BECA+78k"}
+O 1705312200005.0.N3f8hJ2w CELL_DELETE nP6kR2mW {}
 ```
 
-Style and format operations use content-addressed base64-encoded binary data. The `"style"` field contains encoded style properties, and the `"format"` field contains encoded format properties.
+Operations use unified SET commands that include all entity properties. Style (`sty`) and format (`fmt`) use content-addressed base64-encoded binary data.
 
 ## Complete Example
 

@@ -45,7 +45,6 @@ Each axis knows its own position, making it simple to sort and serialize.
 ### File Structure
 
 ```
-#zcd v1
 D <doc-id> "<name>"
 N "<name>" <scope> <sheet-id> <type> <target-data>  # Named ranges (optional)
 
@@ -54,7 +53,7 @@ V <key:value...>                      # Sheet view properties (optional)
 C <id> <position> [props...]
 R <id> <position> [props...]
 X <id> <col-id> <row-id> <type> <value> [props...]
-RG <id> <corners> <flags> [sty:<base64>] [fmt:<base64>]  # Ranges (merged cells, styles, formats)
+RG <id> <start-col> <start-row> <end-col> <end-row> <flags> [fmt:<base64>] [sty:<base64>]
 
 #oplog
 O <hlc> <op-type> <target-id> <payload>
@@ -83,7 +82,7 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 
 | Prefix | Meaning | Format |
 |--------|---------|--------|
-| `#zcd` | Format version | `#zcd v1` |
+| `#` | Comment | Lines starting with `#` are ignored (used for section markers) |
 | `D` | Document | `D <id> "<name>"` |
 | `N` | Named range | `N "<name>" <scope> <sheet-id> <type> <data>` |
 | `S` | Sheet | `S <id> "<name>"` |
@@ -91,7 +90,7 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 | `C` | Column | `C <id> <position> [props...]` |
 | `R` | Row | `R <id> <position> [props...]` |
 | `X` | Cell | `X <id> <col> <row> <type> <value> [props...]` |
-| `RG` | Range | `RG <id> <corners> <flags> [sty:<base64>] [fmt:<base64>]` |
+| `RG` | Range | `RG <id> <start-col> <start-row> <end-col> <end-row> <flags> [fmt:...] [sty:...]` |
 | `O` | Operation | `O <hlc> <op-type> <target-id> <payload>` |
 
 Styles and formats are content-addressed and stored inline as `sty:<base64>` and `fmt:<base64>` properties on columns, rows, cells, and ranges.
