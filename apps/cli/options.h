@@ -50,6 +50,9 @@ struct Options {
     XlsxOptions xlsx;
     OutputOptions output;
 
+    // Processing options
+    bool evaluate_formulas = false;  // --eval: Evaluate formulas before export
+
     // Info flags
     bool show_help = false;
     bool show_version = false;
