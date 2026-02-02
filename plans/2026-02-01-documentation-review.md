@@ -65,9 +65,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
   - "CRDT operations" terminology → Already consistent across docs
   - "UUID-based" vs "ID-based" → Intentionally different: UUID-based for data model, ID-based for file format (8-char short IDs)
 
-- [ ] 3b: Update cross-references between docs
-  - Fix any broken internal links
-  - Ensure referenced sections exist
+- [x] 3b: Update cross-references between docs
+  - All document links verified (file-format.md, sync-protocol.md, all docs/*.md files)
+  - All internal section references (#anchors) verified in file-format.md
+  - No broken links found
 
 - [ ] 3c: Final review pass
   - Read through all docs for flow
