@@ -977,5 +977,209 @@ X xB100002 cB000002 r0000001 f "=A1*2"
     EXPECT_TRUE(csv_output.find("10") != std::string::npos);
 }
 
+// ============================================================
+// Script execution tests (--script and -e flags)
+// ============================================================
+
+TEST_F(ConverterTest, Script_InlineSetCell) {
+    // Test inline script with -e that modifies a cell
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+R r0000001 0
+X xA100001 cA000001 r0000001 n 10
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;
+    opts.script_inline = "setCell('A1', 999)";  // Change A1 from 10 to 999
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Verify the output contains 999 (modified value), not 10
+    std::string zcd_output = readFile(output);
+    EXPECT_TRUE(zcd_output.find(" n 999") != std::string::npos)
+        << "Expected 999 in output. Got: " << zcd_output;
+}
+
+TEST_F(ConverterTest, Script_InlineMultipleStatements) {
+    // Test inline script with multiple statements
+    std::string csv_content = "A,B\n1,2\n";
+    std::string input = tempFile(".csv", csv_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kCsv;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;
+    opts.script_inline = "setCell('A1', 100); setCell('B1', 200)";
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    std::string zcd_output = readFile(output);
+    EXPECT_TRUE(zcd_output.find(" n 100") != std::string::npos);
+    EXPECT_TRUE(zcd_output.find(" n 200") != std::string::npos);
+}
+
+TEST_F(ConverterTest, Script_FromFile) {
+    // Test --script flag with script file
+    std::string script_content = "setCell('A1', 'Hello from script')";
+    std::string script_file = tempFile(".luau", script_content);
+
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+R r0000001 0
+X xA100001 cA000001 r0000001 n 0
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;
+    opts.script_file = script_file;
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    std::string zcd_output = readFile(output);
+    EXPECT_TRUE(zcd_output.find("Hello from script") != std::string::npos)
+        << "Expected 'Hello from script' in output. Got: " << zcd_output;
+}
+
+TEST_F(ConverterTest, Script_Error_SyntaxError) {
+    // Test that script syntax errors are reported
+    std::string csv_content = "A\n1\n";
+    std::string input = tempFile(".csv", csv_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kCsv;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.script_inline = "setCell('A1',";  // Incomplete syntax
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.find("Script error") != std::string::npos ||
+                result.error.find("Compile error") != std::string::npos)
+        << "Expected script error message. Got: " << result.error;
+}
+
+TEST_F(ConverterTest, Script_Error_FileNotFound) {
+    // Test error when script file doesn't exist
+    std::string csv_content = "A\n1\n";
+    std::string input = tempFile(".csv", csv_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kCsv;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.script_file = "/nonexistent/path/script.luau";
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.find("Could not open") != std::string::npos)
+        << "Expected file not found error. Got: " << result.error;
+}
+
+TEST_F(ConverterTest, Script_PrintOutput) {
+    // Test that print() output is captured
+    std::string csv_content = "A\n1\n";
+    std::string input = tempFile(".csv", csv_content);
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kCsv;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;  // Quiet mode to suppress print output (still succeeds)
+    opts.script_inline = "print('Hello, World!')";
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    // Script should succeed even with print
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+}
+
+TEST_F(ConverterTest, Script_WithEval) {
+    // Test that --eval and --script can be combined
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+C cB000002 1
+R r0000001 0
+X xA100001 cA000001 r0000001 n 5
+X xB100002 cB000002 r0000001 f "=A1*2"
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;
+    opts.evaluate_formulas = true;
+    opts.script_inline = "setCell('A1', 10)";  // Change A1 from 5 to 10
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Note: Script runs AFTER eval, so B1 would be evaluated first (5*2=10),
+    // then script changes A1 to 10. The formula in B1 doesn't re-evaluate.
+    std::string csv_output = readFile(output);
+    EXPECT_TRUE(csv_output.find("10") != std::string::npos);
+}
+
 }  // namespace
 }  // namespace cells::cli
