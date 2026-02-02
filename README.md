@@ -10,9 +10,11 @@ Cells is a spreadsheet engine that works two ways:
 
 1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
 
-   ![Cells Web App Demo](./docs/img/demo.gif)
+   <img style="max-width:600px" src="./docs/img/demo.gif">
 
 2. **Headless CLI** — Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
+
+	<img style="max-width:600px" src="./docs/img/cli.png">
 
 Both share the same core engine, so formulas and files work identically across environments.
 
@@ -55,7 +57,7 @@ cells -i data.xlsx output.zcd
 # CSV to Excel
 cells -i report.csv report.xlsx
 
-# Excel to CSV (values only)
+# Excel to CSV
 cells -i budget.xlsx budget.csv
 ```
 
@@ -97,7 +99,7 @@ cells output.zcd
 cells output.xlsx
 
 # Create with initial content via script
-cells output.xlsx -e 'setCell("A1", "Hello"); setCell("A2", "=A1 & \" World\")'
+cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 ```
 
 ## Features
@@ -130,6 +132,9 @@ cells output.xlsx -e 'setCell("A1", "Hello"); setCell("A2", "=A1 & \" World\")'
 - Empty workbook creation
 
 ### Scripting
+
+<img style="max-width:500px" src="./docs/img/scripting.png">
+
 - **[Luau](https://luau.org)** - Full scripting support with access to the cell engine API
 - Automate data transformations, generate reports, run calculations
 - **Coming soon:** Python, VBA, and TypeScript bindings
