@@ -106,20 +106,23 @@ Cells uses its own text-based format (`.zcd`) designed for Git-friendly persiste
 - **CRDT operation log** - Full edit history for sync and conflict resolution
 
 ```
-#zcd v1
-D Qx7mXp2L "Budget"
-
-S bF3hL8mN "Sheet1"
-C kR7pN2wQ 0
-C vT5mK9xL 1
-R jH4sW8nF 0
-X nP6kR2mW kR7pN2wQ jH4sW8nF n 42 fmt:IyMjLDA=
-X hT8sL4xQ vT5mK9xL jH4sW8nF s "hello" sty:Ym9sZDox
-
-#oplog
-O 1706000001:0:abc CellSet nP6kR2mW n 42
-O 1706000002:0:abc CellSet hT8sL4xQ s "hello"
+D yRUosCbW "Untitled"
+S FD3KLIgo "Sheet1"
+C C4Jr2s32 1
+C pYYl3eZ1 2
+R Zv6vRn4q 1
+X XO5lD1Nh C4Jr2s32 Zv6vRn4q n 42 fmt:DwICAQEk
+X 1MvyBXyr pYYl3eZ1 Zv6vRn4q f "=~~XO5lD1Nh*10" fmt:DwICAQEk sty:BAAB
 ```
+<sub>
+
+```
+#oplog
+O 1769998913268.0.atyBEwwf CELL_SET XO5lD1Nh {"t":"n","v":"42","col":"C4Jr2s32","row":"Zv6vRn4q"}
+O 1769998921630.0.atyBEwwf CELL_SET 1MvyBXyr {"t":"f","v":"=~~XO5lD1Nh*10","col":"pYYl3eZ1","row":"Zv6vRn4q"}
+```
+
+</sub>
 
 See [docs/persistence.md](./docs/persistence.md) for the full specification.
 
