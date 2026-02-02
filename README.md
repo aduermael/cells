@@ -169,24 +169,15 @@ bazel run :check            # All checks (test + lint + types)
 
 ## Project Stats
 
-| Category | Count |
-|----------|------:|
-| C++ (core) | 45,004 lines |
-| TypeScript (UI) | 23,659 lines |
-| Unit tests | 3,481 |
-| E2E tests | 384 |
-| Total tests | 3,908 |
-| Commits | 1,521 |
-
 ### Source Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 45,004 |
-| TypeScript | 23,659 |
+| C++ | 45,474 |
+| TypeScript | 23,668 |
 | CSS | 2,706 |
 | Starlark | 1,947 |
-| JavaScript | 1,680 |
+| JavaScript | 1,683 |
 | Go | 1,363 |
 | Shell | 1,168 |
 | HTML | 1,051 |
@@ -196,22 +187,41 @@ bazel run :check            # All checks (test + lint + types)
 
 | Language | Lines |
 |----------|------:|
-| C++ | 42,844 |
-| JavaScript | 13,606 |
+| C++ | 43,220 |
+| JavaScript | 13,978 |
 | Go | 315 |
 
-### Bundle Size
+### Documentation
 
-- WASM Module: 5.14 MB
-- Total Web Bundle: 7.23 MB
+| Type | Lines |
+|------|------:|
+| Markdown | 19,522 |
+| Inline Comments | 19,459 |
 
-<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc). Generate with `./tools/generate-stats.sh`</sub>
+### Test Counts
+
+| Category | Tests |
+|----------|------:|
+| Unit (C++) | 3497 |
+| Unit (Go) | 13 |
+| Unit (JavaScript) | 30 |
+| E2E (Puppeteer) | 391 |
+| **Total** | **3931** |
+
+- **Commits**: 1552
+- **WASM Module**: 5.17 MB
+- **Total Web Bundle**: 7.26 MB
+
+<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
 ### LOC Evolution
 
 <img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">
 
+<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs`</sub>
+
 ### Diff Size Evolution
 
 <img src="stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">
 
+<sub>Average diff size per commit (lines added + removed, code files only). Generate with `./tools/diff-tracker.sh && node tools/generate-diff-svg.mjs`</sub>
