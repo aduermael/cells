@@ -1181,5 +1181,171 @@ X xB100002 cB000002 r0000001 f "=A1*2"
     EXPECT_TRUE(csv_output.find("10") != std::string::npos);
 }
 
+// ============================================================
+// Empty workbook and script-only mode tests
+// ============================================================
+
+TEST_F(ConverterTest, EmptyWorkbook_CreateZcd) {
+    // Create an empty workbook without input file
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.output_file = output;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    // No input_file set - should create empty workbook
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+    EXPECT_EQ(result.cells_converted, 0);  // Empty workbook has no cells
+
+    // Verify output file contains valid zcd with a sheet
+    std::string output_content = readFile(output);
+    EXPECT_FALSE(output_content.empty());
+    EXPECT_TRUE(output_content.find("D ") != std::string::npos);  // Document
+    EXPECT_TRUE(output_content.find("S ") != std::string::npos);  // Sheet
+    EXPECT_TRUE(output_content.find("Sheet1") != std::string::npos);  // Default sheet name
+}
+
+TEST_F(ConverterTest, EmptyWorkbook_CreateXlsx) {
+    // Create an empty workbook in XLSX format
+    std::string output = tempFile(".xlsx", "");
+    trackFile(output);
+
+    Options opts;
+    opts.output_file = output;
+    opts.output_format = Format::kXlsx;
+    opts.output.overwrite = true;
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Verify XLSX file was created
+    EXPECT_TRUE(std::filesystem::exists(output));
+    EXPECT_GT(std::filesystem::file_size(output), 0);
+}
+
+TEST_F(ConverterTest, EmptyWorkbook_WithScript) {
+    // Create empty workbook and populate it with a script
+    std::string output = tempFile(".zcd", "");
+    trackFile(output);
+
+    Options opts;
+    opts.output_file = output;
+    opts.output_format = Format::kZcd;
+    opts.output.overwrite = true;
+    opts.output.quiet = true;
+    opts.script_inline = "setCell('A1', 'Hello'); setCell('B1', 42)";
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+    EXPECT_EQ(result.cells_converted, 2);  // Script created 2 cells
+
+    // Verify output contains the script-created values
+    std::string output_content = readFile(output);
+    EXPECT_TRUE(output_content.find("Hello") != std::string::npos);
+    EXPECT_TRUE(output_content.find(" n 42") != std::string::npos);
+}
+
+TEST_F(ConverterTest, EmptyWorkbook_CreateCsv) {
+    // Create an empty CSV (edge case - should produce empty file)
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.output_file = output;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+    EXPECT_EQ(result.cells_converted, 0);
+
+    // CSV file should exist (may be empty or have just headers)
+    EXPECT_TRUE(std::filesystem::exists(output));
+}
+
+TEST_F(ConverterTest, ScriptOnly_NoOutput) {
+    // Script-only mode: run script on input, no output file
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+R r0000001 0
+X xA100001 cA000001 r0000001 n 42
+)";
+    std::string input = tempFile(".zcd", zcd_content);
+
+    Options opts;
+    opts.input_file = input;
+    opts.input_format = Format::kZcd;
+    opts.output.quiet = true;
+    opts.script_inline = "local val = getCell('A1'); print('Value is: ' .. tostring(val))";
+    // No output_file set - script-only mode
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+    // Script executed successfully, no output file created
+}
+
+TEST_F(ConverterTest, ScriptOnly_WithScriptFile) {
+    // Script-only mode with external script file
+    std::string script_content = "print('Script executed!')";
+    std::string script_file = tempFile(".luau", script_content);
+
+    std::string csv_content = "A\n1\n";
+    std::string input = tempFile(".csv", csv_content);
+
+    Options opts;
+    opts.input_file = input;
+    opts.input_format = Format::kCsv;
+    opts.output.quiet = true;
+    opts.script_file = script_file;
+    // No output_file set - script-only mode
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+}
+
+TEST_F(ConverterTest, ScriptOnly_ModifiesWorkbook) {
+    // Script-only mode that modifies the workbook (changes are discarded)
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+R r0000001 0
+X xA100001 cA000001 r0000001 n 10
+)";
+    std::string input = tempFile(".zcd", zcd_content);
+
+    Options opts;
+    opts.input_file = input;
+    opts.input_format = Format::kZcd;
+    opts.output.quiet = true;
+    opts.script_inline = "setCell('A1', 999)";  // Modify value (not saved)
+    // No output_file set - changes are not persisted
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Original file should be unchanged
+    std::string original = readFile(input);
+    EXPECT_TRUE(original.find(" n 10") != std::string::npos);
+    EXPECT_TRUE(original.find(" n 999") == std::string::npos);
+}
+
 }  // namespace
 }  // namespace cells::cli

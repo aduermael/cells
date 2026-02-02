@@ -46,6 +46,9 @@ private:
     // Returns nullptr on error (sets error_out)
     std::unique_ptr<Workbook> readInput(std::string& error_out);
 
+    // Create an empty workbook with one sheet
+    std::unique_ptr<Workbook> createEmptyWorkbook();
+
     // Write workbook to output file
     // Returns false on error (sets error_out)
     bool writeOutput(const Workbook& workbook, std::string& error_out);

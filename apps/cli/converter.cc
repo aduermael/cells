@@ -9,6 +9,7 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/id.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
@@ -35,18 +36,23 @@ ConversionResult Converter::convert() {
     }
 
     // Check if output file exists and we're not allowed to overwrite
-    if (!options_.output.overwrite && outputFileExists()) {
+    if (!options_.output_file.empty() && !options_.output.overwrite && outputFileExists()) {
         result.error =
             "Output file already exists: " + options_.output_file + " (use -y to overwrite)";
         return result;
     }
 
-    // Read input file
+    // Read input file or create empty workbook
     std::string error;
-    auto workbook = readInput(error);
-    if (!workbook) {
-        result.error = error;
-        return result;
+    std::unique_ptr<Workbook> workbook;
+    if (options_.input_file.empty()) {
+        workbook = createEmptyWorkbook();
+    } else {
+        workbook = readInput(error);
+        if (!workbook) {
+            result.error = error;
+            return result;
+        }
     }
 
     // Check for feature loss and generate warnings
@@ -65,10 +71,12 @@ ConversionResult Converter::convert() {
         }
     }
 
-    // Write output file
-    if (!writeOutput(*workbook, error)) {
-        result.error = error;
-        return result;
+    // Write output file (skip for script-only mode)
+    if (!options_.output_file.empty()) {
+        if (!writeOutput(*workbook, error)) {
+            result.error = error;
+            return result;
+        }
     }
 
     // Calculate total cells
@@ -294,6 +302,14 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
 
     error_out = "Unexpected input format";
     return nullptr;
+}
+
+std::unique_ptr<Workbook> Converter::createEmptyWorkbook() {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Untitled");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+    workbook->addSheet(std::move(sheet));
+    return workbook;
 }
 
 bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {

@@ -33,8 +33,10 @@ void print_usage(const char* program_name) {
     std::cerr << "cells - spreadsheet format converter and sync client\n"
               << "\n"
               << "Usage: " << program_name << " [options] -i <input> <output>\n"
-              << "       " << program_name << " -I <file>     (info mode)\n"
-              << "       " << program_name << " sync <url>    (sync mode)\n"
+              << "       " << program_name << " [options] <output>            (create empty workbook)\n"
+              << "       " << program_name << " [options] -i <input> -e '...' (script-only mode)\n"
+              << "       " << program_name << " -I <file>                     (info mode)\n"
+              << "       " << program_name << " sync <url>                    (sync mode)\n"
               << "\n"
               << "Convert between spreadsheet formats (.zcd, .csv, .xlsx).\n"
               << "Format is auto-detected from file extension.\n"
@@ -46,7 +48,7 @@ void print_usage(const char* program_name) {
               << "  .xlsx     Excel 2007+ format\n"
               << "\n"
               << "Input/Output:\n"
-              << "  -i <file>           Input file (required)\n"
+              << "  -i <file>           Input file (optional if creating empty workbook)\n"
               << "  -f <format>         Force input format (zcd, csv, xlsx)\n"
               << "  -t <format>         Force output format (zcd, csv, xlsx)\n"
               << "\n"
@@ -102,6 +104,14 @@ void print_usage(const char* program_name) {
               << "  # Luau scripting\n"
               << "  cells -i data.xlsx output.csv --script transform.luau\n"
               << "  cells -i data.csv out.xlsx -e 'setCell(\"A1\", 100)'\n"
+              << "\n"
+              << "  # Empty workbook creation\n"
+              << "  cells output.zcd                        # Create empty workbook\n"
+              << "  cells out.xlsx -e 'setCell(\"A1\", 42)'  # Create with script\n"
+              << "\n"
+              << "  # Script-only mode (no output file)\n"
+              << "  cells -i data.xlsx --script analyze.luau   # Run analysis script\n"
+              << "  cells -i report.csv -e 'print(getCell(\"A1\"))'  # Read and print\n"
               << "\n"
               << "  # Automation flags\n"
               << "  cells -i input.xlsx output.csv -q -y    # Quiet, overwrite\n"
@@ -262,18 +272,21 @@ bool validate_options(Options& opts) {
         return true;
     }
 
-    if (opts.input_file.empty()) {
-        std::cerr << "Error: Input file required (-i <file>)\n";
+    // Allow missing input file in these cases:
+    // 1. Output file specified (create empty workbook)
+    // 2. Script specified (script-only mode)
+    bool has_script = !opts.script_file.empty() || !opts.script_inline.empty();
+    bool has_output = !opts.output_file.empty();
+
+    if (opts.input_file.empty() && !has_output && !has_script) {
+        std::cerr << "Error: Input file required (-i <file>), or specify output "
+                  << "file to create empty workbook, or use --script/-e for "
+                  << "script-only mode\n";
         return false;
     }
 
-    if (opts.output_file.empty()) {
-        std::cerr << "Error: Output file required\n";
-        return false;
-    }
-
-    // Auto-detect input format if not specified
-    if (opts.input_format == Format::kUnknown) {
+    // Auto-detect input format if not specified (skip if no input file)
+    if (!opts.input_file.empty() && opts.input_format == Format::kUnknown) {
         opts.input_format = detect_format(opts.input_file);
         if (opts.input_format == Format::kUnknown) {
             std::cerr << "Error: Cannot detect input format from extension. "
@@ -282,8 +295,8 @@ bool validate_options(Options& opts) {
         }
     }
 
-    // Auto-detect output format if not specified
-    if (opts.output_format == Format::kUnknown) {
+    // Auto-detect output format if not specified (skip if no output file)
+    if (!opts.output_file.empty() && opts.output_format == Format::kUnknown) {
         opts.output_format = detect_format(opts.output_file);
         if (opts.output_format == Format::kUnknown) {
             std::cerr << "Error: Cannot detect output format from extension. "
@@ -293,7 +306,8 @@ bool validate_options(Options& opts) {
     }
 
     // Auto-set tab delimiter for .tsv files
-    if (ends_with_tsv(opts.input_file) || ends_with_tsv(opts.output_file)) {
+    if ((!opts.input_file.empty() && ends_with_tsv(opts.input_file)) ||
+        (!opts.output_file.empty() && ends_with_tsv(opts.output_file))) {
         if (opts.csv.delimiter == ",") {
             opts.csv.delimiter = "\t";
         }
@@ -533,10 +547,18 @@ int main(int argc, char* argv[]) {
     } else {
         // Run conversion pipeline
         if (opts.output.verbose) {
-            std::cout << "Input:  " << opts.input_file << " ("
-                      << format_name(opts.input_format) << ")\n";
-            std::cout << "Output: " << opts.output_file << " ("
-                      << format_name(opts.output_format) << ")\n";
+            if (!opts.input_file.empty()) {
+                std::cout << "Input:  " << opts.input_file << " ("
+                          << format_name(opts.input_format) << ")\n";
+            } else {
+                std::cout << "Input:  (empty workbook)\n";
+            }
+            if (!opts.output_file.empty()) {
+                std::cout << "Output: " << opts.output_file << " ("
+                          << format_name(opts.output_format) << ")\n";
+            } else {
+                std::cout << "Output: (script-only mode)\n";
+            }
         }
 
         Converter converter(opts);
@@ -554,8 +576,19 @@ int main(int argc, char* argv[]) {
             result = 1;
         } else {
             if (!opts.output.quiet) {
-                std::cout << "Converted: " << opts.input_file << " -> " << opts.output_file
-                          << " (" << conv_result.cells_converted << " cells)\n";
+                // Different messages for different modes
+                if (opts.output_file.empty()) {
+                    // Script-only mode
+                    std::cout << "Script executed successfully\n";
+                } else if (opts.input_file.empty()) {
+                    // Created empty workbook
+                    std::cout << "Created: " << opts.output_file << " ("
+                              << conv_result.cells_converted << " cells)\n";
+                } else {
+                    // Normal conversion
+                    std::cout << "Converted: " << opts.input_file << " -> " << opts.output_file
+                              << " (" << conv_result.cells_converted << " cells)\n";
+                }
             }
         }
     }

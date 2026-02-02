@@ -44,11 +44,11 @@ Allow creating empty workbooks when no input is specified. Useful for:
 - Generating empty templates
 - Running scripts that create data programmatically
 
-- [ ] 3a: Update `validate_options()` to allow missing input when output is specified
-- [ ] 3b: Create empty workbook in converter when no input file
-- [ ] 3c: Allow script-only mode (no input, no output, just run script)
-- [ ] 3d: Update help text to reflect optional input
-- [ ] 3e: Add tests for empty workbook creation and script-only mode
+- [x] 3a: Update `validate_options()` to allow missing input when output is specified - Updated validation to allow: 1) output-only mode (create empty workbook), 2) script-only mode (no input, no output).
+- [x] 3b: Create empty workbook in converter when no input file - Added `createEmptyWorkbook()` method that creates a workbook with one sheet named "Sheet1".
+- [x] 3c: Allow script-only mode (no input, no output, just run script) - Scripts can now run without requiring an output file.
+- [x] 3d: Update help text to reflect optional input - Added usage examples for empty workbook creation and script-only mode.
+- [x] 3e: Add tests for empty workbook creation and script-only mode - Added 7 tests: EmptyWorkbook_CreateZcd, EmptyWorkbook_CreateXlsx, EmptyWorkbook_WithScript, EmptyWorkbook_CreateCsv, ScriptOnly_NoOutput, ScriptOnly_WithScriptFile, ScriptOnly_ModifiesWorkbook.
 
 **Files:**
 - `apps/cli/main.cc` - Update validation logic
