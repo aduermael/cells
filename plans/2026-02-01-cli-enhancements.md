@@ -59,9 +59,9 @@ Allow creating empty workbooks when no input is specified. Useful for:
 
 Add comprehensive examples to the main README showing all three features.
 
-- [ ] 4a: Add `--eval` examples to README CLI section
-- [ ] 4b: Add `--script` and `-e` examples to README CLI section
-- [ ] 4c: Add empty workbook creation examples to README CLI section
+- [x] 4a: Add `--eval` examples to README CLI section - Added "Formula Evaluation" subsection with examples showing `--eval` for recalculating formulas before export.
+- [x] 4b: Add `--script` and `-e` examples to README CLI section - Added "Luau Scripting" subsection with examples for script files, inline scripts, and script-only mode.
+- [x] 4c: Add empty workbook creation examples to README CLI section - Added "Empty Workbook Creation" subsection with examples for creating empty workbooks and scripted content.
 
 **Files:**
 - `README.md` - Add CLI examples section

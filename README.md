@@ -40,10 +40,64 @@ bazel run :serve
 bazel run :cli
 
 # Convert Excel to Cells format
-./dist/cli/cells convert spreadsheet.xlsx output.zcd
+./dist/cli/cells -i spreadsheet.xlsx output.zcd
 
 # Inspect a file
-./dist/cli/cells info spreadsheet.zcd
+./dist/cli/cells -I spreadsheet.zcd
+```
+
+#### Format Conversion
+
+```bash
+# Excel to native format
+cells -i data.xlsx output.zcd
+
+# CSV to Excel
+cells -i report.csv report.xlsx
+
+# Excel to CSV (values only)
+cells -i budget.xlsx budget.csv
+```
+
+#### Formula Evaluation
+
+Use `--eval` to recalculate formulas using the Cells calculation engine before export:
+
+```bash
+# Evaluate formulas when exporting to CSV
+cells -i budget.xlsx budget.csv --eval
+
+# Useful when XLSX cached values are stale or missing
+cells -i calculations.xlsx results.csv --eval
+```
+
+#### Luau Scripting
+
+Run [Luau](https://luau.org) scripts to transform data, automate workflows, or analyze spreadsheets:
+
+```bash
+# Run a script file
+cells -i data.xlsx output.csv --script transform.luau
+
+# Run inline script
+cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
+
+# Script-only mode (no output file)
+cells -i report.xlsx --script analyze.luau
+cells -i data.csv -e 'print(getCell("A1"))'
+```
+
+#### Empty Workbook Creation
+
+Create new workbooks from scratch, optionally with scripted content:
+
+```bash
+# Create empty workbook
+cells output.zcd
+cells output.xlsx
+
+# Create with initial content via script
+cells output.xlsx -e 'setCell("A1", "Hello"); setCell("A2", "=A1 & \" World\")'
 ```
 
 ## Features
@@ -71,6 +125,9 @@ bazel run :cli
 - Format conversion: `xlsx <-> zcd <-> csv`
 - File inspection and validation
 - Headless spreadsheet operations
+- Formula evaluation with `--eval`
+- Luau scripting with `--script` and `-e`
+- Empty workbook creation
 
 ### Scripting
 - **[Luau](https://luau.org)** - Full scripting support with access to the cell engine API
