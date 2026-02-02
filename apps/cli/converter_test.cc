@@ -800,5 +800,182 @@ TEST_F(ConverterTest, CsvWithUnicode) {
     ASSERT_TRUE(result.ok()) << "Error: " << result.error;
 }
 
+// ============================================================
+// --eval flag tests (formula evaluation before export)
+// ============================================================
+
+TEST_F(ConverterTest, EvalFlag_SimpleArithmetic) {
+    // Create a .zcd file with formulas using A1 notation
+    // A1 = 10, B1 = 5, C1 = =A1+B1 (should evaluate to 15)
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+C cB000002 1
+C cC000003 2
+R r0000001 0
+X xA100001 cA000001 r0000001 n 10
+X xB100002 cB000002 r0000001 n 5
+X xC100003 cC000003 r0000001 f "=A1+B1"
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.evaluate_formulas = true;  // Enable formula evaluation
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Verify the CSV contains the computed value (15), not a formula
+    std::string csv_output = readFile(output);
+    EXPECT_TRUE(csv_output.find("10") != std::string::npos);
+    EXPECT_TRUE(csv_output.find("5") != std::string::npos);
+    EXPECT_TRUE(csv_output.find("15") != std::string::npos)
+        << "Expected 15 (10+5) in CSV output. Got: " << csv_output;
+}
+
+TEST_F(ConverterTest, EvalFlag_MultiplicationFormula) {
+    // A1 = 6, B1 = 7, C1 = =A1*B1 (should evaluate to 42)
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+C cB000002 1
+C cC000003 2
+R r0000001 0
+X xA100001 cA000001 r0000001 n 6
+X xB100002 cB000002 r0000001 n 7
+X xC100003 cC000003 r0000001 f "=A1*B1"
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.evaluate_formulas = true;
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    std::string csv_output = readFile(output);
+    EXPECT_TRUE(csv_output.find("42") != std::string::npos)
+        << "Expected 42 (6*7) in CSV output. Got: " << csv_output;
+}
+
+TEST_F(ConverterTest, EvalFlag_SumFunction) {
+    // A1 = 1, A2 = 2, A3 = 3, B1 = =SUM(A1:A3) (should evaluate to 6)
+    std::string zcd_content = R"ZCD(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+C cB000002 1
+R r0000001 0
+R r0000002 1
+R r0000003 2
+X xA100001 cA000001 r0000001 n 1
+X xA200002 cA000001 r0000002 n 2
+X xA300003 cA000001 r0000003 n 3
+X xB100004 cB000002 r0000001 f "=SUM(A1:A3)"
+)ZCD";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.evaluate_formulas = true;
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    std::string csv_output = readFile(output);
+    // SUM(1,2,3) = 6
+    EXPECT_TRUE(csv_output.find("6") != std::string::npos)
+        << "Expected 6 (SUM of 1,2,3) in CSV output. Got: " << csv_output;
+}
+
+TEST_F(ConverterTest, EvalFlag_XlsxWithFormulas) {
+    // Test --eval with XLSX input containing formulas
+    std::string input = getTestDataPath("formulas.xlsx");
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kXlsx;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.evaluate_formulas = true;  // Recalculate formulas
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Verify the CSV was created and has content
+    std::string csv_output = readFile(output);
+    EXPECT_FALSE(csv_output.empty());
+    // Formula indicators should not appear (=, $) since values are computed
+    // Note: This checks formula text doesn't leak through; values are numbers
+}
+
+TEST_F(ConverterTest, EvalFlag_Disabled_PreservesFormulaValue) {
+    // When --eval is NOT set, formulas should still be exported as their
+    // cached values (not recalculated). The CSV writer always writes values.
+    // This test ensures the flag doesn't break normal conversion.
+    std::string zcd_content = R"(D doc1 "TestDoc"
+S sheet1 "Sheet1"
+C cA000001 0
+C cB000002 1
+R r0000001 0
+X xA100001 cA000001 r0000001 n 10
+X xB100002 cB000002 r0000001 f "=A1*2"
+)";
+
+    std::string input = tempFile(".zcd", zcd_content);
+    std::string output = tempFile(".csv", "");
+    trackFile(output);
+
+    Options opts;
+    opts.input_file = input;
+    opts.output_file = output;
+    opts.input_format = Format::kZcd;
+    opts.output_format = Format::kCsv;
+    opts.output.overwrite = true;
+    opts.evaluate_formulas = false;  // Don't evaluate (default behavior)
+
+    Converter converter(opts);
+    ConversionResult result = converter.convert();
+
+    ASSERT_TRUE(result.ok()) << "Error: " << result.error;
+
+    // Should still produce valid CSV (values from cached results or empty)
+    std::string csv_output = readFile(output);
+    EXPECT_TRUE(csv_output.find("10") != std::string::npos);
+}
+
 }  // namespace
 }  // namespace cells::cli

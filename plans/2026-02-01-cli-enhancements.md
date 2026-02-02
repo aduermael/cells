@@ -12,7 +12,7 @@ When converting XLSX to CSV, formulas are currently exported as-is (computed val
 - [x] 1a: Add `evaluate_formulas` bool to `Options` struct in `options.h`
 - [x] 1b: Add `--eval` argument parsing in `parse_args()` in `main.cc`
 - [x] 1c: Implement formula evaluation in converter before CSV write - Added `evaluateFormulas()` method that calls `cells::evaluateCell()` on all formula cells. Also fixed pre-existing compilation errors from model refactoring.
-- [ ] 1d: Add unit tests for `--eval` flag
+- [x] 1d: Add unit tests for `--eval` flag - Tests for simple arithmetic, multiplication, SUM function, XLSX, and disabled flag behavior.
 
 **Files:**
 - `apps/cli/options.h` - Add `evaluate_formulas` to `Options`
