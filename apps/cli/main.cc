@@ -67,6 +67,8 @@ void print_usage(const char* program_name) {
               << "\n"
               << "Processing Options:\n"
               << "  --eval              Evaluate formulas before export (use calc engine)\n"
+              << "  --script <file>     Run Luau script from file\n"
+              << "  -e \"<code>\"         Run inline Luau script\n"
               << "\n"
               << "Info:\n"
               << "  -I, --info          Show file information (no conversion)\n"
@@ -198,6 +200,14 @@ bool parse_args(int argc, char* argv[], Options& opts) {
         }
         if (arg == "--eval") {
             opts.evaluate_formulas = true;
+            continue;
+        }
+        if (arg == "--script" && i + 1 < argc) {
+            opts.script_file = argv[++i];
+            continue;
+        }
+        if (arg == "-e" && i + 1 < argc) {
+            opts.script_inline = argv[++i];
             continue;
         }
         // Positional argument (output file)
