@@ -178,9 +178,6 @@ bazel run :check            # All checks (test + lint + types)
 | Total tests | 3,908 |
 | Commits | 1,521 |
 
-<details>
-<summary>Detailed stats</summary>
-
 ### Source Code
 
 | Language | Lines |
@@ -218,8 +215,3 @@ bazel run :check            # All checks (test + lint + types)
 
 <img src="stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">
 
-</details>
-
-## License
-
-[License information here]
