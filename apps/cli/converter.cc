@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 
 #include "core/cells/csv_reader.h"
@@ -12,6 +13,7 @@
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
+#include "core/cells/luau_sandbox.h"
 #include "core/cells/parser.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
@@ -53,6 +55,14 @@ ConversionResult Converter::convert() {
     // Evaluate formulas if requested
     if (options_.evaluate_formulas) {
         evaluateFormulas(*workbook);
+    }
+
+    // Execute script if specified
+    if (!options_.script_file.empty() || !options_.script_inline.empty()) {
+        if (!executeScript(*workbook, error)) {
+            result.error = error;
+            return result;
+        }
     }
 
     // Write output file
@@ -476,6 +486,49 @@ void Converter::evaluateFormulas(Workbook& workbook) {
             }
         }
     }
+}
+
+bool Converter::executeScript(Workbook& workbook, std::string& error_out) {
+    // Determine script content
+    std::string script;
+
+    if (!options_.script_file.empty()) {
+        // Read script from file
+        script = readFileContents(options_.script_file, error_out);
+        if (script.empty() && !error_out.empty()) {
+            return false;
+        }
+    } else if (!options_.script_inline.empty()) {
+        // Use inline script
+        script = options_.script_inline;
+    } else {
+        // No script to execute
+        return true;
+    }
+
+    // Create sandbox and set context
+    LuauSandbox sandbox;
+    Sheet* sheet = workbook.sheets.empty() ? nullptr : workbook.sheets[0].get();
+    sandbox.setContext(&workbook, sheet);
+
+    // Execute script
+    ScriptResult result = sandbox.execute(script);
+
+    // Print script output if any (unless quiet mode)
+    if (!options_.output.quiet && !result.output.empty()) {
+        std::cout << result.output;
+        // Add newline if output doesn't end with one
+        if (!result.output.empty() && result.output.back() != '\n') {
+            std::cout << "\n";
+        }
+    }
+
+    if (!result.success) {
+        error_out = "Script error: " + result.error;
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace cells::cli
