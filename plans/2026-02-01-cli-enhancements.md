@@ -24,7 +24,7 @@ When converting XLSX to CSV, formulas are currently exported as-is (computed val
 
 Allow running a Luau script either from a file or inline. The script runs after loading input (if any) and before writing output (if any).
 
-- [ ] 2a: Add `script_file` and `script_inline` to `Options` struct
+- [x] 2a: Add `script_file` and `script_inline` to `Options` struct
 - [ ] 2b: Add `--script` and `-e` argument parsing in `main.cc`
 - [ ] 2c: Add LuauSandbox integration in converter or main
 - [ ] 2d: Update help text with script examples
