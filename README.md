@@ -75,6 +75,8 @@ cells -i calculations.xlsx results.csv --eval
 
 #### Luau Scripting
 
+<img style="max-width:500px" src="./docs/img/scripting.png">
+
 Run [Luau](https://luau.org) scripts to transform data, automate workflows, or analyze spreadsheets:
 
 ```bash
@@ -102,43 +104,6 @@ cells output.xlsx
 cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 ```
 
-## Features
-
-### Spreadsheet Engine
-- Formula engine with 80+ Excel-compatible functions
-- Dependency graph for reactive updates
-- Multi-sheet support
-- Number formatting with Excel format codes
-
-### Collaboration
-- Peer-to-peer sync via WebRTC
-- CRDT-based conflict resolution (concurrent edits just work)
-- Real-time cursor and selection sharing
-- No relay servers - document data stays between peers
-
-### Web UI
-- Canvas-based rendering with virtual scrolling
-- Inline cell editing and formula bar
-- Column/row resizing and drag-to-reorder
-- Keyboard navigation (arrow keys, Tab, Enter)
-- Drag-and-drop XLSX import
-
-### CLI Tools
-- Format conversion: `xlsx <-> zcd <-> csv`
-- File inspection and validation
-- Headless spreadsheet operations
-- Formula evaluation with `--eval`
-- Luau scripting with `--script` and `-e`
-- Empty workbook creation
-
-### Scripting
-
-<img style="max-width:500px" src="./docs/img/scripting.png">
-
-- **[Luau](https://luau.org)** - Full scripting support with access to the cell engine API
-- Automate data transformations, generate reports, run calculations
-- **Coming soon:** Python, VBA, and TypeScript bindings
-
 ## Architecture
 
 ```
@@ -162,9 +127,11 @@ cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 
 The engine compiles to WebAssembly for the browser and native code for the CLI. All mutations go through CRDT operations, making collaboration a first-class feature rather than an afterthought.
 
-### ZCD File Format
+### Collaboration & ZCD Format
 
-Cells uses its own text-based format (`.zcd`) designed for Git-friendly persistence and CRDT collaboration:
+Cells uses peer-to-peer sync via WebRTC - document data travels directly between browsers with no relay servers. Concurrent edits merge automatically using CRDTs.
+
+The native `.zcd` format (Zero Conflict Document) is designed for this:
 
 - **One entity per line** - Editing a cell changes exactly one line, minimal diffs
 - **Content-addressed styles** - Styles/formats stored as base64 hashes, auto-deduplicated
