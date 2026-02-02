@@ -25,6 +25,8 @@ cc_binary(
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
+        "//core/cells:formula_eval",
+        "//core/cells:formula_recalc",
         "//core/cells:id",
         "//core/cells:model",
         "//core/cells:parser",
@@ -49,6 +51,8 @@ cc_test(
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
+        "//core/cells:formula_eval",
+        "//core/cells:formula_recalc",
         "//core/cells:model",
         "//core/cells:parser",
         "//core/cells:ref_converter",

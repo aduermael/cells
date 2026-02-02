@@ -69,6 +69,9 @@ private:
     // Convert A1 formulas to UUID references (for XLSX import)
     void convertFormulasToUuid(Workbook& workbook);
 
+    // Evaluate all formulas in the workbook and store computed values
+    void evaluateFormulas(Workbook& workbook);
+
     // Handle --all-sheets mode (export each sheet to separate CSV)
     ConversionResult convertAllSheets();
 };

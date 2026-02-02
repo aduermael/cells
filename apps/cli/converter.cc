@@ -8,7 +8,9 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/parser.h"
 #include "core/cells/ref_converter.h"
@@ -47,6 +49,11 @@ ConversionResult Converter::convert() {
 
     // Check for feature loss and generate warnings
     checkFeatureLoss(*workbook);
+
+    // Evaluate formulas if requested
+    if (options_.evaluate_formulas) {
+        evaluateFormulas(*workbook);
+    }
 
     // Write output file
     if (!writeOutput(*workbook, error)) {
@@ -136,9 +143,12 @@ ConversionResult Converter::convertAllSheets() {
         // We need to duplicate the sheet for the temp workbook
         // CSV writer only writes the first sheet anyway
         auto temp_sheet = std::make_unique<Sheet>(sheet->id, sheet->name);
+        temp_sheet->setWorkbook(&temp_workbook);
 
         // Copy columns
-        for (const auto& [col_id, col] : sheet->columns) {
+        for (const auto& col_id : sheet->getColumnIds()) {
+            const Axis* col = workbook->getColumn(col_id);
+            if (!col) continue;
             auto new_col = std::make_unique<Axis>(col->id, true);
             new_col->position = col->position;
             new_col->size = col->size;
@@ -147,7 +157,9 @@ ConversionResult Converter::convertAllSheets() {
         }
 
         // Copy rows
-        for (const auto& [row_id, row] : sheet->rows) {
+        for (const auto& row_id : sheet->getRowIds()) {
+            const Axis* row = workbook->getRow(row_id);
+            if (!row) continue;
             auto new_row = std::make_unique<Axis>(row->id, false);
             new_row->position = row->position;
             new_row->size = row->size;
@@ -156,7 +168,7 @@ ConversionResult Converter::convertAllSheets() {
 
         // Copy cells (shallow copy of value is fine)
         for (const auto& cellId : sheet->getCellIds()) {
-            Cell* cell = workbook->getCell(cellId);
+            const Cell* cell = workbook->getCell(cellId);
             if (!cell) continue;
             auto new_cell = std::make_unique<Cell>(cell->id, cell->colId, cell->rowId);
             new_cell->value = cell->value;
@@ -384,7 +396,7 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
         bool has_formulas = false;
         for (const auto& sheet : workbook.sheets) {
             for (const auto& cellId : sheet->getCellIds()) {
-                Cell* cell = workbook.getCell(cellId);
+                const Cell* cell = workbook.getCell(cellId);
                 if (cell && cell->isFormula()) {
                     has_formulas = true;
                     break;
@@ -402,8 +414,8 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
     if (options_.output_format == Format::kXlsx) {
         // Check for Excel row/column limits
         for (const auto& sheet : workbook.sheets) {
-            size_t row_count = sheet->rows.size();
-            size_t col_count = sheet->columns.size();
+            size_t row_count = sheet->rowCount();
+            size_t col_count = sheet->columnCount();
 
             if (row_count > 1048576) {
                 addWarning("Sheet \"" + sheet->name + "\" has " + std::to_string(row_count) +
@@ -449,6 +461,18 @@ void Converter::convertFormulasToUuid(Workbook& workbook) {
                     formula->dirty = true;
                     cell->setFormula(formula);
                 }
+            }
+        }
+    }
+}
+
+void Converter::evaluateFormulas(Workbook& workbook) {
+    // Evaluate all formula cells in each sheet using the recalculation engine
+    for (auto& sheet : workbook.sheets) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook.getCell(cellId);
+            if (cell && cell->isFormula()) {
+                cells::evaluateCell(sheet.get(), cell);
             }
         }
     }

@@ -299,17 +299,19 @@ std::string read_file(const std::string& path) {
     return ss.str();
 }
 
-// Calculate actual grid dimension by finding max position
-size_t calc_grid_dimension(
-    const std::unordered_map<cells::ID, std::unique_ptr<cells::Axis>, cells::IDHash>& axes) {
-    if (axes.empty()) {
+// Calculate actual grid dimension by finding max position from axis IDs
+size_t calc_grid_dimension(const cells::Workbook& workbook,
+                           const std::unordered_set<cells::ID, cells::IDHash>& axis_ids,
+                           bool is_column) {
+    if (axis_ids.empty()) {
         return 0;
     }
 
     uint32_t max_position = 0;
-    for (const auto& pair : axes) {
-        if (pair.second->position >= max_position) {
-            max_position = pair.second->position + 1;
+    for (const auto& id : axis_ids) {
+        const cells::Axis* axis = is_column ? workbook.getColumn(id) : workbook.getRow(id);
+        if (axis && axis->position >= max_position) {
+            max_position = axis->position + 1;
         }
     }
 
@@ -390,7 +392,7 @@ int show_file_info(const Options& opts) {
 
         size_t formula_count = 0;
         for (const auto& cellId : sheet->getCellIds()) {
-            Cell* cell = workbook->getCell(cellId);
+            cells::Cell* cell = workbook->getCell(cellId);
             if (cell && cell->isFormula()) {
                 formula_count++;
             }
@@ -402,8 +404,8 @@ int show_file_info(const Options& opts) {
         const char* indent = is_last ? "   " : "│  ";
 
         // Calculate actual grid dimensions from max position
-        size_t num_rows = calc_grid_dimension(sheet->rows);
-        size_t num_cols = calc_grid_dimension(sheet->columns);
+        size_t num_rows = calc_grid_dimension(*workbook, sheet->getRowIds(), false);
+        size_t num_cols = calc_grid_dimension(*workbook, sheet->getColumnIds(), true);
 
         std::cout << branch << sheet->name << "\n";
         std::cout << indent << num_rows << (num_rows == 1 ? " row x " : " rows x ")
