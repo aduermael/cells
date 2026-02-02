@@ -258,7 +258,7 @@ Zoom state is stored in SheetInfo and persisted with the sheet.
 
 ## Viewport Indexing Architecture
 
-The viewport query system uses Order-Statistic Trees (augmented red-black trees) for O(log n) spatial lookups, replacing the previous quadtree implementation.
+The viewport query system uses Order Statistic Trees (augmented red-black trees) for O(log n) spatial lookups, replacing the previous quadtree implementation.
 
 ### Architecture Overview
 
@@ -267,7 +267,7 @@ The viewport query system uses Order-Statistic Trees (augmented red-black trees)
 │                         Sheet                                    │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │ Column AxisIndex│  │ Row AxisIndex   │  │ SpillIndex      │  │
-│  │ (OS Tree)       │  │ (OS Tree)       │  │ (R-tree)        │  │
+│  │ (OSTree)       │  │ (OSTree)       │  │ (R-tree)        │  │
 │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
 │           │                    │                    │           │
 │           └────────────────────┼────────────────────┘           │
@@ -319,7 +319,7 @@ The viewport query system uses Order-Statistic Trees (augmented red-black trees)
 | `remove(axisId)` | O(log n) | Remove column/row |
 | `querySpills(viewport)` | O(log n + s) | Find spill ranges intersecting viewport (s = spills in range) |
 
-### Order-Statistic Tree
+### Order Statistic Tree (OSTree)
 
 Each node stores:
 - `id`: 8-char base62 UUID (column or row identifier)
@@ -397,7 +397,7 @@ Memory per axis: ~56 bytes (UUID + size + subtree_total + subtree_count + pointe
 | `apps/wasm/src/grid-formula-renderer.ts` | Formula reference highlight rendering |
 | `apps/wasm/src/grid-events.ts` | Mouse/keyboard event handling |
 | `apps/wasm/src/grid-utils.ts` | Cell bounds calculation utilities |
-| `core/cells/ostree.h/cc` | Generic Order-Statistic Tree (augmented red-black tree) |
+| `core/cells/ostree.h/cc` | Generic Order Statistic Tree (augmented red-black tree) |
 | `core/cells/axis_index.h/cc` | AxisIndex wrapping OSTree for column/row indexing |
 | `core/cells/spill_index.h/cc` | SpillIndex using R-tree for spill range queries |
 | `core/cells/viewport_index.h/cc` | ViewportIndex with cell HashMap (delegates axis queries to Sheet) |

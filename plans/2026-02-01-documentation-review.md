@@ -60,10 +60,10 @@ Review and improve all documentation for accuracy and clarity. The main README s
 
 ## Phase 3: Cleanup & Consistency
 
-- [ ] 3a: Ensure consistent terminology across all docs
-  - "Order Statistic Tree" vs "OSTree"
-  - "CRDT operations" terminology
-  - "UUID-based" vs "ID-based"
+- [x] 3a: Ensure consistent terminology across all docs
+  - "Order Statistic Tree" vs "OSTree" → Standardized to "Order Statistic Tree" (no hyphen) with "OSTree" abbreviation
+  - "CRDT operations" terminology → Already consistent across docs
+  - "UUID-based" vs "ID-based" → Intentionally different: UUID-based for data model, ID-based for file format (8-char short IDs)
 
 - [ ] 3b: Update cross-references between docs
   - Fix any broken internal links
