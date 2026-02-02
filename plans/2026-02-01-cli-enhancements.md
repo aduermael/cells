@@ -27,7 +27,7 @@ Allow running a Luau script either from a file or inline. The script runs after 
 - [x] 2a: Add `script_file` and `script_inline` to `Options` struct
 - [x] 2b: Add `--script` and `-e` argument parsing in `main.cc`
 - [x] 2c: Add LuauSandbox integration in converter - Added `executeScript()` method that reads script from file or inline, executes in sandbox, and prints output.
-- [ ] 2d: Update help text with script examples
+- [x] 2d: Update help text with script examples
 - [ ] 2e: Add unit tests for script execution
 
 **Files:**
