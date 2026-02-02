@@ -1,6 +1,8 @@
 # Cells
 
-A modern spreadsheet engine—use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
+A modern spreadsheet engine! 
+
+Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
 
 **[Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
 
@@ -8,18 +10,20 @@ A modern spreadsheet engine—use it as a **browser-based alternative to Excel/G
 
 Cells is a spreadsheet engine that works two ways:
 
-1. **Web App** — A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
+1. **Web App:** A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
 
-   <img style="max-width:600px" src="./docs/img/demo.gif">
+   <img style="max-width:500px" src="./docs/img/demo.gif">
 
-2. **Headless CLI** — Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
+2. **Headless CLI:** Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
 
-	<img style="max-width:600px" src="./docs/img/cli.png">
+	<img style="max-width:500px" src="./docs/img/cli.png">
 
 Both share the same core engine, so formulas and files work identically across environments.
 
 **Key features:**
-- **Real-time collaboration** - Edit together with P2P sync (no server required for document data)
+
+- **Lightweight & Fast**
+- **Real-time collaboration** - Edit together with P2P sync
 - **Excel compatible** - Import and export .xlsx files seamlessly
 - **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
 - **Git-friendly** - Text-based file format that diffs cleanly
@@ -35,7 +39,7 @@ bazel run :serve
 # Open http://localhost:8081
 ```
 
-### CLI Tool
+### CLI Tool 
 
 ```bash
 # Build the CLI
@@ -73,9 +77,9 @@ cells -i budget.xlsx budget.csv --eval
 cells -i calculations.xlsx results.csv --eval
 ```
 
-#### Luau Scripting
+#### Scripting
 
-<img style="max-width:500px" src="./docs/img/scripting.png">
+<img style="max-width:400px" src="./docs/img/scripting.png">
 
 Run [Luau](https://luau.org) scripts to transform data, automate workflows, or analyze spreadsheets:
 
@@ -104,32 +108,32 @@ cells output.xlsx
 cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 ```
 
-## Architecture
+## Architecture 🏛️
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │              Web UI (TypeScript)                    │
-│         Canvas rendering, event handling           │
+│         Canvas rendering, event handling            │
 └─────────────────────────────────────────────────────┘
                         │ WASM
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │             Core Engine (C++17)                     │
-│    Data Model  │  Formulas  │  CRDT Operations     │
+│    Data Model  │  Formulas  │  CRDT Operations      │
 └─────────────────────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │              Persistence Layer                      │
-│   Native: .zcd  │  Import/Export: .xlsx, .csv      │
+│   Native: .zcd  │  Import/Export: .xlsx, .csv       │
 └─────────────────────────────────────────────────────┘
 ```
 
 The engine compiles to WebAssembly for the browser and native code for the CLI. All mutations go through CRDT operations, making collaboration a first-class feature rather than an afterthought.
 
-### Collaboration & ZCD Format
+### Collaboration & ZCD Format 📄
 
-Cells uses peer-to-peer sync via WebRTC - document data travels directly between browsers with no relay servers. Concurrent edits merge automatically using CRDTs.
+Cells uses peer-to-peer sync via WebRTC. Document data travels directly between clients with no relay servers. Concurrent edits merge automatically using CRDTs.
 
 The native `.zcd` format (Zero Conflict Document) is designed for this:
 
@@ -160,19 +164,19 @@ See [docs/persistence.md](./docs/persistence.md) for the full specification.
 
 For detailed architecture documentation, see [docs/](./docs/).
 
-## AI Agents
+## AI Agents 🤖
 
 A basic agent integration is available—provide an Anthropic API key and the agent can generate and execute Luau code to manipulate the spreadsheet.
 
-**Note:** The current implementation is a prototype. The planned architecture will have agents run in their own app instances, communicating via CRDT operations—just like human collaborators. This ensures consistent conflict-free collaboration whether edits come from humans or AI.
+> ⚠️ The current implementation is a prototype. The planned architecture will have agents run in their own app instances, communicating via CRDT operations—just like human collaborators. This ensures consistent conflict-free collaboration whether edits come from humans or AI.
 
-## Requirements
+## Requirements 📋
 
 - **Bazel** 7.0+
 - **C++17** compiler (Clang, GCC, or MSVC)
 - **Go 1.22+** (for development server; macOS 15+ requires 1.22)
 
-## Build Commands
+## Build Commands ⚙️
 
 ```bash
 # Build
@@ -190,7 +194,7 @@ bazel run :format           # Format code
 bazel run :check            # All checks (test + lint + types)
 ```
 
-## Documentation
+## Documentation 📚
 
 | Document | Description |
 |----------|-------------|
@@ -202,7 +206,7 @@ bazel run :check            # All checks (test + lint + types)
 | [Rendering](./docs/rendering.md) | Canvas rendering pipeline |
 | [Type System](./docs/type-system.md) | Optional column typing |
 
-## Project Stats
+## Project Stats 📈
 
 ### Source Code
 
