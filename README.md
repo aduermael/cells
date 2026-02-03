@@ -206,16 +206,16 @@ bazel run :check            # All checks (test + lint + types)
 | [Rendering](./docs/rendering.md) | Canvas rendering pipeline |
 | [Type System](./docs/type-system.md) | Optional column typing |
 
-## Project Stats 📈
+## Project Stats
 
 ### Source Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 45,474 |
-| TypeScript | 23,668 |
+| C++ | 45,661 |
+| TypeScript | 23,795 |
 | CSS | 2,706 |
-| Starlark | 1,947 |
+| Starlark | 1,953 |
 | JavaScript | 1,683 |
 | Go | 1,363 |
 | Shell | 1,168 |
@@ -226,7 +226,7 @@ bazel run :check            # All checks (test + lint + types)
 
 | Language | Lines |
 |----------|------:|
-| C++ | 43,220 |
+| C++ | 43,681 |
 | JavaScript | 13,978 |
 | Go | 315 |
 
@@ -234,22 +234,22 @@ bazel run :check            # All checks (test + lint + types)
 
 | Type | Lines |
 |------|------:|
-| Markdown | 19,522 |
-| Inline Comments | 19,459 |
+| Markdown | 19,762 |
+| Inline Comments | 19,579 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 3497 |
+| Unit (C++) | 3506 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
 | E2E (Puppeteer) | 391 |
-| **Total** | **3931** |
+| **Total** | **3940** |
 
-- **Commits**: 1552
+- **Commits**: 1577
 - **WASM Module**: 5.17 MB
-- **Total Web Bundle**: 7.26 MB
+- **Total Web Bundle**: 7.27 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
