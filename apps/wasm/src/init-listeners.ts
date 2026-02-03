@@ -166,6 +166,7 @@ export function setupDataListeners(config: DataListenersConfig): {
    * causing the grid to appear frozen during long inertial scrolls.
    */
   function fetchViewportNow(): void {
+    const callStart = performance.now();
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTime;
 
@@ -186,6 +187,11 @@ export function setupDataListeners(config: DataListenersConfig): {
       trailingFetchTimer = null;
       doFetchViewport();
     }, THROTTLE_INTERVAL_MS);
+
+    const elapsed = performance.now() - callStart;
+    if (elapsed > 1) {
+      console.debug(`[PERF] fetchViewportNow (sync portion): ${elapsed.toFixed(2)}ms`);
+    }
   }
 
   async function doFetchViewport(): Promise<void> {
@@ -196,9 +202,20 @@ export function setupDataListeners(config: DataListenersConfig): {
 
     fetchInFlight = true;
     lastFetchTime = Date.now();
+    const fetchStart = performance.now();
     try {
+      const wasmStart = performance.now();
       await fetchViewport();
+      const wasmElapsed = performance.now() - wasmStart;
+
+      const renderStart = performance.now();
       render();
+      const renderElapsed = performance.now() - renderStart;
+
+      const totalElapsed = performance.now() - fetchStart;
+      if (totalElapsed > 16) { // More than one frame
+        console.debug(`[PERF] doFetchViewport: total=${totalElapsed.toFixed(2)}ms, wasm=${wasmElapsed.toFixed(2)}ms, render=${renderElapsed.toFixed(2)}ms, scrollY=${app.scrollY.toFixed(0)}`);
+      }
     } finally {
       fetchInFlight = false;
     }

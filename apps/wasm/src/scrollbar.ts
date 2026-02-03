@@ -30,7 +30,10 @@ export interface ScrollbarCallbacks {
   getViewportHeight: () => number;
   getContentWidth: () => number;
   getContentHeight: () => number;
+  /** Called on scroll to fetch viewport data (normal scrolling) */
   onScroll: () => void;
+  /** Called during fast scrollbar drag to render without fetching new data */
+  onScrollPreview?: () => void;
 }
 
 /**
@@ -55,6 +58,10 @@ export class ScrollbarManager {
   private dragStartX = 0;
   private dragStartScrollY = 0;
   private dragStartScrollX = 0;
+
+  // RAF batching state for smooth scrollbar dragging
+  private rafPending = false;
+  private pendingMouseEvent: MouseEvent | null = null;
 
   // Bound event handlers for removal
   private boundMouseMove: (e: MouseEvent) => void;
@@ -151,6 +158,24 @@ export class ScrollbarManager {
   }
 
   private handleMouseMove(e: MouseEvent): void {
+    // Use RAF batching to coalesce rapid mousemove events during drag
+    // This prevents overwhelming the system with scroll updates
+    this.pendingMouseEvent = e;
+
+    if (!this.rafPending) {
+      this.rafPending = true;
+      requestAnimationFrame(() => {
+        this.rafPending = false;
+        if (this.pendingMouseEvent) {
+          this.processMouseMove(this.pendingMouseEvent);
+          this.pendingMouseEvent = null;
+        }
+      });
+    }
+  }
+
+  private processMouseMove(e: MouseEvent): void {
+    const startTime = performance.now();
     if (this.isDraggingVertical) {
       const trackHeight = this.verticalTrack.clientHeight;
       const thumbHeight = this.verticalThumb.clientHeight;
@@ -172,7 +197,14 @@ export class ScrollbarManager {
           const newScrollY = scrollRatio * maxScrollY;
           this.callbacks.setScrollY(newScrollY);
           this.updateVertical(); // Update thumb position visually
-          this.callbacks.onScroll();
+
+          // During drag, use lightweight preview callback if available
+          // This avoids expensive WASM fetches on every frame
+          if (this.callbacks.onScrollPreview) {
+            this.callbacks.onScrollPreview();
+          } else {
+            this.callbacks.onScroll();
+          }
         }
       }
     }
@@ -198,19 +230,39 @@ export class ScrollbarManager {
           const newScrollX = scrollRatio * maxScrollX;
           this.callbacks.setScrollX(newScrollX);
           this.updateHorizontal(); // Update thumb position visually
-          this.callbacks.onScroll();
+
+          // During drag, use lightweight preview callback if available
+          if (this.callbacks.onScrollPreview) {
+            this.callbacks.onScrollPreview();
+          } else {
+            this.callbacks.onScroll();
+          }
         }
       }
+    }
+    const elapsed = performance.now() - startTime;
+    if (elapsed > 5) {
+      console.debug(`[PERF] scrollbar processMouseMove: ${elapsed.toFixed(2)}ms`);
     }
   }
 
   private handleMouseUp(): void {
+    const wasDragging = this.isDraggingVertical || this.isDraggingHorizontal;
     this.isDraggingVertical = false;
     this.isDraggingHorizontal = false;
     this.verticalTrack.classList.remove("active");
     this.horizontalTrack.classList.remove("active");
     document.removeEventListener("mousemove", this.boundMouseMove);
     document.removeEventListener("mouseup", this.boundMouseUp);
+
+    // Clear any pending RAF callback
+    this.pendingMouseEvent = null;
+
+    // Trigger a full viewport fetch now that drag is complete
+    // This ensures we have accurate data for the final scroll position
+    if (wasDragging) {
+      this.callbacks.onScroll();
+    }
 
     // Refocus the active editor if we were editing before scrollbar drag
     // This restores the cursor to the formula bar or cell editor

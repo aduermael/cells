@@ -288,6 +288,22 @@ export function createComponents(config: ComponentsConfig): Components {
         render();
         fetchViewportNow();
       },
+      // Lightweight preview during fast scrollbar drag - renders with existing data
+      // without triggering expensive WASM viewport fetches
+      onScrollPreview: () => {
+        const zoomFactor = getZoomFactor();
+        const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight();
+        const logicalViewportHeight = scrollableScreenHeight / zoomFactor;
+        const actualRows = app.sheetInfo?.rowCount ?? 100;
+        app.discoveredRows = calculateDiscoveredRows(
+          app.scrollY,
+          logicalViewportHeight,
+          app.discoveredRows,
+          actualRows
+        );
+        // Only render - skip the viewport fetch for smooth scrolling
+        render();
+      },
     });
     app.scrollbarManager.setVisible(true);
   }

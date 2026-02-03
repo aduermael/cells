@@ -298,6 +298,7 @@ export class GridRenderer {
 
   /** Main render function - draws the entire grid */
   render(): void {
+    const renderStart = performance.now();
     if (!this.sheetInfo) return;
 
     const container = this.canvas.parentElement;
@@ -442,6 +443,11 @@ export class GridRenderer {
     ctx.moveTo(zoomedHeaderWidth + 0.5, 0);
     ctx.lineTo(zoomedHeaderWidth + 0.5, viewHeight);
     ctx.stroke();
+
+    const renderElapsed = performance.now() - renderStart;
+    if (renderElapsed > 16) { // More than one frame
+      console.debug(`[PERF] GridRenderer.render: ${renderElapsed.toFixed(2)}ms, cells=${this.cells.length}`);
+    }
   }
 
   /** Draw cell background colors */

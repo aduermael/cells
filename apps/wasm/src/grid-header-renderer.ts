@@ -105,8 +105,27 @@ export function getColumnHeaderText(
 }
 
 /**
+ * Compute column pixel offset efficiently in O(customCols) instead of O(col).
+ * Uses formula: offset = col * DEFAULT_COL_WIDTH + sum of width adjustments for custom cols < col
+ */
+function computeColOffsetFast(col: number, colWidths: Map<number, number>): number {
+  // Start with default width assumption for all columns
+  let offset = col * DEFAULT_COL_WIDTH;
+
+  // Add adjustments for custom column widths (only iterate custom cols, not all cols)
+  for (const [customCol, width] of colWidths) {
+    if (customCol < col) {
+      offset += width - DEFAULT_COL_WIDTH;
+    }
+  }
+
+  return offset;
+}
+
+/**
  * Get the visual X position for a column during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
+ * Falls back to O(customCols) calculation (NOT O(col)) when cache misses.
  * All positions are returned in zoomed pixels.
  */
 export function getDragAdjustedColX(
@@ -129,34 +148,35 @@ export function getDragAdjustedColX(
     if (cachedOffset !== undefined) {
       return zoomedHeaderWidth + Math.round(cachedOffset * zoomFactor) - zoomedScrollX;
     }
-    // Fallback: sum unzoomed widths first, then zoom the total
-    // This matches the cached calculation and avoids rounding accumulation errors
-    let offset = 0;
-    for (let i = 0; i < col; i++) {
-      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-    }
+    // Fallback: use O(customCols) calculation instead of O(col)
+    const offset = computeColOffsetFast(col, state.colWidths);
     return zoomedHeaderWidth + Math.round(offset * zoomFactor) - zoomedScrollX;
   }
 
-  // Dragging case - sum unzoomed widths then zoom to avoid rounding accumulation
+  // Dragging case - use O(customCols) calculation
   const sourceBaseW = state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH;
-  let offset = 0;
 
+  // Start with fast calculation excluding source column
+  let offset = computeColOffsetFast(col, state.colWidths);
+
+  // Adjust for the source column being moved
+  if (col > state.dragSourceIndex) {
+    // Source column is to our left, so we've overcounted by sourceBaseW
+    offset -= sourceBaseW;
+  }
+
+  // Add source column width at new position if applicable
   if (state.dragTargetIndex < state.dragSourceIndex) {
-    for (let i = 0; i < col; i++) {
-      if (i === state.dragSourceIndex) continue;
-      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-    }
+    // Moving left: insert source before target
     if (col >= state.dragTargetIndex && col !== state.dragSourceIndex) {
       offset += sourceBaseW;
     }
   } else {
-    for (let i = 0; i < col; i++) {
-      if (i === state.dragSourceIndex) continue;
-      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      if (i === state.dragTargetIndex - 1) {
-        offset += sourceBaseW;
-      }
+    // Moving right: insert source after target-1
+    if (col > state.dragSourceIndex && col <= state.dragTargetIndex - 1) {
+      // These columns shift left, no change needed
+    } else if (col >= state.dragTargetIndex && col !== state.dragSourceIndex) {
+      offset += sourceBaseW;
     }
   }
 
@@ -165,8 +185,27 @@ export function getDragAdjustedColX(
 }
 
 /**
+ * Compute row pixel offset efficiently in O(customRows) instead of O(row).
+ * Uses formula: offset = row * DEFAULT_ROW_HEIGHT + sum of height adjustments for custom rows < row
+ */
+function computeRowOffsetFast(row: number, rowHeights: Map<number, number>): number {
+  // Start with default height assumption for all rows
+  let offset = row * DEFAULT_ROW_HEIGHT;
+
+  // Add adjustments for custom row heights (only iterate custom rows, not all rows)
+  for (const [customRow, height] of rowHeights) {
+    if (customRow < row) {
+      offset += height - DEFAULT_ROW_HEIGHT;
+    }
+  }
+
+  return offset;
+}
+
+/**
  * Get the visual Y position for a row during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
+ * Falls back to O(customRows) calculation (NOT O(row)) when cache misses.
  * All positions are returned in zoomed pixels.
  */
 export function getDragAdjustedRowY(
@@ -189,34 +228,35 @@ export function getDragAdjustedRowY(
     if (cachedOffset !== undefined) {
       return zoomedHeaderHeight + Math.round(cachedOffset * zoomFactor) - zoomedScrollY;
     }
-    // Fallback: sum unzoomed heights first, then zoom the total
-    // This matches the cached calculation and avoids rounding accumulation errors
-    let offset = 0;
-    for (let i = 0; i < row; i++) {
-      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-    }
+    // Fallback: use O(customRows) calculation instead of O(row)
+    const offset = computeRowOffsetFast(row, state.rowHeights);
     return zoomedHeaderHeight + Math.round(offset * zoomFactor) - zoomedScrollY;
   }
 
-  // Dragging case - sum unzoomed heights then zoom to avoid rounding accumulation
+  // Dragging case - use O(customRows) calculation
   const sourceBaseH = state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
-  let offset = 0;
 
+  // Start with fast calculation excluding source row
+  let offset = computeRowOffsetFast(row, state.rowHeights);
+
+  // Adjust for the source row being moved
+  if (row > state.dragSourceIndex) {
+    // Source row is above us, so we've overcounted by sourceBaseH
+    offset -= sourceBaseH;
+  }
+
+  // Add source row width at new position if applicable
   if (state.dragTargetIndex < state.dragSourceIndex) {
-    for (let i = 0; i < row; i++) {
-      if (i === state.dragSourceIndex) continue;
-      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-    }
+    // Moving up: insert source before target
     if (row >= state.dragTargetIndex && row !== state.dragSourceIndex) {
       offset += sourceBaseH;
     }
   } else {
-    for (let i = 0; i < row; i++) {
-      if (i === state.dragSourceIndex) continue;
-      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      if (i === state.dragTargetIndex - 1) {
-        offset += sourceBaseH;
-      }
+    // Moving down: insert source after target-1
+    if (row > state.dragSourceIndex && row <= state.dragTargetIndex - 1) {
+      // These rows shift up, no change needed
+    } else if (row >= state.dragTargetIndex && row !== state.dragSourceIndex) {
+      offset += sourceBaseH;
     }
   }
 
