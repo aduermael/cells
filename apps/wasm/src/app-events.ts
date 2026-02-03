@@ -148,6 +148,10 @@ export interface AppEventManagerConfig {
     toggleAstDebugPanel: () => void;
     commitFormulaBarEdit: () => Promise<void>;
     updateScrollbars: () => void;
+
+    // Scroll coordination - check if scrollbar is being dragged
+    // to avoid triggering expensive data fetches from wheel events
+    isScrollbarDragging?: () => boolean;
 }
 
 // =============================================================================

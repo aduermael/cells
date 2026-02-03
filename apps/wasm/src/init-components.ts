@@ -1119,6 +1119,7 @@ export function createComponents(config: ComponentsConfig): Components {
     toggleAstDebugPanel: () => astDebugPanel.toggle(elements.formulaInput.value),
     commitFormulaBarEdit: () => formulaBarEditor.commitFormulaBarEdit(),
     updateScrollbars,
+    isScrollbarDragging: () => app.scrollbarManager?.isDragging() ?? false,
   });
 
   // =========================================================================

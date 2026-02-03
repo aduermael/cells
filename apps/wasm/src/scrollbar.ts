@@ -278,6 +278,15 @@ export class ScrollbarManager {
     this.focusManager = focusManager;
   }
 
+  /**
+   * Check if scrollbar is currently being dragged.
+   * Used to coordinate with other scroll sources (e.g., mouse wheel)
+   * to avoid triggering expensive data fetches during drag.
+   */
+  isDragging(): boolean {
+    return this.isDraggingVertical || this.isDraggingHorizontal;
+  }
+
   private scrollToVerticalPosition(e: MouseEvent): void {
     const rect = this.verticalTrack.getBoundingClientRect();
     const clickY = e.clientY - rect.top;

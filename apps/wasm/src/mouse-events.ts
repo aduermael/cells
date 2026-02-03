@@ -488,6 +488,7 @@ export class MouseEventHandlers {
             fetchViewportNow,
             updateScrollbars,
             canvas,
+            isScrollbarDragging,
         } = this.config;
 
         const sheetInfo = getSheetInfo();
@@ -558,7 +559,13 @@ export class MouseEventHandlers {
         setScrollY(Math.max(0, Math.min(maxScrollY, newScrollY)));
 
         render();
-        fetchViewportNow();
+        // Skip expensive WASM data fetch if scrollbar is being dragged.
+        // The scrollbar drag handler uses lightweight preview mode, and wheel
+        // events should respect that to avoid triggering fetch storms on large files.
+        // The scrollbar's mouseup handler will trigger a final fetch when drag ends.
+        if (!isScrollbarDragging?.()) {
+            fetchViewportNow();
+        }
         updateScrollbars();
     }
 
