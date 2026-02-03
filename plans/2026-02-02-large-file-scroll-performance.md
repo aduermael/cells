@@ -68,6 +68,21 @@ Reduce event frequency and work per event during thumb drag.
 - On mouseup, always calls `onScroll` to fetch viewport data for final position
 - `init-components.ts:initScrollbars()` provides both callbacks
 
+### Phase 2.5: Mouse Wheel Inertia Optimization
+
+Reduce event frequency during mouse wheel scrolling with inertia (trackpad momentum scrolling).
+
+- [x] 2.5a: Add requestAnimationFrame batching to wheel events
+- [x] 2.5b: Accumulate wheel deltas across batched events
+- [x] 2.5c: Process once per frame instead of per event
+
+**Implementation:**
+- Added RAF batching in `mouse-events.ts:handleWheel()` - accumulates deltas and processes once per frame
+- Added `pendingWheelDeltaX`, `pendingWheelDeltaY`, `wheelRafPending` state variables
+- `handleWheel()` now only accumulates deltas and schedules RAF callback
+- `processWheel()` processes accumulated deltas, then calls render/fetch/updateScrollbars
+- This coalesces dozens of inertia events per second into ~60 frame updates
+
 ### Phase 3: Viewport Fetch Optimization for Large Positions
 
 Optimize the specific case of jumping to far positions in large files.
@@ -97,10 +112,18 @@ previously fetched (even if it's stale for the current position).
 
 Secondary improvement for better CSV import experience.
 
-- [ ] 5a: Add `detectDelimiter()` function to csv_reader.cc - sample first few lines
-- [ ] 5b: Check frequency of comma, semicolon, tab in first 1000 characters
-- [ ] 5c: Auto-set delimiter in CSVReadOptions if not explicitly specified
-- [ ] 5d: Add tests for semicolon and tab-delimited files
+- [x] 5a: Add `detectDelimiter()` function to csv_reader.cc - sample first few lines
+- [x] 5b: Check frequency of comma, semicolon, tab in first 1000 characters
+- [x] 5c: Auto-set delimiter in CSVReadOptions if not explicitly specified
+- [x] 5d: Add tests for semicolon and tab-delimited files
+
+**Implementation:**
+- Added `autoDetectDelimiter` option to `CSVReadOptions` (default: true)
+- Added `CSVReader::detectDelimiter()` static method that samples first 1000 characters
+- Detection counts comma, semicolon, and tab occurrences outside quoted fields
+- Returns delimiter with highest count (defaults to comma if no delimiters found)
+- Auto-detection runs in `read()` when `autoDetectDelimiter` is enabled
+- Added 9 new tests covering detection for comma, semicolon, tab, quoted fields, BOM handling
 
 ### Phase 6: Validation
 

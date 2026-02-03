@@ -97,6 +97,11 @@ export class MouseEventHandlers {
     /** Formula range drag state for move/resize operations */
     protected formulaRangeDragState: FormulaRangeDragState | null = null;
 
+    /** RAF batching for wheel events to coalesce rapid scroll events */
+    protected pendingWheelDeltaX = 0;
+    protected pendingWheelDeltaY = 0;
+    protected wheelRafPending = false;
+
     constructor(config: AppEventManagerConfig) {
         this.config = config;
     }
@@ -446,6 +451,31 @@ export class MouseEventHandlers {
     // =========================================================================
 
     handleWheel(e: WheelEvent): void {
+        const { getSheetInfo } = this.config;
+        const sheetInfo = getSheetInfo();
+        if (!sheetInfo) return;
+        e.preventDefault();
+
+        // Get zoom factor for coordinate conversion
+        const zoomFactor = getZoomFactor();
+
+        // Accumulate wheel deltas (converted to logical pixels)
+        this.pendingWheelDeltaX += e.deltaX / zoomFactor;
+        this.pendingWheelDeltaY += e.deltaY / zoomFactor;
+
+        // Use RAF batching to coalesce rapid wheel events (e.g., inertia scrolling)
+        // This prevents overwhelming the system with scroll updates
+        if (!this.wheelRafPending) {
+            this.wheelRafPending = true;
+            requestAnimationFrame(() => {
+                this.wheelRafPending = false;
+                this.processWheel();
+            });
+        }
+    }
+
+    /** Process accumulated wheel deltas - called once per animation frame */
+    protected processWheel(): void {
         const {
             getSheetInfo,
             getScrollX,
@@ -462,7 +492,12 @@ export class MouseEventHandlers {
 
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
-        e.preventDefault();
+
+        // Get accumulated deltas and reset
+        const logicalDeltaX = this.pendingWheelDeltaX;
+        const logicalDeltaY = this.pendingWheelDeltaY;
+        this.pendingWheelDeltaX = 0;
+        this.pendingWheelDeltaY = 0;
 
         // Get zoom factor for coordinate conversion
         const zoomFactor = getZoomFactor();
@@ -485,10 +520,6 @@ export class MouseEventHandlers {
             0,
             contentWidth - logicalViewportWidth,
         );
-
-        // Convert wheel delta from screen pixels to logical pixels
-        const logicalDeltaX = e.deltaX / zoomFactor;
-        const logicalDeltaY = e.deltaY / zoomFactor;
 
         const newScrollY = getScrollY() + logicalDeltaY;
 
