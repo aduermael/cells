@@ -30,6 +30,7 @@
 #ifndef CELLS_CSV_READER_H_
 #define CELLS_CSV_READER_H_
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -39,11 +40,18 @@
 
 namespace cells {
 
+// Progress callback for CSV parsing
+// Parameters: cellsLoaded (current count), totalEstimate (0 if unknown)
+using CSVProgressCallback = std::function<void(size_t cellsLoaded, size_t totalEstimate)>;
+
 // Options for CSV parsing
 struct CSVReadOptions {
-    char delimiter{','};         // Field delimiter (comma, tab, semicolon, etc.)
-    bool hasHeader{true};        // First row is header (used for column names)
-    bool autoDetectTypes{true};  // Auto-detect numeric vs string values
+    char delimiter{','};             // Field delimiter (comma, tab, semicolon, etc.)
+    bool hasHeader{true};            // First row is header (used for column names)
+    bool autoDetectTypes{true};      // Auto-detect numeric vs string values
+    bool autoDetectDelimiter{true};  // Auto-detect delimiter from content
+    CSVProgressCallback progressCallback{};  // Optional progress callback
+    size_t progressInterval{500};            // Call progress callback every N cells
 
     CSVReadOptions() = default;
 };
@@ -125,6 +133,11 @@ private:
 
     // Check if string looks like a boolean
     static bool looksLikeBoolean(const std::string& s);
+
+public:
+    // Detect the most likely delimiter from content
+    // Analyzes the first ~1000 characters to find comma, semicolon, or tab
+    static char detectDelimiter(std::string_view content);
 };
 
 // Convenience functions for one-shot parsing

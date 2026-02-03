@@ -465,5 +465,95 @@ TEST(SampleCSVFileTest, ParseBOMCSV) {
     EXPECT_EQ(firstCol->name, "Name");
 }
 
+// --- Delimiter Auto-Detection Tests ---
+
+TEST(CSVDelimiterDetectionTest, DetectCommaDelimiter) {
+    const std::string csv = "A,B,C\n1,2,3\n4,5,6\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(csv);
+    EXPECT_EQ(detected, ',');
+}
+
+TEST(CSVDelimiterDetectionTest, DetectSemicolonDelimiter) {
+    const std::string csv = "A;B;C\n1;2;3\n4;5;6\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(csv);
+    EXPECT_EQ(detected, ';');
+}
+
+TEST(CSVDelimiterDetectionTest, DetectTabDelimiter) {
+    const std::string tsv = "A\tB\tC\n1\t2\t3\n4\t5\t6\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(tsv);
+    EXPECT_EQ(detected, '\t');
+}
+
+TEST(CSVDelimiterDetectionTest, IgnoreDelimitersInQuotedFields) {
+    // Commas inside quotes shouldn't count toward comma delimiter detection
+    // The semicolons outside quotes should determine the delimiter
+    const std::string csv = "Name;Description\n\"Hello, World\";Test\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(csv);
+    EXPECT_EQ(detected, ';');
+}
+
+TEST(CSVDelimiterDetectionTest, AutoDetectSemicolonOnParse) {
+    // Test that auto-detection works during parsing
+    const std::string csv = "A;B;C\n1;2;3\n";
+    CSVReadResult result = readCSV(csv);  // Default options have autoDetectDelimiter=true
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    EXPECT_EQ(sheet->columnCount(), 3u);  // Should detect 3 columns, not 1
+    EXPECT_EQ(sheet->rowCount(), 1u);
+}
+
+TEST(CSVDelimiterDetectionTest, AutoDetectTabOnParse) {
+    // Test that auto-detection works for tab-delimited files
+    const std::string tsv = "Name\tAge\tCity\nAlice\t30\tNYC\n";
+    CSVReadResult result = readCSV(tsv);  // Default options have autoDetectDelimiter=true
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    EXPECT_EQ(sheet->columnCount(), 3u);
+    EXPECT_EQ(sheet->rowCount(), 1u);
+}
+
+TEST(CSVDelimiterDetectionTest, DisableAutoDetection) {
+    // When autoDetectDelimiter is false, use the specified delimiter
+    const std::string csv = "A;B;C\n1;2;3\n";
+    CSVReadOptions options;
+    options.autoDetectDelimiter = false;
+    options.delimiter = ',';  // Use comma even though data has semicolons
+
+    CSVReadResult result = readCSV(csv, options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    // Since we're using comma delimiter on semicolon data, we get 1 column
+    EXPECT_EQ(sheet->columnCount(), 1u);
+}
+
+TEST(CSVDelimiterDetectionTest, DetectWithBOM) {
+    // Test that BOM doesn't interfere with delimiter detection
+    const std::string csv =
+        "\xEF\xBB\xBF"
+        "A;B;C\n1;2;3\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(csv);
+    EXPECT_EQ(detected, ';');
+}
+
+TEST(CSVDelimiterDetectionTest, DefaultToCommaWhenNoDelimiters) {
+    // Single column data should default to comma
+    const std::string csv = "Value\n1\n2\n3\n";
+    CSVReader reader;
+    char detected = reader.detectDelimiter(csv);
+    EXPECT_EQ(detected, ',');
+}
+
 }  // namespace
 }  // namespace cells

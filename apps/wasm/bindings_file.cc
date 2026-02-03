@@ -92,8 +92,21 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
 
 std::string CellsEngine::loadFromCSV(const std::string& content, char delimiter, bool hasHeader) {
     CSVReadOptions opts;
-    opts.delimiter = delimiter;
     opts.hasHeader = hasHeader;
+    if (delimiter == '\0') {
+        // Auto-detect delimiter when '\0' is passed
+        opts.autoDetectDelimiter = true;
+    } else {
+        // Use explicitly specified delimiter
+        opts.autoDetectDelimiter = false;
+        opts.delimiter = delimiter;
+    }
+
+    // Set up progress callback
+    opts.progressCallback = [this](size_t cellsLoaded, size_t totalEstimate) {
+        notifyLoadProgress(cellsLoaded, totalEstimate);
+    };
+
     auto result = readCSV(content, opts);
     if (!result.ok()) {
         return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";

@@ -51,13 +51,24 @@ export function handleLoad(
                 : new TextDecoder().decode(data as ArrayBuffer);
         result = JSON.parse(engine.loadFromCells(content)) as JsonResult;
     } else if (format === "csv") {
-        // data is ArrayBuffer, delimiter defaults to comma
-        const content = new TextDecoder().decode(data as ArrayBuffer);
-        const delimiter = (params.delimiter as string) || ",";
+        // data is ArrayBuffer, delimiter auto-detected if not specified
+        // Use UTF-8 with fatal: false to handle encoding issues gracefully
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        const content = decoder.decode(data as ArrayBuffer);
+        // Use 0 (null char) to signal auto-detection when no delimiter specified
+        const delimiterCode = params.delimiter
+            ? (params.delimiter as string).charCodeAt(0)
+            : 0;
         const hasHeader = params.hasHeader !== false;
-        result = JSON.parse(
-            engine.loadFromCSV(content, delimiter.charCodeAt(0), hasHeader),
-        ) as JsonResult;
+        try {
+            const jsonResult = engine.loadFromCSV(content, delimiterCode, hasHeader);
+            result = JSON.parse(jsonResult) as JsonResult;
+        } catch (e) {
+            // Provide detailed error info for debugging
+            const err = e instanceof Error ? e.message : String(e);
+            respond({ type: "error", error: `CSV load failed: ${err}` });
+            return;
+        }
     } else if (format === "xlsx") {
         // data is ArrayBuffer - copy directly to WASM heap to avoid UTF-8 encoding issues
         const bytes = new Uint8Array(data as ArrayBuffer);

@@ -80,6 +80,52 @@ bool CSVReader::looksLikeBoolean(const std::string& s) {
     return lower == "true" || lower == "false";
 }
 
+char CSVReader::detectDelimiter(std::string_view content) {
+    // Skip BOM if present
+    content = skipBOM(content);
+
+    // Sample the first ~1000 characters (or less if content is shorter)
+    constexpr size_t SAMPLE_SIZE = 1000;
+    const std::string_view sample = content.substr(0, std::min(content.size(), SAMPLE_SIZE));
+
+    // Count occurrences of potential delimiters outside of quoted fields
+    int commaCount = 0;
+    int semicolonCount = 0;
+    int tabCount = 0;
+
+    bool inQuote = false;
+    for (size_t i = 0; i < sample.size(); ++i) {
+        char const c = sample[i];
+
+        if (c == '"') {
+            // Handle escaped quotes ("") inside quoted fields
+            if (inQuote && i + 1 < sample.size() && sample[i + 1] == '"') {
+                ++i;  // Skip the escaped quote
+            } else {
+                inQuote = !inQuote;
+            }
+        } else if (!inQuote) {
+            if (c == ',') {
+                ++commaCount;
+            } else if (c == ';') {
+                ++semicolonCount;
+            } else if (c == '\t') {
+                ++tabCount;
+            }
+        }
+    }
+
+    // Return the delimiter with the highest count
+    // Default to comma if no delimiters found or all equal
+    if (semicolonCount > commaCount && semicolonCount >= tabCount) {
+        return ';';
+    }
+    if (tabCount > commaCount && tabCount > semicolonCount) {
+        return '\t';
+    }
+    return ',';  // Default to comma
+}
+
 CellValue CSVReader::detectValue(const std::string& raw, bool autoDetect) {
     if (!autoDetect || raw.empty()) {
         return CellValue(raw);
@@ -195,6 +241,11 @@ CSVReadResult CSVReader::read(std::string_view content) {
     reset();
     CSVReadResult result;
 
+    // Auto-detect delimiter if enabled
+    if (options_.autoDetectDelimiter) {
+        options_.delimiter = detectDelimiter(content);
+    }
+
     // Skip BOM if present
     content = skipBOM(content);
 
@@ -287,6 +338,8 @@ CSVReadResult CSVReader::read(std::string_view content) {
     }
 
     // Create cells
+    size_t cellsLoaded = 0;
+    size_t const totalEstimate = numRows * numCols;  // Upper bound estimate
     for (size_t r = 0; r < numRows; r++) {
         const auto& record = records[startRow + r];
         for (size_t c = 0; c < record.size(); c++) {
@@ -300,7 +353,18 @@ CSVReadResult CSVReader::read(std::string_view content) {
             auto cell = std::make_unique<Cell>(generate_id(), colIds[c], rowIds[r]);
             cell->value = detectValue(fieldValue, options_.autoDetectTypes);
             sheet->addCell(std::move(cell));
+            ++cellsLoaded;
+
+            // Call progress callback periodically
+            if (options_.progressCallback && cellsLoaded % options_.progressInterval == 0) {
+                options_.progressCallback(cellsLoaded, totalEstimate);
+            }
         }
+    }
+
+    // Final progress callback
+    if (options_.progressCallback) {
+        options_.progressCallback(cellsLoaded, cellsLoaded);
     }
 
     workbook->addSheet(std::move(sheet));
