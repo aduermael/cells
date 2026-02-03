@@ -31,6 +31,55 @@ import type {
 type RespondFn = (response: WorkerResponse, transfer?: Transferable[]) => void;
 
 // ============================================================================
+// Encoding Detection
+// ============================================================================
+
+/**
+ * Decode an ArrayBuffer with automatic encoding detection.
+ * Strategy:
+ * 1. Check for UTF-8 BOM - if present, decode as UTF-8
+ * 2. Try UTF-8 with fatal=true - if it works without errors, use UTF-8
+ * 3. Check if UTF-8 decoded content has replacement characters (U+FFFD)
+ * 4. Fall back to Windows-1252 (superset of ISO-8859-1, common for European files)
+ */
+function decodeWithEncodingDetection(data: ArrayBuffer): string {
+    const bytes = new Uint8Array(data);
+
+    // Check for UTF-8 BOM (EF BB BF)
+    const hasUtf8Bom = bytes.length >= 3 &&
+        bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+
+    if (hasUtf8Bom) {
+        // Has UTF-8 BOM, definitely UTF-8
+        return new TextDecoder("utf-8").decode(data);
+    }
+
+    // Try UTF-8 with fatal mode to detect if it's valid UTF-8
+    try {
+        const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+        const decoded = utf8Decoder.decode(data);
+
+        // Additional check: if decoding succeeded but contains replacement chars,
+        // the file might have been saved with mixed encoding
+        if (!decoded.includes("\uFFFD")) {
+            return decoded;
+        }
+    } catch {
+        // UTF-8 decoding failed, fall through to fallback encoding
+    }
+
+    // Fall back to Windows-1252 (superset of ISO-8859-1)
+    // This is the most common encoding for European CSV files from Excel
+    try {
+        const win1252Decoder = new TextDecoder("windows-1252", { fatal: false });
+        return win1252Decoder.decode(data);
+    } catch {
+        // If Windows-1252 is not supported (unlikely), fall back to UTF-8 lossy
+        return new TextDecoder("utf-8", { fatal: false }).decode(data);
+    }
+}
+
+// ============================================================================
 // File Operations
 // ============================================================================
 
@@ -52,9 +101,8 @@ export function handleLoad(
         result = JSON.parse(engine.loadFromCells(content)) as JsonResult;
     } else if (format === "csv") {
         // data is ArrayBuffer, delimiter auto-detected if not specified
-        // Use UTF-8 with fatal: false to handle encoding issues gracefully
-        const decoder = new TextDecoder("utf-8", { fatal: false });
-        const content = decoder.decode(data as ArrayBuffer);
+        // Auto-detect encoding: try UTF-8 first, fall back to Windows-1252
+        const content = decodeWithEncodingDetection(data as ArrayBuffer);
         // Use 0 (null char) to signal auto-detection when no delimiter specified
         const delimiterCode = params.delimiter
             ? (params.delimiter as string).charCodeAt(0)
