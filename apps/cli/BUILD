@@ -4,6 +4,7 @@ config_setting(
     constraint_values = ["@platforms//os:macos"],
 )
 
+# Full CLI binary with sync support (requires OpenSSL/libdatachannel)
 cc_binary(
     name = "cells",
     srcs = [
@@ -37,6 +38,34 @@ cc_binary(
         "//core/cells:xlsx_writer",
         "//core/net:sync_client",
         "//core/net:url",
+    ],
+)
+
+# Converter-only CLI binary (no sync/network support)
+# This target avoids OpenSSL/libdatachannel dependencies, making it easier to
+# build on platforms where Bazel's rules_perl doesn't work (e.g., Alpine/musl)
+cc_binary(
+    name = "cells-converter",
+    srcs = [
+        "converter.cc",
+        "converter.h",
+        "main.cc",
+        "options.h",
+        "sync_command.h",
+        "sync_command_stub.cc",
+    ],
+    deps = [
+        "//core/cells:csv_reader",
+        "//core/cells:csv_writer",
+        "//core/cells:formula_eval",
+        "//core/cells:formula_recalc",
+        "//core/cells:id",
+        "//core/cells:luau_sandbox",
+        "//core/cells:model",
+        "//core/cells:parser",
+        "//core/cells:serializer",
+        "//core/cells:xlsx_reader",
+        "//core/cells:xlsx_writer",
     ],
 )
 

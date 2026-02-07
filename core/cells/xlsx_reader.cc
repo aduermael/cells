@@ -1,5 +1,6 @@
 #include "core/cells/xlsx_reader.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>

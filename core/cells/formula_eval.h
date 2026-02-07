@@ -29,6 +29,7 @@
 #define CELLS_FORMULA_EVAL_H_
 
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 

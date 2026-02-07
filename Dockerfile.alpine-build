@@ -1,0 +1,48 @@
+# Alpine Linux build container for Cells CLI
+# Builds native musl-linked CLI binary using Bazel
+FROM alpine:edge
+
+# Install Bazel from Alpine testing repository and build tools
+RUN apk add --no-cache \
+    # Bazel from testing repo (native musl build)
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing \
+    bazel8 \
+    # Bazel requirements
+    openjdk21-jdk \
+    bash \
+    curl \
+    zip \
+    unzip \
+    # C++ build tools
+    build-base \
+    g++ \
+    gcc \
+    musl-dev \
+    linux-headers \
+    # Git for fetching dependencies
+    git \
+    # Python for Bazel
+    python3 \
+    # Perl for OpenSSL assembly generation
+    perl \
+    # OpenSSL development headers (for libdatachannel)
+    openssl-dev \
+    # CMake and make for foreign_cc rules
+    cmake \
+    make \
+    ninja
+
+# Set JAVA_HOME for Bazel
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+
+# Create build user (avoid running as root)
+RUN adduser -D -h /build builder
+USER builder
+WORKDIR /build
+
+# Copy source code
+COPY --chown=builder:builder . /build
+
+# Build the converter-only CLI binary with optimizations
+# The cells-converter target avoids OpenSSL/libdatachannel dependencies
+CMD ["bazel", "build", "-c", "opt", "//apps/cli:cells-converter"]
