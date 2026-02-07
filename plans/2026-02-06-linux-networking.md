@@ -14,12 +14,12 @@ WebRTC (RTCPeerConnection, RTCDataChannel) already works on Linux via libdatacha
 ## Phase 1: HTTP Implementation with libcurl
 
 - [x] 1a: Add libcurl as a Bazel dependency (http_archive or system library) - Added `curl` 8.11.0.bcr.4 from BCR
-- [ ] 1b: Create `core/net/native/HttpRequest_curl.cc` implementing the HttpRequest interface
+- [x] 1b: Create `core/net/native/HttpRequest_curl.cc` implementing the HttpRequest interface
   - Implement `_sendAsync()` for regular requests
   - Implement `_sendAsyncStreaming()` for streaming responses
   - Implement `_cancel()` for request cancellation
   - Handle headers, body, and response codes
-- [ ] 1c: Update `core/net/BUILD` to use curl implementation on Linux
+- [x] 1c: Update `core/net/BUILD` to use curl implementation on Linux
   - Add config_setting for Linux if not present
   - Update http_request deps select() to use curl on Linux
 

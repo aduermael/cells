@@ -22,6 +22,11 @@ config_setting(
     constraint_values = ["@platforms//os:ios"],
 )
 
+config_setting(
+    name = "is_linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
 # =============================================================================
 # Apple platform implementations (Objective-C++)
 # These objc_library targets compile .mm files and are only used on Apple platforms.
@@ -78,6 +83,21 @@ cc_library(
         "@libdatachannel",
         "@openssl//:ssl",     # libdatachannel links against OpenSSL
         "@openssl//:crypto",  # libdatachannel links against libcrypto
+    ],
+)
+
+# HTTP request using libcurl (Linux/native platforms)
+cc_library(
+    name = "http_request_curl",
+    srcs = ["native/HttpRequest_curl.cc"],
+    hdrs = ["include/HttpRequest.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    deps = [
+        ":http_request_common",
+        ":http_response",
+        ":url",
+        "@curl",
     ],
 )
 
@@ -155,6 +175,7 @@ cc_library(
         "@platforms//os:emscripten": [":http_request_web"],
         ":is_macos": [":http_request_apple"],
         ":is_ios": [":http_request_apple"],
+        ":is_linux": [":http_request_curl"],
         "//conditions:default": [":http_request_default"],
     }),
 )
