@@ -101,6 +101,23 @@ cc_library(
     ],
 )
 
+# WebSocket connection using libdatachannel (Linux/native platforms)
+cc_library(
+    name = "ws_connection_libdc",
+    srcs = ["native/WSConnection_libdc.cc"],
+    hdrs = ["include/WSConnection.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    deps = [
+        ":connection",
+        ":url",
+        ":ws_connection_common",
+        "@libdatachannel",
+        "@openssl//:ssl",
+        "@openssl//:crypto",
+    ],
+)
+
 # RTCPeerConnection using libdatachannel (native platforms)
 cc_library(
     name = "rtc_peer_connection_libdc",
@@ -241,6 +258,7 @@ cc_library(
         "@platforms//os:emscripten": [":ws_connection_web"],
         ":is_macos": [":ws_connection_apple"],
         ":is_ios": [":ws_connection_apple"],
+        ":is_linux": [":ws_connection_libdc"],
         "//conditions:default": [":ws_connection_default"],
     }),
 )

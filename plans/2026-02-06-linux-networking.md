@@ -25,13 +25,13 @@ WebRTC (RTCPeerConnection, RTCDataChannel) already works on Linux via libdatacha
 
 ## Phase 2: WebSocket Implementation
 
-- [ ] 2a: Evaluate and add WebSocket library (libwebsockets, websocketpp, or Boost.Beast)
-- [ ] 2b: Create `core/net/native/WSConnection_<lib>.cc` implementing the WSConnection interface
+- [x] 2a: Evaluate and add WebSocket library - Using libdatachannel which is already a dependency (for WebRTC). It includes WebSocket support via `rtc::WebSocket`.
+- [x] 2b: Create `core/net/native/WSConnection_libdc.cc` implementing the WSConnection interface
   - Implement `_connect()` for establishing connection
   - Implement `send()` for sending messages
   - Implement `close()` for graceful disconnect
   - Handle `onOpen`, `onMessage`, `onError`, `onClose` callbacks
-- [ ] 2c: Update `core/net/BUILD` to use WebSocket implementation on Linux
+- [x] 2c: Update `core/net/BUILD` to use WebSocket implementation on Linux - Added `ws_connection_libdc` target and updated select() to use it on Linux
 
 ## Phase 3: Integration and Testing
 
