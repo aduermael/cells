@@ -36,7 +36,7 @@ WebRTC (RTCPeerConnection, RTCDataChannel) already works on Linux via libdatacha
 ## Phase 3: Integration and Testing
 
 - [x] 3a: Build and test on Linux (glibc) - Successfully built using Docker with Debian testing (trixie). Fixed several Linux-specific issues: missing `<cstddef>` in oplog.cc, missing `<cstring>` in libdatachannel implementations, `std::byte` to `uint8_t` conversion, and `alwayslink` for ws_connection_libdc linking.
-- [ ] 3b: Verify sync command works end-to-end on Linux
+- [x] 3b: Verify sync command works end-to-end on Linux - Created `scripts/linux-sync-test.sh` which builds the CLI, starts a signaling server, and verifies the CLI can connect and reach ONLINE state. Test passes: WebSocket connects, WebRTC signaling works.
 - [ ] 3c: (Optional) Evaluate Alpine/musl compatibility
 
 ## Technical Notes

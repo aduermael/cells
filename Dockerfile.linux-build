@@ -50,4 +50,6 @@ WORKDIR /build
 COPY --chown=builder:builder . /build
 
 # Build the full CLI binary with networking/sync support
-CMD ["bazel", "build", "-c", "opt", "//apps/cli:cells"]
+# The build happens at runtime (docker run) to avoid issues with Docker layer caching
+# and to leverage Bazel's own caching in the container
+CMD ["sh", "-c", "bazel build -c opt //apps/cli:cells && mkdir -p /build/bin && cp bazel-bin/apps/cli/cells /build/bin/cells && echo 'Build complete! Binary at /build/bin/cells'"]
