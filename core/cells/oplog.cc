@@ -1,5 +1,7 @@
 #include "core/cells/oplog.h"
 
+#include <cstddef>
+
 #include <algorithm>
 
 namespace cells {

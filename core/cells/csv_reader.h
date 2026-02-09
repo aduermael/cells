@@ -46,10 +46,10 @@ using CSVProgressCallback = std::function<void(size_t cellsLoaded, size_t totalE
 
 // Options for CSV parsing
 struct CSVReadOptions {
-    char delimiter{','};             // Field delimiter (comma, tab, semicolon, etc.)
-    bool hasHeader{true};            // First row is header (used for column names)
-    bool autoDetectTypes{true};      // Auto-detect numeric vs string values
-    bool autoDetectDelimiter{true};  // Auto-detect delimiter from content
+    char delimiter{','};                     // Field delimiter (comma, tab, semicolon, etc.)
+    bool hasHeader{true};                    // First row is header (used for column names)
+    bool autoDetectTypes{true};              // Auto-detect numeric vs string values
+    bool autoDetectDelimiter{true};          // Auto-detect delimiter from content
     CSVProgressCallback progressCallback{};  // Optional progress callback
     size_t progressInterval{500};            // Call progress callback every N cells
 

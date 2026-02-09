@@ -3,6 +3,8 @@
 
 #if !defined(__EMSCRIPTEN__)
 
+#include <cstring>
+
 #include <memory>
 #include <rtc/rtc.hpp>
 #include <string>

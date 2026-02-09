@@ -106,6 +106,9 @@ cc_library(
     name = "ws_connection_libdc",
     srcs = ["native/WSConnection_libdc.cc"],
     hdrs = ["include/WSConnection.h"],
+    # alwayslink needed because WSConnection::make(url) calls WSConnection::make(scheme, host, port, path)
+    # which is defined here but not directly referenced from other translation units
+    alwayslink = True,
     copts = ["-std=c++17"],
     includes = ["."],
     deps = [

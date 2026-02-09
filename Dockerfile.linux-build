@@ -1,0 +1,53 @@
+# Linux (glibc) build container for Cells CLI with networking
+# Builds full CLI binary with sync/networking support using Bazel
+# Using Debian testing (trixie) for newer glibc required by rules_foreign_cc tooling
+FROM debian:trixie
+
+# Install Bazel and build dependencies
+RUN apt-get update && apt-get install -y \
+    # Bazelisk (manages Bazel versions)
+    curl \
+    unzip \
+    # JDK for Bazel
+    openjdk-21-jdk-headless \
+    # C++ build tools
+    build-essential \
+    g++ \
+    gcc \
+    # Git for fetching dependencies
+    git \
+    # Python for Bazel
+    python3 \
+    # Perl for OpenSSL assembly generation
+    perl \
+    # CMake and ninja for foreign_cc rules
+    cmake \
+    ninja-build \
+    # OpenSSL development headers
+    libssl-dev \
+    # ca-certificates for HTTPS
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bazelisk (wrapper that downloads correct Bazel version)
+# Detect architecture and download appropriate binary
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        BAZELISK_ARCH="arm64"; \
+    else \
+        BAZELISK_ARCH="amd64"; \
+    fi && \
+    curl -L -o /usr/local/bin/bazel \
+    https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-${BAZELISK_ARCH} \
+    && chmod +x /usr/local/bin/bazel
+
+# Create build user (avoid running as root)
+RUN useradd -m -d /build builder
+USER builder
+WORKDIR /build
+
+# Copy source code
+COPY --chown=builder:builder . /build
+
+# Build the full CLI binary with networking/sync support
+CMD ["bazel", "build", "-c", "opt", "//apps/cli:cells"]

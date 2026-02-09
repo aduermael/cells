@@ -4,6 +4,8 @@
 
 #if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
 
+#include <cstring>
+
 #include <memory>
 #include <mutex>
 #include <rtc/rtc.hpp>
@@ -49,7 +51,10 @@ protected:
                 payload = Payload(std::get<rtc::string>(data));
             } else {
                 const auto& binary = std::get<rtc::binary>(data);
-                std::vector<uint8_t> bytes(binary.begin(), binary.end());
+                // Use reinterpret_cast for std::byte -> uint8_t conversion
+                std::vector<uint8_t> bytes(
+                    reinterpret_cast<const uint8_t*>(binary.data()),
+                    reinterpret_cast<const uint8_t*>(binary.data()) + binary.size());
                 payload = Payload(std::move(bytes));
             }
             self->onMessage(payload);
