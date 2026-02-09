@@ -1,15 +1,15 @@
-# Linux Networking Implementation
+# Linux Networking Implementation ✅
 
 Implement HTTP and WebSocket support for Linux/native platforms.
+
+**Status: Complete.** HTTP (libcurl) and WebSocket (libdatachannel) are working on Linux/glibc. End-to-end sync verified. Alpine/musl networking not feasible due to `rules_perl` glibc dependency.
 
 ## Background
 
 The networking abstraction in `/core/net/` has platform-specific implementations:
 - **Emscripten**: Uses browser APIs (`emscripten_fetch`, native WebSocket)
 - **Apple (iOS/macOS)**: Uses `NSURLSession` and `NSURLSessionWebSocketTask`
-- **Linux/Native**: Currently uses stubs that return errors
-
-WebRTC (RTCPeerConnection, RTCDataChannel) already works on Linux via libdatachannel. The missing pieces are HTTP and WebSocket, which are needed for the sync feature to work on Linux.
+- **Linux/Native**: HTTP via libcurl, WebSocket/WebRTC via libdatachannel
 
 ## Phase 1: HTTP Implementation with libcurl
 
