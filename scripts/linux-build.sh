@@ -34,9 +34,15 @@ echo "Running build inside container..."
 CONTAINER_NAME="cells-linux-build-$$"
 docker run --name "$CONTAINER_NAME" cells-linux-build
 
+# Copy the binary out
+echo "Extracting binary..."
+mkdir -p dist/cli
+docker cp "$CONTAINER_NAME:/build/bin/cells" dist/cli/cells-linux
+
+# Clean up container
+docker rm "$CONTAINER_NAME" > /dev/null
+
 echo ""
-echo "Build complete! Binary is inside container '$CONTAINER_NAME' at /build/bin/cells"
+echo "Built: dist/cli/cells-linux"
 echo ""
-echo "To extract the binary:"
-echo "  docker cp $CONTAINER_NAME:/build/bin/cells ./cells-linux"
-echo "  docker rm $CONTAINER_NAME"
+echo "Verify with: file dist/cli/cells-linux"

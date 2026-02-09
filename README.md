@@ -183,6 +183,10 @@ A basic agent integration is available—provide an Anthropic API key and the ag
 bazel run :cli              # CLI tool → dist/cli/cells
 bazel run :wasm-dist        # Web app → dist/wasm/
 
+# Build Linux CLI binaries (requires Docker)
+./tools/cli-alpine.sh       # Alpine/musl (converter only) → dist/cli/cells-alpine
+./scripts/linux-build.sh    # Debian/glibc (full CLI with sync) → dist/cli/cells-linux
+
 # Test
 bazel run :test             # Unit tests
 bazel run :e2e              # E2E tests (headless)
