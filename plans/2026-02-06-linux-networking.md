@@ -37,7 +37,11 @@ WebRTC (RTCPeerConnection, RTCDataChannel) already works on Linux via libdatacha
 
 - [x] 3a: Build and test on Linux (glibc) - Successfully built using Docker with Debian testing (trixie). Fixed several Linux-specific issues: missing `<cstddef>` in oplog.cc, missing `<cstring>` in libdatachannel implementations, `std::byte` to `uint8_t` conversion, and `alwayslink` for ws_connection_libdc linking.
 - [x] 3b: Verify sync command works end-to-end on Linux - Created `scripts/linux-sync-test.sh` which builds the CLI, starts a signaling server, and verifies the CLI can connect and reach ONLINE state. Test passes: WebSocket connects, WebRTC signaling works.
-- [ ] 3c: (Optional) Evaluate Alpine/musl compatibility
+- [x] 3c: (Optional) Evaluate Alpine/musl compatibility - **Not currently feasible.** The full `cells` target fails to build on Alpine/musl because the OpenSSL BCR package uses `rules_perl` to generate assembly files, and `rules_perl` downloads glibc-linked Perl binaries from [relocatable-perl](https://github.com/skaji/relocatable-perl) that cannot execute on musl (error: "cannot execute: required file not found" due to missing glibc dynamic linker). Workarounds considered:
+  - **Use system Perl**: Would require patching the OpenSSL BCR overlay's `perl_genrule.bzl` to use system Perl instead of the `rules_perl` toolchain — invasive and fragile.
+  - **Use system OpenSSL (`openssl-dev`)**: Would require replacing `@openssl` BCR dependency with a `cc_library` wrapping system headers/libs via `rules_foreign_cc` — significant build system changes.
+  - **Build OpenSSL with `no-asm`**: Would skip Perl-based assembly generation entirely, but the BCR package doesn't expose this option and would need a custom overlay.
+  - **Conclusion**: The Alpine build continues to use `cells-converter` (no networking). Full networking on Alpine would require either upstream `rules_perl` musl support or switching to a system OpenSSL approach. Neither is worth the complexity for now.
 
 ## Technical Notes
 
