@@ -155,6 +155,16 @@ int mapCellType(const char* type) {
 // XLSX Style parsing helpers
 // ---------------------------------------------------------------------------
 
+// Color reference from XLSX - preserves the original reference type
+struct ColorRef {
+    std::string hex;            // Resolved RGB color as #RRGGBB
+    int8_t themeIndex{-1};      // Theme color index (0-11), -1 = not theme
+    double themeTint{0.0};      // Tint modifier for theme color
+    int8_t indexedColor{-1};    // Indexed color palette index (0-65), -1 = not indexed
+
+    [[nodiscard]] bool empty() const { return hex.empty(); }
+};
+
 // Parsed font from styles.xml
 struct XLSXFont {
     bool bold{false};
@@ -162,19 +172,28 @@ struct XLSXFont {
     bool underline{false};
     std::string name;   // Font family name
     double size{0};     // Font size in points
-    std::string color;  // Text color as #RRGGBB
+    std::string color;  // Text color as #RRGGBB (resolved)
+    int8_t colorThemeIndex{-1};
+    double colorThemeTint{0.0};
+    int8_t colorIndexed{-1};
 };
 
 // Parsed fill (background) from styles.xml
 struct XLSXFill {
     std::string fgColor;  // Foreground color as #RRGGBB (used for solid fills)
     std::string bgColor;  // Background color as #RRGGBB
+    int8_t fgThemeIndex{-1};
+    double fgThemeTint{0.0};
+    int8_t fgIndexed{-1};
 };
 
 // Parsed border edge from styles.xml
 struct XLSXBorderEdge {
     cells::BorderStyle style{cells::BorderStyle::NONE};
-    std::string color;  // Color as #RRGGBB
+    std::string color;  // Color as #RRGGBB (resolved)
+    int8_t themeIndex{-1};
+    double themeTint{0.0};
+    int8_t indexedColor{-1};
 };
 
 // Parsed border from styles.xml (complete cell border)
@@ -536,9 +555,8 @@ std::string getIndexedColor(int index) {
 }
 
 // Resolve a color from an XML color node (handles rgb, theme+tint, indexed)
-// colorNode is an element like <color rgb="FF000000"/> or <color theme="1" tint="0.5"/>
-// or <color indexed="5"/>
-std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme) {
+// Returns a ColorRef preserving the original reference type alongside the resolved hex
+ColorRef resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme) {
     if (!colorNode) {
         return {};
     }
@@ -546,38 +564,35 @@ std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme)
     // First check for direct RGB color
     const char* rgb = colorNode.attribute("rgb").value();
     if (rgb && rgb[0] != '\0') {
-        return argbToRgb(rgb);
+        return {argbToRgb(rgb)};
     }
 
-    // Check for theme color
+    // Check for theme color - preserve both resolved hex and theme reference
     auto themeAttr = colorNode.attribute("theme");
     if (themeAttr) {
         const int themeIndex = themeAttr.as_int(-1);
         std::string baseColor = theme.getColor(themeIndex);
         if (!baseColor.empty()) {
-            // Apply tint if present
             const double tint = colorNode.attribute("tint").as_double(0.0);
-            if (tint != 0.0) {
-                return applyTint(baseColor, tint);
-            }
-            return baseColor;
+            std::string resolved = (tint != 0.0) ? applyTint(baseColor, tint) : baseColor;
+            return {resolved, static_cast<int8_t>(themeIndex), tint};
         }
     }
 
-    // Check for indexed color
+    // Check for indexed color - preserve both resolved hex and indexed reference
     auto indexedAttr = colorNode.attribute("indexed");
     if (indexedAttr) {
         const int colorIndex = indexedAttr.as_int(-1);
         std::string indexedColor = getIndexedColor(colorIndex);
         if (!indexedColor.empty()) {
-            return indexedColor;
+            return {indexedColor, -1, 0.0, static_cast<int8_t>(colorIndex)};
         }
     }
 
     // Check for auto color (maps to black)
     auto autoAttr = colorNode.attribute("auto");
     if (autoAttr && autoAttr.as_bool()) {
-        return "#000000";
+        return {"#000000"};
     }
 
     return {};
@@ -682,10 +697,14 @@ XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode, const XLSXThemeColors& t
     const char* style = edgeNode.attribute("style").value();
     edge.style = parseBorderStyle(style);
 
-    // Get color (from <color> child element)
+    // Get color (from <color> child element) - preserves theme/indexed refs
     auto colorNode = edgeNode.child("color");
     if (colorNode) {
-        edge.color = resolveColor(colorNode, theme);
+        ColorRef ref = resolveColor(colorNode, theme);
+        edge.color = ref.hex;
+        edge.themeIndex = ref.themeIndex;
+        edge.themeTint = ref.themeTint;
+        edge.indexedColor = ref.indexedColor;
     }
 
     return edge;
@@ -739,6 +758,9 @@ struct XLSXStyles {
             }
             if (!font.color.empty()) {
                 outStyle.textColor = font.color;
+                outStyle.textThemeIndex = font.colorThemeIndex;
+                outStyle.textThemeTint = font.colorThemeTint;
+                outStyle.textIndexedColor = font.colorIndexed;
                 outStyle.setDefined(cells::DEFINED_TEXTCOLOR);
                 hasStyle = true;
             }
@@ -749,6 +771,9 @@ struct XLSXStyles {
             const XLSXFill& fill = fills[xf.fillId];
             if (!fill.fgColor.empty()) {
                 outStyle.bgColor = fill.fgColor;
+                outStyle.bgThemeIndex = fill.fgThemeIndex;
+                outStyle.bgThemeTint = fill.fgThemeTint;
+                outStyle.bgIndexedColor = fill.fgIndexed;
                 outStyle.setDefined(cells::DEFINED_BGCOLOR);
                 hasStyle = true;
             }
@@ -758,28 +783,33 @@ struct XLSXStyles {
         if (xf.applyBorder && xf.borderId >= 0 && xf.borderId < static_cast<int>(borders.size())) {
             const XLSXBorder& border = borders[xf.borderId];
             if (border.hasValue()) {
+                // Helper to copy border edge with theme/indexed refs
+                auto copyBorderEdge = [](cells::BorderEdge& dst, const XLSXBorderEdge& src) {
+                    dst.style = src.style;
+                    dst.color = src.color;
+                    dst.themeIndex = src.themeIndex;
+                    dst.themeTint = src.themeTint;
+                    dst.indexedColor = src.indexedColor;
+                };
+
                 // Copy top border
                 if (border.top.style != cells::BorderStyle::NONE) {
-                    outStyle.border.top.style = border.top.style;
-                    outStyle.border.top.color = border.top.color;
+                    copyBorderEdge(outStyle.border.top, border.top);
                     outStyle.setDefined(cells::DEFINED_BORDER_TOP);
                 }
                 // Copy right border
                 if (border.right.style != cells::BorderStyle::NONE) {
-                    outStyle.border.right.style = border.right.style;
-                    outStyle.border.right.color = border.right.color;
+                    copyBorderEdge(outStyle.border.right, border.right);
                     outStyle.setDefined(cells::DEFINED_BORDER_RIGHT);
                 }
                 // Copy bottom border
                 if (border.bottom.style != cells::BorderStyle::NONE) {
-                    outStyle.border.bottom.style = border.bottom.style;
-                    outStyle.border.bottom.color = border.bottom.color;
+                    copyBorderEdge(outStyle.border.bottom, border.bottom);
                     outStyle.setDefined(cells::DEFINED_BORDER_BOTTOM);
                 }
                 // Copy left border
                 if (border.left.style != cells::BorderStyle::NONE) {
-                    outStyle.border.left.style = border.left.style;
-                    outStyle.border.left.color = border.left.color;
+                    copyBorderEdge(outStyle.border.left, border.left);
                     outStyle.setDefined(cells::DEFINED_BORDER_LEFT);
                 }
                 hasStyle = true;
@@ -1018,7 +1048,11 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
         // Font color: <color rgb="FF000000"/> or <color theme="1"/>
         auto colorNode = fontNode.child("color");
         if (colorNode) {
-            font.color = resolveColor(colorNode, theme);
+            ColorRef ref = resolveColor(colorNode, theme);
+            font.color = ref.hex;
+            font.colorThemeIndex = ref.themeIndex;
+            font.colorThemeTint = ref.themeTint;
+            font.colorIndexed = ref.indexedColor;
         }
 
         styles.fonts.push_back(font);
@@ -1036,7 +1070,11 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
             if (patternType && std::strcmp(patternType, "solid") == 0) {
                 auto fgColorNode = patternFill.child("fgColor");
                 if (fgColorNode) {
-                    fill.fgColor = resolveColor(fgColorNode, theme);
+                    ColorRef ref = resolveColor(fgColorNode, theme);
+                    fill.fgColor = ref.hex;
+                    fill.fgThemeIndex = ref.themeIndex;
+                    fill.fgThemeTint = ref.themeTint;
+                    fill.fgIndexed = ref.indexedColor;
                 }
             }
         }

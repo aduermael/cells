@@ -108,7 +108,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - Store on workbook via `setTheme()`
   - Keep existing `XLSXThemeColors` parsing working (it feeds the theme entity now)
 
-- [ ] 2b: Preserve theme color references in imported styles
+- [x] 2b: Preserve theme color references in imported styles. Added `ColorRef` struct. Changed `resolveColor()` to return `ColorRef` with hex + themeIndex/tint + indexedColor. Extended `XLSXFont`, `XLSXFill`, `XLSXBorderEdge` with color ref fields. Updated `getCellStyle()` to copy refs through to `CellStyle`. The existing `fromCellStyle()` in StyleBuffer already handles theme/indexed → binary encoding.
   - Change `resolveColor()` to return a struct: `{ string hex; int8_t themeIndex; double tint; int8_t indexedColor; }`
   - When color is `<color theme="1" tint="0.3"/>`, store the theme ref in CellStyle/StyleBuffer
   - When color is `<color indexed="5"/>`, store the indexed ref
