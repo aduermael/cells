@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 5a complete.**
+**Status: Complete — all phases done.**
 
 ## Design
 
@@ -158,8 +158,8 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - Selecting a theme color applies `bgThemeIndex`/`textThemeIndex` + tint instead of a direct hex
   - Direct hex ("custom color") still available as fallback
 
-- [ ] 5c: Display current theme mapping in cell style inspector
-  - When a cell uses a theme color, show which theme slot it maps to (e.g. "Accent 1 +40%")
+- [x] 5c: Display current theme mapping in cell style inspector. Extended `styleToJson` in C++ to include `bgThemeIndex`/`bgThemeTint`/`textThemeIndex`/`textThemeTint` fields when theme colors are active. Added `themeColorLabel()` helper and `updateColorHexDisplay()` method to show "Accent 1, +40%" style labels in the hex input (read-only, italic) when a cell uses a theme color. Direct hex display unchanged for non-theme colors.
+  - When a cell uses a theme color, show which theme slot it maps to (e.g. "Accent 1, +40%")
   - When a cell uses a direct color, show the hex as before
 
 ## Technical Notes

@@ -40,6 +40,15 @@ const THEME_COLOR_NAMES = [
 /** Tint values for the 5-row theme color matrix (lightest to darkest) */
 const THEME_TINTS = [0.8, 0.6, 0.4, -0.25, -0.5];
 
+/** Build a human-readable label for a theme color slot, e.g. "Accent 1, +40%" */
+function themeColorLabel(themeIndex: number, tint: number): string {
+  const name = THEME_COLOR_NAMES[themeIndex] || `Theme ${themeIndex}`;
+  if (tint === 0) return name;
+  const pct = Math.round(tint * 100);
+  const tintStr = pct > 0 ? `+${pct}%` : `${pct}%`;
+  return `${name}, ${tintStr}`;
+}
+
 /** Apply tint to a hex color (TS port of C++ applyTint from theme.h) */
 function applyTint(hexColor: string, tint: number): string {
   if (!hexColor || hexColor.length !== 7 || tint === 0) return hexColor;
@@ -771,6 +780,10 @@ export class StyleControls {
     this.updateBgColorSwatch(style.bgColor || "", mixed?.bgColor);
     this.updateTextColorSwatch(style.textColor || "", mixed?.textColor);
 
+    // Show theme mapping in hex inputs when theme colors are active
+    this.updateColorHexDisplay("bg", style);
+    this.updateColorHexDisplay("text", style);
+
     // Update font dropdowns
     this.updateFontFamilyDisplay(style.fontFamily || "Arial", mixed?.fontFamily);
     this.updateFontSizeDisplay(style.fontSize || 12, mixed?.fontSize);
@@ -847,6 +860,31 @@ export class StyleControls {
         optionColor.toUpperCase() === color.toUpperCase()
       );
     });
+  }
+
+  /**
+   * Update the hex input to show theme color label or hex value.
+   * When a theme color is active, shows e.g. "Accent 1, +40%" as a read-only label.
+   * When a direct color is active, shows the editable hex input as before.
+   */
+  private updateColorHexDisplay(type: "bg" | "text", style: Partial<CellStyle>): void {
+    const hexInput = type === "bg" ? this.bgColorHexInput : this.textColorHexInput;
+    const themeIndex = type === "bg" ? style.bgThemeIndex : style.textThemeIndex;
+    const themeTint = type === "bg" ? (style.bgThemeTint ?? 0) : (style.textThemeTint ?? 0);
+
+    if (themeIndex !== undefined && themeIndex >= 0) {
+      // Theme color — show label
+      const label = themeColorLabel(themeIndex, themeTint);
+      hexInput.value = label;
+      hexInput.readOnly = true;
+      hexInput.classList.add("theme-label");
+    } else {
+      // Direct color — show hex
+      const color = type === "bg" ? (style.bgColor || "") : (style.textColor || "");
+      hexInput.value = color ? color.toUpperCase() : "";
+      hexInput.readOnly = false;
+      hexInput.classList.remove("theme-label");
+    }
   }
 
   private updateHAlignButtons(hAlign: "left" | "center" | "right" | undefined, isMixed?: boolean): void {

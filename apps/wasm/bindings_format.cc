@@ -702,10 +702,26 @@ std::string styleToJson(const CellStyle& style) {
         ss << "\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
         first = false;
     }
+    if (style.hasBgThemeColor()) {
+        if (!first) ss << ",";
+        ss << "\"bgThemeIndex\":" << static_cast<int>(style.bgThemeIndex);
+        first = false;
+        if (style.bgThemeTint != 0.0) {
+            ss << ",\"bgThemeTint\":" << style.bgThemeTint;
+        }
+    }
     if (style.isDefined(DEFINED_TEXTCOLOR)) {
         if (!first) ss << ",";
         ss << "\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
         first = false;
+    }
+    if (style.hasTextThemeColor()) {
+        if (!first) ss << ",";
+        ss << "\"textThemeIndex\":" << static_cast<int>(style.textThemeIndex);
+        first = false;
+        if (style.textThemeTint != 0.0) {
+            ss << ",\"textThemeTint\":" << style.textThemeTint;
+        }
     }
     if (style.isDefined(DEFINED_FONTFAMILY)) {
         if (!first) ss << ",";

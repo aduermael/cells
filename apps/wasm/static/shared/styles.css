@@ -3097,6 +3097,15 @@ canvas {
     text-transform: none;
 }
 
+/* Theme color label in hex input (read-only when showing theme slot name) */
+.color-hex-input.theme-label {
+    text-transform: none;
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    font-style: italic;
+    cursor: default;
+}
+
 /* Theme color section in color picker */
 .color-picker-theme {
     margin-bottom: var(--spacing-xs);
