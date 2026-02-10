@@ -2091,6 +2091,29 @@ void CellsEngine::setWorkbookName(const std::string& name) {
 }
 
 // ============================================================================
+// Theme
+// ============================================================================
+
+std::string CellsEngine::getTheme() {
+    if (!_workbook || !_workbook->hasTheme()) {
+        return "null";
+    }
+
+    const Theme* theme = _workbook->getTheme();
+    std::ostringstream ss;
+    ss << "{\"name\":\"" << jsonEscape(theme->name) << "\",\"colorScheme\":{\"colors\":[";
+    for (int i = 0; i < 12; ++i) {
+        if (i > 0) {
+            ss << ",";
+        }
+        ss << "\"" << jsonEscape(theme->colorScheme.getColor(i)) << "\"";
+    }
+    ss << "]},\"fontScheme\":{\"majorFont\":\"" << jsonEscape(theme->fontScheme.majorFont)
+       << "\",\"minorFont\":\"" << jsonEscape(theme->fontScheme.minorFont) << "\"}}";
+    return ss.str();
+}
+
+// ============================================================================
 // Named ranges
 // ============================================================================
 

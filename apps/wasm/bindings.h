@@ -257,11 +257,12 @@ public:
     bool hasFormulas();
 
     // ========================================================================
-    // Workbook name (bindings_core.cc)
+    // Workbook name and theme (bindings_core.cc)
     // ========================================================================
 
     std::string getWorkbookName();
     void setWorkbookName(const std::string& name);
+    std::string getTheme();
 
     // ========================================================================
     // Named ranges (bindings_core.cc)

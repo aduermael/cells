@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 4.**
+**Status: In Progress — Phase 4 complete.**
 
 ## Design
 
@@ -137,7 +137,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 - [x] 4a: C# comparator fix (brought in externally)
 
-- [ ] 4b: Expose theme to frontend via WASM bindings
+- [x] 4b: Expose theme to frontend via WASM bindings. Added `getTheme()` WASM binding returning JSON with name, colorScheme (12 colors), and fontScheme (majorFont/minorFont). `getEffectiveCellStyle()` and viewport rendering already resolve theme/indexed colors to hex — no frontend changes needed. Also fixed pre-existing lint warning in xlsx_writer.cc (const-correctness).
   - `getTheme()` → JSON with color scheme and font scheme
   - `getEffectiveCellStyle()` resolves theme/indexed colors to hex before returning
   - Frontend receives resolved colors (no theme awareness in TS needed initially)

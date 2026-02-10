@@ -809,6 +809,13 @@ declare module 'cells-wasm' {
     setWorkbookName(name: string): void;
 
     /**
+     * Get the workbook theme (color scheme and font scheme)
+     * Returns JSON string: { name, colorScheme: { colors: string[12] }, fontScheme: { majorFont, minorFont } }
+     * Returns "null" if no theme is set
+     */
+    getTheme(): string;
+
+    /**
      * Create a new empty workbook with one sheet
      */
     createEmptyWorkbook(): void;

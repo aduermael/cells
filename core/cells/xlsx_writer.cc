@@ -481,7 +481,7 @@ std::string generateTheme(const cells::Theme* theme) {
     };
 
     // Default colors (Office theme)
-    static const char* kDefaultColors[] = {
+    static const char* const kDefaultColors[] = {
         "FFFFFF",  // 0: lt1
         "000000",  // 1: dk1
         "E7E6E6",  // 2: lt2
