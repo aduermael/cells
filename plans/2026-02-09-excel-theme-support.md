@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: Complete — all phases done.**
+**Status: In Progress — Phase 5 complete, Phase 6 planned.**
 
 ## Design
 
@@ -161,6 +161,33 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 - [x] 5c: Display current theme mapping in cell style inspector. Extended `styleToJson` in C++ to include `bgThemeIndex`/`bgThemeTint`/`textThemeIndex`/`textThemeTint` fields when theme colors are active. Added `themeColorLabel()` helper and `updateColorHexDisplay()` method to show "Accent 1, +40%" style labels in the hex input (read-only, italic) when a cell uses a theme color. Direct hex display unchanged for non-theme colors.
   - When a cell uses a theme color, show which theme slot it maps to (e.g. "Accent 1, +40%")
   - When a cell uses a direct color, show the hex as before
+
+## Phase 6: Cell Styles Gallery
+
+A "Cell Styles" dropdown menu that provides named style presets (like Excel's Home → Cell Styles). Styles are theme-aware: accent-based styles use the workbook's theme colors and update when the theme changes. The gallery groups styles into categories with visual previews.
+
+- [x] 6a: Define built-in cell style presets in the C++ core. Created `core/cells/cell_style_presets.h` with `CellStylePreset` struct (name, category, CellStyle, optional formatCode), `getBuiltinCellStylePresets()` returning 46 presets across 5 categories, and `resolvePresetPreviewColors()` to resolve theme refs to hex for UI display. Themed Cell Styles use bgThemeIndex+tint for theme-aware accent fills. Data/Model and Good/Bad/Neutral use direct hex colors matching Excel defaults.
+  - Data model: named style preset = name + CellStyle (font, fill, border, number format)
+  - Built-in preset categories: "Good, Bad and Neutral" (Normal, Bad, Good, Neutral), "Data and Model" (Calculation, Check Cell, Explanatory Text, Input, Linked Cell, Note, Output, Warning Text), "Titles and Headings" (Heading 1-4, Title, Total), "Themed Cell Styles" (20%/40%/60%/100% × Accent 1-6), "Number Format" (Comma, Comma [0], Currency, Currency [0], Percent)
+  - Theme-aware: accent-based presets reference theme colors (bgThemeIndex + tint), not hard-coded hex
+  - Provide a `getBuiltinCellStyles()` API that returns all presets as JSON, with resolved preview colors
+
+- [ ] 6b: WASM binding and TypeScript types for cell style presets
+  - `getCellStylePresets()` → JSON array of `{ name, category, style (with resolved preview colors) }`
+  - TypeScript types: `CellStylePreset`, `CellStylePresetCategory`
+  - Worker handler + CellsClient + WasmDataSource methods
+
+- [ ] 6c: Cell Styles gallery dropdown UI
+  - "Cell Styles" button in toolbar that opens a dropdown/gallery
+  - Group presets by category with section headers
+  - Each preset shown as a styled label/chip with visual preview (bg color, text color, font style, borders)
+  - Clicking a preset applies the full style to the current selection
+  - Gallery updates when theme changes (re-resolve accent colors)
+
+- [ ] 6d: "New Cell Style..." dialog (stretch)
+  - Allow users to create custom named styles from current cell formatting
+  - Store custom styles in workbook metadata
+  - Custom styles appear in the gallery alongside built-ins
 
 ## Technical Notes
 
