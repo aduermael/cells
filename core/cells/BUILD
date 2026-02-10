@@ -11,6 +11,12 @@ cc_library(
 )
 
 cc_library(
+    name = "theme",
+    hdrs = ["theme.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "style_buffer",
     srcs = ["style_buffer.cc"],
     hdrs = ["style_buffer.h"],
@@ -311,6 +317,7 @@ cc_library(
         ":range_index",
         ":spill_index",
         ":style_types",
+        ":theme",
         ":types",
     ],
 )

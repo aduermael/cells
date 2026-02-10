@@ -48,6 +48,7 @@
 #include "core/cells/oplog.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
+#include "core/cells/theme.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -866,6 +867,20 @@ struct Workbook {
     void startCollaboration();
 
     // ========================================================================
+    // Theme
+    // ========================================================================
+
+    // Get the workbook theme (returns nullptr if no theme is set)
+    [[nodiscard]] const Theme* getTheme() const { return _theme.get(); }
+    [[nodiscard]] Theme* getTheme() { return _theme.get(); }
+
+    // Set the workbook theme (takes ownership)
+    void setTheme(std::unique_ptr<Theme> theme) { _theme = std::move(theme); }
+
+    // Check if workbook has a theme
+    [[nodiscard]] bool hasTheme() const { return _theme != nullptr; }
+
+    // ========================================================================
     // Named ranges
     // ========================================================================
 
@@ -1145,6 +1160,9 @@ struct Workbook {
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
+
+    // Workbook theme (color scheme + font scheme from Excel)
+    std::unique_ptr<Theme> _theme;
 
     // Operation log for CRDT synchronization
     std::unique_ptr<OpLog> _oplog;

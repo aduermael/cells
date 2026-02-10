@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: Planning.**
+**Status: In Progress — Phase 1.**
 
 ## Design
 
@@ -66,7 +66,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 ## Phase 1: Theme Data Model
 
-- [ ] 1a: Add `Theme` struct to a new `core/cells/theme.h`
+- [x] 1a: Add `Theme` struct to a new `core/cells/theme.h`. Created ThemeColorScheme, ThemeFontScheme, Theme structs, applyTint/resolveThemeColor/resolveIndexedColor/resolveThemeFont helpers, kIndexedColors palette, and added `_theme` to Workbook with getter/setter.
   - ThemeColorScheme: 12 `std::string` color slots (#RRGGBB) with named accessors (lt1, dk1, accent1, etc.)
   - ThemeFontScheme: majorFont and minorFont (std::string names)
   - Theme struct combining both + a name string
