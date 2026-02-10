@@ -157,10 +157,10 @@ int mapCellType(const char* type) {
 
 // Color reference from XLSX - preserves the original reference type
 struct ColorRef {
-    std::string hex;            // Resolved RGB color as #RRGGBB
-    int8_t themeIndex{-1};      // Theme color index (0-11), -1 = not theme
-    double themeTint{0.0};      // Tint modifier for theme color
-    int8_t indexedColor{-1};    // Indexed color palette index (0-65), -1 = not indexed
+    std::string hex;          // Resolved RGB color as #RRGGBB
+    int8_t themeIndex{-1};    // Theme color index (0-11), -1 = not theme
+    double themeTint{0.0};    // Tint modifier for theme color
+    int8_t indexedColor{-1};  // Indexed color palette index (0-65), -1 = not indexed
 
     [[nodiscard]] bool empty() const { return hex.empty(); }
 };
@@ -176,6 +176,7 @@ struct XLSXFont {
     int8_t colorThemeIndex{-1};
     double colorThemeTint{0.0};
     int8_t colorIndexed{-1};
+    int8_t fontSchemeIndex{-1};  // -1 = direct, 0 = major (headings), 1 = minor (body)
 };
 
 // Parsed fill (background) from styles.xml
@@ -748,6 +749,7 @@ struct XLSXStyles {
             }
             if (!font.name.empty()) {
                 outStyle.fontFamily = font.name;
+                outStyle.fontThemeIndex = font.fontSchemeIndex;
                 outStyle.setDefined(cells::DEFINED_FONTFAMILY);
                 hasStyle = true;
             }
@@ -1037,6 +1039,17 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
         auto nameNode = fontNode.child("name");
         if (nameNode) {
             font.name = nameNode.attribute("val").value();
+        }
+
+        // Font scheme: <scheme val="major"/> or <scheme val="minor"/>
+        auto schemeNode = fontNode.child("scheme");
+        if (schemeNode) {
+            const char* schemeVal = schemeNode.attribute("val").value();
+            if (schemeVal && std::strcmp(schemeVal, "major") == 0) {
+                font.fontSchemeIndex = 0;
+            } else if (schemeVal && std::strcmp(schemeVal, "minor") == 0) {
+                font.fontSchemeIndex = 1;
+            }
         }
 
         // Font size: <sz val="11"/>

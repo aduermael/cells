@@ -115,7 +115,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - When color is `<color rgb="FF..."/>`, store as direct RGB (current behavior)
   - Pass refs through: XML → XLSXFont/XLSXFill/XLSXBorder → CellStyle → StyleBuffer → workbook
 
-- [ ] 2c: Preserve font scheme references
+- [x] 2c: Preserve font scheme references. Parse `<scheme val="major"/>` / `<scheme val="minor"/>` element in XLSX font entries. Added `fontSchemeIndex` to `XLSXFont`, copied to `CellStyle.fontThemeIndex` in `getCellStyle()`. All 338 unit tests pass.
   - Detect when a font name matches the theme's major or minor font
   - XLSX may use `<name val="Calibri"/>` with `<scheme val="minor"/>` — check for `<scheme>` element
   - Store as fontThemeIndex in CellStyle/StyleBuffer
