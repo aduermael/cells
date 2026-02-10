@@ -2182,6 +2182,36 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
         }
     }
 
+    // Resolve theme/indexed color references to hex
+    const Theme* theme = workbook.getTheme();
+    if (result.hasBgThemeColor()) {
+        result.bgColor = resolveThemeColor(theme, result.bgThemeIndex, result.bgThemeTint);
+    } else if (result.hasBgIndexedColor()) {
+        result.bgColor = resolveIndexedColor(result.bgIndexedColor);
+    }
+    if (result.hasTextThemeColor()) {
+        result.textColor = resolveThemeColor(theme, result.textThemeIndex, result.textThemeTint);
+    } else if (result.hasTextIndexedColor()) {
+        result.textColor = resolveIndexedColor(result.textIndexedColor);
+    }
+    if (result.hasFontTheme()) {
+        std::string resolved = resolveThemeFont(theme, result.fontThemeIndex);
+        if (!resolved.empty()) {
+            result.fontFamily = resolved;
+        }
+    }
+    auto resolveBorderColor = [&](BorderEdge& edge) {
+        if (edge.themeIndex >= 0) {
+            edge.color = resolveThemeColor(theme, edge.themeIndex, edge.themeTint);
+        } else if (edge.indexedColor >= 0) {
+            edge.color = resolveIndexedColor(edge.indexedColor);
+        }
+    };
+    resolveBorderColor(result.border.top);
+    resolveBorderColor(result.border.right);
+    resolveBorderColor(result.border.bottom);
+    resolveBorderColor(result.border.left);
+
     return result;
 }
 

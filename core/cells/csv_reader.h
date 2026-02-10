@@ -88,7 +88,7 @@ struct CSVReadResult {
 class CSVReader {
 public:
     CSVReader();
-    explicit CSVReader(const CSVReadOptions& options);
+    explicit CSVReader(CSVReadOptions options);
 
     // Parse CSV from string content
     // Returns CSVReadResult with workbook on success, error on failure

@@ -158,6 +158,39 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
 
     // Return result with merged style if we found any styles
     if (hasAnyStyle) {
+        // Resolve theme/indexed color references to hex for frontend rendering
+        const Theme* theme = workbook.getTheme();
+        if (combinedStyle.hasBgThemeColor()) {
+            combinedStyle.bgColor = resolveThemeColor(theme, combinedStyle.bgThemeIndex,
+                                                       combinedStyle.bgThemeTint);
+        } else if (combinedStyle.hasBgIndexedColor()) {
+            combinedStyle.bgColor = resolveIndexedColor(combinedStyle.bgIndexedColor);
+        }
+        if (combinedStyle.hasTextThemeColor()) {
+            combinedStyle.textColor = resolveThemeColor(theme, combinedStyle.textThemeIndex,
+                                                         combinedStyle.textThemeTint);
+        } else if (combinedStyle.hasTextIndexedColor()) {
+            combinedStyle.textColor = resolveIndexedColor(combinedStyle.textIndexedColor);
+        }
+        if (combinedStyle.hasFontTheme()) {
+            std::string resolved = resolveThemeFont(theme, combinedStyle.fontThemeIndex);
+            if (!resolved.empty()) {
+                combinedStyle.fontFamily = resolved;
+            }
+        }
+        // Resolve border edge theme/indexed colors
+        auto resolveBorderColor = [&](BorderEdge& edge) {
+            if (edge.themeIndex >= 0) {
+                edge.color = resolveThemeColor(theme, edge.themeIndex, edge.themeTint);
+            } else if (edge.indexedColor >= 0) {
+                edge.color = resolveIndexedColor(edge.indexedColor);
+            }
+        };
+        resolveBorderColor(combinedStyle.border.top);
+        resolveBorderColor(combinedStyle.border.right);
+        resolveBorderColor(combinedStyle.border.bottom);
+        resolveBorderColor(combinedStyle.border.left);
+
         result.mergedStyle = combinedStyle;
         result.hasMergedStyle = true;
     }

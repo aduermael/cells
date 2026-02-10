@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <sstream>
+#include <utility>
 
 #include "core/cells/id.h"
 
@@ -29,7 +30,7 @@ std::string CSVReadError::toString() const {
 
 CSVReader::CSVReader() = default;
 
-CSVReader::CSVReader(const CSVReadOptions& options) : options_(options) {}
+CSVReader::CSVReader(CSVReadOptions options) : options_(std::move(options)) {}
 
 void CSVReader::reset() {
     lineNum_ = 0;

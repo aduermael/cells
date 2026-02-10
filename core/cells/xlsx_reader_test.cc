@@ -881,19 +881,26 @@ TEST(XLSXReaderTest, ReadThemeColorsFromLBOModel) {
     // Theme colors with tint result in colors like dark blue (#2D4D6E or similar)
     size_t cellsWithBgColor = 0;
     size_t cellsWithDarkBgColor = 0;
+    const Theme* theme = result.workbook->getTheme();
 
     for (const auto& cellId : sheet->getCellIds()) {
         const StyleBuffer* styleBuf = result.workbook->getEntityStyle(cellId);
         if (styleBuf != nullptr) {
             const CellStyle style = styleBuf->toCellStyle();
-            if (!style.bgColor.empty()) {
+            // Resolve bgColor from theme/indexed refs if needed
+            std::string bgHex = style.bgColor;
+            if (style.hasBgThemeColor() && theme) {
+                bgHex = resolveThemeColor(theme, style.bgThemeIndex, style.bgThemeTint);
+            } else if (style.hasBgIndexedColor()) {
+                bgHex = resolveIndexedColor(style.bgIndexedColor);
+            }
+            if (!bgHex.empty()) {
                 cellsWithBgColor++;
                 // Check if it's a darkened color (not pure white or very light)
-                // Dark colors typically have hex values where each component is < 0x80
-                if (style.bgColor.length() == 7 && style.bgColor[0] == '#') {
-                    int r = std::stoi(style.bgColor.substr(1, 2), nullptr, 16);
-                    int g = std::stoi(style.bgColor.substr(3, 2), nullptr, 16);
-                    int b = std::stoi(style.bgColor.substr(5, 2), nullptr, 16);
+                if (bgHex.length() == 7 && bgHex[0] == '#') {
+                    int r = std::stoi(bgHex.substr(1, 2), nullptr, 16);
+                    int g = std::stoi(bgHex.substr(3, 2), nullptr, 16);
+                    int b = std::stoi(bgHex.substr(5, 2), nullptr, 16);
                     // Consider it "dark" if all RGB < 128 or max is < 180
                     if (std::max({r, g, b}) < 180) {
                         cellsWithDarkBgColor++;
@@ -929,14 +936,23 @@ TEST(XLSXReaderTest, ReadLightGrayBackgroundFromTheme) {
     // Light gray is approximately #D9D9D9 to #E6E6E6
     size_t cellsWithLightGray = 0;
 
+    const Theme* theme = result.workbook->getTheme();
+
     for (const auto& cellId : sheet->getCellIds()) {
         const StyleBuffer* styleBuf = result.workbook->getEntityStyle(cellId);
         if (styleBuf != nullptr) {
             const CellStyle style = styleBuf->toCellStyle();
-            if (!style.bgColor.empty() && style.bgColor.length() == 7) {
-                int r = std::stoi(style.bgColor.substr(1, 2), nullptr, 16);
-                int g = std::stoi(style.bgColor.substr(3, 2), nullptr, 16);
-                int b = std::stoi(style.bgColor.substr(5, 2), nullptr, 16);
+            // Resolve bgColor from theme/indexed refs if needed
+            std::string bgHex = style.bgColor;
+            if (style.hasBgThemeColor() && theme) {
+                bgHex = resolveThemeColor(theme, style.bgThemeIndex, style.bgThemeTint);
+            } else if (style.hasBgIndexedColor()) {
+                bgHex = resolveIndexedColor(style.bgIndexedColor);
+            }
+            if (!bgHex.empty() && bgHex.length() == 7) {
+                int r = std::stoi(bgHex.substr(1, 2), nullptr, 16);
+                int g = std::stoi(bgHex.substr(3, 2), nullptr, 16);
+                int b = std::stoi(bgHex.substr(5, 2), nullptr, 16);
                 // Light gray: all components similar and > 200 but < 250
                 if (r > 200 && g > 200 && b > 200 && r < 250 && g < 250 && b < 250 &&
                     std::abs(r - g) < 5 && std::abs(g - b) < 5) {

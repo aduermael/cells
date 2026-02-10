@@ -572,10 +572,10 @@ ColorRef resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme) {
     auto themeAttr = colorNode.attribute("theme");
     if (themeAttr) {
         const int themeIndex = themeAttr.as_int(-1);
-        std::string baseColor = theme.getColor(themeIndex);
+        const std::string baseColor = theme.getColor(themeIndex);
         if (!baseColor.empty()) {
             const double tint = colorNode.attribute("tint").as_double(0.0);
-            std::string resolved = (tint != 0.0) ? applyTint(baseColor, tint) : baseColor;
+            const std::string resolved = (tint != 0.0) ? applyTint(baseColor, tint) : baseColor;
             return {resolved, static_cast<int8_t>(themeIndex), tint};
         }
     }
@@ -584,7 +584,7 @@ ColorRef resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme) {
     auto indexedAttr = colorNode.attribute("indexed");
     if (indexedAttr) {
         const int colorIndex = indexedAttr.as_int(-1);
-        std::string indexedColor = getIndexedColor(colorIndex);
+        const std::string indexedColor = getIndexedColor(colorIndex);
         if (!indexedColor.empty()) {
             return {indexedColor, -1, 0.0, static_cast<int8_t>(colorIndex)};
         }
@@ -701,7 +701,7 @@ XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode, const XLSXThemeColors& t
     // Get color (from <color> child element) - preserves theme/indexed refs
     auto colorNode = edgeNode.child("color");
     if (colorNode) {
-        ColorRef ref = resolveColor(colorNode, theme);
+        const ColorRef ref = resolveColor(colorNode, theme);
         edge.color = ref.hex;
         edge.themeIndex = ref.themeIndex;
         edge.themeTint = ref.themeTint;
@@ -1061,7 +1061,7 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
         // Font color: <color rgb="FF000000"/> or <color theme="1"/>
         auto colorNode = fontNode.child("color");
         if (colorNode) {
-            ColorRef ref = resolveColor(colorNode, theme);
+            const ColorRef ref = resolveColor(colorNode, theme);
             font.color = ref.hex;
             font.colorThemeIndex = ref.themeIndex;
             font.colorThemeTint = ref.themeTint;
@@ -1083,7 +1083,7 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
             if (patternType && std::strcmp(patternType, "solid") == 0) {
                 auto fgColorNode = patternFill.child("fgColor");
                 if (fgColorNode) {
-                    ColorRef ref = resolveColor(fgColorNode, theme);
+                    const ColorRef ref = resolveColor(fgColorNode, theme);
                     fill.fgColor = ref.hex;
                     fill.fgThemeIndex = ref.themeIndex;
                     fill.fgThemeTint = ref.themeTint;

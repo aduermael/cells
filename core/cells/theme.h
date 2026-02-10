@@ -134,8 +134,9 @@ struct ThemeColorScheme {
 
     bool operator==(const ThemeColorScheme& other) const {
         for (int i = 0; i < 12; ++i) {
-            if (colors[i] != other.colors[i])
+            if (colors[i] != other.colors[i]) {
                 return false;
+            }
         }
         return true;
     }
@@ -217,16 +218,21 @@ inline std::string applyTint(const std::string& color, double tint) {
 
     // Convert HSL back to RGB
     auto hueToRgb = [](double p, double q, double t) {
-        if (t < 0)
+        if (t < 0) {
             t += 1;
-        if (t > 1)
+        }
+        if (t > 1) {
             t -= 1;
-        if (t < 1.0 / 6.0)
+        }
+        if (t < 1.0 / 6.0) {
             return p + (q - p) * 6.0 * t;
-        if (t < 0.5)
+        }
+        if (t < 0.5) {
             return q;
-        if (t < 2.0 / 3.0)
+        }
+        if (t < 2.0 / 3.0) {
             return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+        }
         return p;
     };
 
@@ -254,13 +260,16 @@ inline std::string applyTint(const std::string& color, double tint) {
 // Looks up the theme's color scheme by index and applies tint
 // Returns empty string if theme is null or index is out of range
 inline std::string resolveThemeColor(const Theme* theme, int index, double tint) {
-    if (!theme)
+    if (!theme) {
         return {};
+    }
     const std::string& base = theme->colorScheme.getColor(index);
-    if (base.empty())
+    if (base.empty()) {
         return {};
-    if (tint == 0.0)
+    }
+    if (tint == 0.0) {
         return base;
+    }
     return applyTint(base, tint);
 }
 
@@ -271,10 +280,12 @@ inline std::string resolveIndexedColor(int index) {
     if (index >= 0 && index < 64) {
         return kIndexedColors[index];
     }
-    if (index == 64)
+    if (index == 64) {
         return "#000000";  // System foreground
-    if (index == 65)
+    }
+    if (index == 65) {
         return "#FFFFFF";  // System background
+    }
     return {};
 }
 
@@ -282,12 +293,15 @@ inline std::string resolveIndexedColor(int index) {
 // fontThemeIndex: 0 = major (headings), 1 = minor (body)
 // Returns empty string if theme is null or index is invalid
 inline std::string resolveThemeFont(const Theme* theme, int fontThemeIndex) {
-    if (!theme)
+    if (!theme) {
         return {};
-    if (fontThemeIndex == 0)
+    }
+    if (fontThemeIndex == 0) {
         return theme->fontScheme.majorFont;
-    if (fontThemeIndex == 1)
+    }
+    if (fontThemeIndex == 1) {
         return theme->fontScheme.minorFont;
+    }
     return {};
 }
 
