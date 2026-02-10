@@ -2,7 +2,7 @@
 
 Validate that the Cells formula engine produces the same results as Excel by roundtripping Excel files through the CLI.
 
-**Status: Pending.** Starting with `data/math-basic`, will extend to other categories later.
+**Status: Phase 1 in progress.**
 
 ## Background
 
@@ -14,7 +14,7 @@ The existing `compare.sh` script uses a Docker-containerized C# evaluator to com
 
 ## Phase 1: Single-Category Test Script
 
-- [ ] 1a: Create `tests/excel-roundtrips/run-test.sh` — runs a single category test
+- [x] 1a: Create `tests/excel-roundtrips/run-test.sh` — runs a single category test. Also fixed namespace-prefix handling in xlsx_reader.cc so the CLI can read files rewritten by the C# evaluator (which uses `x:` prefixed element names).
   - Takes a category name as argument (e.g. `math-basic`)
   - Resolves paths relative to the script's own directory
   - Verifies both `data/<category>/file.xlsx` and `data/<category>/file_no_cached_results.xlsx` exist

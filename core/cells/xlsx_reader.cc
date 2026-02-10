@@ -25,6 +25,73 @@
 
 namespace {
 
+// Get the local name of an XML node, stripping any namespace prefix.
+// e.g. "x:workbook" -> "workbook", "worksheet" -> "worksheet"
+const char* localName(const char* name) {
+    const char* colon = std::strchr(name, ':');
+    return colon ? colon + 1 : name;
+}
+
+// Find a child element by local name (ignoring namespace prefix).
+// Tries exact match first for performance, then falls back to local name comparison.
+pugi::xml_node xmlChild(pugi::xml_node parent, const char* name) {
+    // Fast path: try exact match first (most common case)
+    auto node = parent.child(name);
+    if (node) {
+        return node;
+    }
+    // Slow path: iterate children and compare local names
+    for (auto child = parent.first_child(); child; child = child.next_sibling()) {
+        if (child.type() == pugi::node_element && std::strcmp(localName(child.name()), name) == 0) {
+            return child;
+        }
+    }
+    return {};
+}
+
+// Overload for xml_document to avoid slicing warnings
+pugi::xml_node xmlChild(const pugi::xml_document& doc, const char* name) {
+    return xmlChild(static_cast<const pugi::xml_node&>(doc), name);
+}
+
+// Iterator adapter for children by local name (ignoring namespace prefix).
+// Usage: for (auto node : xmlChildren(parent, "sheet")) { ... }
+struct XmlChildrenRange {
+    pugi::xml_node parent_;
+    const char* name_{nullptr};
+
+    struct Iterator {
+        pugi::xml_node current_;
+        const char* name_{nullptr};
+
+        Iterator(pugi::xml_node node, const char* name) : current_(node), name_(name) {
+            advance_to_match();
+        }
+
+        void advance_to_match() {
+            while (current_ && (current_.type() != pugi::node_element ||
+                                std::strcmp(localName(current_.name()), name_) != 0)) {
+                current_ = current_.next_sibling();
+            }
+        }
+
+        pugi::xml_node operator*() const { return current_; }
+        Iterator& operator++() {
+            current_ = current_.next_sibling();
+            advance_to_match();
+            return *this;
+        }
+        bool operator!=(const Iterator& other) const { return current_ != other.current_; }
+    };
+
+    [[nodiscard]] Iterator begin() const { return {parent_.first_child(), name_}; }
+    [[nodiscard]] Iterator end() const { return {pugi::xml_node(), name_}; }
+};
+
+XmlChildrenRange xmlChildren(pugi::xml_node parent, const char* name) {
+    return {parent, name};
+}
+
 // Debug timing - set via environment variable
 bool debugTiming() {
     static const bool enabled = std::getenv("CELLS_DEBUG_TIMING") != nullptr;
@@ -1315,7 +1382,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     if (!relsContent.empty()) {
         pugi::xml_document relsDoc;
         if (relsDoc.load_buffer(relsContent.data(), relsContent.size())) {
-            for (auto rel : relsDoc.child("Relationships").children("Relationship")) {
+            for (auto rel : xmlChildren(xmlChild(relsDoc, "Relationships"), "Relationship")) {
                 const char* id = rel.attribute("Id").value();
                 const char* target = rel.attribute("Target").value();
                 if (id && target) {
@@ -1352,7 +1419,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         return result;
     }
 
-    for (auto sheet : wbDoc.child("workbook").child("sheets").children("sheet")) {
+    for (auto sheet : xmlChildren(xmlChild(xmlChild(wbDoc, "workbook"), "sheets"), "sheet")) {
         const char* name = sheet.attribute("name").value();
         const char* rId = sheet.attribute("r:id").value();
         if (name && rId) {
@@ -1371,7 +1438,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     // Parse defined names (named ranges) from workbook.xml
     // These will be resolved after all sheets are loaded
     std::vector<RawDefinedName> rawDefinedNames;
-    for (auto defName : wbDoc.child("workbook").child("definedNames").children("definedName")) {
+    for (auto defName :
+         xmlChildren(xmlChild(xmlChild(wbDoc, "workbook"), "definedNames"), "definedName")) {
         const char* name = defName.attribute("name").value();
         const char* refText = defName.text().get();
         if (name && name[0] != '\0' && refText && refText[0] != '\0') {
@@ -1396,16 +1464,16 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     if (!ssContent.empty()) {
         pugi::xml_document ssDoc;
         if (ssDoc.load_buffer(ssContent.data(), ssContent.size())) {
-            for (auto si : ssDoc.child("sst").children("si")) {
+            for (auto si : xmlChildren(xmlChild(ssDoc, "sst"), "si")) {
                 // Handle both <t> and <r> (rich text) elements
-                auto t = si.child("t");
+                auto t = xmlChild(si, "t");
                 if (t) {
                     sharedStrings.emplace_back(t.text().get());
                 } else {
                     // Rich text: concatenate all <t> elements within <r> elements
                     std::string text;
-                    for (auto r : si.children("r")) {
-                        auto rt = r.child("t");
+                    for (auto r : xmlChildren(si, "r")) {
+                        auto rt = xmlChild(r, "t");
                         if (rt) {
                             text += rt.text().get();
                         }
@@ -1517,10 +1585,10 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         sheet->setWorkbook(workbook.get());
 
         // Parse sheet view properties (grid lines, zoom, etc.)
-        auto worksheetNode = sheetDoc.child("worksheet");
-        auto sheetViewsNode = worksheetNode.child("sheetViews");
+        auto worksheetNode = xmlChild(sheetDoc, "worksheet");
+        auto sheetViewsNode = xmlChild(worksheetNode, "sheetViews");
         if (sheetViewsNode) {
-            auto sheetViewNode = sheetViewsNode.child("sheetView");
+            auto sheetViewNode = xmlChild(sheetViewsNode, "sheetView");
             if (sheetViewNode) {
                 // showGridLines: default is "1" (true), "0" means hidden
                 auto showGridLinesAttr = sheetViewNode.attribute("showGridLines");
@@ -1544,7 +1612,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Parse freeze panes from <pane> element
                 // XLSX uses xSplit/ySplit to indicate frozen columns/rows when state="frozen"
-                auto paneNode = sheetViewNode.child("pane");
+                auto paneNode = xmlChild(sheetViewNode, "pane");
                 if (paneNode) {
                     auto stateAttr = paneNode.attribute("state");
                     const std::string state = stateAttr ? stateAttr.as_string() : "";
@@ -1571,9 +1639,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         std::unordered_map<int, bool> columnHidden;      // 0-indexed col -> hidden
         std::unordered_map<int, int> columnStyleIndex;   // 0-indexed col -> XLSX style index
         std::unordered_map<int, uint32_t> columnWidths;  // 0-indexed col -> width in pixels
-        auto colsNode = worksheetNode.child("cols");
+        auto colsNode = xmlChild(worksheetNode, "cols");
         if (colsNode) {
-            for (auto colNode : colsNode.children("col")) {
+            for (auto colNode : xmlChildren(colsNode, "col")) {
                 const int minCol = colNode.attribute("min").as_int(1) - 1;  // Convert to 0-indexed
                 const int maxColRange = colNode.attribute("max").as_int(1) - 1;
                 const bool hidden = colNode.attribute("hidden").as_bool(false);
@@ -1604,14 +1672,14 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         // First pass: find dimensions
         start = std::chrono::steady_clock::now();
         int maxRow = 0, maxCol = 0;
-        auto sheetData = sheetDoc.child("worksheet").child("sheetData");
+        auto sheetData = xmlChild(xmlChild(sheetDoc, "worksheet"), "sheetData");
 
         // Also track hidden rows, row styles, and row heights as we scan
         std::unordered_map<int, bool> rowHidden;       // 0-indexed row -> hidden
         std::unordered_map<int, int> rowStyleIndex;    // 0-indexed row -> XLSX style index
         std::unordered_map<int, uint32_t> rowHeights;  // 0-indexed row -> height in pixels
 
-        for (auto row : sheetData.children("row")) {
+        for (auto row : xmlChildren(sheetData, "row")) {
             const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
             if (rowNum >= maxRow) {
                 maxRow = rowNum + 1;
@@ -1639,7 +1707,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 }
             }
 
-            for (auto cell : row.children("c")) {
+            for (auto cell : xmlChildren(row, "c")) {
                 int col = 0, r = 0;
                 parseCellRef(cell.attribute("r").value(), col, r);
                 if (col >= maxCol) {
@@ -1702,8 +1770,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         int cellCount = 0;
 
         // Count cells for reservation
-        for (auto row : sheetData.children("row")) {
-            for ([[maybe_unused]] auto c : row.children("c")) {
+        for (auto row : xmlChildren(sheetData, "row")) {
+            for ([[maybe_unused]] auto c : xmlChildren(row, "c")) {
                 cellCount++;
             }
         }
@@ -1724,8 +1792,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         };
 
-        for (auto row : sheetData.children("row")) {
-            for (auto cellNode : row.children("c")) {
+        for (auto row : xmlChildren(sheetData, "row")) {
+            for (auto cellNode : xmlChildren(row, "c")) {
                 int col = 0, rowNum = 0;
                 parseCellRef(cellNode.attribute("r").value(), col, rowNum);
 
@@ -1736,7 +1804,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 // Get value
                 std::string value;
                 const char* type = cellNode.attribute("t").value();
-                auto vNode = cellNode.child("v");
+                auto vNode = xmlChild(cellNode, "v");
 
                 if (vNode) {
                     const char* rawValue = vNode.text().get();
@@ -1752,15 +1820,15 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     }
                 } else if (type && std::strcmp(type, "inlineStr") == 0) {
                     // Inline string: <c t="inlineStr"><is><t>text</t></is></c>
-                    auto isNode = cellNode.child("is");
+                    auto isNode = xmlChild(cellNode, "is");
                     if (isNode) {
-                        auto tNode = isNode.child("t");
+                        auto tNode = xmlChild(isNode, "t");
                         if (tNode) {
                             value = tNode.text().get();
                         } else {
                             // Rich text: concatenate all <t> elements within <r> elements
-                            for (auto rNode : isNode.children("r")) {
-                                auto rtNode = rNode.child("t");
+                            for (auto rNode : xmlChildren(isNode, "r")) {
+                                auto rtNode = xmlChild(rNode, "t");
                                 if (rtNode) {
                                     value += rtNode.text().get();
                                 }
@@ -1773,7 +1841,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 // We need to keep empty cells if they have styling (e.g., background color)
                 // as they may be part of styled header rows
                 const int styleIndexForSkip = cellNode.attribute("s").as_int(0);
-                if (value.empty() && !cellNode.child("f") && styleIndexForSkip == 0) {
+                if (value.empty() && !xmlChild(cellNode, "f") && styleIndexForSkip == 0) {
                     continue;
                 }
 
@@ -1818,7 +1886,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Read formula if present and requested
                 if (options.readFormulas) {
-                    auto fNode = cellNode.child("f");
+                    auto fNode = xmlChild(cellNode, "f");
                     if (fNode) {
                         const char* formulaType = fNode.attribute("t").value();
                         const bool isShared =
@@ -1921,9 +1989,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         // Note: Merged cells may span columns/rows that don't have cells.
         // We need to ensure those columns/rows exist before adding the merge.
         start = std::chrono::steady_clock::now();
-        auto mergeCellsNode = worksheetNode.child("mergeCells");
+        auto mergeCellsNode = xmlChild(worksheetNode, "mergeCells");
         if (mergeCellsNode) {
-            for (auto mergeNode : mergeCellsNode.children("mergeCell")) {
+            for (auto mergeNode : xmlChildren(mergeCellsNode, "mergeCell")) {
                 const char* refAttr = mergeNode.attribute("ref").value();
                 if (refAttr == nullptr || refAttr[0] == '\0') {
                     continue;
