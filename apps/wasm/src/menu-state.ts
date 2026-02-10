@@ -21,6 +21,7 @@ export type MenuId =
   | "merge"
   | "border"
   | "namedRanges"
+  | "cellStyles"
   | "formulaAutocomplete"
   | "scriptAutocomplete";
 

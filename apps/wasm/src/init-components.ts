@@ -32,6 +32,7 @@ import { FormatControls } from "./format-controls";
 import { StyleControls } from "./style-controls";
 import { MergeControls } from "./merge-controls";
 import { BorderControls } from "./border-controls";
+import { CellStylesGallery } from "./cell-styles-gallery";
 import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
@@ -906,6 +907,31 @@ export function createComponents(config: ComponentsConfig): Components {
     }
   );
 
+  const cellStylesGallery = new CellStylesGallery(
+    {
+      galleryBtn: elements.cellStylesBtn,
+      galleryContainer: elements.cellStylesGallery,
+    },
+    {
+      getSelectedCell: () => app.selectedCell,
+      getSelectionRange: () => ({
+        start: app.selectionStart,
+        end: app.selectionEnd,
+      }),
+      getSelectedAxis: () => {
+        if (app.selectedColumn >= 0) {
+          return { type: "column", index: app.selectedColumn };
+        }
+        if (app.selectedRow >= 0) {
+          return { type: "row", index: app.selectedRow };
+        }
+        return null;
+      },
+      requestRender: render,
+      updateFormulaBar,
+    }
+  );
+
   // Named ranges dropdown for quick insertion
   const namedRangesDropdown = new NamedRangesDropdown(
     elements.formulaBar,
@@ -982,6 +1008,7 @@ export function createComponents(config: ComponentsConfig): Components {
       styleControls.setDataSource(dataSource);
       mergeControls.setDataSource(dataSource);
       borderControls.setDataSource(dataSource);
+      cellStylesGallery.setDataSource(dataSource);
       namedRangesDropdown.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },

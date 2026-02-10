@@ -177,7 +177,7 @@ A "Cell Styles" dropdown menu that provides named style presets (like Excel's Ho
   - TypeScript types: `CellStylePreset`, `CellStylePresetCategory`
   - Worker handler + CellsClient + WasmDataSource methods
 
-- [ ] 6c: Cell Styles gallery dropdown UI
+- [x] 6c: Cell Styles gallery dropdown UI. Created `CellStylesGallery` component with `DropdownFrame` integration. Added "Cell Styles" button in toolbar (Block 5) with dropdown arrow. Gallery fetches presets lazily on first open, groups by category with section headers, shows styled chips with bg/text/font previews. Clicking a preset applies the full style (including theme colors) to the current selection via the same `applyStyleToSelection` pattern as other controls. Presets are re-fetched when a new workbook is loaded. Added `cellStyles` MenuId for mutual exclusivity.
   - "Cell Styles" button in toolbar that opens a dropdown/gallery
   - Group presets by category with section headers
   - Each preset shown as a styled label/chip with visual preview (bg color, text color, font style, borders)

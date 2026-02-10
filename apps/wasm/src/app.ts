@@ -205,6 +205,9 @@ export interface DOMElements {
   borderStyleGrid: HTMLElement;
   borderColorPalette: HTMLElement;
   borderColorHexInput: HTMLInputElement;
+  // Cell Styles gallery
+  cellStylesBtn: HTMLButtonElement;
+  cellStylesGallery: HTMLElement;
 }
 
 // =============================================================================
@@ -716,6 +719,9 @@ export function createApp(): App {
     borderStyleGrid: getElement("border-style-grid"),
     borderColorPalette: getElement("border-color-palette"),
     borderColorHexInput: getElement<HTMLInputElement>("border-color-hex"),
+    // Cell Styles gallery
+    cellStylesBtn: getElement<HTMLButtonElement>("cell-styles-btn"),
+    cellStylesGallery: getElement("cell-styles-gallery"),
   };
 
   return new App(elements);
