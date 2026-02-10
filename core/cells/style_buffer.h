@@ -54,7 +54,16 @@ namespace cells {
 //   Bit 4 (12): textWrap present
 //   Bit 5 (13): numberFormat present
 //   Bit 6 (14): border present
-//   Bit 7 (15): reserved
+//   Bit 7 (15): extended flags byte present (3rd flag byte follows)
+//
+// Extended Flag Byte (byte 2, only present when bit 15 is set):
+//   Bit 0: bgColor is theme reference (3 bytes: index, tint_hi, tint_lo)
+//   Bit 1: bgColor is indexed reference (3 bytes: index, 0, 0)
+//   Bit 2: textColor is theme reference
+//   Bit 3: textColor is indexed reference
+//   Bit 4: fontFamily is theme font reference (1 byte: scheme index)
+//   Bit 5: border has theme/indexed color types (extra byte in border section)
+//   Bits 6-7: reserved
 //
 
 // Flag byte 0 bits
@@ -73,6 +82,15 @@ constexpr uint16_t STYLE_FLAG_VALIGN = 1 << 11;
 constexpr uint16_t STYLE_FLAG_TEXTWRAP = 1 << 12;
 constexpr uint16_t STYLE_FLAG_NUMBERFORMAT = 1 << 13;
 constexpr uint16_t STYLE_FLAG_BORDER = 1 << 14;
+constexpr uint16_t STYLE_FLAG_EXTENDED = 1 << 15;  // Extended flags byte follows
+
+// Extended flags byte bit positions (in byte 2, only present when STYLE_FLAG_EXTENDED is set)
+constexpr uint8_t STYLE_EXT_BG_THEME = 1 << 0;       // bgColor slot is theme reference
+constexpr uint8_t STYLE_EXT_BG_INDEXED = 1 << 1;      // bgColor slot is indexed reference
+constexpr uint8_t STYLE_EXT_TEXT_THEME = 1 << 2;       // textColor slot is theme reference
+constexpr uint8_t STYLE_EXT_TEXT_INDEXED = 1 << 3;     // textColor slot is indexed reference
+constexpr uint8_t STYLE_EXT_FONT_THEME = 1 << 4;       // fontFamily slot is theme font ref
+constexpr uint8_t STYLE_EXT_BORDER_THEME = 1 << 5;     // border has theme/indexed color types
 
 // Mask for all boolean flags (bold, italic, underline, strikethrough, textWrap)
 constexpr uint16_t STYLE_FLAG_BOOLEANS = STYLE_FLAG_BOLD | STYLE_FLAG_ITALIC |
@@ -160,6 +178,7 @@ public:
 
     // =========================================================================
     // Color property setters (RGB, 3 bytes each)
+    // Setting direct color clears any theme/indexed reference, and vice versa.
     // =========================================================================
 
     void setBgColor(uint8_t r, uint8_t g, uint8_t b);
@@ -171,15 +190,50 @@ public:
     void clearTextColor();
 
     // =========================================================================
+    // Theme/indexed color references
+    // These use the same 3-byte slot as direct colors but reinterpret the bytes.
+    // Theme: [index(1), tint_hi(1), tint_lo(1)] where tint = int16/1000
+    // Indexed: [index(1), 0, 0]
+    // Setting a theme/indexed ref clears any direct color, and vice versa.
+    // =========================================================================
+
+    // Background theme/indexed color
+    void setBgThemeColor(uint8_t themeIndex, double tint);
+    void setBgIndexedColor(uint8_t paletteIndex);
+    [[nodiscard]] bool hasBgThemeColor() const;
+    [[nodiscard]] bool hasBgIndexedColor() const;
+    [[nodiscard]] uint8_t getBgThemeIndex() const;
+    [[nodiscard]] double getBgThemeTint() const;
+    [[nodiscard]] uint8_t getBgIndexedColorIndex() const;
+
+    // Text theme/indexed color
+    void setTextThemeColor(uint8_t themeIndex, double tint);
+    void setTextIndexedColor(uint8_t paletteIndex);
+    [[nodiscard]] bool hasTextThemeColor() const;
+    [[nodiscard]] bool hasTextIndexedColor() const;
+    [[nodiscard]] uint8_t getTextThemeIndex() const;
+    [[nodiscard]] double getTextThemeTint() const;
+    [[nodiscard]] uint8_t getTextIndexedColorIndex() const;
+
+    // Font theme reference (0 = major/headings, 1 = minor/body)
+    void setFontTheme(uint8_t schemeIndex);
+    void clearFontTheme();
+    [[nodiscard]] bool hasFontTheme() const;
+    [[nodiscard]] uint8_t getFontThemeIndex() const;
+
+    // =========================================================================
     // Color property getters
     // =========================================================================
 
+    // hasBgColor/hasTextColor return true for ANY color type (direct, theme, or indexed)
     [[nodiscard]] bool hasBgColor() const { return hasFlag(STYLE_FLAG_BGCOLOR); }
     [[nodiscard]] bool hasTextColor() const { return hasFlag(STYLE_FLAG_TEXTCOLOR); }
 
+    // These return raw RGB bytes. For theme/indexed refs, the bytes are the encoded ref data.
     void getBgColor(uint8_t& r, uint8_t& g, uint8_t& b) const;
     void getTextColor(uint8_t& r, uint8_t& g, uint8_t& b) const;
 
+    // These return hex color. For theme/indexed refs, returns "#000000" (not meaningful).
     [[nodiscard]] std::string getBgColorHex() const;
     [[nodiscard]] std::string getTextColorHex() const;
 
@@ -269,6 +323,32 @@ public:
     [[nodiscard]] std::string getBorderRightColorHex() const;
     [[nodiscard]] std::string getBorderBottomColorHex() const;
     [[nodiscard]] std::string getBorderLeftColorHex() const;
+
+    // Border theme/indexed color setters
+    void setBorderTopThemeColor(BorderStyle style, uint8_t themeIndex, double tint);
+    void setBorderRightThemeColor(BorderStyle style, uint8_t themeIndex, double tint);
+    void setBorderBottomThemeColor(BorderStyle style, uint8_t themeIndex, double tint);
+    void setBorderLeftThemeColor(BorderStyle style, uint8_t themeIndex, double tint);
+
+    void setBorderTopIndexedColor(BorderStyle style, uint8_t paletteIndex);
+    void setBorderRightIndexedColor(BorderStyle style, uint8_t paletteIndex);
+    void setBorderBottomIndexedColor(BorderStyle style, uint8_t paletteIndex);
+    void setBorderLeftIndexedColor(BorderStyle style, uint8_t paletteIndex);
+
+    // Border color type queries (per side: 0=direct, 1=theme, 2=indexed)
+    [[nodiscard]] uint8_t getBorderSideColorType(uint8_t sideBit) const;
+    [[nodiscard]] uint8_t getBorderTopThemeIndex() const;
+    [[nodiscard]] double getBorderTopThemeTint() const;
+    [[nodiscard]] uint8_t getBorderTopIndexedColorIndex() const;
+    [[nodiscard]] uint8_t getBorderRightThemeIndex() const;
+    [[nodiscard]] double getBorderRightThemeTint() const;
+    [[nodiscard]] uint8_t getBorderRightIndexedColorIndex() const;
+    [[nodiscard]] uint8_t getBorderBottomThemeIndex() const;
+    [[nodiscard]] double getBorderBottomThemeTint() const;
+    [[nodiscard]] uint8_t getBorderBottomIndexedColorIndex() const;
+    [[nodiscard]] uint8_t getBorderLeftThemeIndex() const;
+    [[nodiscard]] double getBorderLeftThemeTint() const;
+    [[nodiscard]] uint8_t getBorderLeftIndexedColorIndex() const;
 
     // =========================================================================
     // Serialization
@@ -384,6 +464,35 @@ private:
     void clearBorderSide(uint8_t sideBit);
     [[nodiscard]] BorderStyle getBorderSideStyle(uint8_t sideBit) const;
     void getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, uint8_t& b) const;
+
+    // Extended flags helpers
+    [[nodiscard]] bool hasExtendedFlags() const;
+    [[nodiscard]] uint8_t getExtFlags() const;
+    void setExtFlag(uint8_t flag);
+    void clearExtFlag(uint8_t flag);
+    void ensureExtendedFlags();
+    void removeExtendedFlagsIfEmpty();
+
+    // Number of flag bytes (2 without extended, 3 with extended)
+    [[nodiscard]] size_t flagByteCount() const;
+
+    // Border theme/indexed color type byte helpers
+    [[nodiscard]] uint8_t getBorderColorTypeByte() const;
+    void setBorderColorTypeByte(uint8_t value);
+    void ensureBorderColorTypeByte();
+    void removeBorderColorTypeByteIfEmpty();
+
+    // Border theme/indexed internal setters/getters
+    void setBorderSideThemeColorImpl(uint8_t sideBit, BorderStyle style, uint8_t themeIndex, double tint);
+    void setBorderSideIndexedColorImpl(uint8_t sideBit, BorderStyle style, uint8_t paletteIndex);
+    [[nodiscard]] uint8_t getBorderSideThemeIndexImpl(uint8_t sideBit) const;
+    [[nodiscard]] double getBorderSideThemeTintImpl(uint8_t sideBit) const;
+    [[nodiscard]] uint8_t getBorderSideIndexedColorIndexImpl(uint8_t sideBit) const;
+
+    // Tint encoding: double -> int16 (x1000), stored as 2 bytes big-endian
+public:
+    static void encodeTint(double tint, uint8_t& hi, uint8_t& lo);
+    static double decodeTint(uint8_t hi, uint8_t lo);
 };
 
 }  // namespace cells

@@ -4,6 +4,7 @@
 
 #include "core/cells/style_buffer.h"
 
+#include <cmath>
 #include <cstring>
 
 #include <algorithm>
@@ -208,6 +209,64 @@ void StyleBuffer::ensureMinSize() {
     }
 }
 
+// =============================================================================
+// Extended flags helpers
+// =============================================================================
+
+bool StyleBuffer::hasExtendedFlags() const {
+    return hasFlag(STYLE_FLAG_EXTENDED);
+}
+
+uint8_t StyleBuffer::getExtFlags() const {
+    if (!hasExtendedFlags() || _data.size() < 3) {
+        return 0;
+    }
+    return _data[2];
+}
+
+void StyleBuffer::setExtFlag(uint8_t flag) {
+    ensureExtendedFlags();
+    _data[2] |= flag;
+}
+
+void StyleBuffer::clearExtFlag(uint8_t flag) {
+    if (!hasExtendedFlags()) return;
+    _data[2] &= ~flag;
+    removeExtendedFlagsIfEmpty();
+}
+
+void StyleBuffer::ensureExtendedFlags() {
+    if (!hasExtendedFlags()) {
+        // Insert a zero byte at position 2 (after the two flag bytes)
+        setFlag(STYLE_FLAG_EXTENDED);
+        const uint8_t zero = 0;
+        insertDataAt(2, &zero, 1);
+    }
+}
+
+void StyleBuffer::removeExtendedFlagsIfEmpty() {
+    if (hasExtendedFlags() && _data.size() >= 3 && _data[2] == 0) {
+        removeDataAt(2, 1);
+        clearFlag(STYLE_FLAG_EXTENDED);
+    }
+}
+
+size_t StyleBuffer::flagByteCount() const {
+    return hasExtendedFlags() ? 3 : 2;
+}
+
+// Tint encoding helpers
+void StyleBuffer::encodeTint(double tint, uint8_t& hi, uint8_t& lo) {
+    auto val = static_cast<int16_t>(std::round(tint * 1000.0));
+    hi = static_cast<uint8_t>((val >> 8) & 0xFF);
+    lo = static_cast<uint8_t>(val & 0xFF);
+}
+
+double StyleBuffer::decodeTint(uint8_t hi, uint8_t lo) {
+    auto val = static_cast<int16_t>((static_cast<uint16_t>(hi) << 8) | lo);
+    return val / 1000.0;
+}
+
 void StyleBuffer::setFlag(uint16_t flag) {
     ensureMinSize();
     _data[0] |= static_cast<uint8_t>(flag & 0xFF);
@@ -235,7 +294,7 @@ void StyleBuffer::clearFlag(uint16_t flag) {
 // 8. border (variable)
 
 size_t StyleBuffer::findPropertyOffset(uint16_t flag) const {
-    size_t offset = 2;  // Skip flag bytes
+    size_t offset = flagByteCount();  // Skip flag bytes (2 or 3)
 
     const uint16_t flags = getFlags();
 
@@ -335,7 +394,12 @@ size_t StyleBuffer::getPropertySize(uint16_t flag) const {
                     ++sideCount;
                 }
             }
-            return 1 + (4 * sideCount);  // sides mask + 4 bytes per side
+            size_t size = 1 + (4 * sideCount);  // sides mask + 4 bytes per side
+            // Add 1 for color type byte if present
+            if ((getExtFlags() & STYLE_EXT_BORDER_THEME) != 0) {
+                size += 1;
+            }
+            return size;
         }
         return 0;
     }
@@ -362,7 +426,7 @@ bool StyleBuffer::hasBooleanByte() const {
 }
 
 size_t StyleBuffer::booleanByteOffset() const {
-    return 2;  // Right after flag bytes
+    return flagByteCount();  // Right after flag bytes (2 or 3)
 }
 
 void StyleBuffer::ensureBooleanByte() {
@@ -394,7 +458,7 @@ void StyleBuffer::ensureBooleanByte() {
     const uint16_t flags = getFlags();
 
     // Calculate expected size without boolean byte
-    size_t expectedWithoutBool = 2;  // flags
+    size_t expectedWithoutBool = flagByteCount();  // flags (2 or 3)
     if ((flags & STYLE_FLAG_BGCOLOR) != 0) {
         expectedWithoutBool += 3;
     }
@@ -424,19 +488,21 @@ void StyleBuffer::removeBooleanByteIfEmpty() {
 }
 
 uint8_t StyleBuffer::getBooleanByte() const {
-    if (!hasBooleanByte() || _data.size() <= 2) {
+    const size_t boolOff = booleanByteOffset();
+    if (!hasBooleanByte() || _data.size() <= boolOff) {
         return 0;
     }
-    return _data[2];
+    return _data[boolOff];
 }
 
 void StyleBuffer::setBooleanBit(uint8_t bit, bool value) {
     ensureBooleanByte();
-    if (_data.size() > 2) {
+    const size_t boolOff = booleanByteOffset();
+    if (_data.size() > boolOff) {
         if (value) {
-            _data[2] |= (1 << bit);
+            _data[boolOff] |= (1 << bit);
         } else {
-            _data[2] &= ~(1 << bit);
+            _data[boolOff] &= ~(1 << bit);
         }
     }
 }
@@ -583,6 +649,12 @@ std::string StyleBuffer::formatHexColor(uint8_t r, uint8_t g, uint8_t b) {
 // =============================================================================
 
 void StyleBuffer::setBgColor(uint8_t r, uint8_t g, uint8_t b) {
+    // Clear theme/indexed flags (mutual exclusion)
+    if (hasExtendedFlags()) {
+        clearExtFlag(STYLE_EXT_BG_THEME);
+        clearExtFlag(STYLE_EXT_BG_INDEXED);
+    }
+
     if (hasFlag(STYLE_FLAG_BGCOLOR)) {
         // Update existing color
         const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
@@ -609,6 +681,11 @@ void StyleBuffer::setBgColorHex(const std::string& hex) {
 
 void StyleBuffer::clearBgColor() {
     if (hasFlag(STYLE_FLAG_BGCOLOR)) {
+        // Clear theme/indexed flags too
+        if (hasExtendedFlags()) {
+            clearExtFlag(STYLE_EXT_BG_THEME);
+            clearExtFlag(STYLE_EXT_BG_INDEXED);
+        }
         const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
         removeDataAt(offset, 3);
         clearFlag(STYLE_FLAG_BGCOLOR);
@@ -616,6 +693,12 @@ void StyleBuffer::clearBgColor() {
 }
 
 void StyleBuffer::setTextColor(uint8_t r, uint8_t g, uint8_t b) {
+    // Clear theme/indexed flags (mutual exclusion)
+    if (hasExtendedFlags()) {
+        clearExtFlag(STYLE_EXT_TEXT_THEME);
+        clearExtFlag(STYLE_EXT_TEXT_INDEXED);
+    }
+
     if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
         // Update existing color
         const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
@@ -642,6 +725,11 @@ void StyleBuffer::setTextColorHex(const std::string& hex) {
 
 void StyleBuffer::clearTextColor() {
     if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
+        // Clear theme/indexed flags too
+        if (hasExtendedFlags()) {
+            clearExtFlag(STYLE_EXT_TEXT_THEME);
+            clearExtFlag(STYLE_EXT_TEXT_INDEXED);
+        }
         const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
         removeDataAt(offset, 3);
         clearFlag(STYLE_FLAG_TEXTCOLOR);
@@ -695,6 +783,190 @@ std::string StyleBuffer::getTextColorHex() const {
 }
 
 // =============================================================================
+// Theme/indexed color references
+// =============================================================================
+
+void StyleBuffer::setBgThemeColor(uint8_t themeIndex, double tint) {
+    uint8_t hi = 0, lo = 0;
+    encodeTint(tint, hi, lo);
+
+    // Use the same 3-byte slot as direct bgColor
+    if (hasFlag(STYLE_FLAG_BGCOLOR)) {
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        if (offset + 2 < _data.size()) {
+            _data[offset] = themeIndex;
+            _data[offset + 1] = hi;
+            _data[offset + 2] = lo;
+        }
+    } else {
+        setFlag(STYLE_FLAG_BGCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        uint8_t color[3] = {themeIndex, hi, lo};
+        insertDataAt(offset, color, 3);
+    }
+
+    // Set theme flag, clear indexed flag
+    setExtFlag(STYLE_EXT_BG_THEME);
+    clearExtFlag(STYLE_EXT_BG_INDEXED);
+}
+
+void StyleBuffer::setBgIndexedColor(uint8_t paletteIndex) {
+    // Use the same 3-byte slot as direct bgColor
+    if (hasFlag(STYLE_FLAG_BGCOLOR)) {
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        if (offset + 2 < _data.size()) {
+            _data[offset] = paletteIndex;
+            _data[offset + 1] = 0;
+            _data[offset + 2] = 0;
+        }
+    } else {
+        setFlag(STYLE_FLAG_BGCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        uint8_t color[3] = {paletteIndex, 0, 0};
+        insertDataAt(offset, color, 3);
+    }
+
+    // Set indexed flag, clear theme flag
+    setExtFlag(STYLE_EXT_BG_INDEXED);
+    clearExtFlag(STYLE_EXT_BG_THEME);
+}
+
+bool StyleBuffer::hasBgThemeColor() const {
+    return hasFlag(STYLE_FLAG_BGCOLOR) && (getExtFlags() & STYLE_EXT_BG_THEME) != 0;
+}
+
+bool StyleBuffer::hasBgIndexedColor() const {
+    return hasFlag(STYLE_FLAG_BGCOLOR) && (getExtFlags() & STYLE_EXT_BG_INDEXED) != 0;
+}
+
+uint8_t StyleBuffer::getBgThemeIndex() const {
+    if (!hasBgThemeColor()) return 0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+    if (offset >= _data.size()) return 0;
+    return _data[offset];
+}
+
+double StyleBuffer::getBgThemeTint() const {
+    if (!hasBgThemeColor()) return 0.0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+    if (offset + 2 >= _data.size()) return 0.0;
+    return decodeTint(_data[offset + 1], _data[offset + 2]);
+}
+
+uint8_t StyleBuffer::getBgIndexedColorIndex() const {
+    if (!hasBgIndexedColor()) return 0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+    if (offset >= _data.size()) return 0;
+    return _data[offset];
+}
+
+void StyleBuffer::setTextThemeColor(uint8_t themeIndex, double tint) {
+    uint8_t hi = 0, lo = 0;
+    encodeTint(tint, hi, lo);
+
+    if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        if (offset + 2 < _data.size()) {
+            _data[offset] = themeIndex;
+            _data[offset + 1] = hi;
+            _data[offset + 2] = lo;
+        }
+    } else {
+        setFlag(STYLE_FLAG_TEXTCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        uint8_t color[3] = {themeIndex, hi, lo};
+        insertDataAt(offset, color, 3);
+    }
+
+    setExtFlag(STYLE_EXT_TEXT_THEME);
+    clearExtFlag(STYLE_EXT_TEXT_INDEXED);
+}
+
+void StyleBuffer::setTextIndexedColor(uint8_t paletteIndex) {
+    if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        if (offset + 2 < _data.size()) {
+            _data[offset] = paletteIndex;
+            _data[offset + 1] = 0;
+            _data[offset + 2] = 0;
+        }
+    } else {
+        setFlag(STYLE_FLAG_TEXTCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        uint8_t color[3] = {paletteIndex, 0, 0};
+        insertDataAt(offset, color, 3);
+    }
+
+    setExtFlag(STYLE_EXT_TEXT_INDEXED);
+    clearExtFlag(STYLE_EXT_TEXT_THEME);
+}
+
+bool StyleBuffer::hasTextThemeColor() const {
+    return hasFlag(STYLE_FLAG_TEXTCOLOR) && (getExtFlags() & STYLE_EXT_TEXT_THEME) != 0;
+}
+
+bool StyleBuffer::hasTextIndexedColor() const {
+    return hasFlag(STYLE_FLAG_TEXTCOLOR) && (getExtFlags() & STYLE_EXT_TEXT_INDEXED) != 0;
+}
+
+uint8_t StyleBuffer::getTextThemeIndex() const {
+    if (!hasTextThemeColor()) return 0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+    if (offset >= _data.size()) return 0;
+    return _data[offset];
+}
+
+double StyleBuffer::getTextThemeTint() const {
+    if (!hasTextThemeColor()) return 0.0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+    if (offset + 2 >= _data.size()) return 0.0;
+    return decodeTint(_data[offset + 1], _data[offset + 2]);
+}
+
+uint8_t StyleBuffer::getTextIndexedColorIndex() const {
+    if (!hasTextIndexedColor()) return 0;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+    if (offset >= _data.size()) return 0;
+    return _data[offset];
+}
+
+// =============================================================================
+// Font theme reference
+// =============================================================================
+
+void StyleBuffer::setFontTheme(uint8_t schemeIndex) {
+    // Font theme stores the scheme index in the fontFamily slot
+    // The fontFamily flag must be set, and the data is just 1 byte (the scheme index)
+    // stored as a length-0 string with the scheme index as the "length" byte
+    // Actually, let's use a simpler approach: store as 1-byte font name
+    // But that's confusing. Instead, just set the ext flag and reinterpret.
+    // When STYLE_EXT_FONT_THEME is set, the fontFamily slot contains:
+    //   [1] [schemeIndex] (length=1, one byte = scheme index)
+    setFontFamily(std::string(1, static_cast<char>(schemeIndex)));
+    setExtFlag(STYLE_EXT_FONT_THEME);
+}
+
+void StyleBuffer::clearFontTheme() {
+    if (hasFontTheme()) {
+        clearExtFlag(STYLE_EXT_FONT_THEME);
+        // Don't clear the fontFamily data - it still holds the theme ref
+        // until fontFamily is explicitly cleared or overwritten
+        clearFontFamily();
+    }
+}
+
+bool StyleBuffer::hasFontTheme() const {
+    return hasFlag(STYLE_FLAG_FONTFAMILY) && (getExtFlags() & STYLE_EXT_FONT_THEME) != 0;
+}
+
+uint8_t StyleBuffer::getFontThemeIndex() const {
+    if (!hasFontTheme()) return 0;
+    const std::string family = getFontFamily();
+    if (family.empty()) return 0;
+    return static_cast<uint8_t>(family[0]);
+}
+
+// =============================================================================
 // Font size
 // =============================================================================
 
@@ -738,6 +1010,13 @@ uint8_t StyleBuffer::getFontSize() const {
 // =============================================================================
 
 void StyleBuffer::setFontFamily(const std::string& family) {
+    // Clear font theme flag (mutual exclusion) — unless called from setFontTheme
+    if (hasExtendedFlags() && (getExtFlags() & STYLE_EXT_FONT_THEME) != 0) {
+        // If setting a real font family (not from setFontTheme), clear the ext flag
+        // setFontTheme sets the flag AFTER calling setFontFamily, so this is safe
+        clearExtFlag(STYLE_EXT_FONT_THEME);
+    }
+
     // Truncate to 255 chars max
     const size_t len = std::min(family.size(), static_cast<size_t>(255));
 
@@ -945,22 +1224,18 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
     }
 
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    const size_t headerSize = 1 + ((getExtFlags() & STYLE_EXT_BORDER_THEME) ? 1 : 0);
 
     const uint8_t oldMask = _data[offset];
 
     if ((oldMask & sideBit) != 0) {
         // Update existing side
-        // Find position of this side in the data
         int sideIndex = 0;
         for (int i = 0; i < 4; ++i) {
-            if ((1 << i) == sideBit) {
-                break;
-            }
-            if ((oldMask & (1 << i)) != 0) {
-                ++sideIndex;
-            }
+            if ((1 << i) == sideBit) break;
+            if ((oldMask & (1 << i)) != 0) ++sideIndex;
         }
-        const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
+        const size_t sideOffset = offset + headerSize + static_cast<size_t>(sideIndex * 4);
         _data[sideOffset] = static_cast<uint8_t>(style);
         _data[sideOffset + 1] = r;
         _data[sideOffset + 2] = g;
@@ -969,17 +1244,12 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
         // Add new side
         _data[offset] |= sideBit;
 
-        // Find where to insert (maintain order: top, right, bottom, left)
         int insertIndex = 0;
         for (int i = 0; i < 4; ++i) {
-            if ((1 << i) == sideBit) {
-                break;
-            }
-            if ((oldMask & (1 << i)) != 0) {
-                ++insertIndex;
-            }
+            if ((1 << i) == sideBit) break;
+            if ((oldMask & (1 << i)) != 0) ++insertIndex;
         }
-        const size_t insertOffset = offset + 1 + static_cast<size_t>(insertIndex * 4);
+        const size_t insertOffset = offset + headerSize + static_cast<size_t>(insertIndex * 4);
         uint8_t sideData[4] = {static_cast<uint8_t>(style), r, g, b};
         insertDataAt(insertOffset, sideData, 4);
     }
@@ -992,6 +1262,8 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
 
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
+    const bool hasColorTypes = (getExtFlags() & STYLE_EXT_BORDER_THEME) != 0;
+    const size_t headerSize = 1 + (hasColorTypes ? 1 : 0);
 
     if ((mask & sideBit) == 0) {
         return;  // Side not set
@@ -1000,25 +1272,40 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
     // Find position of this side
     int sideIndex = 0;
     for (int i = 0; i < 4; ++i) {
-        if ((1 << i) == sideBit) {
-            break;
-        }
-        if ((mask & (1 << i)) != 0) {
-            ++sideIndex;
-        }
+        if ((1 << i) == sideBit) break;
+        if ((mask & (1 << i)) != 0) ++sideIndex;
     }
 
     // Remove side data
-    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
+    const size_t sideOffset = offset + headerSize + static_cast<size_t>(sideIndex * 4);
     removeDataAt(sideOffset, 4);
+
+    // Clear color type bits for this side
+    if (hasColorTypes) {
+        int sideIdx = 0;
+        for (int i = 0; i < 4; ++i) {
+            if ((1 << i) == sideBit) { sideIdx = i; break; }
+        }
+        _data[offset + 1] &= ~(0x03 << (sideIdx * 2));
+    }
 
     // Update mask
     _data[offset] &= ~sideBit;
 
     // If no sides remain, remove border entirely
     if (_data[offset] == 0) {
-        removeDataAt(offset, 1);
+        size_t removeSize = 1;
+        if (hasColorTypes) {
+            removeSize += 1;
+            clearExtFlag(STYLE_EXT_BORDER_THEME);
+        }
+        removeDataAt(offset, removeSize);
         clearFlag(STYLE_FLAG_BORDER);
+    } else {
+        // Check if we can remove the color type byte
+        if (hasColorTypes) {
+            removeBorderColorTypeByteIfEmpty();
+        }
     }
 }
 
@@ -1029,23 +1316,19 @@ BorderStyle StyleBuffer::getBorderSideStyle(uint8_t sideBit) const {
 
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
+    const size_t headerSize = 1 + ((getExtFlags() & STYLE_EXT_BORDER_THEME) ? 1 : 0);
 
     if ((mask & sideBit) == 0) {
         return BorderStyle::NONE;
     }
 
-    // Find position of this side
     int sideIndex = 0;
     for (int i = 0; i < 4; ++i) {
-        if ((1 << i) == sideBit) {
-            break;
-        }
-        if ((mask & (1 << i)) != 0) {
-            ++sideIndex;
-        }
+        if ((1 << i) == sideBit) break;
+        if ((mask & (1 << i)) != 0) ++sideIndex;
     }
 
-    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
+    const size_t sideOffset = offset + headerSize + static_cast<size_t>(sideIndex * 4);
     if (sideOffset >= _data.size()) {
         return BorderStyle::NONE;
     }
@@ -1061,23 +1344,19 @@ void StyleBuffer::getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, ui
 
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
+    const size_t headerSize = 1 + ((getExtFlags() & STYLE_EXT_BORDER_THEME) ? 1 : 0);
 
     if ((mask & sideBit) == 0) {
         return;
     }
 
-    // Find position of this side
     int sideIndex = 0;
     for (int i = 0; i < 4; ++i) {
-        if ((1 << i) == sideBit) {
-            break;
-        }
-        if ((mask & (1 << i)) != 0) {
-            ++sideIndex;
-        }
+        if ((1 << i) == sideBit) break;
+        if ((mask & (1 << i)) != 0) ++sideIndex;
     }
 
-    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
+    const size_t sideOffset = offset + headerSize + static_cast<size_t>(sideIndex * 4);
     if (sideOffset + 3 >= _data.size()) {
         return;
     }
@@ -1156,6 +1435,9 @@ void StyleBuffer::clearBorder() {
         const size_t size = getPropertySize(STYLE_FLAG_BORDER);
         removeDataAt(offset, size);
         clearFlag(STYLE_FLAG_BORDER);
+        if (hasExtendedFlags()) {
+            clearExtFlag(STYLE_EXT_BORDER_THEME);
+        }
     }
 }
 
@@ -1232,6 +1514,162 @@ std::string StyleBuffer::getBorderLeftColorHex() const {
 }
 
 // =============================================================================
+// Border theme/indexed color type byte
+// =============================================================================
+// When STYLE_EXT_BORDER_THEME is set, the border section has an extra byte
+// after the side mask byte. This byte encodes 2 bits per side:
+//   00 = direct RGB, 01 = theme, 10 = indexed
+//   Bits 0-1: top, 2-3: right, 4-5: bottom, 6-7: left
+
+uint8_t StyleBuffer::getBorderColorTypeByte() const {
+    if (!hasFlag(STYLE_FLAG_BORDER) || !(getExtFlags() & STYLE_EXT_BORDER_THEME)) {
+        return 0;
+    }
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    if (offset + 1 >= _data.size()) return 0;
+    return _data[offset + 1];  // Right after the side mask
+}
+
+void StyleBuffer::setBorderColorTypeByte(uint8_t value) {
+    if (!hasFlag(STYLE_FLAG_BORDER)) return;
+    if (!(getExtFlags() & STYLE_EXT_BORDER_THEME)) {
+        ensureBorderColorTypeByte();
+    }
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    if (offset + 1 < _data.size()) {
+        _data[offset + 1] = value;
+    }
+}
+
+void StyleBuffer::ensureBorderColorTypeByte() {
+    if (!hasFlag(STYLE_FLAG_BORDER)) return;
+    if (getExtFlags() & STYLE_EXT_BORDER_THEME) return;  // Already present
+
+    setExtFlag(STYLE_EXT_BORDER_THEME);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    // Insert after the side mask byte
+    const uint8_t zero = 0;
+    insertDataAt(offset + 1, &zero, 1);
+}
+
+void StyleBuffer::removeBorderColorTypeByteIfEmpty() {
+    if (!hasFlag(STYLE_FLAG_BORDER) || !(getExtFlags() & STYLE_EXT_BORDER_THEME)) return;
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    if (offset + 1 < _data.size() && _data[offset + 1] == 0) {
+        removeDataAt(offset + 1, 1);
+        clearExtFlag(STYLE_EXT_BORDER_THEME);
+    }
+}
+
+uint8_t StyleBuffer::getBorderSideColorType(uint8_t sideBit) const {
+    const uint8_t ctByte = getBorderColorTypeByte();
+    if (ctByte == 0) return 0;  // All direct
+
+    int sideIdx = 0;
+    for (int i = 0; i < 4; ++i) {
+        if ((1 << i) == sideBit) {
+            sideIdx = i;
+            break;
+        }
+    }
+    return (ctByte >> (sideIdx * 2)) & 0x03;
+}
+
+// Border theme/indexed internal member implementations
+
+void StyleBuffer::setBorderSideThemeColorImpl(uint8_t sideBit, BorderStyle style,
+                                               uint8_t themeIndex, double tint) {
+    uint8_t hi = 0, lo = 0;
+    encodeTint(tint, hi, lo);
+    setBorderSide(sideBit, style, themeIndex, hi, lo);
+
+    ensureBorderColorTypeByte();
+    uint8_t ctByte = getBorderColorTypeByte();
+    int sideIdx = 0;
+    for (int i = 0; i < 4; ++i) {
+        if ((1 << i) == sideBit) { sideIdx = i; break; }
+    }
+    ctByte &= ~(0x03 << (sideIdx * 2));
+    ctByte |= (0x01 << (sideIdx * 2));
+    setBorderColorTypeByte(ctByte);
+}
+
+void StyleBuffer::setBorderSideIndexedColorImpl(uint8_t sideBit, BorderStyle style,
+                                                 uint8_t paletteIndex) {
+    setBorderSide(sideBit, style, paletteIndex, 0, 0);
+
+    ensureBorderColorTypeByte();
+    uint8_t ctByte = getBorderColorTypeByte();
+    int sideIdx = 0;
+    for (int i = 0; i < 4; ++i) {
+        if ((1 << i) == sideBit) { sideIdx = i; break; }
+    }
+    ctByte &= ~(0x03 << (sideIdx * 2));
+    ctByte |= (0x02 << (sideIdx * 2));
+    setBorderColorTypeByte(ctByte);
+}
+
+uint8_t StyleBuffer::getBorderSideThemeIndexImpl(uint8_t sideBit) const {
+    if (getBorderSideColorType(sideBit) != 1) return 0;
+    uint8_t r = 0, g = 0, b = 0;
+    getBorderSideColor(sideBit, r, g, b);
+    return r;
+}
+
+double StyleBuffer::getBorderSideThemeTintImpl(uint8_t sideBit) const {
+    if (getBorderSideColorType(sideBit) != 1) return 0.0;
+    uint8_t r = 0, g = 0, b = 0;
+    getBorderSideColor(sideBit, r, g, b);
+    return decodeTint(g, b);
+}
+
+uint8_t StyleBuffer::getBorderSideIndexedColorIndexImpl(uint8_t sideBit) const {
+    if (getBorderSideColorType(sideBit) != 2) return 0;
+    uint8_t r = 0, g = 0, b = 0;
+    getBorderSideColor(sideBit, r, g, b);
+    return r;
+}
+
+void StyleBuffer::setBorderTopThemeColor(BorderStyle style, uint8_t themeIndex, double tint) {
+    setBorderSideThemeColorImpl(BORDER_SIDE_TOP, style, themeIndex, tint);
+}
+void StyleBuffer::setBorderRightThemeColor(BorderStyle style, uint8_t themeIndex, double tint) {
+    setBorderSideThemeColorImpl(BORDER_SIDE_RIGHT, style, themeIndex, tint);
+}
+void StyleBuffer::setBorderBottomThemeColor(BorderStyle style, uint8_t themeIndex, double tint) {
+    setBorderSideThemeColorImpl(BORDER_SIDE_BOTTOM, style, themeIndex, tint);
+}
+void StyleBuffer::setBorderLeftThemeColor(BorderStyle style, uint8_t themeIndex, double tint) {
+    setBorderSideThemeColorImpl(BORDER_SIDE_LEFT, style, themeIndex, tint);
+}
+
+void StyleBuffer::setBorderTopIndexedColor(BorderStyle style, uint8_t paletteIndex) {
+    setBorderSideIndexedColorImpl(BORDER_SIDE_TOP, style, paletteIndex);
+}
+void StyleBuffer::setBorderRightIndexedColor(BorderStyle style, uint8_t paletteIndex) {
+    setBorderSideIndexedColorImpl(BORDER_SIDE_RIGHT, style, paletteIndex);
+}
+void StyleBuffer::setBorderBottomIndexedColor(BorderStyle style, uint8_t paletteIndex) {
+    setBorderSideIndexedColorImpl(BORDER_SIDE_BOTTOM, style, paletteIndex);
+}
+void StyleBuffer::setBorderLeftIndexedColor(BorderStyle style, uint8_t paletteIndex) {
+    setBorderSideIndexedColorImpl(BORDER_SIDE_LEFT, style, paletteIndex);
+}
+
+uint8_t StyleBuffer::getBorderTopThemeIndex() const { return getBorderSideThemeIndexImpl(BORDER_SIDE_TOP); }
+double StyleBuffer::getBorderTopThemeTint() const { return getBorderSideThemeTintImpl(BORDER_SIDE_TOP); }
+uint8_t StyleBuffer::getBorderTopIndexedColorIndex() const { return getBorderSideIndexedColorIndexImpl(BORDER_SIDE_TOP); }
+uint8_t StyleBuffer::getBorderRightThemeIndex() const { return getBorderSideThemeIndexImpl(BORDER_SIDE_RIGHT); }
+double StyleBuffer::getBorderRightThemeTint() const { return getBorderSideThemeTintImpl(BORDER_SIDE_RIGHT); }
+uint8_t StyleBuffer::getBorderRightIndexedColorIndex() const { return getBorderSideIndexedColorIndexImpl(BORDER_SIDE_RIGHT); }
+uint8_t StyleBuffer::getBorderBottomThemeIndex() const { return getBorderSideThemeIndexImpl(BORDER_SIDE_BOTTOM); }
+double StyleBuffer::getBorderBottomThemeTint() const { return getBorderSideThemeTintImpl(BORDER_SIDE_BOTTOM); }
+uint8_t StyleBuffer::getBorderBottomIndexedColorIndex() const { return getBorderSideIndexedColorIndexImpl(BORDER_SIDE_BOTTOM); }
+uint8_t StyleBuffer::getBorderLeftThemeIndex() const { return getBorderSideThemeIndexImpl(BORDER_SIDE_LEFT); }
+double StyleBuffer::getBorderLeftThemeTint() const { return getBorderSideThemeTintImpl(BORDER_SIDE_LEFT); }
+uint8_t StyleBuffer::getBorderLeftIndexedColorIndex() const { return getBorderSideIndexedColorIndexImpl(BORDER_SIDE_LEFT); }
+
+// =============================================================================
 // Serialization
 // =============================================================================
 
@@ -1285,11 +1723,33 @@ std::string StyleBuffer::toJSON() const {
     }
     if (hasBgColor()) {
         addComma();
-        ss << "\"bgColor\":" << escapeJsonString(getBgColorHex());
+        if (hasBgThemeColor()) {
+            ss << "\"bgColor\":{\"theme\":" << static_cast<int>(getBgThemeIndex());
+            const double tint = getBgThemeTint();
+            if (tint != 0.0) {
+                ss << ",\"tint\":" << tint;
+            }
+            ss << "}";
+        } else if (hasBgIndexedColor()) {
+            ss << "\"bgColor\":{\"indexed\":" << static_cast<int>(getBgIndexedColorIndex()) << "}";
+        } else {
+            ss << "\"bgColor\":" << escapeJsonString(getBgColorHex());
+        }
     }
     if (hasTextColor()) {
         addComma();
-        ss << "\"textColor\":" << escapeJsonString(getTextColorHex());
+        if (hasTextThemeColor()) {
+            ss << "\"textColor\":{\"theme\":" << static_cast<int>(getTextThemeIndex());
+            const double tint = getTextThemeTint();
+            if (tint != 0.0) {
+                ss << ",\"tint\":" << tint;
+            }
+            ss << "}";
+        } else if (hasTextIndexedColor()) {
+            ss << "\"textColor\":{\"indexed\":" << static_cast<int>(getTextIndexedColorIndex()) << "}";
+        } else {
+            ss << "\"textColor\":" << escapeJsonString(getTextColorHex());
+        }
     }
     if (hasFontSize()) {
         addComma();
@@ -1297,7 +1757,11 @@ std::string StyleBuffer::toJSON() const {
     }
     if (hasFontFamily()) {
         addComma();
-        ss << "\"fontFamily\":" << escapeJsonString(getFontFamily());
+        if (hasFontTheme()) {
+            ss << "\"fontFamily\":{\"theme\":" << static_cast<int>(getFontThemeIndex()) << "}";
+        } else {
+            ss << "\"fontFamily\":" << escapeJsonString(getFontFamily());
+        }
     }
     if (hasHAlign()) {
         addComma();
@@ -1401,17 +1865,33 @@ StyleBuffer StyleBuffer::fromCellStyle(const CellStyle& style) {
     if (style.isDefined(DEFINED_WRAPTEXT)) {
         buf.setTextWrap(style.wrapText);
     }
-    if (style.isDefined(DEFINED_BGCOLOR) && !style.bgColor.empty()) {
-        buf.setBgColorHex(style.bgColor);
+    if (style.isDefined(DEFINED_BGCOLOR)) {
+        if (style.bgThemeIndex >= 0) {
+            buf.setBgThemeColor(static_cast<uint8_t>(style.bgThemeIndex), style.bgThemeTint);
+        } else if (style.bgIndexedColor >= 0) {
+            buf.setBgIndexedColor(static_cast<uint8_t>(style.bgIndexedColor));
+        } else if (!style.bgColor.empty()) {
+            buf.setBgColorHex(style.bgColor);
+        }
     }
-    if (style.isDefined(DEFINED_TEXTCOLOR) && !style.textColor.empty()) {
-        buf.setTextColorHex(style.textColor);
+    if (style.isDefined(DEFINED_TEXTCOLOR)) {
+        if (style.textThemeIndex >= 0) {
+            buf.setTextThemeColor(static_cast<uint8_t>(style.textThemeIndex), style.textThemeTint);
+        } else if (style.textIndexedColor >= 0) {
+            buf.setTextIndexedColor(static_cast<uint8_t>(style.textIndexedColor));
+        } else if (!style.textColor.empty()) {
+            buf.setTextColorHex(style.textColor);
+        }
     }
     if (style.isDefined(DEFINED_FONTSIZE) && style.fontSize > 0) {
         buf.setFontSize(style.fontSize);
     }
-    if (style.isDefined(DEFINED_FONTFAMILY) && !style.fontFamily.empty()) {
-        buf.setFontFamily(style.fontFamily);
+    if (style.isDefined(DEFINED_FONTFAMILY)) {
+        if (style.fontThemeIndex >= 0) {
+            buf.setFontTheme(static_cast<uint8_t>(style.fontThemeIndex));
+        } else if (!style.fontFamily.empty()) {
+            buf.setFontFamily(style.fontFamily);
+        }
     }
     if (style.isDefined(DEFINED_HALIGN)) {
         buf.setHAlign(style.hAlign);
@@ -1419,17 +1899,42 @@ StyleBuffer StyleBuffer::fromCellStyle(const CellStyle& style) {
     if (style.isDefined(DEFINED_VALIGN)) {
         buf.setVAlign(style.vAlign);
     }
-    if (style.isDefined(DEFINED_BORDER_TOP) && style.border.top.hasValue()) {
-        buf.setBorderTopHex(style.border.top.style, style.border.top.color);
+
+    // Helper to set border side from CellStyle edge
+    auto setBorderEdge = [&buf](const BorderEdge& edge, uint8_t sideBit) {
+        if (!edge.hasValue()) return;
+        if (edge.themeIndex >= 0) {
+            switch (sideBit) {
+                case BORDER_SIDE_TOP: buf.setBorderTopThemeColor(edge.style, static_cast<uint8_t>(edge.themeIndex), edge.themeTint); break;
+                case BORDER_SIDE_RIGHT: buf.setBorderRightThemeColor(edge.style, static_cast<uint8_t>(edge.themeIndex), edge.themeTint); break;
+                case BORDER_SIDE_BOTTOM: buf.setBorderBottomThemeColor(edge.style, static_cast<uint8_t>(edge.themeIndex), edge.themeTint); break;
+                case BORDER_SIDE_LEFT: buf.setBorderLeftThemeColor(edge.style, static_cast<uint8_t>(edge.themeIndex), edge.themeTint); break;
+            }
+        } else if (edge.indexedColor >= 0) {
+            switch (sideBit) {
+                case BORDER_SIDE_TOP: buf.setBorderTopIndexedColor(edge.style, static_cast<uint8_t>(edge.indexedColor)); break;
+                case BORDER_SIDE_RIGHT: buf.setBorderRightIndexedColor(edge.style, static_cast<uint8_t>(edge.indexedColor)); break;
+                case BORDER_SIDE_BOTTOM: buf.setBorderBottomIndexedColor(edge.style, static_cast<uint8_t>(edge.indexedColor)); break;
+                case BORDER_SIDE_LEFT: buf.setBorderLeftIndexedColor(edge.style, static_cast<uint8_t>(edge.indexedColor)); break;
+            }
+        } else {
+            uint8_t r = 0, g = 0, b = 0;
+            parseHexColor(edge.color, r, g, b);
+            buf.setBorderSide(sideBit, edge.style, r, g, b);
+        }
+    };
+
+    if (style.isDefined(DEFINED_BORDER_TOP)) {
+        setBorderEdge(style.border.top, BORDER_SIDE_TOP);
     }
-    if (style.isDefined(DEFINED_BORDER_RIGHT) && style.border.right.hasValue()) {
-        buf.setBorderRightHex(style.border.right.style, style.border.right.color);
+    if (style.isDefined(DEFINED_BORDER_RIGHT)) {
+        setBorderEdge(style.border.right, BORDER_SIDE_RIGHT);
     }
-    if (style.isDefined(DEFINED_BORDER_BOTTOM) && style.border.bottom.hasValue()) {
-        buf.setBorderBottomHex(style.border.bottom.style, style.border.bottom.color);
+    if (style.isDefined(DEFINED_BORDER_BOTTOM)) {
+        setBorderEdge(style.border.bottom, BORDER_SIDE_BOTTOM);
     }
-    if (style.isDefined(DEFINED_BORDER_LEFT) && style.border.left.hasValue()) {
-        buf.setBorderLeftHex(style.border.left.style, style.border.left.color);
+    if (style.isDefined(DEFINED_BORDER_LEFT)) {
+        setBorderEdge(style.border.left, BORDER_SIDE_LEFT);
     }
 
     return buf;
@@ -1455,11 +1960,25 @@ CellStyle StyleBuffer::toCellStyle() const {
         style.setDefined(DEFINED_WRAPTEXT);
     }
     if (hasBgColor()) {
-        style.bgColor = getBgColorHex();
+        if (hasBgThemeColor()) {
+            style.bgThemeIndex = static_cast<int8_t>(getBgThemeIndex());
+            style.bgThemeTint = getBgThemeTint();
+        } else if (hasBgIndexedColor()) {
+            style.bgIndexedColor = static_cast<int8_t>(getBgIndexedColorIndex());
+        } else {
+            style.bgColor = getBgColorHex();
+        }
         style.setDefined(DEFINED_BGCOLOR);
     }
     if (hasTextColor()) {
-        style.textColor = getTextColorHex();
+        if (hasTextThemeColor()) {
+            style.textThemeIndex = static_cast<int8_t>(getTextThemeIndex());
+            style.textThemeTint = getTextThemeTint();
+        } else if (hasTextIndexedColor()) {
+            style.textIndexedColor = static_cast<int8_t>(getTextIndexedColorIndex());
+        } else {
+            style.textColor = getTextColorHex();
+        }
         style.setDefined(DEFINED_TEXTCOLOR);
     }
     if (hasFontSize()) {
@@ -1467,7 +1986,11 @@ CellStyle StyleBuffer::toCellStyle() const {
         style.setDefined(DEFINED_FONTSIZE);
     }
     if (hasFontFamily()) {
-        style.fontFamily = getFontFamily();
+        if (hasFontTheme()) {
+            style.fontThemeIndex = static_cast<int8_t>(getFontThemeIndex());
+        } else {
+            style.fontFamily = getFontFamily();
+        }
         style.setDefined(DEFINED_FONTFAMILY);
     }
     if (hasHAlign()) {
@@ -1478,24 +2001,37 @@ CellStyle StyleBuffer::toCellStyle() const {
         style.vAlign = getVAlign();
         style.setDefined(DEFINED_VALIGN);
     }
+
+    // Helper to populate border edge theme/indexed refs
+    auto populateBorderEdge = [this](BorderEdge& edge, uint8_t sideBit) {
+        edge.style = getBorderSideStyle(sideBit);
+        const uint8_t ct = getBorderSideColorType(sideBit);
+        if (ct == 1) {  // theme
+            edge.themeIndex = static_cast<int8_t>(getBorderSideThemeIndexImpl(sideBit));
+            edge.themeTint = getBorderSideThemeTintImpl(sideBit);
+        } else if (ct == 2) {  // indexed
+            edge.indexedColor = static_cast<int8_t>(getBorderSideIndexedColorIndexImpl(sideBit));
+        } else {  // direct
+            uint8_t r = 0, g = 0, b = 0;
+            getBorderSideColor(sideBit, r, g, b);
+            edge.color = formatHexColor(r, g, b);
+        }
+    };
+
     if (hasBorderTop()) {
-        style.border.top.style = getBorderTopStyle();
-        style.border.top.color = getBorderTopColorHex();
+        populateBorderEdge(style.border.top, BORDER_SIDE_TOP);
         style.setDefined(DEFINED_BORDER_TOP);
     }
     if (hasBorderRight()) {
-        style.border.right.style = getBorderRightStyle();
-        style.border.right.color = getBorderRightColorHex();
+        populateBorderEdge(style.border.right, BORDER_SIDE_RIGHT);
         style.setDefined(DEFINED_BORDER_RIGHT);
     }
     if (hasBorderBottom()) {
-        style.border.bottom.style = getBorderBottomStyle();
-        style.border.bottom.color = getBorderBottomColorHex();
+        populateBorderEdge(style.border.bottom, BORDER_SIDE_BOTTOM);
         style.setDefined(DEFINED_BORDER_BOTTOM);
     }
     if (hasBorderLeft()) {
-        style.border.left.style = getBorderLeftStyle();
-        style.border.left.color = getBorderLeftColorHex();
+        populateBorderEdge(style.border.left, BORDER_SIDE_LEFT);
         style.setDefined(DEFINED_BORDER_LEFT);
     }
 
@@ -1524,16 +2060,30 @@ void StyleBuffer::merge(const StyleBuffer& other) {
         setTextWrap(other.getTextWrap());
     }
 
-    // Merge colors
+    // Merge bg color (preserving color type)
     if (other.hasBgColor()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getBgColor(r, g, b);
-        setBgColor(r, g, b);
+        if (other.hasBgThemeColor()) {
+            setBgThemeColor(other.getBgThemeIndex(), other.getBgThemeTint());
+        } else if (other.hasBgIndexedColor()) {
+            setBgIndexedColor(other.getBgIndexedColorIndex());
+        } else {
+            uint8_t r = 0, g = 0, b = 0;
+            other.getBgColor(r, g, b);
+            setBgColor(r, g, b);
+        }
     }
+
+    // Merge text color (preserving color type)
     if (other.hasTextColor()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getTextColor(r, g, b);
-        setTextColor(r, g, b);
+        if (other.hasTextThemeColor()) {
+            setTextThemeColor(other.getTextThemeIndex(), other.getTextThemeTint());
+        } else if (other.hasTextIndexedColor()) {
+            setTextIndexedColor(other.getTextIndexedColorIndex());
+        } else {
+            uint8_t r = 0, g = 0, b = 0;
+            other.getTextColor(r, g, b);
+            setTextColor(r, g, b);
+        }
     }
 
     // Merge font properties
@@ -1541,7 +2091,11 @@ void StyleBuffer::merge(const StyleBuffer& other) {
         setFontSize(other.getFontSize());
     }
     if (other.hasFontFamily()) {
-        setFontFamily(other.getFontFamily());
+        if (other.hasFontTheme()) {
+            setFontTheme(other.getFontThemeIndex());
+        } else {
+            setFontFamily(other.getFontFamily());
+        }
     }
 
     // Merge alignment
@@ -1557,27 +2111,53 @@ void StyleBuffer::merge(const StyleBuffer& other) {
         setNumberFormat(other.getNumberFormat());
     }
 
-    // Merge borders
-    if (other.hasBorderTop()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getBorderTopColor(r, g, b);
-        setBorderTop(other.getBorderTopStyle(), r, g, b);
-    }
-    if (other.hasBorderRight()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getBorderRightColor(r, g, b);
-        setBorderRight(other.getBorderRightStyle(), r, g, b);
-    }
-    if (other.hasBorderBottom()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getBorderBottomColor(r, g, b);
-        setBorderBottom(other.getBorderBottomStyle(), r, g, b);
-    }
-    if (other.hasBorderLeft()) {
-        uint8_t r = 0, g = 0, b = 0;
-        other.getBorderLeftColor(r, g, b);
-        setBorderLeft(other.getBorderLeftStyle(), r, g, b);
-    }
+    // Merge borders (preserving color types)
+    auto mergeBorderSide = [this, &other](uint8_t sideBit) {
+        if (!(other.getBorderSideMask() & sideBit)) return;
+        const uint8_t ct = other.getBorderSideColorType(sideBit);
+        if (ct == 1) {  // theme
+            uint8_t r = 0, g = 0, b = 0;
+            other.getBorderSideColor(sideBit, r, g, b);
+            setBorderSide(sideBit, other.getBorderSideStyle(sideBit), r, g, b);
+            // Set theme color type
+            ensureBorderColorTypeByte();
+            uint8_t ctByte = getBorderColorTypeByte();
+            int sideIdx = 0;
+            for (int i = 0; i < 4; ++i) { if ((1 << i) == sideBit) { sideIdx = i; break; } }
+            ctByte &= ~(0x03 << (sideIdx * 2));
+            ctByte |= (0x01 << (sideIdx * 2));
+            setBorderColorTypeByte(ctByte);
+        } else if (ct == 2) {  // indexed
+            uint8_t r = 0, g = 0, b = 0;
+            other.getBorderSideColor(sideBit, r, g, b);
+            setBorderSide(sideBit, other.getBorderSideStyle(sideBit), r, g, b);
+            ensureBorderColorTypeByte();
+            uint8_t ctByte = getBorderColorTypeByte();
+            int sideIdx = 0;
+            for (int i = 0; i < 4; ++i) { if ((1 << i) == sideBit) { sideIdx = i; break; } }
+            ctByte &= ~(0x03 << (sideIdx * 2));
+            ctByte |= (0x02 << (sideIdx * 2));
+            setBorderColorTypeByte(ctByte);
+        } else {  // direct
+            uint8_t r = 0, g = 0, b = 0;
+            other.getBorderSideColor(sideBit, r, g, b);
+            setBorderSide(sideBit, other.getBorderSideStyle(sideBit), r, g, b);
+            // Clear any existing theme/indexed type for this side
+            if (getExtFlags() & STYLE_EXT_BORDER_THEME) {
+                uint8_t ctByte = getBorderColorTypeByte();
+                int sideIdx = 0;
+                for (int i = 0; i < 4; ++i) { if ((1 << i) == sideBit) { sideIdx = i; break; } }
+                ctByte &= ~(0x03 << (sideIdx * 2));
+                setBorderColorTypeByte(ctByte);
+                removeBorderColorTypeByteIfEmpty();
+            }
+        }
+    };
+
+    mergeBorderSide(BORDER_SIDE_TOP);
+    mergeBorderSide(BORDER_SIDE_RIGHT);
+    mergeBorderSide(BORDER_SIDE_BOTTOM);
+    mergeBorderSide(BORDER_SIDE_LEFT);
 }
 
 bool StyleBuffer::hasCollision(const StyleBuffer& other) const {

@@ -82,7 +82,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - Update equality operators and hash functions
   - Add corresponding DEFINED flags
 
-- [ ] 1c: Extend `StyleBuffer` with theme/indexed color support
+- [x] 1c: Extend `StyleBuffer` with theme/indexed color support. Added bit 15 as extended flags indicator with 3rd flag byte, theme/indexed setters/getters for bg/text colors and borders, mutual exclusion between direct/theme/indexed, updated merge/toJSON/fromCellStyle/toCellStyle, border color type byte for per-side theme/indexed tracking.
   - Add bit 15 as "extended flags" indicator, third flag byte for new bits
   - New flags: `STYLE_FLAG_BG_THEME`, `STYLE_FLAG_BG_INDEXED`, `STYLE_FLAG_TEXT_THEME`, `STYLE_FLAG_TEXT_INDEXED`, `STYLE_FLAG_FONT_THEME`
   - Theme color data: index (1 byte) + tint (2 bytes int16 × 1000) = 3 bytes
