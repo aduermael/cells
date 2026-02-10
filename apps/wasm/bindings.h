@@ -266,6 +266,8 @@ public:
     std::string getWorkbookName();
     void setWorkbookName(const std::string& name);
     std::string getTheme();
+    std::string getBuiltinThemes();
+    std::string setTheme(const std::string& themeJson);
 
     // ========================================================================
     // Named ranges (bindings_core.cc)

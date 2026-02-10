@@ -199,6 +199,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getWorkbookName", &cells::wasm::CellsEngine::getWorkbookName)
         .function("setWorkbookName", &cells::wasm::CellsEngine::setWorkbookName)
         .function("getTheme", &cells::wasm::CellsEngine::getTheme)
+        .function("getBuiltinThemes", &cells::wasm::CellsEngine::getBuiltinThemes)
+        .function("setTheme", &cells::wasm::CellsEngine::setTheme)
         .function("getNamedRanges", &cells::wasm::CellsEngine::getNamedRanges)
         .function("createEmptyWorkbook", &cells::wasm::CellsEngine::createEmptyWorkbook)
         // CRDT collaboration

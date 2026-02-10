@@ -696,6 +696,16 @@ export class WasmDataSource {
     return this._client.getTheme();
   }
 
+  /** Get all built-in theme palettes */
+  async getBuiltinThemes(): Promise<WorkbookTheme[]> {
+    return this._client.getBuiltinThemes();
+  }
+
+  /** Apply a theme to the workbook */
+  async setTheme(theme: WorkbookTheme): Promise<void> {
+    return this._client.setTheme(theme);
+  }
+
   /** Get built-in cell style presets with resolved preview colors */
   async getCellStylePresets(): Promise<CellStylePreset[]> {
     return this._client.getCellStylePresets();

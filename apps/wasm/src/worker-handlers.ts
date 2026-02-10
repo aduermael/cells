@@ -1425,6 +1425,27 @@ export function handleGetCellStylePresets(
     respond({ type: "cellStylePresets", presets });
 }
 
+export function handleGetBuiltinThemes(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const result = engine.getBuiltinThemes();
+    const themes = JSON.parse(result);
+    respond({ type: "builtinThemes", themes });
+}
+
+export function handleSetTheme(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { themeJson } = params as { themeJson: string };
+    const result = engine.setTheme(themeJson);
+    const parsed = JSON.parse(result);
+    respond({ type: "setTheme", ...parsed });
+}
+
 // ============================================================================
 // Debug Operations
 // ============================================================================

@@ -178,6 +178,8 @@ export interface CellsEngine {
     setWorkbookName(name: string): void;
     createEmptyWorkbook(): void;
     getTheme(): string;
+    getBuiltinThemes(): string;
+    setTheme(themeJson: string): string;
 
     // CRDT collaboration
     setNodeId(nodeId: string): string;

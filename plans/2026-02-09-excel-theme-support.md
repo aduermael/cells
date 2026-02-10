@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 7a complete, 7b next.**
+**Status: In Progress — Phase 7b complete, 7c next.**
 
 ## Design
 
@@ -202,7 +202,7 @@ A "Themes" dropdown that lets users switch the workbook's theme from a gallery o
   - Theme ideas: "Arctic" (cool blues/grays), "Sunset" (warm oranges/reds), "Forest" (earthy greens), "Lavender" (purples/pinks), "Midnight" (deep blues/teals), "Coral" (warm pastels), "Slate" (neutral/professional), "Neon" (high contrast/vibrant), "Sage" (muted greens/naturals), "Rose Gold" (warm pinks/golds)
   - Include "Office" (Excel default) and "Cells Default" (our own clean default) as first entries
 
-- [ ] 7b: WASM binding and TypeScript types for theme switching
+- [x] 7b: WASM binding and TypeScript types for theme switching. Added `getBuiltinThemes()` C++ method serializing all 12 built-in themes as JSON. Added `setTheme(themeJson)` that parses a theme JSON, sets it on the workbook, and notifies listeners. Wired through all 5 layers: Embind registration, worker-types.ts, worker-handlers.ts, worker.ts, client.ts, wasm-data-source.ts. Added `builtin_themes` BUILD dep. Existing `WorkbookTheme` TS type reused for both builtins and current theme.
   - `getBuiltinThemes()` → JSON array of `{ name, colorScheme, fontScheme }`
   - `setTheme(themeJson)` → applies a new theme to the workbook, triggers re-resolve of all theme-referenced styles
   - Worker handler + CellsClient + WasmDataSource methods

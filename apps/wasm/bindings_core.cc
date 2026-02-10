@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <sstream>
 
+#include "core/cells/builtin_themes.h"
 #include "core/cells/crdt.h"
 #include "core/cells/fill_range.h"
 #include "core/cells/format_buffer.h"
@@ -2111,6 +2112,94 @@ std::string CellsEngine::getTheme() {
     ss << "]},\"fontScheme\":{\"majorFont\":\"" << jsonEscape(theme->fontScheme.majorFont)
        << "\",\"minorFont\":\"" << jsonEscape(theme->fontScheme.minorFont) << "\"}}";
     return ss.str();
+}
+
+std::string CellsEngine::getBuiltinThemes() {
+    auto themes = cells::getBuiltinThemes();
+
+    std::ostringstream ss;
+    ss << "[";
+    bool first = true;
+    for (const auto& bt : themes) {
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+
+        const auto& t = bt.theme;
+        ss << "{\"name\":\"" << jsonEscape(bt.name) << "\",\"colorScheme\":{\"colors\":[";
+        for (int i = 0; i < 12; ++i) {
+            if (i > 0) {
+                ss << ",";
+            }
+            ss << "\"" << jsonEscape(t.colorScheme.getColor(i)) << "\"";
+        }
+        ss << "]},\"fontScheme\":{\"majorFont\":\"" << jsonEscape(t.fontScheme.majorFont)
+           << "\",\"minorFont\":\"" << jsonEscape(t.fontScheme.minorFont) << "\"}}";
+    }
+    ss << "]";
+    return ss.str();
+}
+
+std::string CellsEngine::setTheme(const std::string& themeJson) {
+    if (!_workbook) {
+        return "{\"success\":false,\"error\":\"No workbook\"}";
+    }
+
+    // Parse the theme JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont, minorFont } }
+    // Simple JSON parsing — extract fields manually
+    auto extractString = [](const std::string& json, const std::string& key) -> std::string {
+        std::string needle = "\"" + key + "\":\"";
+        auto pos = json.find(needle);
+        if (pos == std::string::npos) {
+            return {};
+        }
+        pos += needle.length();
+        auto end = json.find('"', pos);
+        if (end == std::string::npos) {
+            return {};
+        }
+        return json.substr(pos, end - pos);
+    };
+
+    auto theme = std::make_unique<Theme>();
+    theme->name = extractString(themeJson, "name");
+
+    // Extract colors array
+    auto colorsStart = themeJson.find("\"colors\":[");
+    if (colorsStart != std::string::npos) {
+        colorsStart += 10;  // skip past "colors":[
+        auto colorsEnd = themeJson.find(']', colorsStart);
+        if (colorsEnd != std::string::npos) {
+            std::string colorsStr = themeJson.substr(colorsStart, colorsEnd - colorsStart);
+            int colorIndex = 0;
+            size_t searchPos = 0;
+            while (colorIndex < 12 && searchPos < colorsStr.length()) {
+                auto qStart = colorsStr.find('"', searchPos);
+                if (qStart == std::string::npos) {
+                    break;
+                }
+                auto qEnd = colorsStr.find('"', qStart + 1);
+                if (qEnd == std::string::npos) {
+                    break;
+                }
+                theme->colorScheme.setColor(colorIndex,
+                                            colorsStr.substr(qStart + 1, qEnd - qStart - 1));
+                colorIndex++;
+                searchPos = qEnd + 1;
+            }
+        }
+    }
+
+    theme->fontScheme.majorFont = extractString(themeJson, "majorFont");
+    theme->fontScheme.minorFont = extractString(themeJson, "minorFont");
+
+    _workbook->setTheme(std::move(theme));
+
+    // Notify that cells need re-rendering (theme colors resolve differently now)
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true}";
 }
 
 // ============================================================================

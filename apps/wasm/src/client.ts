@@ -1021,6 +1021,17 @@ export class CellsClient {
     return (response.theme as WorkbookTheme) ?? null;
   }
 
+  /** Get all built-in theme palettes. */
+  async getBuiltinThemes(): Promise<WorkbookTheme[]> {
+    const response = await this._send("getBuiltinThemes");
+    return (response.themes as WorkbookTheme[]) ?? [];
+  }
+
+  /** Apply a theme to the workbook. Accepts the full theme JSON. */
+  async setTheme(theme: WorkbookTheme): Promise<void> {
+    await this._send("setTheme", { themeJson: JSON.stringify(theme) });
+  }
+
   /** Get built-in cell style presets with resolved preview colors. */
   async getCellStylePresets(): Promise<CellStylePreset[]> {
     const response = await this._send("getCellStylePresets");
