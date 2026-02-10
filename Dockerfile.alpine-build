@@ -1,5 +1,5 @@
 # Alpine Linux build container for Cells CLI
-# Builds native musl-linked CLI binary using Bazel
+# Builds native musl-linked CLI binary with full networking support using Bazel
 FROM alpine:edge
 
 # Install Bazel from Alpine testing repository and build tools
@@ -23,8 +23,9 @@ RUN apk add --no-cache \
     git \
     # Python for Bazel
     python3 \
-    # Perl for OpenSSL assembly generation
+    # Perl for OpenSSL assembly generation (system Perl toolchain)
     perl \
+    perl-utils \
     # OpenSSL development headers (for libdatachannel)
     openssl-dev \
     # CMake and make for foreign_cc rules
@@ -43,6 +44,15 @@ WORKDIR /build
 # Copy source code
 COPY --chown=builder:builder . /build
 
-# Build the converter-only CLI binary with optimizations
-# The cells-converter target avoids OpenSSL/libdatachannel dependencies
-CMD ["bazel", "build", "-c", "opt", "//apps/cli:cells-converter"]
+# Build the full CLI binary with networking/sync support
+# --extra_toolchains: Use system cmake, make, ninja, and pkg-config instead of
+# downloading/bootstrapping them (the pre-built binaries are glibc-linked and
+# won't run on musl, and the bootstrapped ones fail to compile on musl/GCC 15)
+CMD ["sh", "-c", "bazel build -c opt \
+  --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain \
+  --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain \
+  --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain \
+  --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain \
+  //apps/cli:cells \
+  && mkdir -p /build/bin && cp bazel-bin/apps/cli/cells /build/bin/cells \
+  && echo 'Build complete! Binary at /build/bin/cells'"]

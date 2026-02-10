@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build CLI binary for Alpine Linux (musl libc) using Docker
+# Build full CLI binary for Alpine Linux (musl libc) using Docker
+# Includes networking/sync support (libcurl, libdatachannel, OpenSSL)
 # Output: dist/cli/cells-alpine
 set -euo pipefail
 
@@ -75,7 +76,7 @@ docker run --name "$CONTAINER_NAME" "$IMAGE_NAME"
 # Copy the binary out
 echo "Step 3/3: Extracting binary..."
 mkdir -p dist/cli
-docker cp "$CONTAINER_NAME:/build/bazel-bin/apps/cli/cells-converter" dist/cli/cells-alpine
+docker cp "$CONTAINER_NAME:/build/bin/cells" dist/cli/cells-alpine
 
 # Clean up container
 docker rm "$CONTAINER_NAME" > /dev/null

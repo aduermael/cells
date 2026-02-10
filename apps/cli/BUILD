@@ -42,8 +42,7 @@ cc_binary(
 )
 
 # Converter-only CLI binary (no sync/network support)
-# This target avoids OpenSSL/libdatachannel dependencies, making it easier to
-# build on platforms where Bazel's rules_perl doesn't work (e.g., Alpine/musl)
+# Useful for lightweight deployments that only need file conversion
 cc_binary(
     name = "cells-converter",
     srcs = [
