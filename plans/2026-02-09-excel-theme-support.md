@@ -153,7 +153,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - WASM binding to get the current theme's 12-color palette as JSON
   - TypeScript type for theme color scheme
 
-- [ ] 5b: Add theme color picker to cell styling UI
+- [x] 5b: Add theme color picker to cell styling UI. Added 10×6 theme color grid (10 base colors × 6 rows: base + 5 tint variations) to bg and text color popups. Selecting a theme color sends `bgThemeIndex`/`bgThemeTint` or `textThemeIndex`/`textThemeTint` to the C++ engine. Added `extractDoubleField` helper and theme field handling in `mergeStyleJson`. Standard colors kept as fallback below theme section.
   - Show the 12 theme colors (with tint variations) when picking bg/text color
   - Selecting a theme color applies `bgThemeIndex`/`textThemeIndex` + tint instead of a direct hex
   - Direct hex ("custom color") still available as fallback

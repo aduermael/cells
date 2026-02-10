@@ -3097,6 +3097,49 @@ canvas {
     text-transform: none;
 }
 
+/* Theme color section in color picker */
+.color-picker-theme {
+    margin-bottom: var(--spacing-xs);
+}
+
+.color-picker-theme:empty {
+    display: none;
+}
+
+.color-picker-theme-label {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.color-picker-theme-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 2px;
+}
+
+.color-picker-theme-grid .color-option {
+    width: 18px;
+    height: 18px;
+    border-radius: 2px;
+}
+
+/* Standard colors section */
+.color-picker-standard {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-xs);
+}
+
+.color-picker-standard-label {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Mixed state indicator (when selection has different values) */
 /* Note: Buttons should look normal (not disabled) when mixed - they're still clickable */
 /* The non-highlighted state already indicates the property is not uniformly applied */

@@ -22,9 +22,80 @@
 // =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
-import type { CellStyle, Position } from "./types";
+import type { CellStyle, Position, WorkbookTheme } from "./types";
 import { getMenuStateManager } from "./menu-state";
 import { positionDropdown } from "./dropdown-utils";
+
+// =============================================================================
+// Theme Color Helpers
+// =============================================================================
+
+/** Theme color slot names (OOXML order: lt1, dk1, lt2, dk2, accent1-6, hlink, folHlink) */
+const THEME_COLOR_NAMES = [
+  "Background 1", "Text 1", "Background 2", "Text 2",
+  "Accent 1", "Accent 2", "Accent 3", "Accent 4",
+  "Accent 5", "Accent 6",
+];
+
+/** Tint values for the 5-row theme color matrix (lightest to darkest) */
+const THEME_TINTS = [0.8, 0.6, 0.4, -0.25, -0.5];
+
+/** Apply tint to a hex color (TS port of C++ applyTint from theme.h) */
+function applyTint(hexColor: string, tint: number): string {
+  if (!hexColor || hexColor.length !== 7 || tint === 0) return hexColor;
+
+  const r = parseInt(hexColor.substring(1, 3), 16);
+  const g = parseInt(hexColor.substring(3, 5), 16);
+  const b = parseInt(hexColor.substring(5, 7), 16);
+
+  // RGB to HSL
+  const rd = r / 255, gd = g / 255, bd = b / 255;
+  const max = Math.max(rd, gd, bd), min = Math.min(rd, gd, bd);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === rd) h = (gd - bd) / d + (gd < bd ? 6 : 0);
+    else if (max === gd) h = (bd - rd) / d + 2;
+    else h = (rd - gd) / d + 4;
+    h /= 6;
+  }
+
+  // Apply tint per ECMA-376 spec
+  let newL: number;
+  if (tint < 0) {
+    newL = l * (1.0 + tint);
+  } else {
+    newL = l * (1.0 - tint) + tint;
+  }
+  newL = Math.max(0, Math.min(1, newL));
+
+  // HSL to RGB
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  let nr: number, ng: number, nb: number;
+  if (s === 0) {
+    nr = ng = nb = newL;
+  } else {
+    const q = newL < 0.5 ? newL * (1 + s) : newL + s - newL * s;
+    const p = 2 * newL - q;
+    nr = hue2rgb(p, q, h + 1 / 3);
+    ng = hue2rgb(p, q, h);
+    nb = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  const toHex = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0").toUpperCase();
+  return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
+}
 
 // =============================================================================
 // Types
@@ -42,11 +113,13 @@ export interface StyleControlsConfig {
   bgColorSwatch: HTMLElement;
   bgColorPopup: HTMLElement;
   bgColorHexInput: HTMLInputElement;
+  bgThemePalette: HTMLElement;
   textColorWrapper: HTMLElement;
   textColorBtn: HTMLButtonElement;
   textColorSwatch: HTMLElement;
   textColorPopup: HTMLElement;
   textColorHexInput: HTMLInputElement;
+  textThemePalette: HTMLElement;
   // Font controls
   fontFamilyDropdown: HTMLElement;
   fontFamilyBtn: HTMLButtonElement;
@@ -108,11 +181,13 @@ export class StyleControls {
   private bgColorSwatch: HTMLElement;
   private bgColorPopup: HTMLElement;
   private bgColorHexInput: HTMLInputElement;
+  private bgThemePalette: HTMLElement;
   private textColorWrapper: HTMLElement;
   private textColorBtn: HTMLButtonElement;
   private textColorSwatch: HTMLElement;
   private textColorPopup: HTMLElement;
   private textColorHexInput: HTMLInputElement;
+  private textThemePalette: HTMLElement;
   private fontFamilyDropdown: HTMLElement;
   private fontFamilyBtn: HTMLButtonElement;
   private fontFamilyLabel: HTMLElement;
@@ -169,11 +244,13 @@ export class StyleControls {
     this.bgColorSwatch = config.bgColorSwatch;
     this.bgColorPopup = config.bgColorPopup;
     this.bgColorHexInput = config.bgColorHexInput;
+    this.bgThemePalette = config.bgThemePalette;
     this.textColorWrapper = config.textColorWrapper;
     this.textColorBtn = config.textColorBtn;
     this.textColorSwatch = config.textColorSwatch;
     this.textColorPopup = config.textColorPopup;
     this.textColorHexInput = config.textColorHexInput;
+    this.textThemePalette = config.textThemePalette;
     this.fontFamilyDropdown = config.fontFamilyDropdown;
     this.fontFamilyBtn = config.fontFamilyBtn;
     this.fontFamilyLabel = config.fontFamilyLabel;
@@ -214,6 +291,15 @@ export class StyleControls {
   /** Set the data source after WASM initialization */
   setDataSource(dataSource: WasmDataSource): void {
     this.dataSource = dataSource;
+    this.loadThemePalette();
+  }
+
+  /** Reload theme palette (call after loading a new workbook) */
+  async loadThemePalette(): Promise<void> {
+    if (!this.dataSource) return;
+    const theme = await this.dataSource.getTheme();
+    this.buildThemePalette(this.bgThemePalette, theme, "bg");
+    this.buildThemePalette(this.textThemePalette, theme, "text");
   }
 
   /**
@@ -831,6 +917,140 @@ export class StyleControls {
 
   private isValidHexColor(color: string): boolean {
     return /^#[0-9A-Fa-f]{6}$/.test(color) || /^#[0-9A-Fa-f]{3}$/.test(color);
+  }
+
+  /**
+   * Build the theme color palette grid for a popup.
+   * Generates a 10-column × 6-row grid: first row is the 10 base theme colors
+   * (indices 0-9), then 5 rows of tint variations per color.
+   */
+  private buildThemePalette(
+    container: HTMLElement,
+    theme: WorkbookTheme | null,
+    type: "bg" | "text",
+  ): void {
+    container.innerHTML = "";
+    if (!theme) return;
+
+    const colors = theme.colorScheme.colors;
+    // Use first 10 colors (lt1, dk1, lt2, dk2, accent1-6), skip hlink/folHlink
+    const count = Math.min(colors.length, 10);
+    if (count === 0) return;
+
+    // Label
+    const label = document.createElement("div");
+    label.className = "color-picker-theme-label";
+    label.textContent = "Theme Colors";
+    container.appendChild(label);
+
+    // Grid
+    const grid = document.createElement("div");
+    grid.className = "color-picker-theme-grid";
+    container.appendChild(grid);
+
+    // Row 0: base theme colors (tint = 0)
+    for (let i = 0; i < count; i++) {
+      const color = colors[i] || "#000000";
+      const name = THEME_COLOR_NAMES[i] || `Theme ${i}`;
+      const btn = this.createThemeColorButton(color, i, 0, name);
+      grid.appendChild(btn);
+    }
+
+    // Rows 1-5: tint variations
+    for (const tint of THEME_TINTS) {
+      for (let i = 0; i < count; i++) {
+        const baseColor = colors[i] || "#000000";
+        const tinted = applyTint(baseColor, tint);
+        const pct = Math.round(tint * 100);
+        const tintLabel = pct > 0 ? `+${pct}%` : `${pct}%`;
+        const name = THEME_COLOR_NAMES[i] || `Theme ${i}`;
+        const btn = this.createThemeColorButton(tinted, i, tint, `${name}, ${tintLabel}`);
+        grid.appendChild(btn);
+      }
+    }
+
+    // Click handler for theme color buttons
+    grid.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest(".color-option") as HTMLElement;
+      if (!btn) return;
+
+      const themeIndex = parseInt(btn.dataset.themeIndex || "-1", 10);
+      const themeTint = parseFloat(btn.dataset.themeTint || "0");
+      if (themeIndex < 0) return;
+
+      if (type === "bg") {
+        this.applyBgThemeColor(themeIndex, themeTint);
+      } else {
+        this.applyTextThemeColor(themeIndex, themeTint);
+      }
+      this.closeColorPopups();
+    });
+  }
+
+  private createThemeColorButton(color: string, themeIndex: number, tint: number, title: string): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.className = "color-option";
+    btn.style.background = color;
+    btn.dataset.color = color.toUpperCase();
+    btn.dataset.themeIndex = String(themeIndex);
+    btn.dataset.themeTint = String(tint);
+    btn.title = title;
+    return btn;
+  }
+
+  private async applyBgThemeColor(themeIndex: number, tint: number): Promise<void> {
+    if (!this.hasValidSelection() || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = {
+      bgThemeIndex: themeIndex,
+      bgThemeTint: tint,
+    };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      // Update swatch with the resolved color for visual feedback
+      const theme = await this.dataSource.getTheme();
+      if (theme) {
+        const baseColor = theme.colorScheme.colors[themeIndex] || "#000000";
+        const resolved = tint === 0 ? baseColor : applyTint(baseColor, tint);
+        this.currentStyle.bgColor = resolved;
+        this.updateBgColorSwatch(resolved);
+      }
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply theme background color:", error);
+    }
+  }
+
+  private async applyTextThemeColor(themeIndex: number, tint: number): Promise<void> {
+    if (!this.hasValidSelection() || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = {
+      textThemeIndex: themeIndex,
+      textThemeTint: tint,
+    };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      // Update swatch with the resolved color for visual feedback
+      const theme = await this.dataSource.getTheme();
+      if (theme) {
+        const baseColor = theme.colorScheme.colors[themeIndex] || "#000000";
+        const resolved = tint === 0 ? baseColor : applyTint(baseColor, tint);
+        this.currentStyle.textColor = resolved;
+        this.updateTextColorSwatch(resolved);
+      }
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply theme text color:", error);
+    }
   }
 
   // =========================================================================

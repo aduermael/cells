@@ -159,11 +159,13 @@ export interface DOMElements {
   bgColorSwatch: HTMLElement;
   bgColorPopup: HTMLElement;
   bgColorHexInput: HTMLInputElement;
+  bgThemePalette: HTMLElement;
   textColorWrapper: HTMLElement;
   textColorBtn: HTMLButtonElement;
   textColorSwatch: HTMLElement;
   textColorPopup: HTMLElement;
   textColorHexInput: HTMLInputElement;
+  textThemePalette: HTMLElement;
   // Font controls
   fontFamilyDropdown: HTMLElement;
   fontFamilyBtn: HTMLButtonElement;
@@ -668,11 +670,13 @@ export function createApp(): App {
     bgColorSwatch: getElement("bg-color-swatch"),
     bgColorPopup: getElement("bg-color-popup"),
     bgColorHexInput: getElement<HTMLInputElement>("bg-color-hex"),
+    bgThemePalette: getElement("bg-theme-palette"),
     textColorWrapper: getElement("text-color-wrapper"),
     textColorBtn: getElement<HTMLButtonElement>("style-text-color-btn"),
     textColorSwatch: getElement("text-color-swatch"),
     textColorPopup: getElement("text-color-popup"),
     textColorHexInput: getElement<HTMLInputElement>("text-color-hex"),
+    textThemePalette: getElement("text-theme-palette"),
     // Font controls
     fontFamilyDropdown: getElement("font-family-dropdown"),
     fontFamilyBtn: getElement<HTMLButtonElement>("font-family-btn"),

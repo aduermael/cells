@@ -207,6 +207,11 @@ export interface CellStyle {
   hAlign: TextAlign;
   vAlign: VerticalAlign;
   border?: CellBorder; // Cell borders (optional)
+  // Theme color references (optional, set instead of direct hex to apply a theme color)
+  bgThemeIndex?: number; // Theme color index (0-11), -1 or undefined = direct
+  bgThemeTint?: number; // Tint modifier (-1.0 to 1.0)
+  textThemeIndex?: number; // Theme color index (0-11), -1 or undefined = direct
+  textThemeTint?: number; // Tint modifier (-1.0 to 1.0)
 }
 
 /** Registered style entry */

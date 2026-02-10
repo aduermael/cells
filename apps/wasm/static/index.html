@@ -267,39 +267,26 @@
                             <span class="color-swatch" id="bg-color-swatch"></span>
                         </button>
                         <div class="color-picker-popup" id="bg-color-popup">
-                            <div class="color-picker-palette">
-                                <button class="color-option no-color" data-color="" title="No fill"></button>
-                                <button class="color-option" data-color="#FFFFFF" style="background:#FFFFFF" title="White"></button>
-                                <button class="color-option" data-color="#F3F4F6" style="background:#F3F4F6" title="Gray 100"></button>
-                                <button class="color-option" data-color="#E5E7EB" style="background:#E5E7EB" title="Gray 200"></button>
-                                <button class="color-option" data-color="#D1D5DB" style="background:#D1D5DB" title="Gray 300"></button>
-                                <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
-                                <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
-                                <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
-                                <button class="color-option" data-color="#FEE2E2" style="background:#FEE2E2" title="Red 100"></button>
-                                <button class="color-option" data-color="#FECACA" style="background:#FECACA" title="Red 200"></button>
-                                <button class="color-option" data-color="#F87171" style="background:#F87171" title="Red 400"></button>
-                                <button class="color-option" data-color="#EF4444" style="background:#EF4444" title="Red 500"></button>
-                                <button class="color-option" data-color="#FEF3C7" style="background:#FEF3C7" title="Amber 100"></button>
-                                <button class="color-option" data-color="#FDE68A" style="background:#FDE68A" title="Amber 200"></button>
-                                <button class="color-option" data-color="#FBBF24" style="background:#FBBF24" title="Amber 400"></button>
-                                <button class="color-option" data-color="#F59E0B" style="background:#F59E0B" title="Amber 500"></button>
-                                <button class="color-option" data-color="#D1FAE5" style="background:#D1FAE5" title="Green 100"></button>
-                                <button class="color-option" data-color="#A7F3D0" style="background:#A7F3D0" title="Green 200"></button>
-                                <button class="color-option" data-color="#34D399" style="background:#34D399" title="Green 400"></button>
-                                <button class="color-option" data-color="#10B981" style="background:#10B981" title="Green 500"></button>
-                                <button class="color-option" data-color="#DBEAFE" style="background:#DBEAFE" title="Blue 100"></button>
-                                <button class="color-option" data-color="#BFDBFE" style="background:#BFDBFE" title="Blue 200"></button>
-                                <button class="color-option" data-color="#60A5FA" style="background:#60A5FA" title="Blue 400"></button>
-                                <button class="color-option" data-color="#3B82F6" style="background:#3B82F6" title="Blue 500"></button>
-                                <button class="color-option" data-color="#E0E7FF" style="background:#E0E7FF" title="Indigo 100"></button>
-                                <button class="color-option" data-color="#C7D2FE" style="background:#C7D2FE" title="Indigo 200"></button>
-                                <button class="color-option" data-color="#818CF8" style="background:#818CF8" title="Indigo 400"></button>
-                                <button class="color-option" data-color="#6366F1" style="background:#6366F1" title="Indigo 500"></button>
-                                <button class="color-option" data-color="#F3E8FF" style="background:#F3E8FF" title="Purple 100"></button>
-                                <button class="color-option" data-color="#E9D5FF" style="background:#E9D5FF" title="Purple 200"></button>
-                                <button class="color-option" data-color="#A78BFA" style="background:#A78BFA" title="Purple 400"></button>
-                                <button class="color-option" data-color="#8B5CF6" style="background:#8B5CF6" title="Purple 500"></button>
+                            <div class="color-picker-theme" id="bg-theme-palette"></div>
+                            <div class="color-picker-standard">
+                                <div class="color-picker-palette">
+                                    <button class="color-option no-color" data-color="" title="No fill"></button>
+                                    <button class="color-option" data-color="#FFFFFF" style="background:#FFFFFF" title="White"></button>
+                                    <button class="color-option" data-color="#000000" style="background:#000000" title="Black"></button>
+                                    <button class="color-option" data-color="#E5E7EB" style="background:#E5E7EB" title="Gray 200"></button>
+                                    <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
+                                    <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
+                                    <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
+                                    <button class="color-option" data-color="#1F2937" style="background:#1F2937" title="Gray 800"></button>
+                                    <button class="color-option" data-color="#EF4444" style="background:#EF4444" title="Red"></button>
+                                    <button class="color-option" data-color="#F97316" style="background:#F97316" title="Orange"></button>
+                                    <button class="color-option" data-color="#EAB308" style="background:#EAB308" title="Yellow"></button>
+                                    <button class="color-option" data-color="#22C55E" style="background:#22C55E" title="Green"></button>
+                                    <button class="color-option" data-color="#3B82F6" style="background:#3B82F6" title="Blue"></button>
+                                    <button class="color-option" data-color="#6366F1" style="background:#6366F1" title="Indigo"></button>
+                                    <button class="color-option" data-color="#8B5CF6" style="background:#8B5CF6" title="Purple"></button>
+                                    <button class="color-option" data-color="#EC4899" style="background:#EC4899" title="Pink"></button>
+                                </div>
                             </div>
                             <div class="color-picker-custom">
                                 <input type="text" class="color-hex-input" id="bg-color-hex" placeholder="#RRGGBB" maxlength="7" />
@@ -317,19 +304,22 @@
                             <span class="color-swatch" id="text-color-swatch" style="background:#000000"></span>
                         </button>
                         <div class="color-picker-popup" id="text-color-popup">
-                            <div class="color-picker-palette">
-                                <button class="color-option" data-color="#000000" style="background:#000000" title="Black"></button>
-                                <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
-                                <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
-                                <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
-                                <button class="color-option" data-color="#DC2626" style="background:#DC2626" title="Red 600"></button>
-                                <button class="color-option" data-color="#EA580C" style="background:#EA580C" title="Orange 600"></button>
-                                <button class="color-option" data-color="#D97706" style="background:#D97706" title="Amber 600"></button>
-                                <button class="color-option" data-color="#059669" style="background:#059669" title="Green 600"></button>
-                                <button class="color-option" data-color="#2563EB" style="background:#2563EB" title="Blue 600"></button>
-                                <button class="color-option" data-color="#4F46E5" style="background:#4F46E5" title="Indigo 600"></button>
-                                <button class="color-option" data-color="#7C3AED" style="background:#7C3AED" title="Purple 600"></button>
-                                <button class="color-option" data-color="#DB2777" style="background:#DB2777" title="Pink 600"></button>
+                            <div class="color-picker-theme" id="text-theme-palette"></div>
+                            <div class="color-picker-standard">
+                                <div class="color-picker-palette">
+                                    <button class="color-option" data-color="#000000" style="background:#000000" title="Black"></button>
+                                    <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
+                                    <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
+                                    <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
+                                    <button class="color-option" data-color="#DC2626" style="background:#DC2626" title="Red 600"></button>
+                                    <button class="color-option" data-color="#EA580C" style="background:#EA580C" title="Orange 600"></button>
+                                    <button class="color-option" data-color="#D97706" style="background:#D97706" title="Amber 600"></button>
+                                    <button class="color-option" data-color="#059669" style="background:#059669" title="Green 600"></button>
+                                    <button class="color-option" data-color="#2563EB" style="background:#2563EB" title="Blue 600"></button>
+                                    <button class="color-option" data-color="#4F46E5" style="background:#4F46E5" title="Indigo 600"></button>
+                                    <button class="color-option" data-color="#7C3AED" style="background:#7C3AED" title="Purple 600"></button>
+                                    <button class="color-option" data-color="#DB2777" style="background:#DB2777" title="Pink 600"></button>
+                                </div>
                             </div>
                             <div class="color-picker-custom">
                                 <input type="text" class="color-hex-input" id="text-color-hex" placeholder="#RRGGBB" maxlength="7" />

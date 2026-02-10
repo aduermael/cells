@@ -836,6 +836,33 @@ int extractIntField(const std::string& json, const std::string& key, int default
     return negative ? -value : value;
 }
 
+// Helper to extract a double field from JSON
+double extractDoubleField(const std::string& json, const std::string& key, double defaultValue) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += searchKey.length();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+    // Extract the number portion as a substring and convert
+    size_t start = pos;
+    if (json[pos] == '-') pos++;
+    while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9')) pos++;
+    if (pos < json.size() && json[pos] == '.') {
+        pos++;
+        while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9')) pos++;
+    }
+    if (pos == start) return defaultValue;
+    return std::stod(json.substr(start, pos - start));
+}
+
 // Helper to extract a nested border edge from JSON
 // Looking for pattern like: "top":{"style":"thin","color":"#000000"}
 BorderEdge extractBorderEdge(const std::string& json, const std::string& edgeName) {
@@ -917,12 +944,34 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
         style.wrapText = extractBoolField(json, "wrapText", style.wrapText);
         style.setDefined(DEFINED_WRAPTEXT);
     }
-    if (hasJsonField(json, "bgColor")) {
+    if (hasJsonField(json, "bgThemeIndex")) {
+        // Theme color reference — clear direct color and indexed
+        style.bgThemeIndex = static_cast<int8_t>(extractIntField(json, "bgThemeIndex", -1));
+        style.bgThemeTint = extractDoubleField(json, "bgThemeTint", 0.0);
+        style.bgColor.clear();
+        style.bgIndexedColor = -1;
+        style.setDefined(DEFINED_BGCOLOR);
+    } else if (hasJsonField(json, "bgColor")) {
+        // Direct hex color — clear theme and indexed refs
         style.bgColor = extractPayloadField(json, "bgColor");
+        style.bgThemeIndex = -1;
+        style.bgThemeTint = 0.0;
+        style.bgIndexedColor = -1;
         style.setDefined(DEFINED_BGCOLOR);
     }
-    if (hasJsonField(json, "textColor")) {
+    if (hasJsonField(json, "textThemeIndex")) {
+        // Theme color reference — clear direct color and indexed
+        style.textThemeIndex = static_cast<int8_t>(extractIntField(json, "textThemeIndex", -1));
+        style.textThemeTint = extractDoubleField(json, "textThemeTint", 0.0);
+        style.textColor.clear();
+        style.textIndexedColor = -1;
+        style.setDefined(DEFINED_TEXTCOLOR);
+    } else if (hasJsonField(json, "textColor")) {
+        // Direct hex color — clear theme and indexed refs
         style.textColor = extractPayloadField(json, "textColor");
+        style.textThemeIndex = -1;
+        style.textThemeTint = 0.0;
+        style.textIndexedColor = -1;
         style.setDefined(DEFINED_TEXTCOLOR);
     }
     if (hasJsonField(json, "fontFamily")) {
@@ -1022,12 +1071,18 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
         result.wrapText = newStyle.wrapText;
         result.setDefined(DEFINED_WRAPTEXT);
     }
-    if (hasJsonField(newStyleJson, "bgColor")) {
+    if (hasJsonField(newStyleJson, "bgThemeIndex") || hasJsonField(newStyleJson, "bgColor")) {
         result.bgColor = newStyle.bgColor;
+        result.bgThemeIndex = newStyle.bgThemeIndex;
+        result.bgThemeTint = newStyle.bgThemeTint;
+        result.bgIndexedColor = newStyle.bgIndexedColor;
         result.setDefined(DEFINED_BGCOLOR);
     }
-    if (hasJsonField(newStyleJson, "textColor")) {
+    if (hasJsonField(newStyleJson, "textThemeIndex") || hasJsonField(newStyleJson, "textColor")) {
         result.textColor = newStyle.textColor;
+        result.textThemeIndex = newStyle.textThemeIndex;
+        result.textThemeTint = newStyle.textThemeTint;
+        result.textIndexedColor = newStyle.textIndexedColor;
         result.setDefined(DEFINED_TEXTCOLOR);
     }
     if (hasJsonField(newStyleJson, "fontFamily")) {
