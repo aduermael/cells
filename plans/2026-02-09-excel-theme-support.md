@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 5 complete, Phase 6 planned.**
+**Status: In Progress — Phase 7a complete, 7b next.**
 
 ## Design
 
@@ -188,6 +188,40 @@ A "Cell Styles" dropdown menu that provides named style presets (like Excel's Ho
   - Allow users to create custom named styles from current cell formatting
   - Store custom styles in workbook metadata
   - Custom styles appear in the gallery alongside built-ins
+
+## Phase 7: Theme Switcher UI
+
+A "Themes" dropdown that lets users switch the workbook's theme from a gallery of built-in modern color palettes. When a theme is switched, all theme-referenced colors (cell styles, accent fills, text colors) update automatically. Imported themes from XLSX files also appear in the list.
+
+**Toolbar layout change:** Move the "Cell Styles" and "Themes" buttons into the alignment toolbar block (Block 2). They go in the right side of that block — top row: alignment + Themes dropdown; bottom row: alignment + Cell Styles dropdown. Remove the standalone Block 5 for Cell Styles.
+
+- [x] 7a: Define built-in themes in C++ core. Created `core/cells/builtin_themes.h` with `BuiltinTheme` struct, `makeTheme()` helper, and `getBuiltinThemes()` returning 12 themes: Office (Excel default), Cells (our modern default with vivid blue/pink/purple accents), Arctic (cool blues/grays), Sunset (warm oranges/reds), Forest (earthy greens), Lavender (soft purples/pinks), Midnight (deep blues/teals), Coral (warm pastels), Slate (neutral/professional), Neon (high contrast/vibrant), Sage (muted greens/naturals), Rose Gold (warm pinks/golds). Each theme has a 12-color scheme and appropriate font scheme. Added `builtin_themes` BUILD target.
+  - Create `core/cells/builtin_themes.h` with `getBuiltinThemes()` returning ~10 modern theme palettes
+  - Each theme: name + 12-color scheme (lt1, dk1, lt2, dk2, accent1-6, hlink, folHlink) + font scheme
+  - Design goal: modern/cooler palettes than Excel defaults — think contemporary design systems, desaturated pastels, vibrant accents, dark mode-friendly
+  - Theme ideas: "Arctic" (cool blues/grays), "Sunset" (warm oranges/reds), "Forest" (earthy greens), "Lavender" (purples/pinks), "Midnight" (deep blues/teals), "Coral" (warm pastels), "Slate" (neutral/professional), "Neon" (high contrast/vibrant), "Sage" (muted greens/naturals), "Rose Gold" (warm pinks/golds)
+  - Include "Office" (Excel default) and "Cells Default" (our own clean default) as first entries
+
+- [ ] 7b: WASM binding and TypeScript types for theme switching
+  - `getBuiltinThemes()` → JSON array of `{ name, colorScheme, fontScheme }`
+  - `setTheme(themeJson)` → applies a new theme to the workbook, triggers re-resolve of all theme-referenced styles
+  - Worker handler + CellsClient + WasmDataSource methods
+  - TypeScript types for the theme list
+  - When a file is opened with a custom theme, include it in the list as "Current" or by its name
+
+- [ ] 7c: Theme switcher dropdown UI
+  - "Themes" button in toolbar (alignment block, top row, right side) with dropdown arrow
+  - Dropdown shows a gallery of built-in themes, each as a row with: name + 6 accent color swatches preview
+  - If the workbook has an imported theme not matching any built-in, show it at the top as "Current Theme" or by its XML name
+  - Active/current theme gets a checkmark or highlight
+  - Clicking a theme applies it: calls `setTheme()`, then reloads theme palette, cell style presets, and re-renders
+  - All theme-aware UI updates: color pickers rebuild, cell style gallery invalidates cached presets
+
+- [ ] 7d: Move Themes and Cell Styles into alignment block
+  - Remove standalone Block 5 (cell-styles-block)
+  - Add Themes dropdown button to alignment block top row (right of v-align group)
+  - Add Cell Styles dropdown button to alignment block bottom row (right of h-align group)
+  - Update CSS for proper layout within the alignment block
 
 ## Technical Notes
 

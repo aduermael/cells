@@ -27,6 +27,15 @@ cc_library(
 )
 
 cc_library(
+    name = "builtin_themes",
+    hdrs = ["builtin_themes.h"],
+    deps = [
+        ":theme",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "style_buffer",
     srcs = ["style_buffer.cc"],
     hdrs = ["style_buffer.h"],
