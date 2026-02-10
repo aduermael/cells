@@ -475,9 +475,9 @@ std::string generateTheme(const cells::Theme* theme) {
         int themeIndex;
     };
     static constexpr ColorSlot kSlots[] = {
-        {"a:dk1", 1}, {"a:lt1", 0}, {"a:dk2", 3}, {"a:lt2", 2},
+        {"a:dk1", 1},     {"a:lt1", 0},     {"a:dk2", 3},     {"a:lt2", 2},
         {"a:accent1", 4}, {"a:accent2", 5}, {"a:accent3", 6}, {"a:accent4", 7},
-        {"a:accent5", 8}, {"a:accent6", 9}, {"a:hlink", 10}, {"a:folHlink", 11},
+        {"a:accent5", 8}, {"a:accent6", 9}, {"a:hlink", 10},  {"a:folHlink", 11},
     };
 
     // Default colors (Office theme)
@@ -504,7 +504,8 @@ std::string generateTheme(const cells::Theme* theme) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
-           "name=\"" << escapeXml(themeName) << "\">\n";
+           "name=\""
+        << escapeXml(themeName) << "\">\n";
     xml << "  <a:themeElements>\n";
 
     // Color scheme - required
@@ -517,8 +518,8 @@ std::string generateTheme(const cells::Theme* theme) {
         if (color.empty()) {
             color = kDefaultColors[slot.themeIndex];
         }
-        xml << "      <" << slot.xmlTag << "><a:srgbClr val=\"" << color << "\"/></"
-            << slot.xmlTag << ">\n";
+        xml << "      <" << slot.xmlTag << "><a:srgbClr val=\"" << color << "\"/></" << slot.xmlTag
+            << ">\n";
     }
     xml << "    </a:clrScheme>\n";
 
@@ -604,9 +605,19 @@ struct XLSXFontEntry {
     double size{11};
     std::string color;  // Empty = default, otherwise ARGB
 
+    // Theme/indexed color references (-1 = not set)
+    int8_t colorThemeIndex{-1};
+    double colorThemeTint{0.0};
+    int8_t colorIndexed{-1};
+
+    // Font scheme reference (-1 = direct, 0 = major, 1 = minor)
+    int8_t fontSchemeIndex{-1};
+
     bool operator==(const XLSXFontEntry& other) const {
         return bold == other.bold && italic == other.italic && underline == other.underline &&
-               name == other.name && size == other.size && color == other.color;
+               name == other.name && size == other.size && color == other.color &&
+               colorThemeIndex == other.colorThemeIndex && colorThemeTint == other.colorThemeTint &&
+               colorIndexed == other.colorIndexed && fontSchemeIndex == other.fontSchemeIndex;
     }
 };
 
@@ -614,7 +625,15 @@ struct XLSXFontEntry {
 struct XLSXFillEntry {
     std::string fgColor;  // ARGB hex, empty = none
 
-    bool operator==(const XLSXFillEntry& other) const { return fgColor == other.fgColor; }
+    // Theme/indexed color references for fgColor (-1 = not set)
+    int8_t fgThemeIndex{-1};
+    double fgThemeTint{0.0};
+    int8_t fgIndexed{-1};
+
+    bool operator==(const XLSXFillEntry& other) const {
+        return fgColor == other.fgColor && fgThemeIndex == other.fgThemeIndex &&
+               fgThemeTint == other.fgThemeTint && fgIndexed == other.fgIndexed;
+    }
 };
 
 // Single border edge entry for styles.xml
@@ -622,8 +641,15 @@ struct XLSXBorderEdgeEntry {
     cells::BorderStyle style{cells::BorderStyle::NONE};
     std::string color;  // ARGB hex, empty = use default (auto)
 
+    // Theme/indexed color references (-1 = not set)
+    int8_t colorThemeIndex{-1};
+    double colorThemeTint{0.0};
+    int8_t colorIndexed{-1};
+
     bool operator==(const XLSXBorderEdgeEntry& other) const {
-        return style == other.style && color == other.color;
+        return style == other.style && color == other.color &&
+               colorThemeIndex == other.colorThemeIndex && colorThemeTint == other.colorThemeTint &&
+               colorIndexed == other.colorIndexed;
     }
 
     [[nodiscard]] bool hasValue() const { return style != cells::BorderStyle::NONE; }
@@ -692,8 +718,8 @@ public:
         // Add required fills (indices 0 and 1) - required by Excel
         fills_.emplace_back();                          // none (index 0)
         fills_.emplace_back(XLSXFillEntry{"gray125"});  // gray125 (required placeholder)
-        fillIndex_[""] = 0;
-        fillIndex_["gray125"] = 1;
+        fillIndex_[fillKey(fills_[0])] = 0;
+        fillIndex_[fillKey(fills_[1])] = 1;
 
         // Add default border (index 0) - required by Excel
         borders_.emplace_back();  // Empty border (no edges)
@@ -716,23 +742,42 @@ public:
         font.name = style.fontFamily.empty() ? "Calibri" : style.fontFamily;
         font.size = style.fontSize > 0 ? style.fontSize : 11;
         font.color = rgbToArgb(style.textColor);
+        font.colorThemeIndex = style.textThemeIndex;
+        font.colorThemeTint = style.textThemeTint;
+        font.colorIndexed = style.textIndexedColor;
+        font.fontSchemeIndex = style.fontThemeIndex;
         const size_t fontId = getOrAddFont(font);
 
         // Get or add fill (background)
         XLSXFillEntry fill;
         fill.fgColor = rgbToArgb(style.bgColor);
+        fill.fgThemeIndex = style.bgThemeIndex;
+        fill.fgThemeTint = style.bgThemeTint;
+        fill.fgIndexed = style.bgIndexedColor;
         const size_t fillId = getOrAddFill(fill);
 
         // Get or add border
         XLSXBorderEntry border;
         border.left.style = style.border.left.style;
         border.left.color = rgbToArgb(style.border.left.color);
+        border.left.colorThemeIndex = style.border.left.themeIndex;
+        border.left.colorThemeTint = style.border.left.themeTint;
+        border.left.colorIndexed = style.border.left.indexedColor;
         border.right.style = style.border.right.style;
         border.right.color = rgbToArgb(style.border.right.color);
+        border.right.colorThemeIndex = style.border.right.themeIndex;
+        border.right.colorThemeTint = style.border.right.themeTint;
+        border.right.colorIndexed = style.border.right.indexedColor;
         border.top.style = style.border.top.style;
         border.top.color = rgbToArgb(style.border.top.color);
+        border.top.colorThemeIndex = style.border.top.themeIndex;
+        border.top.colorThemeTint = style.border.top.themeTint;
+        border.top.colorIndexed = style.border.top.indexedColor;
         border.bottom.style = style.border.bottom.style;
         border.bottom.color = rgbToArgb(style.border.bottom.color);
+        border.bottom.colorThemeIndex = style.border.bottom.themeIndex;
+        border.bottom.colorThemeTint = style.border.bottom.themeTint;
+        border.bottom.colorIndexed = style.border.bottom.indexedColor;
         const size_t borderId = getOrAddBorder(border);
 
         // Get number format ID
@@ -886,12 +931,18 @@ private:
     static std::string fontKey(const XLSXFontEntry& f) {
         std::ostringstream oss;
         oss << (f.bold ? "B" : "b") << (f.italic ? "I" : "i") << (f.underline ? "U" : "u") << "|"
-            << f.name << "|" << f.size << "|" << f.color;
+            << f.name << "|" << f.size << "|" << f.color << "|"
+            << static_cast<int>(f.colorThemeIndex) << ":" << f.colorThemeTint << ":"
+            << static_cast<int>(f.colorIndexed) << "|" << static_cast<int>(f.fontSchemeIndex);
         return oss.str();
     }
 
     static std::string borderEdgeKey(const XLSXBorderEdgeEntry& e) {
-        return std::to_string(static_cast<int>(e.style)) + ":" + e.color;
+        std::ostringstream oss;
+        oss << static_cast<int>(e.style) << ":" << e.color << ":"
+            << static_cast<int>(e.colorThemeIndex) << ":" << e.colorThemeTint << ":"
+            << static_cast<int>(e.colorIndexed);
+        return oss.str();
     }
 
     static std::string borderKey(const XLSXBorderEntry& b) {
@@ -919,18 +970,26 @@ private:
         return idx;
     }
 
+    static std::string fillKey(const XLSXFillEntry& f) {
+        std::ostringstream oss;
+        oss << f.fgColor << "|" << static_cast<int>(f.fgThemeIndex) << ":" << f.fgThemeTint << ":"
+            << static_cast<int>(f.fgIndexed);
+        return oss.str();
+    }
+
     size_t getOrAddFill(const XLSXFillEntry& fill) {
-        // Empty fill uses index 0
-        if (fill.fgColor.empty()) {
+        // Empty fill uses index 0 (no color refs of any kind)
+        if (fill.fgColor.empty() && fill.fgThemeIndex < 0 && fill.fgIndexed < 0) {
             return 0;
         }
-        auto it = fillIndex_.find(fill.fgColor);
+        const std::string key = fillKey(fill);
+        auto it = fillIndex_.find(key);
         if (it != fillIndex_.end()) {
             return it->second;
         }
         const size_t idx = fills_.size();
         fills_.push_back(fill);
-        fillIndex_[fill.fgColor] = idx;
+        fillIndex_[key] = idx;
         return idx;
     }
 
@@ -1493,6 +1552,23 @@ const char* borderStyleToXlsx(cells::BorderStyle style) {
     }
 }
 
+// Write a color element with theme/indexed/RGB support
+// tag: XML element name (e.g. "color", "fgColor", "bgColor")
+void writeColorElement(std::ostringstream& xml, const char* tag, const std::string& argbColor,
+                       int8_t themeIndex, double themeTint, int8_t indexedColor) {
+    if (themeIndex >= 0) {
+        xml << "<" << tag << " theme=\"" << static_cast<int>(themeIndex) << "\"";
+        if (themeTint != 0.0) {
+            xml << " tint=\"" << themeTint << "\"";
+        }
+        xml << "/>";
+    } else if (indexedColor >= 0) {
+        xml << "<" << tag << " indexed=\"" << static_cast<int>(indexedColor) << "\"/>";
+    } else if (!argbColor.empty()) {
+        xml << "<" << tag << " rgb=\"" << argbColor << "\"/>";
+    }
+}
+
 // Output a border edge element (left, right, top, bottom)
 void writeBorderEdge(std::ostringstream& xml, const char* name, const XLSXBorderEdgeEntry& edge) {
     const char* styleStr = borderStyleToXlsx(edge.style);
@@ -1501,8 +1577,9 @@ void writeBorderEdge(std::ostringstream& xml, const char* name, const XLSXBorder
         xml << "      <" << name << "/>\n";
     } else {
         xml << "      <" << name << " style=\"" << styleStr << "\">";
-        if (!edge.color.empty()) {
-            xml << "<color rgb=\"" << edge.color << "\"/>";
+        if (edge.colorThemeIndex >= 0 || edge.colorIndexed >= 0 || !edge.color.empty()) {
+            writeColorElement(xml, "color", edge.color, edge.colorThemeIndex, edge.colorThemeTint,
+                              edge.colorIndexed);
         } else {
             // Use auto color (black)
             xml << "<color auto=\"1\"/>";
@@ -1543,10 +1620,18 @@ std::string generateStyles(const StyleTable& styles) {
             xml << "      <u/>\n";
         }
         xml << "      <sz val=\"" << font.size << "\"/>\n";
-        if (!font.color.empty()) {
-            xml << "      <color rgb=\"" << font.color << "\"/>\n";
+        if (font.colorThemeIndex >= 0 || font.colorIndexed >= 0 || !font.color.empty()) {
+            xml << "      ";
+            writeColorElement(xml, "color", font.color, font.colorThemeIndex, font.colorThemeTint,
+                              font.colorIndexed);
+            xml << "\n";
         }
         xml << "      <name val=\"" << escapeXml(font.name) << "\"/>\n";
+        if (font.fontSchemeIndex == 0) {
+            xml << "      <scheme val=\"major\"/>\n";
+        } else if (font.fontSchemeIndex == 1) {
+            xml << "      <scheme val=\"minor\"/>\n";
+        }
         xml << "    </font>\n";
     }
     xml << "  </fonts>\n";
@@ -1559,10 +1644,13 @@ std::string generateStyles(const StyleTable& styles) {
         if (i == 1 && fill.fgColor == "gray125") {
             // Second fill is required gray125 placeholder
             xml << "    <fill><patternFill patternType=\"gray125\"/></fill>\n";
-        } else if (!fill.fgColor.empty() && fill.fgColor != "gray125") {
-            // Solid fill with color
-            xml << "    <fill><patternFill patternType=\"solid\"><fgColor rgb=\"" << fill.fgColor
-                << "\"/></patternFill></fill>\n";
+        } else if (fill.fgThemeIndex >= 0 || fill.fgIndexed >= 0 ||
+                   (!fill.fgColor.empty() && fill.fgColor != "gray125")) {
+            // Solid fill with color (theme, indexed, or direct RGB)
+            xml << "    <fill><patternFill patternType=\"solid\">";
+            writeColorElement(xml, "fgColor", fill.fgColor, fill.fgThemeIndex, fill.fgThemeTint,
+                              fill.fgIndexed);
+            xml << "</patternFill></fill>\n";
         } else {
             // Empty fill or index 0 - use none pattern
             xml << "    <fill><patternFill patternType=\"none\"/></fill>\n";

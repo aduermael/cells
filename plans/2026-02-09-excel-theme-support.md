@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 2.**
+**Status: In Progress — Phase 4.**
 
 ## Design
 
@@ -126,7 +126,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - If workbook has a theme, serialize its color and font schemes as DrawingML XML
   - If no theme, keep the current minimal placeholder
 
-- [ ] 3b: Write theme/indexed color references in styles
+- [x] 3b: Write theme/indexed color references in styles. Extended XLSXFontEntry/FillEntry/BorderEdgeEntry with theme/indexed fields. Added `writeColorElement()` helper for theme/indexed/RGB output. Updated font output with `<scheme>` element. Updated fill and border edge output. Updated dedup keys and `getOrAddFormat()` to propagate refs from CellStyle.
   - When a style has theme color: output `<color theme="N" tint="T"/>` (omit tint if 0.0)
   - When indexed: output `<color indexed="N"/>`
   - When direct RGB: output `<color rgb="FFRRGGBB"/>` (current behavior)
