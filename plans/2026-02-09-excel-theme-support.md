@@ -135,11 +135,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 ## Phase 4: Comparator & Verification
 
-- [ ] 4a: Fix C# comparator to resolve theme and indexed colors to hex
-  - Load theme palette from workbook, resolve `theme:N` → `#RRGGBB`
-  - Resolve `indexed:N` → `#RRGGBB` using the fixed palette
-  - Apply tint when present
-  - Both files now produce comparable hex values
+- [ ] 4a: C# comparator fix (done externally — will be brought in from another project)
 
 - [ ] 4b: Expose theme to frontend via WASM bindings
   - `getTheme()` → JSON with color scheme and font scheme
@@ -150,6 +146,21 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - `./run-test.sh math-basic` — verify theme color roundtrip
   - Test with indexed-color test file once provided
   - Fix any remaining style mismatches
+
+## Phase 5: Theme UI
+
+- [ ] 5a: Expose theme color palette to frontend
+  - WASM binding to get the current theme's 12-color palette as JSON
+  - TypeScript type for theme color scheme
+
+- [ ] 5b: Add theme color picker to cell styling UI
+  - Show the 12 theme colors (with tint variations) when picking bg/text color
+  - Selecting a theme color applies `bgThemeIndex`/`textThemeIndex` + tint instead of a direct hex
+  - Direct hex ("custom color") still available as fallback
+
+- [ ] 5c: Display current theme mapping in cell style inspector
+  - When a cell uses a theme color, show which theme slot it maps to (e.g. "Accent 1 +40%")
+  - When a cell uses a direct color, show the hex as before
 
 ## Technical Notes
 
@@ -186,4 +197,5 @@ Tint ranges -1.0 to +1.0. Stored as int16 × 1000 (e.g. 0.399 → 399, -0.25 →
 | `core/cells/xlsx_writer.cc` | Export theme XML, write theme/indexed color refs |
 | `core/cells/model.h` | Workbook::_theme member |
 | `apps/wasm/bindings.cc` | getTheme(), resolve colors for frontend |
-| `tests/excel-roundtrips/evaluator/Program.cs` | Resolve colors in comparator |
+| `tests/excel-roundtrips/evaluator/Program.cs` | Resolve colors in comparator (external) |
+| Frontend (TBD) | Theme color picker, style inspector theme display |
