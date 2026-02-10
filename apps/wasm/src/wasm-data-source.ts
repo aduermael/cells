@@ -37,6 +37,7 @@ import type {
   NamedRangeInfo,
   CellStyle,
   RegisteredStyle,
+  WorkbookTheme,
 } from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
@@ -683,6 +684,15 @@ export class WasmDataSource {
   /** Get total height of all rows in pixels */
   async getTotalHeight(): Promise<number> {
     return this._client.getTotalHeight();
+  }
+
+  // ==========================================================================
+  // Theme
+  // ==========================================================================
+
+  /** Get the workbook's theme (color palette + font scheme), or null if none */
+  async getTheme(): Promise<WorkbookTheme | null> {
+    return this._client.getTheme();
   }
 
   // ==========================================================================

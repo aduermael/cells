@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 4 complete.**
+**Status: In Progress — Phase 5a complete.**
 
 ## Design
 
@@ -149,7 +149,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 ## Phase 5: Theme UI
 
-- [ ] 5a: Expose theme color palette to frontend
+- [x] 5a: Expose theme color palette to frontend. Added `WorkbookTheme`, `ThemeColorScheme`, `ThemeFontScheme` TypeScript types. Added `getTheme()` worker handler, CellsClient method, and WasmDataSource method. The existing WASM `getTheme()` binding (from 4b) returns JSON with name, 12-color scheme, and font scheme.
   - WASM binding to get the current theme's 12-color palette as JSON
   - TypeScript type for theme color scheme
 

@@ -176,6 +176,7 @@ export interface CellsEngine {
     getWorkbookName(): string;
     setWorkbookName(name: string): void;
     createEmptyWorkbook(): void;
+    getTheme(): string;
 
     // CRDT collaboration
     setNodeId(nodeId: string): string;

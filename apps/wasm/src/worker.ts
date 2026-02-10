@@ -110,6 +110,7 @@ import {
     handleCreateEmpty,
     handleSetWorkbookName,
     handleGetWorkbookName,
+    handleGetTheme,
     handleDebugParseFormula,
     handleGetColumnPixelOffset,
     handleGetRowPixelOffset,
@@ -646,6 +647,9 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getWorkbookName":
                 handleGetWorkbookName(engine, params, respond);
+                break;
+            case "getTheme":
+                handleGetTheme(engine, params, respond);
                 break;
 
             // ================================================================

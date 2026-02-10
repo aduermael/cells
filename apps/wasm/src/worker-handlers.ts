@@ -1402,6 +1402,20 @@ export function handleGetWorkbookName(
 }
 
 // ============================================================================
+// Theme Operations
+// ============================================================================
+
+export function handleGetTheme(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const result = engine.getTheme();
+    const theme = JSON.parse(result);
+    respond({ type: "theme", theme });
+}
+
+// ============================================================================
 // Debug Operations
 // ============================================================================
 

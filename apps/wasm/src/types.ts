@@ -215,6 +215,24 @@ export interface RegisteredStyle {
   style: CellStyle;
 }
 
+/** Theme color scheme (12 OOXML theme colors) */
+export interface ThemeColorScheme {
+  colors: string[]; // 12 hex colors: lt1, dk1, lt2, dk2, accent1-6, hlink, folHlink
+}
+
+/** Theme font scheme */
+export interface ThemeFontScheme {
+  majorFont: string; // Headings font name
+  minorFont: string; // Body font name
+}
+
+/** Workbook theme (color palette + font scheme) */
+export interface WorkbookTheme {
+  name: string;
+  colorScheme: ThemeColorScheme;
+  fontScheme: ThemeFontScheme;
+}
+
 // ============================================================================
 // Formula Function Types
 // ============================================================================

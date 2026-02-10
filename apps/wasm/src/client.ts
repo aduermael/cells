@@ -39,6 +39,7 @@ import type {
   FormatDetails,
   CellStyle,
   RegisteredStyle,
+  WorkbookTheme,
 } from "./types";
 import type {
   WorkerMessage,
@@ -1008,6 +1009,15 @@ export class CellsClient {
 
   async setWorkbookName(name: string): Promise<void> {
     await this._send("setWorkbookName", { name });
+  }
+
+  /**
+   * Get the workbook's theme (color palette + font scheme).
+   * Returns null if the workbook has no theme.
+   */
+  async getTheme(): Promise<WorkbookTheme | null> {
+    const response = await this._send("getTheme");
+    return (response.theme as WorkbookTheme) ?? null;
   }
 
   // ========== CRDT Collaboration API ==========
