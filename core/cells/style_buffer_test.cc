@@ -906,5 +906,454 @@ TEST(StyleBufferTest, EffectiveStyleBorderMerge) {
     EXPECT_EQ(result.getBorderBottomColorHex(), "#00FF00");
 }
 
+// =============================================================================
+// Theme Color Encoding Tests
+// =============================================================================
+
+TEST(StyleBufferTest, BgThemeColorRoundtrip) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.399);  // accent1, tint 0.399
+
+    EXPECT_TRUE(s.hasBgColor());
+    EXPECT_TRUE(s.hasBgThemeColor());
+    EXPECT_FALSE(s.hasBgIndexedColor());
+    EXPECT_EQ(s.getBgThemeIndex(), 4);
+    EXPECT_NEAR(s.getBgThemeTint(), 0.399, 0.002);
+
+    // Base64 roundtrip
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(decoded->hasBgThemeColor());
+    EXPECT_EQ(decoded->getBgThemeIndex(), 4);
+    EXPECT_NEAR(decoded->getBgThemeTint(), 0.399, 0.002);
+}
+
+TEST(StyleBufferTest, BgThemeColorZeroTint) {
+    StyleBuffer s;
+    s.setBgThemeColor(1, 0.0);
+
+    EXPECT_TRUE(s.hasBgThemeColor());
+    EXPECT_EQ(s.getBgThemeIndex(), 1);
+    EXPECT_EQ(s.getBgThemeTint(), 0.0);
+}
+
+TEST(StyleBufferTest, BgThemeColorNegativeTint) {
+    StyleBuffer s;
+    s.setBgThemeColor(0, -0.5);
+
+    EXPECT_TRUE(s.hasBgThemeColor());
+    EXPECT_EQ(s.getBgThemeIndex(), 0);
+    EXPECT_NEAR(s.getBgThemeTint(), -0.5, 0.002);
+}
+
+TEST(StyleBufferTest, BgIndexedColorRoundtrip) {
+    StyleBuffer s;
+    s.setBgIndexedColor(22);  // Silver
+
+    EXPECT_TRUE(s.hasBgColor());
+    EXPECT_FALSE(s.hasBgThemeColor());
+    EXPECT_TRUE(s.hasBgIndexedColor());
+    EXPECT_EQ(s.getBgIndexedColorIndex(), 22);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(decoded->hasBgIndexedColor());
+    EXPECT_EQ(decoded->getBgIndexedColorIndex(), 22);
+}
+
+TEST(StyleBufferTest, TextThemeColorRoundtrip) {
+    StyleBuffer s;
+    s.setTextThemeColor(1, -0.25);  // dk1, tint -0.25
+
+    EXPECT_TRUE(s.hasTextColor());
+    EXPECT_TRUE(s.hasTextThemeColor());
+    EXPECT_FALSE(s.hasTextIndexedColor());
+    EXPECT_EQ(s.getTextThemeIndex(), 1);
+    EXPECT_NEAR(s.getTextThemeTint(), -0.25, 0.002);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(decoded->hasTextThemeColor());
+    EXPECT_EQ(decoded->getTextThemeIndex(), 1);
+    EXPECT_NEAR(decoded->getTextThemeTint(), -0.25, 0.002);
+}
+
+TEST(StyleBufferTest, TextIndexedColorRoundtrip) {
+    StyleBuffer s;
+    s.setTextIndexedColor(64);  // System foreground
+
+    EXPECT_TRUE(s.hasTextColor());
+    EXPECT_TRUE(s.hasTextIndexedColor());
+    EXPECT_EQ(s.getTextIndexedColorIndex(), 64);
+}
+
+// =============================================================================
+// Mutual Exclusion Tests
+// =============================================================================
+
+TEST(StyleBufferTest, DirectClearsTheme) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.3);
+    EXPECT_TRUE(s.hasBgThemeColor());
+
+    s.setBgColorHex("#FF0000");
+    EXPECT_FALSE(s.hasBgThemeColor());
+    EXPECT_FALSE(s.hasBgIndexedColor());
+    EXPECT_TRUE(s.hasBgColor());
+    EXPECT_EQ(s.getBgColorHex(), "#FF0000");
+}
+
+TEST(StyleBufferTest, DirectClearsIndexed) {
+    StyleBuffer s;
+    s.setBgIndexedColor(5);
+    EXPECT_TRUE(s.hasBgIndexedColor());
+
+    s.setBgColorHex("#00FF00");
+    EXPECT_FALSE(s.hasBgIndexedColor());
+    EXPECT_FALSE(s.hasBgThemeColor());
+    EXPECT_EQ(s.getBgColorHex(), "#00FF00");
+}
+
+TEST(StyleBufferTest, ThemeClearsDirectAndIndexed) {
+    StyleBuffer s;
+    s.setBgColorHex("#FF0000");
+    EXPECT_TRUE(s.hasBgColor());
+    EXPECT_FALSE(s.hasBgThemeColor());
+
+    s.setBgThemeColor(4, 0.0);
+    EXPECT_TRUE(s.hasBgThemeColor());
+    EXPECT_FALSE(s.hasBgIndexedColor());
+    EXPECT_EQ(s.getBgThemeIndex(), 4);
+}
+
+TEST(StyleBufferTest, IndexedClearsDirectAndTheme) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.3);
+    s.setBgIndexedColor(22);
+    EXPECT_TRUE(s.hasBgIndexedColor());
+    EXPECT_FALSE(s.hasBgThemeColor());
+}
+
+TEST(StyleBufferTest, ClearBgColorClearsTheme) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.3);
+    s.clearBgColor();
+    EXPECT_FALSE(s.hasBgColor());
+    EXPECT_FALSE(s.hasBgThemeColor());
+}
+
+TEST(StyleBufferTest, TextMutualExclusion) {
+    StyleBuffer s;
+    s.setTextThemeColor(1, 0.0);
+    EXPECT_TRUE(s.hasTextThemeColor());
+
+    s.setTextColorHex("#000000");
+    EXPECT_FALSE(s.hasTextThemeColor());
+    EXPECT_TRUE(s.hasTextColor());
+}
+
+// =============================================================================
+// Merge Tests with Theme Colors
+// =============================================================================
+
+TEST(StyleBufferTest, MergeThemeOverDirect) {
+    StyleBuffer base;
+    base.setBgColorHex("#FF0000");
+
+    StyleBuffer overlay;
+    overlay.setBgThemeColor(4, 0.3);
+
+    base.merge(overlay);
+    EXPECT_TRUE(base.hasBgThemeColor());
+    EXPECT_EQ(base.getBgThemeIndex(), 4);
+    EXPECT_NEAR(base.getBgThemeTint(), 0.3, 0.002);
+}
+
+TEST(StyleBufferTest, MergeDirectOverTheme) {
+    StyleBuffer base;
+    base.setBgThemeColor(4, 0.3);
+
+    StyleBuffer overlay;
+    overlay.setBgColorHex("#FF0000");
+
+    base.merge(overlay);
+    EXPECT_FALSE(base.hasBgThemeColor());
+    EXPECT_EQ(base.getBgColorHex(), "#FF0000");
+}
+
+TEST(StyleBufferTest, MergeIndexedOverTheme) {
+    StyleBuffer base;
+    base.setBgThemeColor(4, 0.3);
+
+    StyleBuffer overlay;
+    overlay.setBgIndexedColor(22);
+
+    base.merge(overlay);
+    EXPECT_FALSE(base.hasBgThemeColor());
+    EXPECT_TRUE(base.hasBgIndexedColor());
+    EXPECT_EQ(base.getBgIndexedColorIndex(), 22);
+}
+
+TEST(StyleBufferTest, MergePreservesThemeInNonOverlap) {
+    StyleBuffer base;
+    base.setBgThemeColor(4, 0.3);
+
+    StyleBuffer overlay;
+    overlay.setBold(true);
+
+    base.merge(overlay);
+    EXPECT_TRUE(base.hasBgThemeColor());
+    EXPECT_TRUE(base.hasBold());
+}
+
+// =============================================================================
+// Font Theme Tests
+// =============================================================================
+
+TEST(StyleBufferTest, FontThemeRoundtrip) {
+    StyleBuffer s;
+    s.setFontTheme(1);  // minor (body)
+
+    EXPECT_TRUE(s.hasFontTheme());
+    EXPECT_TRUE(s.hasFontFamily());
+    EXPECT_EQ(s.getFontThemeIndex(), 1);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(decoded->hasFontTheme());
+    EXPECT_EQ(decoded->getFontThemeIndex(), 1);
+}
+
+TEST(StyleBufferTest, FontFamilyClearsFontTheme) {
+    StyleBuffer s;
+    s.setFontTheme(0);
+    EXPECT_TRUE(s.hasFontTheme());
+
+    s.setFontFamily("Arial");
+    EXPECT_FALSE(s.hasFontTheme());
+    EXPECT_EQ(s.getFontFamily(), "Arial");
+}
+
+// =============================================================================
+// JSON Serialization Tests
+// =============================================================================
+
+TEST(StyleBufferTest, ThemeColorToJSON) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.399);
+    s.setTextIndexedColor(22);
+
+    std::string json = s.toJSON();
+    EXPECT_NE(json.find("\"theme\":4"), std::string::npos);
+    EXPECT_NE(json.find("\"tint\":"), std::string::npos);
+    EXPECT_NE(json.find("\"indexed\":22"), std::string::npos);
+}
+
+TEST(StyleBufferTest, FontThemeToJSON) {
+    StyleBuffer s;
+    s.setFontTheme(1);
+
+    std::string json = s.toJSON();
+    EXPECT_NE(json.find("\"fontFamily\":{\"theme\":1}"), std::string::npos);
+}
+
+// =============================================================================
+// CellStyle Conversion Tests
+// =============================================================================
+
+TEST(StyleBufferTest, ThemeColorCellStyleRoundtrip) {
+    CellStyle cs;
+    cs.setDefined(DEFINED_BGCOLOR);
+    cs.bgThemeIndex = 4;
+    cs.bgThemeTint = 0.399;
+    cs.setDefined(DEFINED_TEXTCOLOR);
+    cs.textIndexedColor = 22;
+
+    StyleBuffer buf = StyleBuffer::fromCellStyle(cs);
+    EXPECT_TRUE(buf.hasBgThemeColor());
+    EXPECT_EQ(buf.getBgThemeIndex(), 4);
+    EXPECT_TRUE(buf.hasTextIndexedColor());
+    EXPECT_EQ(buf.getTextIndexedColorIndex(), 22);
+
+    CellStyle cs2 = buf.toCellStyle();
+    EXPECT_EQ(cs2.bgThemeIndex, 4);
+    EXPECT_NEAR(cs2.bgThemeTint, 0.399, 0.002);
+    EXPECT_EQ(cs2.textIndexedColor, 22);
+}
+
+TEST(StyleBufferTest, FontThemeCellStyleRoundtrip) {
+    CellStyle cs;
+    cs.setDefined(DEFINED_FONTFAMILY);
+    cs.fontThemeIndex = 1;
+
+    StyleBuffer buf = StyleBuffer::fromCellStyle(cs);
+    EXPECT_TRUE(buf.hasFontTheme());
+    EXPECT_EQ(buf.getFontThemeIndex(), 1);
+
+    CellStyle cs2 = buf.toCellStyle();
+    EXPECT_EQ(cs2.fontThemeIndex, 1);
+}
+
+// =============================================================================
+// Backward Compatibility Tests
+// =============================================================================
+
+TEST(StyleBufferTest, OldBuffersStillWork) {
+    // A style buffer with only 2 flag bytes (no extended flags) should still parse
+    StyleBuffer s;
+    s.setBgColorHex("#FF0000");
+    s.setBold(true);
+
+    EXPECT_FALSE(s.hasExtendedFlags());
+    EXPECT_EQ(s.getBgColorHex(), "#FF0000");
+    EXPECT_TRUE(s.getBold());
+
+    // Base64 roundtrip
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_FALSE(decoded->hasExtendedFlags());
+    EXPECT_EQ(decoded->getBgColorHex(), "#FF0000");
+    EXPECT_TRUE(decoded->getBold());
+}
+
+TEST(StyleBufferTest, ExtendedFlagsRemovedWhenEmpty) {
+    StyleBuffer s;
+    s.setBgThemeColor(4, 0.3);
+    EXPECT_TRUE(s.hasExtendedFlags());
+
+    s.setBgColorHex("#FF0000");  // Switch to direct
+    // Extended flags should be removed since no ext bits are set
+    EXPECT_FALSE(s.hasExtendedFlags());
+}
+
+// =============================================================================
+// Border Theme/Indexed Color Tests
+// =============================================================================
+
+TEST(StyleBufferTest, BorderThemeColorRoundtrip) {
+    StyleBuffer s;
+    s.setBorderTopThemeColor(BorderStyle::THIN, 4, 0.3);
+
+    EXPECT_TRUE(s.hasBorderTop());
+    EXPECT_EQ(s.getBorderTopStyle(), BorderStyle::THIN);
+    EXPECT_EQ(s.getBorderSideColorType(BORDER_SIDE_TOP), 1);
+    EXPECT_EQ(s.getBorderTopThemeIndex(), 4);
+    EXPECT_NEAR(s.getBorderTopThemeTint(), 0.3, 0.002);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_TOP), 1);
+    EXPECT_EQ(decoded->getBorderTopThemeIndex(), 4);
+    EXPECT_NEAR(decoded->getBorderTopThemeTint(), 0.3, 0.002);
+}
+
+TEST(StyleBufferTest, BorderIndexedColorRoundtrip) {
+    StyleBuffer s;
+    s.setBorderLeftIndexedColor(BorderStyle::MEDIUM, 22);
+
+    EXPECT_TRUE(s.hasBorderLeft());
+    EXPECT_EQ(s.getBorderLeftStyle(), BorderStyle::MEDIUM);
+    EXPECT_EQ(s.getBorderSideColorType(BORDER_SIDE_LEFT), 2);
+    EXPECT_EQ(s.getBorderLeftIndexedColorIndex(), 22);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_LEFT), 2);
+    EXPECT_EQ(decoded->getBorderLeftIndexedColorIndex(), 22);
+}
+
+TEST(StyleBufferTest, BorderMixedColorTypes) {
+    StyleBuffer s;
+    s.setBorderTop(BorderStyle::THIN, 0xFF, 0x00, 0x00);      // direct
+    s.setBorderRightThemeColor(BorderStyle::MEDIUM, 4, 0.3);  // theme
+    s.setBorderBottomIndexedColor(BorderStyle::THICK, 22);    // indexed
+
+    EXPECT_EQ(s.getBorderSideColorType(BORDER_SIDE_TOP), 0);     // direct
+    EXPECT_EQ(s.getBorderSideColorType(BORDER_SIDE_RIGHT), 1);   // theme
+    EXPECT_EQ(s.getBorderSideColorType(BORDER_SIDE_BOTTOM), 2);  // indexed
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_TOP), 0);
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_RIGHT), 1);
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_BOTTOM), 2);
+    EXPECT_EQ(decoded->getBorderTopColorHex(), "#FF0000");
+    EXPECT_EQ(decoded->getBorderRightThemeIndex(), 4);
+    EXPECT_EQ(decoded->getBorderBottomIndexedColorIndex(), 22);
+}
+
+TEST(StyleBufferTest, BorderThemeCellStyleRoundtrip) {
+    CellStyle cs;
+    cs.setDefined(DEFINED_BORDER_TOP);
+    cs.border.top.style = BorderStyle::THIN;
+    cs.border.top.themeIndex = 4;
+    cs.border.top.themeTint = 0.3;
+    cs.setDefined(DEFINED_BORDER_RIGHT);
+    cs.border.right.style = BorderStyle::MEDIUM;
+    cs.border.right.indexedColor = 22;
+
+    StyleBuffer buf = StyleBuffer::fromCellStyle(cs);
+    EXPECT_EQ(buf.getBorderSideColorType(BORDER_SIDE_TOP), 1);
+    EXPECT_EQ(buf.getBorderTopThemeIndex(), 4);
+    EXPECT_EQ(buf.getBorderSideColorType(BORDER_SIDE_RIGHT), 2);
+    EXPECT_EQ(buf.getBorderRightIndexedColorIndex(), 22);
+
+    CellStyle cs2 = buf.toCellStyle();
+    EXPECT_EQ(cs2.border.top.themeIndex, 4);
+    EXPECT_NEAR(cs2.border.top.themeTint, 0.3, 0.002);
+    EXPECT_EQ(cs2.border.right.indexedColor, 22);
+}
+
+// =============================================================================
+// Complex Interaction Tests
+// =============================================================================
+
+TEST(StyleBufferTest, ThemeColorWithOtherProperties) {
+    // Test that theme colors work alongside other style properties
+    StyleBuffer s;
+    s.setBold(true);
+    s.setBgThemeColor(4, 0.3);
+    s.setTextIndexedColor(22);
+    s.setFontSize(14);
+    s.setFontTheme(1);
+    s.setHAlign(TextAlign::CENTER);
+    s.setBorderTopThemeColor(BorderStyle::THIN, 1, -0.25);
+
+    auto decoded = StyleBuffer::fromBase64(s.toBase64());
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_TRUE(decoded->getBold());
+    EXPECT_TRUE(decoded->hasBgThemeColor());
+    EXPECT_EQ(decoded->getBgThemeIndex(), 4);
+    EXPECT_TRUE(decoded->hasTextIndexedColor());
+    EXPECT_EQ(decoded->getTextIndexedColorIndex(), 22);
+    EXPECT_EQ(decoded->getFontSize(), 14);
+    EXPECT_TRUE(decoded->hasFontTheme());
+    EXPECT_EQ(decoded->getFontThemeIndex(), 1);
+    EXPECT_EQ(decoded->getHAlign(), TextAlign::CENTER);
+    EXPECT_EQ(decoded->getBorderSideColorType(BORDER_SIDE_TOP), 1);
+    EXPECT_EQ(decoded->getBorderTopThemeIndex(), 1);
+    EXPECT_NEAR(decoded->getBorderTopThemeTint(), -0.25, 0.002);
+}
+
+TEST(StyleBufferTest, TintEncodingPrecision) {
+    // Test various tint values for encoding precision
+    struct TestCase {
+        double tint;
+        double maxError;
+    };
+    TestCase cases[] = {
+        {0.0, 0.001},   {1.0, 0.001},    {-1.0, 0.001},  {0.5, 0.001},    {-0.5, 0.001},
+        {0.399, 0.002}, {-0.249, 0.002}, {0.001, 0.002}, {-0.001, 0.002},
+    };
+
+    for (const auto& tc : cases) {
+        uint8_t hi = 0, lo = 0;
+        StyleBuffer::encodeTint(tc.tint, hi, lo);
+        double decoded = StyleBuffer::decodeTint(hi, lo);
+        EXPECT_NEAR(decoded, tc.tint, tc.maxError)
+            << "Tint " << tc.tint << " decoded as " << decoded;
+    }
+}
+
 }  // namespace
 }  // namespace cells

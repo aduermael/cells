@@ -85,12 +85,12 @@ constexpr uint16_t STYLE_FLAG_BORDER = 1 << 14;
 constexpr uint16_t STYLE_FLAG_EXTENDED = 1 << 15;  // Extended flags byte follows
 
 // Extended flags byte bit positions (in byte 2, only present when STYLE_FLAG_EXTENDED is set)
-constexpr uint8_t STYLE_EXT_BG_THEME = 1 << 0;       // bgColor slot is theme reference
-constexpr uint8_t STYLE_EXT_BG_INDEXED = 1 << 1;      // bgColor slot is indexed reference
-constexpr uint8_t STYLE_EXT_TEXT_THEME = 1 << 2;       // textColor slot is theme reference
-constexpr uint8_t STYLE_EXT_TEXT_INDEXED = 1 << 3;     // textColor slot is indexed reference
-constexpr uint8_t STYLE_EXT_FONT_THEME = 1 << 4;       // fontFamily slot is theme font ref
-constexpr uint8_t STYLE_EXT_BORDER_THEME = 1 << 5;     // border has theme/indexed color types
+constexpr uint8_t STYLE_EXT_BG_THEME = 1 << 0;      // bgColor slot is theme reference
+constexpr uint8_t STYLE_EXT_BG_INDEXED = 1 << 1;    // bgColor slot is indexed reference
+constexpr uint8_t STYLE_EXT_TEXT_THEME = 1 << 2;    // textColor slot is theme reference
+constexpr uint8_t STYLE_EXT_TEXT_INDEXED = 1 << 3;  // textColor slot is indexed reference
+constexpr uint8_t STYLE_EXT_FONT_THEME = 1 << 4;    // fontFamily slot is theme font ref
+constexpr uint8_t STYLE_EXT_BORDER_THEME = 1 << 5;  // border has theme/indexed color types
 
 // Mask for all boolean flags (bold, italic, underline, strikethrough, textWrap)
 constexpr uint16_t STYLE_FLAG_BOOLEANS = STYLE_FLAG_BOLD | STYLE_FLAG_ITALIC |
@@ -135,6 +135,9 @@ public:
 
     // Check if style has any defined properties
     [[nodiscard]] bool isEmpty() const;
+
+    // Check if extended flags byte is present (for testing/debugging)
+    [[nodiscard]] bool hasExtendedFlags() const;
 
     // =========================================================================
     // Boolean property setters
@@ -466,7 +469,6 @@ private:
     void getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, uint8_t& b) const;
 
     // Extended flags helpers
-    [[nodiscard]] bool hasExtendedFlags() const;
     [[nodiscard]] uint8_t getExtFlags() const;
     void setExtFlag(uint8_t flag);
     void clearExtFlag(uint8_t flag);
@@ -483,7 +485,8 @@ private:
     void removeBorderColorTypeByteIfEmpty();
 
     // Border theme/indexed internal setters/getters
-    void setBorderSideThemeColorImpl(uint8_t sideBit, BorderStyle style, uint8_t themeIndex, double tint);
+    void setBorderSideThemeColorImpl(uint8_t sideBit, BorderStyle style, uint8_t themeIndex,
+                                     double tint);
     void setBorderSideIndexedColorImpl(uint8_t sideBit, BorderStyle style, uint8_t paletteIndex);
     [[nodiscard]] uint8_t getBorderSideThemeIndexImpl(uint8_t sideBit) const;
     [[nodiscard]] double getBorderSideThemeTintImpl(uint8_t sideBit) const;

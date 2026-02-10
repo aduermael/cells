@@ -93,7 +93,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - Update `toCellStyle()` / `fromCellStyle()` roundtrip
   - Update border encoding: add per-side color type bits
 
-- [ ] 1d: Unit tests for theme color encoding in StyleBuffer
+- [x] 1d: Unit tests for theme color encoding in StyleBuffer. Added 27 new tests covering theme/indexed roundtrip, mutual exclusion, merge behavior, JSON output, CellStyle conversion, border theme/indexed, backward compat, and tint precision. All 338 unit + 338 E2E tests pass.
   - Test theme color set/get roundtrip
   - Test indexed color set/get roundtrip
   - Test mutual exclusion (setting direct clears theme, etc.)

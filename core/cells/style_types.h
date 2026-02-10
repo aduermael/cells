@@ -167,9 +167,8 @@ struct CellStyle {
                fontFamily == other.fontFamily && fontSize == other.fontSize &&
                hAlign == other.hAlign && vAlign == other.vAlign && border == other.border &&
                bgThemeIndex == other.bgThemeIndex && bgThemeTint == other.bgThemeTint &&
-               bgIndexedColor == other.bgIndexedColor &&
-               textThemeIndex == other.textThemeIndex && textThemeTint == other.textThemeTint &&
-               textIndexedColor == other.textIndexedColor &&
+               bgIndexedColor == other.bgIndexedColor && textThemeIndex == other.textThemeIndex &&
+               textThemeTint == other.textThemeTint && textIndexedColor == other.textIndexedColor &&
                fontThemeIndex == other.fontThemeIndex;
     }
 
