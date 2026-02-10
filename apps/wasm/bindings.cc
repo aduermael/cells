@@ -142,6 +142,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getCellStyle", &cells::wasm::CellsEngine::getCellStyle)
         .function("getCellStyleAt", &cells::wasm::CellsEngine::getCellStyleAt)
         .function("getAvailableStyles", &cells::wasm::CellsEngine::getAvailableStyles)
+        .function("getCellStylePresets", &cells::wasm::CellsEngine::getCellStylePresets)
         // Range styles
         .function("setRangeStyle", &cells::wasm::CellsEngine::setRangeStyle)
         .function("setRangeStyleOnSheet", &cells::wasm::CellsEngine::setRangeStyleOnSheet)

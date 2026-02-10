@@ -40,6 +40,7 @@ import type {
   CellStyle,
   RegisteredStyle,
   WorkbookTheme,
+  CellStylePreset,
 } from "./types";
 import type {
   WorkerMessage,
@@ -1018,6 +1019,12 @@ export class CellsClient {
   async getTheme(): Promise<WorkbookTheme | null> {
     const response = await this._send("getTheme");
     return (response.theme as WorkbookTheme) ?? null;
+  }
+
+  /** Get built-in cell style presets with resolved preview colors. */
+  async getCellStylePresets(): Promise<CellStylePreset[]> {
+    const response = await this._send("getCellStylePresets");
+    return (response.presets as CellStylePreset[]) ?? [];
   }
 
   // ========== CRDT Collaboration API ==========

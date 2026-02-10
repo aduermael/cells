@@ -111,6 +111,7 @@ import {
     handleSetWorkbookName,
     handleGetWorkbookName,
     handleGetTheme,
+    handleGetCellStylePresets,
     handleDebugParseFormula,
     handleGetColumnPixelOffset,
     handleGetRowPixelOffset,
@@ -650,6 +651,9 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getTheme":
                 handleGetTheme(engine, params, respond);
+                break;
+            case "getCellStylePresets":
+                handleGetCellStylePresets(engine, params, respond);
                 break;
 
             // ================================================================

@@ -38,6 +38,7 @@ import type {
   CellStyle,
   RegisteredStyle,
   WorkbookTheme,
+  CellStylePreset,
 } from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
@@ -693,6 +694,11 @@ export class WasmDataSource {
   /** Get the workbook's theme (color palette + font scheme), or null if none */
   async getTheme(): Promise<WorkbookTheme | null> {
     return this._client.getTheme();
+  }
+
+  /** Get built-in cell style presets with resolved preview colors */
+  async getCellStylePresets(): Promise<CellStylePreset[]> {
+    return this._client.getCellStylePresets();
   }
 
   // ==========================================================================

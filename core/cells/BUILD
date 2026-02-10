@@ -17,6 +17,16 @@ cc_library(
 )
 
 cc_library(
+    name = "cell_style_presets",
+    hdrs = ["cell_style_presets.h"],
+    deps = [
+        ":style_types",
+        ":theme",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "style_buffer",
     srcs = ["style_buffer.cc"],
     hdrs = ["style_buffer.h"],

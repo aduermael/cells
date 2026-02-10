@@ -21,6 +21,7 @@
 #include <sstream>
 #include <utility>
 
+#include "core/cells/cell_style_presets.h"
 #include "core/cells/crdt.h"
 #include "core/cells/format_buffer.h"
 #include "core/cells/range.h"
@@ -2979,6 +2980,39 @@ std::string CellsEngine::removeRangeFormat(uint32_t col, uint32_t row) {
     notifyListeners(ChangeType::CELL_CHANGED);
 
     return "{\"success\":true}";
+}
+
+// ============================================================================
+// Cell style presets
+// ============================================================================
+
+std::string CellsEngine::getCellStylePresets() {
+    auto presets = cells::getBuiltinCellStylePresets();
+    const Theme* theme = _workbook ? _workbook->getTheme() : nullptr;
+
+    std::ostringstream ss;
+    ss << "[";
+    bool first = true;
+    for (const auto& preset : presets) {
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+
+        // Resolve theme colors to hex for preview rendering
+        CellStyle resolved = cells::resolvePresetPreviewColors(preset.style, theme);
+
+        ss << "{\"name\":\"" << jsonEscape(preset.name) << "\",\"category\":\""
+           << jsonEscape(preset.category) << "\",\"style\":" << styleToJson(resolved);
+
+        if (!preset.formatCode.empty()) {
+            ss << ",\"formatCode\":\"" << jsonEscape(preset.formatCode) << "\"";
+        }
+
+        ss << "}";
+    }
+    ss << "]";
+    return ss.str();
 }
 
 }  // namespace cells::wasm

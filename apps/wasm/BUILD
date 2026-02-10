@@ -69,6 +69,7 @@ cc_binary(
     ],
     deps = [
         "//core/cells:agent_client",
+        "//core/cells:cell_style_presets",
         "//core/cells:crdt",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",

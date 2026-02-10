@@ -1415,6 +1415,16 @@ export function handleGetTheme(
     respond({ type: "theme", theme });
 }
 
+export function handleGetCellStylePresets(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const result = engine.getCellStylePresets();
+    const presets = JSON.parse(result);
+    respond({ type: "cellStylePresets", presets });
+}
+
 // ============================================================================
 // Debug Operations
 // ============================================================================

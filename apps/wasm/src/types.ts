@@ -238,6 +238,14 @@ export interface WorkbookTheme {
   fontScheme: ThemeFontScheme;
 }
 
+/** Cell style preset (named style from the Cell Styles gallery) */
+export interface CellStylePreset {
+  name: string;
+  category: string;
+  style: CellStyle;
+  formatCode?: string; // Optional number format code (e.g. "#,##0.00")
+}
+
 // ============================================================================
 // Formula Function Types
 // ============================================================================

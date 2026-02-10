@@ -169,6 +169,9 @@ public:
                                      uint32_t endCol, uint32_t endRow, const std::string& styleJson);
     std::string removeRangeStyle(uint32_t col, uint32_t row);
 
+    // Cell style presets (built-in named styles like Excel's Cell Styles gallery)
+    std::string getCellStylePresets();
+
     // Effective style operations (resolves cell > range > column > row hierarchy)
     // Used by UI to show the actual style in the toolbar
     std::string getEffectiveCellStyle(uint32_t col, uint32_t row);

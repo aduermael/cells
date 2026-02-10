@@ -172,7 +172,7 @@ A "Cell Styles" dropdown menu that provides named style presets (like Excel's Ho
   - Theme-aware: accent-based presets reference theme colors (bgThemeIndex + tint), not hard-coded hex
   - Provide a `getBuiltinCellStyles()` API that returns all presets as JSON, with resolved preview colors
 
-- [ ] 6b: WASM binding and TypeScript types for cell style presets
+- [x] 6b: WASM binding and TypeScript types for cell style presets. Added `getCellStylePresets()` C++ method in bindings_format.cc that serializes all presets with theme-resolved preview colors. Added `CellStylePreset` TypeScript interface. Wired through all 5 layers: Embind registration, worker-types.ts, worker-handlers.ts, worker.ts, client.ts, wasm-data-source.ts. Added cell_style_presets BUILD target with deps.
   - `getCellStylePresets()` → JSON array of `{ name, category, style (with resolved preview colors) }`
   - TypeScript types: `CellStylePreset`, `CellStylePresetCategory`
   - Worker handler + CellsClient + WasmDataSource methods

@@ -80,6 +80,7 @@ export interface CellsEngine {
     getCellStyle(cellId: string): string;
     getCellStyleAt(col: number, row: number): string;
     getAvailableStyles(): string;
+    getCellStylePresets(): string;
 
     // Range style operations
     setRangeStyle(
