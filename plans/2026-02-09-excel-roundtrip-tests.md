@@ -2,7 +2,7 @@
 
 Validate that the Cells formula engine produces the same results as Excel by roundtripping Excel files through the CLI.
 
-**Status: Phase 1 in progress.**
+**Status: Phase 2 complete.** Test infrastructure installed. Tests currently fail on style fidelity (theme color references resolved to hex).
 
 ## Background
 
@@ -26,7 +26,7 @@ The existing `compare.sh` script uses a Docker-containerized C# evaluator to com
 
 ## Phase 2: Multi-Category Test Runner
 
-- [ ] 2a: Create `tests/excel-roundtrips/run-all-tests.sh` — runs multiple categories
+- [x] 2a: Create `tests/excel-roundtrips/run-all-tests.sh` — runs multiple categories
   - With args: runs only the specified categories
   - Without args: auto-discovers all categories under `data/` that have both files
   - Runs `run-test.sh` for each category
