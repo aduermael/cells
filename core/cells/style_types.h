@@ -48,13 +48,21 @@ struct BorderEdge {
     BorderStyle style{BorderStyle::NONE};
     std::string color;  // Hex color "#RRGGBB" or empty for default black
 
+    // Theme/indexed color references (-1 = not set, use direct color)
+    int8_t themeIndex{-1};    // Theme color index (0-11), -1 = direct
+    double themeTint{0.0};    // Tint modifier for theme color (-1.0 to 1.0)
+    int8_t indexedColor{-1};  // Indexed color palette index (0-65), -1 = direct
+
     BorderEdge() = default;
     explicit BorderEdge(BorderStyle s, std::string c = "") : style(s), color(std::move(c)) {}
 
     [[nodiscard]] bool hasValue() const { return style != BorderStyle::NONE; }
+    [[nodiscard]] bool hasThemeColor() const { return themeIndex >= 0; }
+    [[nodiscard]] bool hasIndexedColor() const { return indexedColor >= 0; }
 
     bool operator==(const BorderEdge& other) const {
-        return style == other.style && color == other.color;
+        return style == other.style && color == other.color && themeIndex == other.themeIndex &&
+               themeTint == other.themeTint && indexedColor == other.indexedColor;
     }
     bool operator!=(const BorderEdge& other) const { return !(*this == other); }
 };
@@ -117,6 +125,19 @@ struct CellStyle {
     std::string textColor;   // Text color (hex, e.g. "#000000")
     std::string fontFamily;  // Font name (e.g. "Arial"), empty = system default
 
+    // Theme/indexed color references for bgColor (-1 = not set, use direct color)
+    int8_t bgThemeIndex{-1};    // Theme color index (0-11)
+    double bgThemeTint{0.0};    // Tint modifier (-1.0 to 1.0)
+    int8_t bgIndexedColor{-1};  // Indexed color palette index (0-65)
+
+    // Theme/indexed color references for textColor (-1 = not set, use direct color)
+    int8_t textThemeIndex{-1};    // Theme color index (0-11)
+    double textThemeTint{0.0};    // Tint modifier (-1.0 to 1.0)
+    int8_t textIndexedColor{-1};  // Indexed color palette index (0-65)
+
+    // Theme font reference (-1 = direct, 0 = major/headings, 1 = minor/body)
+    int8_t fontThemeIndex{-1};
+
     // Border (nested struct)
     CellBorder border;  // Cell borders (top, right, bottom, left)
 
@@ -131,13 +152,25 @@ struct CellStyle {
     // The defined flag is the source of truth, not whether values equal defaults
     [[nodiscard]] bool isEmpty() const { return defined == 0; }
 
+    // Theme/indexed helpers
+    [[nodiscard]] bool hasBgThemeColor() const { return bgThemeIndex >= 0; }
+    [[nodiscard]] bool hasBgIndexedColor() const { return bgIndexedColor >= 0; }
+    [[nodiscard]] bool hasTextThemeColor() const { return textThemeIndex >= 0; }
+    [[nodiscard]] bool hasTextIndexedColor() const { return textIndexedColor >= 0; }
+    [[nodiscard]] bool hasFontTheme() const { return fontThemeIndex >= 0; }
+
     // Equality comparison
     bool operator==(const CellStyle& other) const {
         return defined == other.defined && bold == other.bold && italic == other.italic &&
                underline == other.underline && wrapText == other.wrapText &&
                bgColor == other.bgColor && textColor == other.textColor &&
                fontFamily == other.fontFamily && fontSize == other.fontSize &&
-               hAlign == other.hAlign && vAlign == other.vAlign && border == other.border;
+               hAlign == other.hAlign && vAlign == other.vAlign && border == other.border &&
+               bgThemeIndex == other.bgThemeIndex && bgThemeTint == other.bgThemeTint &&
+               bgIndexedColor == other.bgIndexedColor &&
+               textThemeIndex == other.textThemeIndex && textThemeTint == other.textThemeTint &&
+               textIndexedColor == other.textIndexedColor &&
+               fontThemeIndex == other.fontThemeIndex;
     }
 
     bool operator!=(const CellStyle& other) const { return !(*this == other); }
@@ -172,12 +205,23 @@ struct CellStyle {
         }
         if (isDefined(DEFINED_BGCOLOR)) {
             hashCombine(std::hash<std::string>{}(bgColor));
+            hashCombine(std::hash<int8_t>{}(bgThemeIndex));
+            if (bgThemeIndex >= 0) {
+                hashCombine(std::hash<double>{}(bgThemeTint));
+            }
+            hashCombine(std::hash<int8_t>{}(bgIndexedColor));
         }
         if (isDefined(DEFINED_TEXTCOLOR)) {
             hashCombine(std::hash<std::string>{}(textColor));
+            hashCombine(std::hash<int8_t>{}(textThemeIndex));
+            if (textThemeIndex >= 0) {
+                hashCombine(std::hash<double>{}(textThemeTint));
+            }
+            hashCombine(std::hash<int8_t>{}(textIndexedColor));
         }
         if (isDefined(DEFINED_FONTFAMILY)) {
             hashCombine(std::hash<std::string>{}(fontFamily));
+            hashCombine(std::hash<int8_t>{}(fontThemeIndex));
         }
         if (isDefined(DEFINED_FONTSIZE)) {
             hashCombine(std::hash<uint8_t>{}(fontSize));
@@ -191,18 +235,26 @@ struct CellStyle {
         if (isDefined(DEFINED_BORDER_TOP)) {
             hashCombine(std::hash<uint8_t>{}(static_cast<uint8_t>(border.top.style)));
             hashCombine(std::hash<std::string>{}(border.top.color));
+            hashCombine(std::hash<int8_t>{}(border.top.themeIndex));
+            hashCombine(std::hash<int8_t>{}(border.top.indexedColor));
         }
         if (isDefined(DEFINED_BORDER_RIGHT)) {
             hashCombine(std::hash<uint8_t>{}(static_cast<uint8_t>(border.right.style)));
             hashCombine(std::hash<std::string>{}(border.right.color));
+            hashCombine(std::hash<int8_t>{}(border.right.themeIndex));
+            hashCombine(std::hash<int8_t>{}(border.right.indexedColor));
         }
         if (isDefined(DEFINED_BORDER_BOTTOM)) {
             hashCombine(std::hash<uint8_t>{}(static_cast<uint8_t>(border.bottom.style)));
             hashCombine(std::hash<std::string>{}(border.bottom.color));
+            hashCombine(std::hash<int8_t>{}(border.bottom.themeIndex));
+            hashCombine(std::hash<int8_t>{}(border.bottom.indexedColor));
         }
         if (isDefined(DEFINED_BORDER_LEFT)) {
             hashCombine(std::hash<uint8_t>{}(static_cast<uint8_t>(border.left.style)));
             hashCombine(std::hash<std::string>{}(border.left.color));
+            hashCombine(std::hash<int8_t>{}(border.left.themeIndex));
+            hashCombine(std::hash<int8_t>{}(border.left.indexedColor));
         }
         return h;
     }

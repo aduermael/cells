@@ -74,7 +74,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
   - Add `resolveIndexedColor(index)` static helper (the fixed 64-color palette + sys fg/bg)
   - Workbook gets `std::unique_ptr<Theme> _theme` with getter/setter
 
-- [ ] 1b: Add theme/indexed color fields to `CellStyle` and `BorderEdge` in `style_types.h`
+- [x] 1b: Add theme/indexed color fields to `CellStyle` and `BorderEdge` in `style_types.h`. Added bgThemeIndex/bgThemeTint/bgIndexedColor, textThemeIndex/textThemeTint/textIndexedColor, fontThemeIndex to CellStyle, and themeIndex/themeTint/indexedColor to BorderEdge. Updated equality and hash.
   - CellStyle: add `int8_t bgThemeIndex{-1}`, `double bgThemeTint{0.0}`, `int8_t bgIndexedColor{-1}`
   - CellStyle: add `int8_t textThemeIndex{-1}`, `double textThemeTint{0.0}`, `int8_t textIndexedColor{-1}`
   - CellStyle: add `int8_t fontThemeIndex{-1}` (-1 = direct, 0 = major, 1 = minor)
