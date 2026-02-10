@@ -343,9 +343,9 @@ std::string applyTint(const std::string& color, double tint) {
     return buf;
 }
 
-// Parse theme.xml to extract the 12 theme colors
-XLSXThemeColors parseThemeXml(const std::string& content) {
-    XLSXThemeColors theme;
+// Parse theme.xml to extract theme colors, font scheme, and name
+cells::Theme parseThemeXml(const std::string& content) {
+    cells::Theme theme;
 
     if (content.empty()) {
         return theme;
@@ -356,10 +356,15 @@ XLSXThemeColors parseThemeXml(const std::string& content) {
         return theme;
     }
 
-    // Navigate to color scheme: theme/themeElements/clrScheme
+    // Navigate to theme elements
     auto themeNode = doc.child("a:theme");
     auto themeElements = themeNode.child("a:themeElements");
-    auto clrScheme = themeElements.child("a:clrScheme");
+
+    // Theme name
+    const char* themeName = themeNode.attribute("name").value();
+    if (themeName && themeName[0] != '\0') {
+        theme.name = themeName;
+    }
 
     // Helper to extract color from a color scheme element
     auto extractColor = [](pugi::xml_node node) -> std::string {
@@ -389,27 +394,57 @@ XLSXThemeColors parseThemeXml(const std::string& content) {
     };
 
     // Extract the 12 theme colors in Excel's index order
-    // Index 0: lt1 (background 1)
-    // Index 1: dk1 (text 1)
-    // Index 2: lt2 (background 2)
-    // Index 3: dk2 (text 2)
-    // Index 4-9: accent1-6
-    // Index 10: hlink
-    // Index 11: folHlink
-    theme.colors[0] = extractColor(clrScheme.child("a:lt1"));
-    theme.colors[1] = extractColor(clrScheme.child("a:dk1"));
-    theme.colors[2] = extractColor(clrScheme.child("a:lt2"));
-    theme.colors[3] = extractColor(clrScheme.child("a:dk2"));
-    theme.colors[4] = extractColor(clrScheme.child("a:accent1"));
-    theme.colors[5] = extractColor(clrScheme.child("a:accent2"));
-    theme.colors[6] = extractColor(clrScheme.child("a:accent3"));
-    theme.colors[7] = extractColor(clrScheme.child("a:accent4"));
-    theme.colors[8] = extractColor(clrScheme.child("a:accent5"));
-    theme.colors[9] = extractColor(clrScheme.child("a:accent6"));
-    theme.colors[10] = extractColor(clrScheme.child("a:hlink"));
-    theme.colors[11] = extractColor(clrScheme.child("a:folHlink"));
+    auto clrScheme = themeElements.child("a:clrScheme");
+    theme.colorScheme.colors[0] = extractColor(clrScheme.child("a:lt1"));
+    theme.colorScheme.colors[1] = extractColor(clrScheme.child("a:dk1"));
+    theme.colorScheme.colors[2] = extractColor(clrScheme.child("a:lt2"));
+    theme.colorScheme.colors[3] = extractColor(clrScheme.child("a:dk2"));
+    theme.colorScheme.colors[4] = extractColor(clrScheme.child("a:accent1"));
+    theme.colorScheme.colors[5] = extractColor(clrScheme.child("a:accent2"));
+    theme.colorScheme.colors[6] = extractColor(clrScheme.child("a:accent3"));
+    theme.colorScheme.colors[7] = extractColor(clrScheme.child("a:accent4"));
+    theme.colorScheme.colors[8] = extractColor(clrScheme.child("a:accent5"));
+    theme.colorScheme.colors[9] = extractColor(clrScheme.child("a:accent6"));
+    theme.colorScheme.colors[10] = extractColor(clrScheme.child("a:hlink"));
+    theme.colorScheme.colors[11] = extractColor(clrScheme.child("a:folHlink"));
+
+    // Extract font scheme: major (headings) and minor (body) font names
+    auto fontScheme = themeElements.child("a:fontScheme");
+    if (fontScheme) {
+        auto majorFont = fontScheme.child("a:majorFont");
+        if (majorFont) {
+            auto latin = majorFont.child("a:latin");
+            if (latin) {
+                const char* typeface = latin.attribute("typeface").value();
+                if (typeface && typeface[0] != '\0') {
+                    theme.fontScheme.majorFont = typeface;
+                }
+            }
+        }
+        auto minorFont = fontScheme.child("a:minorFont");
+        if (minorFont) {
+            auto latin = minorFont.child("a:latin");
+            if (latin) {
+                const char* typeface = latin.attribute("typeface").value();
+                if (typeface && typeface[0] != '\0') {
+                    theme.fontScheme.minorFont = typeface;
+                }
+            }
+        }
+    }
 
     return theme;
+}
+
+// Convert Theme color scheme to XLSXThemeColors for backward compatibility
+// with existing resolveColor() pipeline (will be removed when resolveColor
+// is updated to use Theme directly in step 2b)
+XLSXThemeColors themeColorsFromTheme(const cells::Theme& theme) {
+    XLSXThemeColors colors;
+    for (int i = 0; i < 12; ++i) {
+        colors.colors[i] = theme.colorScheme.colors[i];
+    }
+    return colors;
 }
 
 // Excel's 64 standard indexed colors (indices 0-63)
@@ -1485,13 +1520,15 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     }
     logTiming("parse sharedStrings", start);
 
-    // Parse theme.xml for theme colors
+    // Parse theme.xml for theme colors and font scheme
     start = std::chrono::steady_clock::now();
+    cells::Theme parsedTheme;
     XLSXThemeColors themeColors;
     if (options.readStyles) {
         const std::string themeContent = zip.readFile("xl/theme/theme1.xml");
         if (!themeContent.empty()) {
-            themeColors = parseThemeXml(themeContent);
+            parsedTheme = parseThemeXml(themeContent);
+            themeColors = themeColorsFromTheme(parsedTheme);
         }
     }
     logTiming("parse theme", start);
@@ -1510,6 +1547,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
     // Create workbook
     auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
+
+    // Store parsed theme on workbook (color scheme + font scheme)
+    if (!parsedTheme.colorScheme.colors[0].empty()) {
+        workbook->setTheme(std::make_unique<cells::Theme>(std::move(parsedTheme)));
+    }
 
     // Style application helper - creates a StyleBuffer from an XLSX style index
     // Defined here to be usable for both cell styles and axis default styles
