@@ -122,7 +122,7 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 ## Phase 3: XLSX Export
 
-- [ ] 3a: Write workbook theme to `xl/theme/theme1.xml`
+- [x] 3a: Write workbook theme to `xl/theme/theme1.xml`. Updated `generateTheme()` to accept `const Theme*`, serialize actual color scheme (12 slots) and font scheme (major/minor fonts) as DrawingML XML. Falls back to Office defaults when no theme. All colors written as `srgbClr` (valid OOXML).
   - If workbook has a theme, serialize its color and font schemes as DrawingML XML
   - If no theme, keep the current minimal placeholder
 

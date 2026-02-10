@@ -457,38 +457,80 @@ std::string generateAppProps() {
     return xml.str();
 }
 
-// Generate xl/theme/theme1.xml (minimal Office theme required by Excel)
-std::string generateTheme() {
-    // This is a minimal theme that Excel requires to open files without errors
+// Helper to strip '#' prefix from a hex color string for XML output
+std::string hexVal(const std::string& color) {
+    if (!color.empty() && color[0] == '#') {
+        return color.substr(1);
+    }
+    return color;
+}
+
+// Generate xl/theme/theme1.xml
+// If theme is provided, writes its colors and fonts; otherwise writes minimal Office defaults.
+std::string generateTheme(const cells::Theme* theme) {
+    // DrawingML color scheme element names in XML order (dk1, lt1, dk2, lt2, then accents)
+    // Note: XML order differs from index order (lt1=0, dk1=1, lt2=2, dk2=3)
+    struct ColorSlot {
+        const char* xmlTag;
+        int themeIndex;
+    };
+    static constexpr ColorSlot kSlots[] = {
+        {"a:dk1", 1}, {"a:lt1", 0}, {"a:dk2", 3}, {"a:lt2", 2},
+        {"a:accent1", 4}, {"a:accent2", 5}, {"a:accent3", 6}, {"a:accent4", 7},
+        {"a:accent5", 8}, {"a:accent6", 9}, {"a:hlink", 10}, {"a:folHlink", 11},
+    };
+
+    // Default colors (Office theme)
+    static const char* kDefaultColors[] = {
+        "FFFFFF",  // 0: lt1
+        "000000",  // 1: dk1
+        "E7E6E6",  // 2: lt2
+        "44546A",  // 3: dk2
+        "4472C4",  // 4: accent1
+        "ED7D31",  // 5: accent2
+        "A5A5A5",  // 6: accent3
+        "FFC000",  // 7: accent4
+        "5B9BD5",  // 8: accent5
+        "70AD47",  // 9: accent6
+        "0563C1",  // 10: hlink
+        "954F72",  // 11: folHlink
+    };
+
+    const std::string themeName = theme ? theme->name : "Office Theme";
+    const std::string schemeName = theme ? theme->name : "Office";
+    const std::string majorFont = theme ? theme->fontScheme.majorFont : "Calibri Light";
+    const std::string minorFont = theme ? theme->fontScheme.minorFont : "Calibri";
+
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
-           "name=\"Office Theme\">\n";
+           "name=\"" << escapeXml(themeName) << "\">\n";
     xml << "  <a:themeElements>\n";
+
     // Color scheme - required
-    xml << "    <a:clrScheme name=\"Office\">\n";
-    xml << "      <a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1>\n";
-    xml << "      <a:lt1><a:sysClr val=\"window\" lastClr=\"FFFFFF\"/></a:lt1>\n";
-    xml << "      <a:dk2><a:srgbClr val=\"44546A\"/></a:dk2>\n";
-    xml << "      <a:lt2><a:srgbClr val=\"E7E6E6\"/></a:lt2>\n";
-    xml << "      <a:accent1><a:srgbClr val=\"4472C4\"/></a:accent1>\n";
-    xml << "      <a:accent2><a:srgbClr val=\"ED7D31\"/></a:accent2>\n";
-    xml << "      <a:accent3><a:srgbClr val=\"A5A5A5\"/></a:accent3>\n";
-    xml << "      <a:accent4><a:srgbClr val=\"FFC000\"/></a:accent4>\n";
-    xml << "      <a:accent5><a:srgbClr val=\"5B9BD5\"/></a:accent5>\n";
-    xml << "      <a:accent6><a:srgbClr val=\"70AD47\"/></a:accent6>\n";
-    xml << "      <a:hlink><a:srgbClr val=\"0563C1\"/></a:hlink>\n";
-    xml << "      <a:folHlink><a:srgbClr val=\"954F72\"/></a:folHlink>\n";
+    xml << "    <a:clrScheme name=\"" << escapeXml(schemeName) << "\">\n";
+    for (const auto& slot : kSlots) {
+        std::string color;
+        if (theme) {
+            color = hexVal(theme->colorScheme.getColor(slot.themeIndex));
+        }
+        if (color.empty()) {
+            color = kDefaultColors[slot.themeIndex];
+        }
+        xml << "      <" << slot.xmlTag << "><a:srgbClr val=\"" << color << "\"/></"
+            << slot.xmlTag << ">\n";
+    }
     xml << "    </a:clrScheme>\n";
+
     // Font scheme - required
-    xml << "    <a:fontScheme name=\"Office\">\n";
+    xml << "    <a:fontScheme name=\"" << escapeXml(schemeName) << "\">\n";
     xml << "      <a:majorFont>\n";
-    xml << "        <a:latin typeface=\"Calibri Light\"/>\n";
+    xml << "        <a:latin typeface=\"" << escapeXml(majorFont) << "\"/>\n";
     xml << "        <a:ea typeface=\"\"/>\n";
     xml << "        <a:cs typeface=\"\"/>\n";
     xml << "      </a:majorFont>\n";
     xml << "      <a:minorFont>\n";
-    xml << "        <a:latin typeface=\"Calibri\"/>\n";
+    xml << "        <a:latin typeface=\"" << escapeXml(minorFont) << "\"/>\n";
     xml << "        <a:ea typeface=\"\"/>\n";
     xml << "        <a:cs typeface=\"\"/>\n";
     xml << "      </a:minorFont>\n";
@@ -1737,7 +1779,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     }
 
     // Write theme
-    if (!zip.addFile("xl/theme/theme1.xml", generateTheme())) {
+    if (!zip.addFile("xl/theme/theme1.xml", generateTheme(workbook.getTheme()))) {
         result.error = XLSXWriteError("Failed to write xl/theme/theme1.xml");
         return result;
     }
