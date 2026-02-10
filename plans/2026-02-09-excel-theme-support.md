@@ -135,14 +135,14 @@ Use bit 15 as "extended flags present" indicator. When set, a third flag byte fo
 
 ## Phase 4: Comparator & Verification
 
-- [ ] 4a: C# comparator fix (done externally — will be brought in from another project)
+- [x] 4a: C# comparator fix (brought in externally)
 
 - [ ] 4b: Expose theme to frontend via WASM bindings
   - `getTheme()` → JSON with color scheme and font scheme
   - `getEffectiveCellStyle()` resolves theme/indexed colors to hex before returning
   - Frontend receives resolved colors (no theme awareness in TS needed initially)
 
-- [ ] 4c: Run roundtrip tests
+- [x] 4c: Run roundtrip tests. Both `math-basic` and `legacy-indexed-colors` pass with zero color/theme/style mismatches. Only remaining diffs are unrelated sheet-level properties (column widths, row heights, page margins) that we don't export yet.
   - `./run-test.sh math-basic` — verify theme color roundtrip
   - Test with indexed-color test file once provided
   - Fix any remaining style mismatches
