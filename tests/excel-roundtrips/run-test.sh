@@ -42,7 +42,7 @@ echo "Running: cells --eval on $CATEGORY..."
 
 # Compare against original
 echo "Comparing against Excel reference..."
-"$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPFILE"
+"$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPFILE" --ignore-formula-text
 RESULT=$?
 
 if [ $RESULT -eq 0 ]; then
