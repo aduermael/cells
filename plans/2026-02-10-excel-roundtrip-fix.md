@@ -77,16 +77,9 @@ Our `std::pow` produces results that differ from Excel by 1 ULP at extreme expon
 - [x] 7a: Investigate which `std::pow` calls produce different results — `std::pow(10,-307)` gives `0x0031FA182C40C60D` which is actually the correctly-rounded IEEE754 value (verified via Python's arbitrary-precision `decimal`). Excel gives `0x0031FA182C40C60E` which matches `1.0/std::pow(10,307)` — Excel apparently computes `x^(-n)` as `1/x^n`. Our `std::pow` and the C++ literal `1e-307` agree. This single 1-ULP diff in C10 cascades to 159 value differences across the test file. The Docker image also needed rebuilding to include the `--ignore-formula-text` flag from Phase 6.
 - [x] 7b: Fix the power operator to match Excel's behavior — added `excelPow()` inline helper in `formula_eval.h` that computes `1.0/pow(base, -exp)` for negative exponents. Updated both call sites in `formula_eval.cc` (^ operator) and `fn_math.cc` (POWER function). Includes explanatory comment to prevent well-meaning "fixes" back to direct `std::pow`.
 
-### Additional issues discovered during 7a investigation (out of scope)
+### Additional issues discovered during investigation
 
-Full diff of the math-basic round-trip test (with `--ignore-formula-text`) revealed additional categories beyond the pow precision issue:
-
-- **inf → #NUM! (332 cells)**: Our arithmetic operations (`+`, `-`, `*`) return `inf`/`-inf` on overflow, but Excel returns `#NUM!`. E.g., `9.999E+307 + 9.999E+307` → Excel: `#NUM!`, ours: `inf`.
-- **0 vs -0 (23 cells)**: Excel normalizes `-0` to `0` in certain contexts (e.g., `0 * -42.5`), we preserve the IEEE754 sign bit.
-- **Error type mismatches (42 cells)**: `#DIV/0!` → `#NAME?` (9 cells), `#NUM!` → `#NAME?` (23 cells), `#NUM!` → `#REF!` (5 cells) — likely missing function implementations or different error propagation rules.
-- **Other 1-ULP precision diffs**: A few cells at other scales, likely also from the cascading C10 difference.
-
-These should be addressed in separate phases once the pow fix lands, to see how many actually resolve from the cascade.
+Full diff of the math-basic round-trip test (with `--ignore-formula-text`) revealed additional categories. These are addressed in Phases 9-12 below.
 
 ## Phase 8: Use Exponentiation by Squaring for Negative Base
 
@@ -104,6 +97,50 @@ Steps:
 - [x] 8a: Add `powBySquaring` helper to `formula_eval.h` — LSB-first binary exponentiation: square `b` and conditionally multiply `result *= b` for each bit. O(log n) multiplications, comparable to `std::pow`. Added unit tests verifying basic cases, exact hex match for `1/powBySquaring(10,307)` (0x0031FA182C40C60B), and agreement with `std::pow` for small exponents.
 - [x] 8b: Update `excelPow` to use squaring for negative base with integer exponent — when `base < 0` and `exponent` is an integer (checked via `std::floor(exponent) == exponent`), compute `powBySquaring(|base|, |exponent|)`, apply sign based on exponent parity, then take reciprocal if exponent was negative. For positive base or non-integer exponent, keep the current `std::pow` path. Both call sites (`formula_eval.cc` `^` operator and `fn_math.cc` POWER function) already use `excelPow` so they get the fix automatically. Added unit tests for positive base, negative base with integer/non-integer exponents, and extreme exponent hex verification.
 - [x] 8c: Add parser precedence test — added test in `formula_parser_test.cc` confirming `-2^2` parses as `POWER(NEGATE(2), 2)` (not `NEGATE(POWER(2, 2))`). This documents the Excel-compatible precedence behavior where unary minus binds tighter than `^`.
+
+## Phase 9: Excel Numeric Normalization (subnormal flush + negative zero)
+
+Excel does not support IEEE754 subnormal (denormalized) numbers — any result where `0 < |result| < 2.2250738585072014e-308` is flushed to `0`. Excel also normalizes `-0` to `+0`. Our engine preserves both, causing mismatches.
+
+**Example**: After Phase 8, C10 (`10^-307`) = `0x0031FA182C40C60E` and C11 (`-10^-307`) = `0x8031FA182C40C60B`. These have different magnitudes (different algorithms), so `C10+C11` = `5.93e-323` — a subnormal. Excel caches `0` for I23 because it flushes subnormals.
+
+- [ ] 9a: Add `excelNormalize(double)` helper in `formula_eval.h` — flush subnormals to `+0` and normalize `-0` to `+0`. Use `std::fpclassify(result) == FP_SUBNORMAL` for subnormals and check `result == 0.0 && std::signbit(result)` for `-0`. Add unit tests covering both cases.
+- [ ] 9b: Apply normalization after all arithmetic binary operators in `formula_eval.cc` — `+`, `-`, `*`, `/`, `^`. Each already returns `EvalResult::Number(result)`. Wrap the result value in `excelNormalize()` before creating the EvalResult. Do NOT apply to comparisons, concatenation, or coercion (they don't produce arithmetic results).
+- [ ] 9c: Apply normalization in math functions — functions in `fn_math.cc` that compute new numeric values (POWER, ROUND, MOD, SQRT, ABS) should normalize their output. Functions that just aggregate (SUM, AVERAGE, MIN, MAX, COUNT) should normalize only their final result.
+- [ ] 9d: Run the roundtrip test and count remaining differences. Record the updated diff summary.
+
+## Phase 10: Overflow to #NUM! Error
+
+Excel returns `#NUM!` when arithmetic operations overflow to infinity. Our engine returns `inf`/`-inf`, which writes as "INF" in XLSX values. This affects ~332 cells (e.g., `9.999E+307 + 9.999E+307`).
+
+- [ ] 10a: Add infinity-to-NUM checks after arithmetic operators — in `formula_eval.cc`, after `+`, `-`, `*` operations, check `std::isinf(result)` and return `EvalResult::Error(CellError::NUM)` if true. The `^` operator already has this check; `/` cannot overflow to inf (only to #DIV/0!).
+- [ ] 10b: Add overflow checks in math functions — functions like POWER already check for inf. Verify SUM, AVERAGE, and other aggregation functions also check their final result.
+- [ ] 10c: Run the roundtrip test and count remaining differences.
+
+## Phase 11: Error Type Mismatches
+
+Some cells produce different error types than Excel. Categories discovered:
+- `#DIV/0!` → `#NAME?` (9 cells) — likely references to unimplemented functions
+- `#NUM!` → `#NAME?` (23 cells) — likely references to unimplemented functions
+- `#NUM!` → `#REF!` (5 cells) — possibly different error propagation rules
+
+- [ ] 11a: Investigate which functions/formulas produce the mismatches — run the roundtrip test with full diff output (not just first difference). Categorize by root cause: unimplemented functions vs different error propagation rules. If it's just missing functions, list them.
+- [ ] 11b: Implement fixes based on 11a findings — this step will be planned after investigation.
+
+## Phase 12: Remaining Precision Differences
+
+After all previous phases, run a final diff to identify any remaining mismatches. Some may be additional 1-ULP differences at other scales.
+
+- [ ] 12a: Run the full roundtrip test and analyze all remaining differences. Categorize and plan fixes if feasible.
+- [ ] 12b: If the test passes (zero differences), celebrate. If not, add new phases.
+
+---
+
+## Ongoing: Discovering New Differences
+
+After each phase, re-run `./run-test.sh math-basic` to see the next diff. If new categories of differences appear (beyond what's already planned), add new phases to this plan. The goal is to keep iterating until `./run-test.sh math-basic` passes with zero differences.
+
+---
 
 ## Design Notes
 
