@@ -219,7 +219,8 @@ public:
     [[nodiscard]] uint8_t getTextIndexedColorIndex() const;
 
     // Font theme reference (0 = major/headings, 1 = minor/body)
-    void setFontTheme(uint8_t schemeIndex);
+    // fontName preserves the resolved font name alongside the theme index
+    void setFontTheme(uint8_t schemeIndex, const std::string& fontName = "");
     void clearFontTheme();
     [[nodiscard]] bool hasFontTheme() const;
     [[nodiscard]] uint8_t getFontThemeIndex() const;

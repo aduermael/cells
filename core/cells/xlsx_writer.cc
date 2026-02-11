@@ -12,6 +12,7 @@
 #include "core/cells/number_format.h"
 #include "core/cells/range.h"
 #include "core/cells/ref_converter.h"
+#include "core/cells/theme.h"
 
 #include "miniz.h"
 
@@ -1976,7 +1977,14 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
                     // Has visual style (and possibly format)
-                    const CellStyle style = styleBuf->toCellStyle();
+                    CellStyle style = styleBuf->toCellStyle();
+                    if (style.fontFamily.empty() && style.fontThemeIndex >= 0) {
+                        const std::string resolved =
+                            resolveThemeFont(workbook.getTheme(), style.fontThemeIndex);
+                        if (!resolved.empty()) {
+                            style.fontFamily = resolved;
+                        }
+                    }
                     const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
                     cellStyleIndices[cell] = styleIdx;
                 } else {
@@ -2001,7 +2009,14 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
 
             if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
-                    const CellStyle style = styleBuf->toCellStyle();
+                    CellStyle style = styleBuf->toCellStyle();
+                    if (style.fontFamily.empty() && style.fontThemeIndex >= 0) {
+                        const std::string resolved =
+                            resolveThemeFont(workbook.getTheme(), style.fontThemeIndex);
+                        if (!resolved.empty()) {
+                            style.fontFamily = resolved;
+                        }
+                    }
                     const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
                     axisStyleIndices[col] = styleIdx;
                 } else {
@@ -2025,7 +2040,14 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
 
             if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
-                    const CellStyle style = styleBuf->toCellStyle();
+                    CellStyle style = styleBuf->toCellStyle();
+                    if (style.fontFamily.empty() && style.fontThemeIndex >= 0) {
+                        const std::string resolved =
+                            resolveThemeFont(workbook.getTheme(), style.fontThemeIndex);
+                        if (!resolved.empty()) {
+                            style.fontFamily = resolved;
+                        }
+                    }
                     const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
                     axisStyleIndices[row] = styleIdx;
                 } else {

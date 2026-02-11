@@ -172,7 +172,7 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
         } else if (combinedStyle.hasTextIndexedColor()) {
             combinedStyle.textColor = resolveIndexedColor(combinedStyle.textIndexedColor);
         }
-        if (combinedStyle.hasFontTheme()) {
+        if (combinedStyle.hasFontTheme() && combinedStyle.fontFamily.empty()) {
             std::string resolved = resolveThemeFont(theme, combinedStyle.fontThemeIndex);
             if (!resolved.empty()) {
                 combinedStyle.fontFamily = resolved;

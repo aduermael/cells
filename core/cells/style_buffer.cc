@@ -960,15 +960,14 @@ uint8_t StyleBuffer::getTextIndexedColorIndex() const {
 // Font theme reference
 // =============================================================================
 
-void StyleBuffer::setFontTheme(uint8_t schemeIndex) {
-    // Font theme stores the scheme index in the fontFamily slot
-    // The fontFamily flag must be set, and the data is just 1 byte (the scheme index)
-    // stored as a length-0 string with the scheme index as the "length" byte
-    // Actually, let's use a simpler approach: store as 1-byte font name
-    // But that's confusing. Instead, just set the ext flag and reinterpret.
+void StyleBuffer::setFontTheme(uint8_t schemeIndex, const std::string& fontName) {
+    // Font theme stores scheme index + optional font name in the fontFamily slot.
     // When STYLE_EXT_FONT_THEME is set, the fontFamily slot contains:
-    //   [1] [schemeIndex] (length=1, one byte = scheme index)
-    setFontFamily(std::string(1, static_cast<char>(schemeIndex)));
+    //   [1+N] [schemeIndex] [name_byte_1]...[name_byte_N]
+    // When fontName is empty: [1] [schemeIndex] (backward compatible)
+    std::string combined(1, static_cast<char>(schemeIndex));
+    combined += fontName;
+    setFontFamily(combined);
     setExtFlag(STYLE_EXT_FONT_THEME);
 }
 
@@ -989,11 +988,16 @@ uint8_t StyleBuffer::getFontThemeIndex() const {
     if (!hasFontTheme()) {
         return 0;
     }
-    const std::string family = getFontFamily();
-    if (family.empty()) {
+    // Read scheme index directly from raw data (first byte after length prefix)
+    const size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
+    if (offset >= _data.size()) {
         return 0;
     }
-    return static_cast<uint8_t>(family[0]);
+    const uint8_t len = _data[offset];
+    if (len == 0 || offset + 1 >= _data.size()) {
+        return 0;
+    }
+    return _data[offset + 1];
 }
 
 // =============================================================================
@@ -1090,6 +1094,14 @@ std::string StyleBuffer::getFontFamily() const {
     const uint8_t len = _data[offset];
     if (offset + 1 + len > _data.size()) {
         return "";
+    }
+    if (hasFontTheme() && len > 0) {
+        // Skip the first byte (scheme index), return remaining as font name
+        if (len <= 1) {
+            return "";  // Only scheme index stored, no font name
+        }
+        return {reinterpret_cast<const char*>(_data.data() + offset + 2),
+                static_cast<size_t>(len - 1)};
     }
     return {reinterpret_cast<const char*>(_data.data() + offset + 1), len};
 }
@@ -1990,7 +2002,7 @@ StyleBuffer StyleBuffer::fromCellStyle(const CellStyle& style) {
     }
     if (style.isDefined(DEFINED_FONTFAMILY)) {
         if (style.fontThemeIndex >= 0) {
-            buf.setFontTheme(static_cast<uint8_t>(style.fontThemeIndex));
+            buf.setFontTheme(static_cast<uint8_t>(style.fontThemeIndex), style.fontFamily);
         } else if (!style.fontFamily.empty()) {
             buf.setFontFamily(style.fontFamily);
         }
@@ -2120,6 +2132,7 @@ CellStyle StyleBuffer::toCellStyle() const {
     if (hasFontFamily()) {
         if (hasFontTheme()) {
             style.fontThemeIndex = static_cast<int8_t>(getFontThemeIndex());
+            style.fontFamily = getFontFamily();  // preserved font name
         } else {
             style.fontFamily = getFontFamily();
         }
