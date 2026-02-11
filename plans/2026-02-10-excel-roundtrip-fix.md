@@ -121,7 +121,7 @@ Excel returns `#NUM!` when arithmetic operations overflow to infinity. Our engin
 
 - [x] 10a: Add infinity-to-NUM checks after arithmetic operators — in `formula_eval.cc`, after `+`, `-`, `*`, `/` operations, check `std::isinf(result)` and return `EvalResult::Error(CellError::NUM)` if true. The `^` operator already had this check. Division can also overflow (e.g., `DBL_MAX / 0.5`), so it gets the check too. Updated `edge_cases_test.cc` (overflow now returns `#NUM!` instead of `inf`) and added 4 new tests in `formula_error_test.cc`.
 - [x] 10b: Add overflow checks in math functions — added `std::isinf` → `#NUM!` checks to SUM (final sum), AVERAGE (final result), ROUND (intermediate overflow), and MOD (intermediate overflow). POWER already had the check. ABS, SQRT, FLOOR, CEILING, INT, MIN, MAX can't overflow. COUNT/COUNTA return integer counts.
-- [ ] 10c: Run the roundtrip test and count remaining differences.
+- [x] 10c: Run the roundtrip test and count remaining differences. **366 differences remain** (down from 398): 306 `#NAME?` (unimplemented functions), 21 `#NUM!`→number, 10 `0`→nonzero, 7 `number`→`#NUM!`, 6 uppercase-E notation (small numbers), 5 `#DIV/0!`→`#NUM!`, 8 `#REF!` related, 2 precision diffs.
 
 ## Phase 11: Error Type Mismatches
 
