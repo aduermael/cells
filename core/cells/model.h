@@ -438,6 +438,16 @@ struct FormulaResult {
     std::string errorMessage;
 };
 
+// Page margins in inches (matching Excel's representation)
+struct PageMargins {
+    double left{0};
+    double right{0};
+    double top{0};
+    double bottom{0};
+    double header{0};
+    double footer{0};
+};
+
 // Sheet - 2D grid containing cells
 struct Sheet {
     ID id;             // Unique identifier
@@ -448,6 +458,13 @@ struct Sheet {
     uint16_t zoomScale{100};   // Zoom level percentage (10-400, default: 100)
     uint16_t freezeCol{0};     // Number of frozen columns (0 = none, 1 = column A frozen, etc.)
     uint16_t freezeRow{0};     // Number of frozen rows (0 = none, 1 = row 1 frozen, etc.)
+
+    // Sheet format properties
+    double defaultRowHeight{0};  // Default row height in points (0 = not set)
+
+    // Page margins
+    PageMargins pageMargins;
+    bool hasPageMargins{false};
 
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");

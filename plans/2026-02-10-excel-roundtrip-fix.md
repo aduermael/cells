@@ -46,7 +46,7 @@ The reader already stores column widths and row heights in `Axis::size`. The wri
 
 These properties are not yet in the data model. Add typed fields so they can be used later.
 
-- [ ] 2a: Add typed fields to `Sheet` in `model.h` — add `double defaultRowHeight{0}` (in points, 0 = not set) and a `PageMargins` struct with `left`, `right`, `top`, `bottom`, `header`, `footer` (all `double`, in inches, matching Excel's representation). Add a `bool hasPageMargins{false}` flag.
+- [x] 2a: Add typed fields to `Sheet` in `model.h` — added `PageMargins` struct with 6 double fields, `double defaultRowHeight{0}`, `PageMargins pageMargins`, and `bool hasPageMargins{false}` to `Sheet`.
 - [ ] 2b: Read `<sheetFormatProperties>` and `<pageMargins>` in xlsx_reader — parse the XML attributes into the new typed fields on `Sheet`.
 - [ ] 2c: Write the properties in xlsx_writer — emit `<sheetFormatProperties defaultRowHeight="..."/>` and `<pageMargins .../>` elements from the typed fields at the correct positions in the worksheet XML.
 
