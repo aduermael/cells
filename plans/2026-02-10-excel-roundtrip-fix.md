@@ -74,9 +74,22 @@ Formula text differences are intentional (our engine normalizes formulas). Add a
 
 Our `std::pow` produces results that differ from Excel by 1 ULP at extreme exponents. We should match Excel's results exactly.
 
-- [ ] 7a: Investigate which `std::pow` calls produce different results — the known case is `10^(-307)` where we get `0x1.1fa182c40c60d` but Excel gets `0x1.1fa182c40c60e`. Profile other extreme exponent cases from the test data to determine the scope.
-- [ ] 7b: Fix the power operator precision — likely need to use a more accurate power implementation for the `^` operator and `POWER()` function. Options include: compensated `pow` algorithms, using `exp(y * log(x))` with extended precision intermediates, or a lookup/correction table for `10^n` specifically. The fix should be in `formula_eval.cc` (line 396) and `fn_math.cc` (line 168) where `std::pow` is called.
+- [x] 7a: Investigate which `std::pow` calls produce different results — `std::pow(10,-307)` gives `0x0031FA182C40C60D` which is actually the correctly-rounded IEEE754 value (verified via Python's arbitrary-precision `decimal`). Excel gives `0x0031FA182C40C60E` which matches `1.0/std::pow(10,307)` — Excel apparently computes `x^(-n)` as `1/x^n`. Our `std::pow` and the C++ literal `1e-307` agree. This single 1-ULP diff in C10 cascades to 159 value differences across the test file. The Docker image also needed rebuilding to include the `--ignore-formula-text` flag from Phase 6.
+- [ ] 7b: Fix the power operator to match Excel's behavior — for negative exponents, compute as `1.0/pow(x, abs(n))` instead of `pow(x, n)`. This matches Excel's apparent algorithm. Add a clear explanatory comment so this isn't "fixed" back to direct `std::pow` later. The fix should be in `formula_eval.cc` (line 396) and `fn_math.cc` (line 168) where `std::pow` is called.
+
+### Additional issues discovered during 7a investigation (out of scope for Phase 7)
+
+Full diff of the math-basic round-trip test (with `--ignore-formula-text`) revealed additional categories beyond the pow precision issue:
+
+- **inf → #NUM! (332 cells)**: Our arithmetic operations (`+`, `-`, `*`) return `inf`/`-inf` on overflow, but Excel returns `#NUM!`. E.g., `9.999E+307 + 9.999E+307` → Excel: `#NUM!`, ours: `inf`.
+- **0 vs -0 (23 cells)**: Excel normalizes `-0` to `0` in certain contexts (e.g., `0 * -42.5`), we preserve the IEEE754 sign bit.
+- **Error type mismatches (42 cells)**: `#DIV/0!` → `#NAME?` (9 cells), `#NUM!` → `#NAME?` (23 cells), `#NUM!` → `#REF!` (5 cells) — likely missing function implementations or different error propagation rules.
+- **Other 1-ULP precision diffs**: A few cells at other scales, likely also from the cascading C10 difference.
+
+These should be addressed in separate phases once the pow fix lands, to see how many actually resolve from the cascade.
 
 ## Design Notes
 
 **Phase 2**: Using typed fields on `Sheet` for `defaultRowHeight` and `pageMargins`. These will be usable by the app later (e.g., for print preview, page layout). Values use Excel's native units (points for row height, inches for margins) to avoid lossy conversions.
+
+**Phase 7**: The `std::pow` on macOS arm64 returns the mathematically correctly-rounded IEEE754 result for `10^(-307)` (`0x...C60D`), but Excel computes `1/10^307` and gets a different result (`0x...C60E`, 1 ULP higher). We intentionally match Excel's algorithm rather than mathematical correctness, because Excel compatibility is the goal. This must be clearly commented in the code to prevent well-meaning "fixes".
