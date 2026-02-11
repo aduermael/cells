@@ -30,7 +30,8 @@ public class Program
                 return 1;
             }
             var ignoreFormulaText = args.Contains("--ignore-formula-text");
-            return CompareFiles(args[1], args[2], ignoreFormulaText);
+            var showAll = args.Contains("--all");
+            return CompareFiles(args[1], args[2], ignoreFormulaText, showAll);
         }
 
         if (args.Length >= 1 && args[0] == "--extract")
@@ -180,7 +181,7 @@ public class Program
         return (count, errorCount);
     }
 
-    private static int CompareFiles(string file1Path, string file2Path, bool ignoreFormulaText = false)
+    private static int CompareFiles(string file1Path, string file2Path, bool ignoreFormulaText = false, bool showAll = false)
     {
         if (!File.Exists(file1Path))
         {
@@ -230,6 +231,29 @@ public class Program
             // Compare cells
             var cells1 = ExtractCellsToList(file1Path);
             var cells2 = ExtractCellsToList(file2Path);
+
+            if (showAll)
+            {
+                var allDiffs = FindAllDifferences(cells1, cells2, ignoreFormulaText);
+                if (allDiffs.Count == 0)
+                {
+                    Console.WriteLine("MATCH: Cells and properties are identical");
+                    Console.WriteLine($"Cells: {cells1.Count}");
+                    return 0;
+                }
+
+                Console.Error.WriteLine("MISMATCH: Cells differ");
+                Console.Error.WriteLine($"Cells in file1: {cells1.Count}");
+                Console.Error.WriteLine($"Cells in file2: {cells2.Count}");
+                Console.Error.WriteLine($"Total differences: {allDiffs.Count}");
+                Console.Error.WriteLine();
+                foreach (var d in allDiffs)
+                {
+                    Console.Error.WriteLine(d);
+                    Console.Error.WriteLine();
+                }
+                return 1;
+            }
 
             var diff = FindFirstDifference(cells1, cells2, ignoreFormulaText);
             if (diff == null)
@@ -314,6 +338,62 @@ public class Program
         }
 
         return null; // No difference found
+    }
+
+    private static List<string> FindAllDifferences(List<CellData> cells1, List<CellData> cells2, bool ignoreFormulaText = false)
+    {
+        var diffs = new List<string>();
+        var jsonOptions = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
+        var maxLen = Math.Max(cells1.Count, cells2.Count);
+
+        for (int i = 0; i < maxLen; i++)
+        {
+            if (i >= cells1.Count)
+            {
+                var extra = cells2[i];
+                var location = $"{extra.Sheet}!{extra.Address}";
+                var diffJson = new { cell = location, file1 = (object?)null, file2 = extra.ToSortedDictionary() };
+                diffs.Add(FormatDiff(location, "Cell exists only in file2", null, diffJson, jsonOptions));
+                continue;
+            }
+            if (i >= cells2.Count)
+            {
+                var extra = cells1[i];
+                var location = $"{extra.Sheet}!{extra.Address}";
+                var diffJson = new { cell = location, file1 = extra.ToSortedDictionary(), file2 = (object?)null };
+                diffs.Add(FormatDiff(location, "Cell exists only in file1", null, diffJson, jsonOptions));
+                continue;
+            }
+
+            var dict1 = cells1[i].ToSortedDictionary();
+            var dict2 = cells2[i].ToSortedDictionary();
+
+            if (ignoreFormulaText)
+            {
+                dict1.Remove("formula");
+                dict2.Remove("formula");
+            }
+
+            var json1 = JsonSerializer.Serialize(dict1, jsonOptions);
+            var json2 = JsonSerializer.Serialize(dict2, jsonOptions);
+
+            if (json1 != json2)
+            {
+                var cell = cells1[i];
+                var location = $"{cell.Sheet}!{cell.Address}";
+                var fieldDiffs = FindFieldDifferences(dict1, dict2, jsonOptions);
+                var diffJson = new { cell = location, file1 = dict1, file2 = dict2 };
+                diffs.Add(FormatDiff(location, fieldDiffs.Summary, fieldDiffs.Details, diffJson, jsonOptions));
+            }
+        }
+
+        return diffs;
     }
 
     private static string? FindFirstPropertyDifference(
