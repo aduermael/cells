@@ -120,7 +120,7 @@ Excel's smallest positive number is `2.2250738585072E-308` (the smallest *normal
 Excel returns `#NUM!` when arithmetic operations overflow to infinity. Our engine returns `inf`/`-inf`, which writes as "INF" in XLSX values. This affects ~332 cells (e.g., `9.999E+307 + 9.999E+307`).
 
 - [x] 10a: Add infinity-to-NUM checks after arithmetic operators — in `formula_eval.cc`, after `+`, `-`, `*`, `/` operations, check `std::isinf(result)` and return `EvalResult::Error(CellError::NUM)` if true. The `^` operator already had this check. Division can also overflow (e.g., `DBL_MAX / 0.5`), so it gets the check too. Updated `edge_cases_test.cc` (overflow now returns `#NUM!` instead of `inf`) and added 4 new tests in `formula_error_test.cc`.
-- [ ] 10b: Add overflow checks in math functions — functions like POWER already check for inf. Verify SUM, AVERAGE, and other aggregation functions also check their final result.
+- [x] 10b: Add overflow checks in math functions — added `std::isinf` → `#NUM!` checks to SUM (final sum), AVERAGE (final result), ROUND (intermediate overflow), and MOD (intermediate overflow). POWER already had the check. ABS, SQRT, FLOOR, CEILING, INT, MIN, MAX can't overflow. COUNT/COUNTA return integer counts.
 - [ ] 10c: Run the roundtrip test and count remaining differences.
 
 ## Phase 11: Error Type Mismatches

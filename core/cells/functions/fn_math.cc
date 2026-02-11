@@ -21,6 +21,9 @@ EvalResult fn_SUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     for (const double val : values) {
         sum += val;
     }
+    if (std::isinf(sum)) {
+        return EvalResult::Error(CellError::NUM);
+    }
     return EvalResult::Number(excelNormalize(sum));
 }
 
@@ -38,7 +41,11 @@ EvalResult fn_AVERAGE(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     for (const double val : values) {
         sum += val;
     }
-    return EvalResult::Number(excelNormalize(sum / static_cast<double>(values.size())));
+    const double result = sum / static_cast<double>(values.size());
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
 }
 
 EvalResult fn_COUNT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -203,6 +210,9 @@ EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         rounded = std::ceil(value * multiplier - 0.5) / multiplier;
     }
 
+    if (std::isinf(rounded)) {
+        return EvalResult::Error(CellError::NUM);
+    }
     return EvalResult::Number(excelNormalize(rounded));
 }
 
@@ -257,6 +267,9 @@ EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     // Excel MOD: result has same sign as divisor
     // MOD(n, d) = n - d * INT(n/d)
     const double result = n - d * std::floor(n / d);
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
     return EvalResult::Number(excelNormalize(result));
 }
 
