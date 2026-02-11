@@ -1233,6 +1233,12 @@ std::string generateWorksheet(
     }
     xml << "  </sheetViews>\n";
 
+    // Write sheetFormatPr (defaultRowHeight)
+    if (sheet.defaultRowHeight > 0) {
+        xml << "  <sheetFormatPr defaultRowHeight=\"" << formatDouble(sheet.defaultRowHeight)
+            << "\"/>\n";
+    }
+
     // Write cols element if any columns have hidden, style, or custom width attributes
     bool needColsElement = false;
     for (const auto& colPair : columns) {
@@ -1258,16 +1264,18 @@ std::string generateWorksheet(
 
         for (size_t i = 0; i < columns.size(); ++i) {
             const cells::Axis* col = sheet.getColumn(columns[i].second);
-            if (col == nullptr)
+            if (col == nullptr) {
                 continue;
+            }
 
             const bool hidden = col->hidden();
             auto styleIt = axisStyleIndices.find(col);
             const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
             const bool hasCustomWidth = writeDimensions && col->sizeSet();
 
-            if (!hidden && !hasStyle && !hasCustomWidth)
+            if (!hidden && !hasStyle && !hasCustomWidth) {
                 continue;
+            }
 
             double width = 0;
             if (hasCustomWidth) {
@@ -1522,6 +1530,18 @@ std::string generateWorksheet(
             xml << "    <mergeCell ref=\"" << startRef << ":" << endRef << "\"/>\n";
         }
         xml << "  </mergeCells>\n";
+    }
+
+    // Write pageMargins
+    if (sheet.hasPageMargins) {
+        xml << "  <pageMargins"
+            << " left=\"" << formatDouble(sheet.pageMargins.left) << "\""
+            << " right=\"" << formatDouble(sheet.pageMargins.right) << "\""
+            << " top=\"" << formatDouble(sheet.pageMargins.top) << "\""
+            << " bottom=\"" << formatDouble(sheet.pageMargins.bottom) << "\""
+            << " header=\"" << formatDouble(sheet.pageMargins.header) << "\""
+            << " footer=\"" << formatDouble(sheet.pageMargins.footer) << "\""
+            << "/>\n";
     }
 
     xml << "</worksheet>";

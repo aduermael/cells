@@ -48,7 +48,7 @@ These properties are not yet in the data model. Add typed fields so they can be 
 
 - [x] 2a: Add typed fields to `Sheet` in `model.h` — added `PageMargins` struct with 6 double fields, `double defaultRowHeight{0}`, `PageMargins pageMargins`, and `bool hasPageMargins{false}` to `Sheet`.
 - [x] 2b: Read `<sheetFormatProperties>` and `<pageMargins>` in xlsx_reader — parses `defaultRowHeight` from `<sheetFormatPr>` and all 6 margin values from `<pageMargins>`. Added unit test verifying against simple.xlsx.
-- [ ] 2c: Write the properties in xlsx_writer — emit `<sheetFormatProperties defaultRowHeight="..."/>` and `<pageMargins .../>` elements from the typed fields at the correct positions in the worksheet XML.
+- [x] 2c: Write the properties in xlsx_writer — emits `<sheetFormatPr>` after `<sheetViews>` and `<pageMargins>` before `</worksheet>`. Added round-trip test.
 
 ## Phase 3: Fix Theme Font Name Preservation
 

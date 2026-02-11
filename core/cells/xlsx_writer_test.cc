@@ -3239,5 +3239,53 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     EXPECT_FALSE(readStyle.bgColor.empty()) << "Style should have background color";
 }
 
+TEST(XLSXWriterTest, RoundtripDefaultRowHeightAndPageMargins) {
+    // Create a workbook with sheet properties set
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Props");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+    sheet->defaultRowHeight = 16.0;
+    sheet->hasPageMargins = true;
+    sheet->pageMargins.left = 0.7;
+    sheet->pageMargins.right = 0.7;
+    sheet->pageMargins.top = 0.75;
+    sheet->pageMargins.bottom = 0.75;
+    sheet->pageMargins.header = 0.3;
+    sheet->pageMargins.footer = 0.3;
+
+    // Add a cell so the sheet isn't empty
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    auto cell = std::make_unique<Cell>(generate_id(), col->id, row->id);
+    cell->value = CellValue(1.0);
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    workbook->addSheet(std::move(sheet));
+
+    // Write to a temp file
+    std::string tmpPath = tempFilePath("roundtrip_sheet_props.xlsx");
+    TempFileGuard guard(tmpPath);
+    auto writeResult = writeXLSX(*workbook, tmpPath);
+    ASSERT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back and verify properties are preserved
+    auto readBack = readXLSX(tmpPath);
+    ASSERT_TRUE(readBack.ok());
+    Sheet* readSheet = readBack.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    EXPECT_DOUBLE_EQ(readSheet->defaultRowHeight, 16.0);
+    EXPECT_TRUE(readSheet->hasPageMargins);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.left, 0.7);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.right, 0.7);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.top, 0.75);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.bottom, 0.75);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.header, 0.3);
+    EXPECT_DOUBLE_EQ(readSheet->pageMargins.footer, 0.3);
+}
+
 }  // namespace
 }  // namespace cells
