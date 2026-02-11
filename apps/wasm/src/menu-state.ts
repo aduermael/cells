@@ -22,6 +22,7 @@ export type MenuId =
   | "border"
   | "namedRanges"
   | "cellStyles"
+  | "themes"
   | "formulaAutocomplete"
   | "scriptAutocomplete";
 

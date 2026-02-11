@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 7b complete, 7c next.**
+**Status: In Progress — Phase 7c complete, 7d next.**
 
 ## Design
 
@@ -209,7 +209,7 @@ A "Themes" dropdown that lets users switch the workbook's theme from a gallery o
   - TypeScript types for the theme list
   - When a file is opened with a custom theme, include it in the list as "Current" or by its name
 
-- [ ] 7c: Theme switcher dropdown UI
+- [x] 7c: Theme switcher dropdown UI. Created `ThemeGallery` component in `theme-gallery.ts` with `DropdownFrame` integration. Added "Themes" button next to "Cell Styles" in Block 5. Gallery fetches built-in themes + current theme on each open, shows rows with checkmark + name + 6 accent swatches. Custom (non-builtin) themes shown at top under "Current Theme" header. Clicking applies theme via `setTheme()`, invalidates cell styles gallery presets and reloads style controls theme palette. Added `themes` MenuId for mutual exclusivity. Added CSS for `.theme-gallery-*` classes. All 338 unit + 338 E2E tests pass.
   - "Themes" button in toolbar (alignment block, top row, right side) with dropdown arrow
   - Dropdown shows a gallery of built-in themes, each as a row with: name + 6 accent color swatches preview
   - If the workbook has an imported theme not matching any built-in, show it at the top as "Current Theme" or by its XML name

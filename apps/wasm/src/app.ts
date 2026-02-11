@@ -208,6 +208,9 @@ export interface DOMElements {
   // Cell Styles gallery
   cellStylesBtn: HTMLButtonElement;
   cellStylesGallery: HTMLElement;
+  // Theme gallery
+  themesBtn: HTMLButtonElement;
+  themeGallery: HTMLElement;
 }
 
 // =============================================================================
@@ -722,6 +725,9 @@ export function createApp(): App {
     // Cell Styles gallery
     cellStylesBtn: getElement<HTMLButtonElement>("cell-styles-btn"),
     cellStylesGallery: getElement("cell-styles-gallery"),
+    // Theme gallery
+    themesBtn: getElement<HTMLButtonElement>("themes-btn"),
+    themeGallery: getElement("theme-gallery"),
   };
 
   return new App(elements);

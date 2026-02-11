@@ -33,6 +33,7 @@ import { StyleControls } from "./style-controls";
 import { MergeControls } from "./merge-controls";
 import { BorderControls } from "./border-controls";
 import { CellStylesGallery } from "./cell-styles-gallery";
+import { ThemeGallery } from "./theme-gallery";
 import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
@@ -932,6 +933,22 @@ export function createComponents(config: ComponentsConfig): Components {
     }
   );
 
+  const themeGallery = new ThemeGallery(
+    {
+      galleryBtn: elements.themesBtn,
+      galleryContainer: elements.themeGallery,
+    },
+    {
+      requestRender: render,
+      onThemeChanged: () => {
+        // Invalidate cell styles gallery (presets have theme-resolved colors)
+        cellStylesGallery.loadPresets();
+        // Reload theme color pickers in style controls
+        styleControls.loadThemePalette();
+      },
+    }
+  );
+
   // Named ranges dropdown for quick insertion
   const namedRangesDropdown = new NamedRangesDropdown(
     elements.formulaBar,
@@ -1009,6 +1026,7 @@ export function createComponents(config: ComponentsConfig): Components {
       mergeControls.setDataSource(dataSource);
       borderControls.setDataSource(dataSource);
       cellStylesGallery.setDataSource(dataSource);
+      themeGallery.setDataSource(dataSource);
       namedRangesDropdown.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },

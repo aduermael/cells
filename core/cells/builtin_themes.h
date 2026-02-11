@@ -33,10 +33,8 @@ struct BuiltinTheme {
 // ---------------------------------------------------------------------------
 // Helper: construct a Theme from color array + fonts
 // ---------------------------------------------------------------------------
-inline Theme makeTheme(const std::string& name,
-                       const std::string (&colors)[12],
-                       const std::string& majorFont,
-                       const std::string& minorFont) {
+inline Theme makeTheme(const std::string& name, const std::string (&colors)[12],
+                       const std::string& majorFont, const std::string& minorFont) {
     Theme t;
     t.name = name;
     for (int i = 0; i < 12; ++i) {
@@ -156,7 +154,8 @@ inline std::vector<BuiltinTheme> getBuiltinThemes() {
             "#588157",  // hlink
             "#3A5A40",  // folHlink
         };
-        themes.push_back({"Forest", makeTheme("Forest", colors, "Palatino Linotype", "Palatino Linotype")});
+        themes.push_back(
+            {"Forest", makeTheme("Forest", colors, "Palatino Linotype", "Palatino Linotype")});
     }
 
     // ========================================================================

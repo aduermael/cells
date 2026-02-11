@@ -484,7 +484,7 @@
                     </button>
                 </div>
             </div>
-            <!-- Block 5: Cell Styles -->
+            <!-- Block 5: Cell Styles & Themes -->
             <div class="toolbar-block" id="cell-styles-block">
                 <div class="toolbar-block-row" style="height: 100%;">
                     <button class="btn btn-icon btn-sm" id="cell-styles-btn" title="Cell Styles">
@@ -499,10 +499,25 @@
                             <path d="M6 9l6 6 6-6"/>
                         </svg>
                     </button>
+                    <button class="btn btn-icon btn-sm" id="themes-btn" title="Themes">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="4"/>
+                            <line x1="12" y1="2" x2="12" y2="6"/>
+                            <line x1="12" y1="18" x2="12" y2="22"/>
+                            <line x1="2" y1="12" x2="6" y2="12"/>
+                            <line x1="18" y1="12" x2="22" y2="12"/>
+                        </svg>
+                        <span class="cell-styles-label">Themes</span>
+                        <svg class="dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
         <div id="cell-styles-gallery" class="cell-styles-gallery"></div>
+        <div id="theme-gallery" class="theme-gallery hidden"></div>
         <div id="formula-bar" class="hidden">
             <div id="cell-ref-wrapper">
                 <span id="cell-reference" title="Click for named ranges">A1</span>

@@ -3514,3 +3514,96 @@ canvas {
 .cell-style-chip:active {
     opacity: 0.8;
 }
+
+/* =============================================================================
+   Theme Gallery
+   ============================================================================= */
+
+/* Gallery dropdown */
+.theme-gallery {
+    position: fixed;
+    width: 280px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    z-index: 1000;
+}
+
+.theme-gallery.hidden {
+    display: none;
+}
+
+/* Category header */
+.theme-gallery-category {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 8px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--color-separator);
+}
+
+.theme-gallery-category:first-child {
+    margin-top: 0;
+}
+
+/* Individual theme row */
+.theme-gallery-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+    text-align: left;
+}
+
+.theme-gallery-row:hover {
+    background-color: var(--color-bg-hover);
+}
+
+.theme-gallery-row-active {
+    background-color: var(--color-bg-selected);
+}
+
+/* Checkmark */
+.theme-gallery-check {
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--color-primary);
+    text-align: center;
+}
+
+/* Theme name */
+.theme-gallery-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Accent color swatches */
+.theme-gallery-swatches {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.theme-gallery-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    border: 1px solid var(--color-border);
+}
