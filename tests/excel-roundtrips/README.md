@@ -5,7 +5,7 @@ Test data and evaluation tools for Excel file processing.
 ## Structure
 
 ```
-excel-roundtrips/
+excel-test-sets/
 ├── data/           # Test Excel files and expected outputs
 │   ├── math-basic/ # Basic math operations
 │   └── math-trig/  # Trigonometric functions
