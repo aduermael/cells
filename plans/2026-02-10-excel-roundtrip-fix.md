@@ -44,11 +44,11 @@ The reader already stores column widths and row heights in `Axis::size`. The wri
 
 ## Phase 2: Preserve Sheet-Level Properties (defaultRowHeight, pageMargins)
 
-These properties are not in the data model and need a pass-through mechanism.
+These properties are not yet in the data model. Add typed fields so they can be used later.
 
-- [ ] 2a: Add an opaque XML pass-through map to `Sheet` — a `std::map<std::string, std::string>` field (e.g., `Sheet::xlsxProperties`) that stores raw XML snippets keyed by element name. This avoids adding typed fields for every possible Excel property.
-- [ ] 2b: Read `<sheetFormatProperties>` and `<pageMargins>` in xlsx_reader — store the raw XML attributes as a serialized string in the pass-through map.
-- [ ] 2c: Write pass-through properties in xlsx_writer — emit `<sheetFormatProperties>` and `<pageMargins>` elements from the pass-through map at the correct positions in the worksheet XML.
+- [ ] 2a: Add typed fields to `Sheet` in `model.h` — add `double defaultRowHeight{0}` (in points, 0 = not set) and a `PageMargins` struct with `left`, `right`, `top`, `bottom`, `header`, `footer` (all `double`, in inches, matching Excel's representation). Add a `bool hasPageMargins{false}` flag.
+- [ ] 2b: Read `<sheetFormatProperties>` and `<pageMargins>` in xlsx_reader — parse the XML attributes into the new typed fields on `Sheet`.
+- [ ] 2c: Write the properties in xlsx_writer — emit `<sheetFormatProperties defaultRowHeight="..."/>` and `<pageMargins .../>` elements from the typed fields at the correct positions in the worksheet XML.
 
 ## Phase 3: Fix Theme Font Name Preservation
 
@@ -71,10 +71,6 @@ Formula text and minor value precision differences are intentional (our engine n
 - [ ] 6b: Add `--value-tolerance` flag to the C# comparator — when set with a relative tolerance (e.g., `1e-14`), treat two numeric values as equal if their relative difference is within the tolerance. This handles the `1.0000000000000001E-307` vs `9.9999999999999991E-308` case.
 - [ ] 6c: Wire flags through `compare.sh` and `run-test.sh` — pass `--ignore-formula-text --value-tolerance 1e-14` from `run-test.sh` to `compare.sh` to the Docker evaluator.
 
-## Design Considerations
+## Design Notes
 
-**Phase 2 (pass-through map)**: This is the main design decision. Two approaches:
-1. **Typed fields**: Add `defaultRowHeight`, `pageMargins` etc. as typed fields to `Sheet`. Pro: type-safe, usable in the app. Con: must add every possible property, model bloat.
-2. **Opaque pass-through**: Store raw XML strings for properties we don't actively use. Pro: handles any property automatically, minimal model changes. Con: not usable by the app logic.
-
-I'm proposing option 2 because these properties (page margins, print settings, etc.) are display/print concerns that our app doesn't need to manipulate — we just need to preserve them for round-trip fidelity.
+**Phase 2**: Using typed fields on `Sheet` for `defaultRowHeight` and `pageMargins`. These will be usable by the app later (e.g., for print preview, page layout). Values use Excel's native units (points for row height, inches for margins) to avoid lossy conversions.
