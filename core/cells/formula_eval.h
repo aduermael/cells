@@ -416,6 +416,22 @@ inline double excelPow(double base, double exponent) {
     return std::pow(base, exponent);
 }
 
+// Excel numeric normalization.
+// Excel does not support IEEE754 subnormal (denormalized) numbers or negative zero.
+// Subnormals (values smaller than 2^-1022 ≈ 2.225e-308) are flushed to +0, and
+// -0 is normalized to +0. See Microsoft's documentation:
+// https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result
+// Do NOT remove — these normalizations are required for Excel compatibility.
+inline double excelNormalize(double value) {
+    if (std::fpclassify(value) == FP_SUBNORMAL) {
+        return 0.0;
+    }
+    if (value == 0.0 && std::signbit(value)) {
+        return 0.0;
+    }
+    return value;
+}
+
 // Forward declaration
 class NamedRangeRegistry;
 

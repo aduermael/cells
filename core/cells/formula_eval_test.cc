@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -1792,6 +1793,59 @@ TEST(ExcelPowTest, NegativeBaseExtremeExponent) {
     std::memcpy(&bits, &result, sizeof(bits));
     // Expected: 0x8031FA182C40C60B (negative of 0x0031FA182C40C60B)
     EXPECT_EQ(0x8031FA182C40C60BULL, bits) << "excelPow(-10, -307) should match Excel's C11 value";
+}
+
+// =============================================================================
+// EXCEL NORMALIZE TESTS (subnormal flush + negative zero)
+// =============================================================================
+
+TEST(ExcelNormalizeTest, NormalValuesUnchanged) {
+    EXPECT_DOUBLE_EQ(1.0, excelNormalize(1.0));
+    EXPECT_DOUBLE_EQ(-1.0, excelNormalize(-1.0));
+    EXPECT_DOUBLE_EQ(1e300, excelNormalize(1e300));
+    EXPECT_DOUBLE_EQ(0.0, excelNormalize(0.0));
+}
+
+TEST(ExcelNormalizeTest, SubnormalsFlushToZero) {
+    // Smallest subnormal: ~5e-324
+    double subnormal = 5e-324;
+    ASSERT_EQ(FP_SUBNORMAL, std::fpclassify(subnormal));
+    EXPECT_DOUBLE_EQ(0.0, excelNormalize(subnormal));
+
+    // Another subnormal
+    double subnormal2 = 1e-320;
+    ASSERT_EQ(FP_SUBNORMAL, std::fpclassify(subnormal2));
+    EXPECT_DOUBLE_EQ(0.0, excelNormalize(subnormal2));
+
+    // Negative subnormal
+    double negSubnormal = -5e-324;
+    ASSERT_EQ(FP_SUBNORMAL, std::fpclassify(negSubnormal));
+    EXPECT_DOUBLE_EQ(0.0, excelNormalize(negSubnormal));
+}
+
+TEST(ExcelNormalizeTest, NegativeZeroNormalized) {
+    double negZero = -0.0;
+    ASSERT_TRUE(std::signbit(negZero));
+    double result = excelNormalize(negZero);
+    EXPECT_DOUBLE_EQ(0.0, result);
+    EXPECT_FALSE(std::signbit(result));
+}
+
+TEST(ExcelNormalizeTest, SmallestNormalNotFlushed) {
+    // The smallest normal double: 2^-1022 ≈ 2.2250738585072014e-308
+    double smallestNormal = 2.2250738585072014e-308;
+    ASSERT_EQ(FP_NORMAL, std::fpclassify(smallestNormal));
+    EXPECT_DOUBLE_EQ(smallestNormal, excelNormalize(smallestNormal));
+}
+
+TEST(ExcelNormalizeTest, InfAndNanPassThrough) {
+    // Infinities and NaN are not affected (they're handled elsewhere)
+    double inf = std::numeric_limits<double>::infinity();
+    EXPECT_EQ(inf, excelNormalize(inf));
+    EXPECT_EQ(-inf, excelNormalize(-inf));
+
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_TRUE(std::isnan(excelNormalize(nan)));
 }
 
 }  // namespace

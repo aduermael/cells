@@ -110,7 +110,7 @@ Excel's smallest positive number is `2.2250738585072E-308` (the smallest *normal
 
 **Example**: After Phase 8, C10 (`10^-307`) = `0x0031FA182C40C60E` and C11 (`-10^-307`) = `0x8031FA182C40C60B`. These have different magnitudes (different algorithms), so `C10+C11` = `5.93e-323` — a subnormal. Excel caches `0` for I23 because it flushes subnormals.
 
-- [ ] 9a: Add `excelNormalize(double)` helper in `formula_eval.h` — flush subnormals to `+0` and normalize `-0` to `+0`. Use `std::fpclassify(result) == FP_SUBNORMAL` for subnormals and check `result == 0.0 && std::signbit(result)` for `-0`. Add unit tests covering both cases.
+- [x] 9a: Add `excelNormalize(double)` helper in `formula_eval.h` — flush subnormals to `+0` and normalize `-0` to `+0`. Uses `std::fpclassify` for subnormals and `std::signbit` for `-0`. Unit tests cover subnormals, negative zero, smallest normal (not flushed), and inf/NaN pass-through.
 - [ ] 9b: Apply normalization after all arithmetic binary operators in `formula_eval.cc` — `+`, `-`, `*`, `/`, `^`. Each already returns `EvalResult::Number(result)`. Wrap the result value in `excelNormalize()` before creating the EvalResult. Do NOT apply to comparisons, concatenation, or coercion (they don't produce arithmetic results).
 - [ ] 9c: Apply normalization in math functions — functions in `fn_math.cc` that compute new numeric values (POWER, ROUND, MOD, SQRT, ABS) should normalize their output. Functions that just aggregate (SUM, AVERAGE, MIN, MAX, COUNT) should normalize only their final result.
 - [ ] 9d: Run the roundtrip test and count remaining differences. Record the updated diff summary.
