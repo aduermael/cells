@@ -112,7 +112,7 @@ Excel's smallest positive number is `2.2250738585072E-308` (the smallest *normal
 
 - [x] 9a: Add `excelNormalize(double)` helper in `formula_eval.h` — flush subnormals to `+0` and normalize `-0` to `+0`. Uses `std::fpclassify` for subnormals and `std::signbit` for `-0`. Unit tests cover subnormals, negative zero, smallest normal (not flushed), and inf/NaN pass-through.
 - [x] 9b: Apply normalization after all arithmetic binary operators in `formula_eval.cc` — `+`, `-`, `*`, `/`, `^` and unary negate. Wrapped result values in `excelNormalize()` before creating EvalResult. Not applied to comparisons, concatenation, or coercion.
-- [ ] 9c: Apply normalization in math functions — functions in `fn_math.cc` that compute new numeric values (POWER, ROUND, MOD, SQRT, ABS) should normalize their output. Functions that just aggregate (SUM, AVERAGE, MIN, MAX, COUNT) should normalize only their final result.
+- [x] 9c: Apply normalization in math functions — all functions in `fn_math.cc` now normalize output via `excelNormalize()`: POWER, ROUND, MOD, SQRT, ABS, FLOOR, CEILING, INT normalize computed values; SUM, AVERAGE, MIN, MAX normalize final results. COUNT/COUNTA return integer counts (no normalization needed).
 - [ ] 9d: Run the roundtrip test and count remaining differences. Record the updated diff summary.
 
 ## Phase 10: Overflow to #NUM! Error

@@ -21,7 +21,7 @@ EvalResult fn_SUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     for (const double val : values) {
         sum += val;
     }
-    return EvalResult::Number(sum);
+    return EvalResult::Number(excelNormalize(sum));
 }
 
 EvalResult fn_AVERAGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -38,7 +38,7 @@ EvalResult fn_AVERAGE(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     for (const double val : values) {
         sum += val;
     }
-    return EvalResult::Number(sum / static_cast<double>(values.size()));
+    return EvalResult::Number(excelNormalize(sum / static_cast<double>(values.size())));
 }
 
 EvalResult fn_COUNT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -93,7 +93,7 @@ EvalResult fn_MIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
             minVal = values[i];
         }
     }
-    return EvalResult::Number(minVal);
+    return EvalResult::Number(excelNormalize(minVal));
 }
 
 EvalResult fn_MAX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -112,7 +112,7 @@ EvalResult fn_MAX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
             maxVal = values[i];
         }
     }
-    return EvalResult::Number(maxVal);
+    return EvalResult::Number(excelNormalize(maxVal));
 }
 
 // =============================================================================
@@ -129,7 +129,7 @@ EvalResult fn_ABS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return num;
     }
 
-    return EvalResult::Number(std::abs(num.getNumber()));
+    return EvalResult::Number(excelNormalize(std::abs(num.getNumber())));
 }
 
 EvalResult fn_SQRT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -147,7 +147,7 @@ EvalResult fn_SQRT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::NUM);
     }
 
-    return EvalResult::Number(std::sqrt(val));
+    return EvalResult::Number(excelNormalize(std::sqrt(val)));
 }
 
 EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -170,7 +170,7 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::NUM);
     }
 
-    return EvalResult::Number(result);
+    return EvalResult::Number(excelNormalize(result));
 }
 
 EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -203,7 +203,7 @@ EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         rounded = std::ceil(value * multiplier - 0.5) / multiplier;
     }
 
-    return EvalResult::Number(rounded);
+    return EvalResult::Number(excelNormalize(rounded));
 }
 
 EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -216,7 +216,7 @@ EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return num;
     }
 
-    return EvalResult::Number(std::floor(num.getNumber()));
+    return EvalResult::Number(excelNormalize(std::floor(num.getNumber())));
 }
 
 EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -229,7 +229,7 @@ EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return num;
     }
 
-    return EvalResult::Number(std::ceil(num.getNumber()));
+    return EvalResult::Number(excelNormalize(std::ceil(num.getNumber())));
 }
 
 EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -257,7 +257,7 @@ EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     // Excel MOD: result has same sign as divisor
     // MOD(n, d) = n - d * INT(n/d)
     const double result = n - d * std::floor(n / d);
-    return EvalResult::Number(result);
+    return EvalResult::Number(excelNormalize(result));
 }
 
 EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -270,7 +270,7 @@ EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return num;
     }
 
-    return EvalResult::Number(std::floor(num.getNumber()));
+    return EvalResult::Number(excelNormalize(std::floor(num.getNumber())));
 }
 
 // =============================================================================
