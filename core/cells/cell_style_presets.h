@@ -390,12 +390,6 @@ inline std::vector<CellStylePreset> getBuiltinCellStylePresets() {
         {7, "Accent 4"}, {8, "Accent 5"}, {9, "Accent 6"},
     };
 
-    struct TintVariation {
-        const char* prefix;  // e.g. "20% - ", "40% - ", "60% - "
-        double bgTint;       // Tint for background
-        bool whiteText;      // Whether to use white text (for dark fills)
-    };
-
     // For each accent: full color, then 60%, 40%, 20% lighter variations
     for (const auto& accent : accents) {
         // Full accent color (100%) — white text on accent bg
@@ -416,7 +410,7 @@ inline std::vector<CellStylePreset> getBuiltinCellStylePresets() {
         // 60% accent (medium tint) — white text
         {
             CellStylePreset p;
-            p.name = std::string("60% - ") + accent.label;
+            p.name = "60%";
             p.category = PresetCategory::kThemedCellStyles;
             p.style.bgThemeIndex = accent.themeIndex;
             p.style.bgThemeTint = 0.399975;
@@ -430,7 +424,7 @@ inline std::vector<CellStylePreset> getBuiltinCellStylePresets() {
         // 40% accent (lighter tint) — dark text
         {
             CellStylePreset p;
-            p.name = std::string("40% - ") + accent.label;
+            p.name = "40%";
             p.category = PresetCategory::kThemedCellStyles;
             p.style.bgThemeIndex = accent.themeIndex;
             p.style.bgThemeTint = 0.599993;
@@ -444,7 +438,7 @@ inline std::vector<CellStylePreset> getBuiltinCellStylePresets() {
         // 20% accent (lightest tint) — dark text
         {
             CellStylePreset p;
-            p.name = std::string("20% - ") + accent.label;
+            p.name = "20%";
             p.category = PresetCategory::kThemedCellStyles;
             p.style.bgThemeIndex = accent.themeIndex;
             p.style.bgThemeTint = 0.799981;

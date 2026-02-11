@@ -3429,21 +3429,16 @@ canvas {
    Cell Styles Gallery
    ============================================================================= */
 
-/* Cell styles block fills height to vertically center its single button */
-#cell-styles-block.toolbar-block {
-    justify-content: center;
-}
-
-/* Button in toolbar */
-#cell-styles-btn {
+/* Themes / Cell Styles buttons in alignment block */
+.toolbar-gallery-btn {
     display: flex;
     align-items: center;
     gap: 4px;
     white-space: nowrap;
-    height: auto;
+    margin-left: var(--spacing-sm);
 }
 
-.cell-styles-label {
+.toolbar-gallery-label {
     font-size: var(--font-size-xs);
 }
 

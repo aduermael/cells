@@ -2,7 +2,7 @@
 
 Add first-class theme support and indexed color preservation for Excel-compatible roundtrips. Themes provide a workbook-level color palette (12 colors) and font scheme (2 fonts) that cells can reference instead of using direct values. Indexed colors (legacy 0-63 palette) are also preserved. Direct properties always override theme/indexed references.
 
-**Status: In Progress — Phase 7c complete, 7d next.**
+**Status: In Progress — Phase 7d complete. Phases 1-7 done (except 6d stretch). Only 6d remains as stretch goal.**
 
 ## Design
 
@@ -217,11 +217,10 @@ A "Themes" dropdown that lets users switch the workbook's theme from a gallery o
   - Clicking a theme applies it: calls `setTheme()`, then reloads theme palette, cell style presets, and re-renders
   - All theme-aware UI updates: color pickers rebuild, cell style gallery invalidates cached presets
 
-- [ ] 7d: Move Themes and Cell Styles into alignment block
-  - Remove standalone Block 5 (cell-styles-block)
-  - Add Themes dropdown button to alignment block top row (right of v-align group)
-  - Add Cell Styles dropdown button to alignment block bottom row (right of h-align group)
-  - Update CSS for proper layout within the alignment block
+- [x] 7d: Reorganize toolbar layout. Merged merge/wrap controls into the alignment block (Block 2) — merge dropdown next to v-align, wrap text next to h-align. Moved Themes and Cell Styles into their own block (Block 4, right side). Shortened accent preset chip labels from "60% - Accent 1" to just "60%" for cleaner gallery display. Removed unused `TintVariation` struct. All 338 unit + 338 E2E tests pass.
+  - Merge/wrap controls moved into alignment block (right of align groups)
+  - Themes + Cell Styles in standalone block (right side of toolbar)
+  - Accent preset labels shortened to just percentage
 
 ## Technical Notes
 
