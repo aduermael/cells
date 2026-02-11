@@ -100,7 +100,13 @@ Steps:
 
 ## Phase 9: Excel Numeric Normalization (subnormal flush + negative zero)
 
-Excel does not support IEEE754 subnormal (denormalized) numbers — any result where `0 < |result| < 2.2250738585072014e-308` is flushed to `0`. Excel also normalizes `-0` to `+0`. Our engine preserves both, causing mismatches.
+Excel does not support IEEE754 subnormal (denormalized) numbers or negative zero. From [Microsoft's documentation](https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result):
+
+> **Denormalized numbers:** "Microsoft doesn't implement this optional portion of the specification because denormalized numbers by their very nature have a variable number of significant digits. This can allow significant error to enter into calculations."
+
+> **Underflow:** "In IEEE and Excel, the result is 0 (with the exception that IEEE has a concept of -0, and Excel doesn't)."
+
+Excel's smallest positive number is `2.2250738585072E-308` (the smallest *normal* IEEE754 double, `2^-1022`). Anything smaller is flushed to `+0`. This is also listed in [Excel specifications and limits](https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3).
 
 **Example**: After Phase 8, C10 (`10^-307`) = `0x0031FA182C40C60E` and C11 (`-10^-307`) = `0x8031FA182C40C60B`. These have different magnitudes (different algorithms), so `C10+C11` = `5.93e-323` — a subnormal. Excel caches `0` for I23 because it flushes subnormals.
 
@@ -149,3 +155,7 @@ After each phase, re-run `./run-test.sh math-basic` to see the next diff. If new
 **Phase 7**: The `std::pow` on macOS arm64 returns the mathematically correctly-rounded IEEE754 result for `10^(-307)` (`0x...C60D`), but Excel computes `1/10^307` and gets a different result (`0x...C60E`, 1 ULP higher). We intentionally match Excel's algorithm rather than mathematical correctness, because Excel compatibility is the goal. This must be clearly commented in the code to prevent well-meaning "fixes".
 
 **Phase 8**: Excel uses two different code paths for exponentiation depending on sign of base. For positive base, it uses its standard pow (which matches `1.0/std::pow` for negative exponents). For negative base with integer exponent, it uses exponentiation by squaring (LSB-first), which accumulates slightly different rounding at extreme exponents. The difference is only observable at extreme scales (e.g., `10^±307`) where intermediate squarings produce values near the limits of double precision. For normal-range exponents (roughly `|exp| < 100`), both paths produce identical results.
+
+**Phase 9**: Excel intentionally deviates from IEEE754 in two ways: (1) no subnormal support — values below `2.2250738585072014e-308` (`2^-1022`, the smallest normal double) are flushed to `+0`; (2) no negative zero — `-0` is normalized to `+0`. Microsoft's rationale: subnormals have "a variable number of significant digits" which "can allow significant error to enter into calculations." This is documented at [learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result). VBA's `Double` type does support subnormals, but the worksheet layer does not — subnormals are flushed when written to cells.
+
+**Phase 10**: Excel treats all infinities as errors. IEEE754 arithmetic can produce `±inf` on overflow (e.g., `DBL_MAX + DBL_MAX`), but Excel returns `#NUM!` instead. This is part of Excel's general approach of mapping non-finite IEEE754 results to spreadsheet error types rather than exposing the raw floating-point behavior.
