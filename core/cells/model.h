@@ -356,12 +356,13 @@ inline AxisFlags& operator&=(AxisFlags& a, AxisFlags b) {
 
 // Axis - represents a column or row
 struct Axis {
-    std::string name;   // Custom name (empty = compute from position)
-    ID id;              // Unique identifier (8-char base62)
-    ID sheetId;         // ID of the sheet this axis belongs to
-    uint32_t position;  // Visual position (0-indexed)
-    uint32_t size;      // Width (column) or height (row) in pixels
-    AxisFlags _flags;   // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE, HAS_FORMAT
+    std::string name;        // Custom name (empty = compute from position)
+    ID id;                   // Unique identifier (8-char base62)
+    ID sheetId;              // ID of the sheet this axis belongs to
+    uint32_t position;       // Visual position (0-indexed)
+    uint32_t size;           // Width (column) or height (row) in pixels
+    double sizeOriginal{0};  // Original size in Excel units (char-widths for cols, points for rows)
+    AxisFlags _flags;        // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE, HAS_FORMAT
     // NOTE: Axis styles/formats stored in Workbook::_styles/_formats maps via axis ID
 
     Axis();

@@ -1732,6 +1732,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         std::unordered_map<int, bool> columnHidden;      // 0-indexed col -> hidden
         std::unordered_map<int, int> columnStyleIndex;   // 0-indexed col -> XLSX style index
         std::unordered_map<int, uint32_t> columnWidths;  // 0-indexed col -> width in pixels
+        std::unordered_map<int, double>
+            columnWidthsOriginal;  // 0-indexed col -> original char-width
         auto colsNode = xmlChild(worksheetNode, "cols");
         if (colsNode) {
             for (auto colNode : xmlChildren(colsNode, "col")) {
@@ -1756,6 +1758,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                         // So: pixels = width * 7.5 (rounded)
                         const auto widthPx = static_cast<uint32_t>(std::lround(widthAttr * 7.5));
                         columnWidths[c] = widthPx > 0 ? widthPx : DEFAULT_COLUMN_WIDTH;
+                        columnWidthsOriginal[c] = widthAttr;
                     }
                 }
             }
@@ -1771,6 +1774,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         std::unordered_map<int, bool> rowHidden;       // 0-indexed row -> hidden
         std::unordered_map<int, int> rowStyleIndex;    // 0-indexed row -> XLSX style index
         std::unordered_map<int, uint32_t> rowHeights;  // 0-indexed row -> height in pixels
+        std::unordered_map<int, double>
+            rowHeightsOriginal;  // 0-indexed row -> original height in points
 
         for (auto row : xmlChildren(sheetData, "row")) {
             const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
@@ -1797,6 +1802,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     // Convert points to pixels: 1pt = 96/72 = 1.333... px
                     const auto heightPx = static_cast<uint32_t>(std::lround(htAttr * 96.0 / 72.0));
                     rowHeights[rowNum] = heightPx > 0 ? heightPx : DEFAULT_ROW_HEIGHT;
+                    rowHeightsOriginal[rowNum] = htAttr;
                 }
             }
 
@@ -1823,6 +1829,13 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             // Apply column width from XLSX if available, otherwise use default
             auto widthIt = columnWidths.find(c);
             col->size = (widthIt != columnWidths.end()) ? widthIt->second : DEFAULT_COLUMN_WIDTH;
+            if (widthIt != columnWidths.end()) {
+                col->setSizeSet(true);
+                auto origIt = columnWidthsOriginal.find(c);
+                if (origIt != columnWidthsOriginal.end()) {
+                    col->sizeOriginal = origIt->second;
+                }
+            }
             col->setHidden(columnHidden.count(c) > 0);
             // Apply column default style if present (store in workbook entity styles)
             auto styleIt = columnStyleIndex.find(c);
@@ -1843,6 +1856,13 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             // Apply row height from XLSX if available, otherwise use default
             auto heightIt = rowHeights.find(r);
             rowAxis->size = (heightIt != rowHeights.end()) ? heightIt->second : DEFAULT_ROW_HEIGHT;
+            if (heightIt != rowHeights.end()) {
+                rowAxis->setSizeSet(true);
+                auto origIt = rowHeightsOriginal.find(r);
+                if (origIt != rowHeightsOriginal.end()) {
+                    rowAxis->sizeOriginal = origIt->second;
+                }
+            }
             rowAxis->setHidden(rowHidden.count(r) > 0);
             // Apply row default style if present (store in workbook entity styles)
             auto styleIt = rowStyleIndex.find(r);

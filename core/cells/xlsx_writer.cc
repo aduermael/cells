@@ -21,6 +21,14 @@ namespace {
 std::string escapeXml(const std::string& str);
 std::string colIndexToLetter(size_t index);
 
+// Format a double for XML attributes, preserving full precision without trailing zeros
+std::string formatDouble(double value) {
+    // Use snprintf with enough precision to represent all significant digits
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%.10g", value);
+    return buf;
+}
+
 // ZIP file writing using miniz
 class ZipWriter {
 public:
@@ -1074,7 +1082,7 @@ struct CellPosition {
 // axisStyleIndices maps axis pointer to XLSX style index (style attribute for cols, s for rows)
 std::string generateWorksheet(
     const cells::Sheet& sheet, const cells::Workbook& workbook, SharedStringTable& sst,
-    const cells::RefConverter& refConverter, bool writeFormulas,
+    const cells::RefConverter& refConverter, bool writeFormulas, bool writeDimensions,
     const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices,
     const std::unordered_map<const cells::Axis*, size_t>& axisStyleIndices) {
     std::ostringstream xml;
@@ -1225,12 +1233,13 @@ std::string generateWorksheet(
     }
     xml << "  </sheetViews>\n";
 
-    // Write cols element if any columns have hidden or style attributes
+    // Write cols element if any columns have hidden, style, or custom width attributes
     bool needColsElement = false;
     for (const auto& colPair : columns) {
         const cells::Axis* col = sheet.getColumn(colPair.second);
         if (col != nullptr) {
-            if (col->hidden() || axisStyleIndices.count(col) > 0) {
+            if (col->hidden() || axisStyleIndices.count(col) > 0 ||
+                (writeDimensions && col->sizeSet())) {
                 needColsElement = true;
                 break;
             }
@@ -1244,10 +1253,19 @@ std::string generateWorksheet(
                 const bool hidden = col->hidden();
                 auto styleIt = axisStyleIndices.find(col);
                 const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
+                const bool hasCustomWidth = writeDimensions && col->sizeSet();
 
-                if (hidden || hasStyle) {
+                if (hidden || hasStyle || hasCustomWidth) {
                     // Excel uses 1-based column indices
                     xml << "    <col min=\"" << (i + 1) << "\" max=\"" << (i + 1) << "\"";
+                    if (hasCustomWidth) {
+                        // Use original Excel value if available (avoids lossy pixel conversion)
+                        // Otherwise convert pixels back: width = pixels / 7.5
+                        const double width = col->sizeOriginal > 0
+                                                 ? col->sizeOriginal
+                                                 : static_cast<double>(col->size) / 7.5;
+                        xml << " width=\"" << formatDouble(width) << "\" customWidth=\"1\"";
+                    }
                     if (hasStyle) {
                         xml << " style=\"" << styleIt->second << "\"";
                     }
@@ -1276,13 +1294,17 @@ std::string generateWorksheet(
             }
         }
 
-        // Check if row is hidden and/or has style
+        // Check if row is hidden, has style, or has custom height
         bool rowHidden = false;
+        bool hasCustomHeight = false;
         size_t rowStyleIdx = 0;
         const cells::Axis* row = sheet.getRow(rows[rowIdx].second);
         if (row != nullptr) {
             if (row->hidden()) {
                 rowHidden = true;
+            }
+            if (writeDimensions && row->sizeSet()) {
+                hasCustomHeight = true;
             }
             auto styleIt = axisStyleIndices.find(row);
             if (styleIt != axisStyleIndices.end()) {
@@ -1290,12 +1312,19 @@ std::string generateWorksheet(
             }
         }
 
-        // Skip rows with no cells, not hidden, and no style
-        if (!hasAnyCells && !rowHidden && rowStyleIdx == 0) {
+        // Skip rows with no cells, not hidden, no style, and no custom height
+        if (!hasAnyCells && !rowHidden && rowStyleIdx == 0 && !hasCustomHeight) {
             continue;
         }
 
         xml << "    <row r=\"" << (rowIdx + 1) << "\"";
+        if (hasCustomHeight) {
+            // Use original Excel value if available (avoids lossy pixel conversion)
+            // Otherwise convert pixels back: points = pixels * 72.0 / 96.0
+            const double ht = row->sizeOriginal > 0 ? row->sizeOriginal
+                                                    : static_cast<double>(row->size) * 72.0 / 96.0;
+            xml << " ht=\"" << formatDouble(ht) << "\" customHeight=\"1\"";
+        }
         if (rowStyleIdx > 0) {
             xml << " s=\"" << rowStyleIdx << "\" customFormat=\"1\"";
         }
@@ -1984,7 +2013,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         // Generate worksheet XML
         const std::string sheetXml =
             generateWorksheet(sheet, workbook, sst, refConverter, options_.writeFormulas,
-                              cellStyleIndices, axisStyleIndices);
+                              options_.writeDimensions, cellStyleIndices, axisStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
         if (!zip.addFile(sheetPath, sheetXml)) {

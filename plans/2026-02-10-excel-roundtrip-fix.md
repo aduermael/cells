@@ -38,9 +38,9 @@ Running the test produces these categories of differences:
 
 The reader already stores column widths and row heights in `Axis::size`. The writer ignores them.
 
-- [ ] 1a: Write column widths in `xlsx_writer.cc` — when `writeDimensions` is true and a column has a non-default size, emit `width` and `customWidth="1"` attributes in `<col>` elements. Also trigger `<cols>` element when any column has non-default width (not just hidden/styled). Convert pixels back to Excel character-width units (reverse of the `* 7.5` import conversion).
-- [ ] 1b: Write row heights in `xlsx_writer.cc` — when `writeDimensions` is true and a row has a non-default size, emit `ht` and `customHeight="1"` attributes on `<row>` elements. Convert pixels back to points (reverse of the `* 96/72` import conversion). Also emit rows that have custom height even if they have no cells.
-- [ ] 1c: Mark imported sizes with `setSizeSet(true)` in `xlsx_reader.cc` — so the writer can distinguish "explicitly set by user" from "default size". Use `sizeSet()` in the writer to decide whether to emit width/height.
+- [x] 1a: Write column widths in `xlsx_writer.cc` — when `writeDimensions` is true and a column has `sizeSet()`, emit `width` and `customWidth="1"` attributes in `<col>` elements. Uses `sizeOriginal` for exact round-trip, falling back to pixel conversion.
+- [x] 1b: Write row heights in `xlsx_writer.cc` — when `writeDimensions` is true and a row has `sizeSet()`, emit `ht` and `customHeight="1"` attributes on `<row>` elements. Rows with custom height are now emitted even without cells.
+- [x] 1c: Mark imported sizes with `setSizeSet(true)` in `xlsx_reader.cc` and store original Excel values in `Axis::sizeOriginal`. Added `sizeOriginal` field to `Axis` in `model.h`.
 
 ## Phase 2: Preserve Sheet-Level Properties (defaultRowHeight, pageMargins)
 
