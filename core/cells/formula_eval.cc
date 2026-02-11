@@ -338,7 +338,8 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(leftNum.numberValue + rightNum.numberValue);
+            return EvalResult::Number(
+                excelNormalize(leftNum.numberValue + rightNum.numberValue));
         }
         case BinaryOp::SUBTRACT: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -351,7 +352,8 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(leftNum.numberValue - rightNum.numberValue);
+            return EvalResult::Number(
+                excelNormalize(leftNum.numberValue - rightNum.numberValue));
         }
         case BinaryOp::MULTIPLY: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -364,7 +366,8 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(leftNum.numberValue * rightNum.numberValue);
+            return EvalResult::Number(
+                excelNormalize(leftNum.numberValue * rightNum.numberValue));
         }
         case BinaryOp::DIVIDE: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -380,7 +383,8 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.numberValue == 0.0) {
                 return EvalResult::Error(CellError::DIV);
             }
-            return EvalResult::Number(leftNum.numberValue / rightNum.numberValue);
+            return EvalResult::Number(
+                excelNormalize(leftNum.numberValue / rightNum.numberValue));
         }
         case BinaryOp::POWER: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -397,7 +401,7 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (std::isnan(result) || std::isinf(result)) {
                 return EvalResult::Error(CellError::NUM);
             }
-            return EvalResult::Number(result);
+            return EvalResult::Number(excelNormalize(result));
         }
         case BinaryOp::CONCAT: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -451,7 +455,7 @@ static EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx) {
 
     switch (node->op) {
         case UnaryOp::NEGATE:
-            return EvalResult::Number(-num.numberValue);
+            return EvalResult::Number(excelNormalize(-num.numberValue));
         case UnaryOp::POSITIVE:
             return EvalResult::Number(num.numberValue);
     }
