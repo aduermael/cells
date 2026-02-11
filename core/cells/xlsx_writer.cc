@@ -1246,35 +1246,61 @@ std::string generateWorksheet(
         }
     }
     if (needColsElement) {
-        xml << "  <cols>\n";
+        // Build a list of column entries, then collapse adjacent ones with identical attributes
+        struct ColEntry {
+            size_t min;       // 1-based
+            size_t max;       // 1-based
+            double width;     // 0 = no custom width
+            size_t styleIdx;  // 0 = no style
+            bool hidden;
+        };
+        std::vector<ColEntry> colEntries;
+
         for (size_t i = 0; i < columns.size(); ++i) {
             const cells::Axis* col = sheet.getColumn(columns[i].second);
-            if (col != nullptr) {
-                const bool hidden = col->hidden();
-                auto styleIt = axisStyleIndices.find(col);
-                const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
-                const bool hasCustomWidth = writeDimensions && col->sizeSet();
+            if (col == nullptr)
+                continue;
 
-                if (hidden || hasStyle || hasCustomWidth) {
-                    // Excel uses 1-based column indices
-                    xml << "    <col min=\"" << (i + 1) << "\" max=\"" << (i + 1) << "\"";
-                    if (hasCustomWidth) {
-                        // Use original Excel value if available (avoids lossy pixel conversion)
-                        // Otherwise convert pixels back: width = pixels / 7.5
-                        const double width = col->sizeOriginal > 0
-                                                 ? col->sizeOriginal
-                                                 : static_cast<double>(col->size) / 7.5;
-                        xml << " width=\"" << formatDouble(width) << "\" customWidth=\"1\"";
-                    }
-                    if (hasStyle) {
-                        xml << " style=\"" << styleIt->second << "\"";
-                    }
-                    if (hidden) {
-                        xml << " hidden=\"1\"";
-                    }
-                    xml << "/>\n";
+            const bool hidden = col->hidden();
+            auto styleIt = axisStyleIndices.find(col);
+            const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
+            const bool hasCustomWidth = writeDimensions && col->sizeSet();
+
+            if (!hidden && !hasStyle && !hasCustomWidth)
+                continue;
+
+            double width = 0;
+            if (hasCustomWidth) {
+                width = col->sizeOriginal > 0 ? col->sizeOriginal
+                                              : static_cast<double>(col->size) / 7.5;
+            }
+            const size_t sIdx = hasStyle ? styleIt->second : 0;
+
+            // Try to extend the previous entry if attributes match
+            if (!colEntries.empty()) {
+                auto& prev = colEntries.back();
+                if (prev.max == i && prev.width == width && prev.styleIdx == sIdx &&
+                    prev.hidden == hidden) {
+                    prev.max = i + 1;
+                    continue;
                 }
             }
+            colEntries.push_back({i + 1, i + 1, width, sIdx, hidden});
+        }
+
+        xml << "  <cols>\n";
+        for (const auto& entry : colEntries) {
+            xml << "    <col min=\"" << entry.min << "\" max=\"" << entry.max << "\"";
+            if (entry.width > 0) {
+                xml << " width=\"" << formatDouble(entry.width) << "\" customWidth=\"1\"";
+            }
+            if (entry.styleIdx > 0) {
+                xml << " style=\"" << entry.styleIdx << "\"";
+            }
+            if (entry.hidden) {
+                xml << " hidden=\"1\"";
+            }
+            xml << "/>\n";
         }
         xml << "  </cols>\n";
     }
@@ -1323,7 +1349,7 @@ std::string generateWorksheet(
             // Otherwise convert pixels back: points = pixels * 72.0 / 96.0
             const double ht = row->sizeOriginal > 0 ? row->sizeOriginal
                                                     : static_cast<double>(row->size) * 72.0 / 96.0;
-            xml << " ht=\"" << formatDouble(ht) << "\" customHeight=\"1\"";
+            xml << " ht=\"" << formatDouble(ht) << "\"";
         }
         if (rowStyleIdx > 0) {
             xml << " s=\"" << rowStyleIdx << "\" customFormat=\"1\"";
