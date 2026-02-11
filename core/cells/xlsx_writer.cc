@@ -1726,6 +1726,7 @@ std::string generateStyles(const StyleTable& styles) {
             xml << "    <fill><patternFill patternType=\"solid\">";
             writeColorElement(xml, "fgColor", fill.fgColor, fill.fgThemeIndex, fill.fgThemeTint,
                               fill.fgIndexed);
+            xml << "<bgColor indexed=\"64\"/>";
             xml << "</patternFill></fill>\n";
         } else {
             // Empty fill or index 0 - use none pattern

@@ -52,12 +52,12 @@ These properties are not yet in the data model. Add typed fields so they can be 
 
 ## Phase 3: Fix Theme Font Name Preservation
 
-- [ ] 3a: Store font family name alongside theme index in `StyleBuffer` — when `fontThemeIndex >= 0`, store both the theme index AND the original font name (currently only stores the index, losing the name).
-- [ ] 3b: Resolve theme font name in xlsx_writer — when writing fonts, if `fontFamily` is empty but `fontThemeIndex >= 0`, resolve the name from the workbook's `Theme::fontScheme` (major/minor font). Fall back to "Calibri"/"Calibri Light" only if no theme is present.
+- [x] 3a: Store font family name alongside theme index in `StyleBuffer` — `setFontTheme()` now stores `char(schemeIndex) + fontName` in the fontFamily slot. `getFontFamily()` skips the scheme byte when `hasFontTheme()` is set. `getFontThemeIndex()` reads raw data directly. `fromCellStyle()` passes fontFamily through; `toCellStyle()` returns both fields.
+- [x] 3b: Resolve theme font name in xlsx_writer — added fallback resolution at all 3 style collection points (cells, columns, rows) using `resolveThemeFont()` from theme.h. Also updated viewport bindings to only resolve when fontFamily is empty.
 
 ## Phase 4: Fix Fill bgColor Export
 
-- [ ] 4a: Write `<bgColor>` in solid fills — in `xlsx_writer.cc`, when writing a `<patternFill patternType="solid">`, also emit `<bgColor indexed="64"/>` after the `<fgColor>` element. This matches Excel's behavior for solid fills.
+- [x] 4a: Write `<bgColor>` in solid fills — added `<bgColor indexed="64"/>` after the `<fgColor>` element in solid patternFill output. This matches Excel's convention where indexed:64 is the system foreground default background for solid fills.
 
 ## Phase 5: Fix Number Value Formatting (uppercase E)
 
