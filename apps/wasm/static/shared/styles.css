@@ -3433,9 +3433,8 @@ canvas {
 .toolbar-gallery-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--spacing-xs);
     white-space: nowrap;
-    margin-left: var(--spacing-sm);
 }
 
 .toolbar-gallery-label {
