@@ -165,7 +165,7 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return exponent;
     }
 
-    const double result = std::pow(base.getNumber(), exponent.getNumber());
+    const double result = excelPow(base.getNumber(), exponent.getNumber());
     if (std::isnan(result) || std::isinf(result)) {
         return EvalResult::Error(CellError::NUM);
     }

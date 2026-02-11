@@ -365,6 +365,19 @@ struct EvalResult {
     }
 };
 
+// Excel-compatible power function.
+// For negative exponents, Excel computes x^(-n) as 1/x^n rather than calling
+// pow(x, -n) directly. This produces results that differ by 1 ULP at extreme
+// exponents (e.g., 10^-307). We match Excel's algorithm intentionally for
+// compatibility, even though direct std::pow is more mathematically correct.
+// Do NOT "fix" this to use std::pow directly.
+inline double excelPow(double base, double exponent) {
+    if (exponent < 0.0) {
+        return 1.0 / std::pow(base, -exponent);
+    }
+    return std::pow(base, exponent);
+}
+
 // Forward declaration
 class NamedRangeRegistry;
 

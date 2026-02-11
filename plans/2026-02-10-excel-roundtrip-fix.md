@@ -75,7 +75,7 @@ Formula text differences are intentional (our engine normalizes formulas). Add a
 Our `std::pow` produces results that differ from Excel by 1 ULP at extreme exponents. We should match Excel's results exactly.
 
 - [x] 7a: Investigate which `std::pow` calls produce different results — `std::pow(10,-307)` gives `0x0031FA182C40C60D` which is actually the correctly-rounded IEEE754 value (verified via Python's arbitrary-precision `decimal`). Excel gives `0x0031FA182C40C60E` which matches `1.0/std::pow(10,307)` — Excel apparently computes `x^(-n)` as `1/x^n`. Our `std::pow` and the C++ literal `1e-307` agree. This single 1-ULP diff in C10 cascades to 159 value differences across the test file. The Docker image also needed rebuilding to include the `--ignore-formula-text` flag from Phase 6.
-- [ ] 7b: Fix the power operator to match Excel's behavior — for negative exponents, compute as `1.0/pow(x, abs(n))` instead of `pow(x, n)`. This matches Excel's apparent algorithm. Add a clear explanatory comment so this isn't "fixed" back to direct `std::pow` later. The fix should be in `formula_eval.cc` (line 396) and `fn_math.cc` (line 168) where `std::pow` is called.
+- [x] 7b: Fix the power operator to match Excel's behavior — added `excelPow()` inline helper in `formula_eval.h` that computes `1.0/pow(base, -exp)` for negative exponents. Updated both call sites in `formula_eval.cc` (^ operator) and `fn_math.cc` (POWER function). Includes explanatory comment to prevent well-meaning "fixes" back to direct `std::pow`.
 
 ### Additional issues discovered during 7a investigation (out of scope for Phase 7)
 

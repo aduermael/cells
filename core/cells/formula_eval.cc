@@ -393,7 +393,7 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            const double result = std::pow(leftNum.numberValue, rightNum.numberValue);
+            const double result = excelPow(leftNum.numberValue, rightNum.numberValue);
             if (std::isnan(result) || std::isinf(result)) {
                 return EvalResult::Error(CellError::NUM);
             }
