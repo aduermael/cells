@@ -1021,5 +1021,32 @@ TEST(XLSXReaderTest, ReadGeneralAlignmentFromLBOModel) {
         << "Expected some cells with GENERAL alignment in the LBO model";
 }
 
+// ============================================================================
+// Sheet Property Tests (defaultRowHeight, pageMargins)
+// ============================================================================
+
+TEST(XLSXReaderTest, ReadDefaultRowHeightAndPageMargins) {
+    XLSXReadOptions options;
+    auto result = readXLSX(testFilePath("simple.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // simple.xlsx has defaultRowHeight="16"
+    EXPECT_DOUBLE_EQ(sheet->defaultRowHeight, 16.0);
+
+    // simple.xlsx has pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75"
+    // header="0.3" footer="0.3"
+    EXPECT_TRUE(sheet->hasPageMargins);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.left, 0.7);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.right, 0.7);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.top, 0.75);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.bottom, 0.75);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.header, 0.3);
+    EXPECT_DOUBLE_EQ(sheet->pageMargins.footer, 0.3);
+}
+
 }  // namespace
 }  // namespace cells

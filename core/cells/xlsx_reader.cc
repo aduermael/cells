@@ -1725,6 +1725,27 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         }
 
+        // Parse sheet format properties (<sheetFormatPr> element)
+        auto sheetFormatPrNode = xmlChild(worksheetNode, "sheetFormatPr");
+        if (sheetFormatPrNode) {
+            auto defaultRowHeightAttr = sheetFormatPrNode.attribute("defaultRowHeight");
+            if (defaultRowHeightAttr) {
+                sheet->defaultRowHeight = defaultRowHeightAttr.as_double(0.0);
+            }
+        }
+
+        // Parse page margins (<pageMargins> element)
+        auto pageMarginsNode = xmlChild(worksheetNode, "pageMargins");
+        if (pageMarginsNode) {
+            sheet->hasPageMargins = true;
+            sheet->pageMargins.left = pageMarginsNode.attribute("left").as_double(0.0);
+            sheet->pageMargins.right = pageMarginsNode.attribute("right").as_double(0.0);
+            sheet->pageMargins.top = pageMarginsNode.attribute("top").as_double(0.0);
+            sheet->pageMargins.bottom = pageMarginsNode.attribute("bottom").as_double(0.0);
+            sheet->pageMargins.header = pageMarginsNode.attribute("header").as_double(0.0);
+            sheet->pageMargins.footer = pageMarginsNode.attribute("footer").as_double(0.0);
+        }
+
         // Parse column properties (<cols> element) - includes hidden, width, style, etc.
         // XLSX cols use 1-based column indices and can specify ranges (min/max)
         // Width is in Excel "character width" units (approx 7 pixels per unit)
