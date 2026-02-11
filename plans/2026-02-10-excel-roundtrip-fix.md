@@ -101,9 +101,9 @@ After Phase 7b, C10 (`10^(-307)`) matches Excel but C11 (`-10^(-307)`) still dif
 
 Steps:
 
-- [ ] 8a: Add `powBySquaring` helper to `formula_eval.h` — LSB-first binary exponentiation: square `b` and conditionally multiply `result *= b` for each bit. O(log n) multiplications, comparable to `std::pow`. Add unit test verifying it matches expected hex values for `10^307` and a few other cases.
-- [ ] 8b: Update `excelPow` to use squaring for negative base with integer exponent — when `base < 0` and `exponent` is an integer (checked via `std::floor(exponent) == exponent`), compute `powBySquaring(|base|, |exponent|)`, apply sign based on exponent parity, then take reciprocal if exponent was negative. For positive base or non-integer exponent, keep the current `std::pow` path. Both call sites (`formula_eval.cc` `^` operator and `fn_math.cc` POWER function) already use `excelPow` so they get the fix automatically.
-- [ ] 8c: Add parser precedence test — add a test in `formula_parser_test.cc` confirming `-2^2` parses as `POWER(NEGATE(2), 2)` (not `NEGATE(POWER(2, 2))`). This documents the Excel-compatible precedence behavior.
+- [x] 8a: Add `powBySquaring` helper to `formula_eval.h` — LSB-first binary exponentiation: square `b` and conditionally multiply `result *= b` for each bit. O(log n) multiplications, comparable to `std::pow`. Added unit tests verifying basic cases, exact hex match for `1/powBySquaring(10,307)` (0x0031FA182C40C60B), and agreement with `std::pow` for small exponents.
+- [x] 8b: Update `excelPow` to use squaring for negative base with integer exponent — when `base < 0` and `exponent` is an integer (checked via `std::floor(exponent) == exponent`), compute `powBySquaring(|base|, |exponent|)`, apply sign based on exponent parity, then take reciprocal if exponent was negative. For positive base or non-integer exponent, keep the current `std::pow` path. Both call sites (`formula_eval.cc` `^` operator and `fn_math.cc` POWER function) already use `excelPow` so they get the fix automatically. Added unit tests for positive base, negative base with integer/non-integer exponents, and extreme exponent hex verification.
+- [x] 8c: Add parser precedence test — added test in `formula_parser_test.cc` confirming `-2^2` parses as `POWER(NEGATE(2), 2)` (not `NEGATE(POWER(2, 2))`). This documents the Excel-compatible precedence behavior where unary minus binds tighter than `^`.
 
 ## Design Notes
 

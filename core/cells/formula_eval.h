@@ -365,13 +365,51 @@ struct EvalResult {
     }
 };
 
+// LSB-first exponentiation by squaring for non-negative integer exponents.
+// Excel uses this algorithm for negative base with integer exponent, because
+// the standard exp(n * log(x)) path doesn't work for negative x. The squaring
+// approach accumulates slightly different rounding errors than std::pow at
+// extreme exponents (e.g., 10^307), which is observable only near the limits
+// of double precision. We match Excel's algorithm intentionally.
+// Do NOT replace with std::pow — the 1-ULP differences are expected.
+inline double powBySquaring(double base, uint64_t exp) {
+    double result = 1.0;
+    double b = base;
+    while (exp > 0) {
+        if ((exp & 1) != 0) {
+            result *= b;
+        }
+        b *= b;
+        exp >>= 1;
+    }
+    return result;
+}
+
 // Excel-compatible power function.
-// For negative exponents, Excel computes x^(-n) as 1/x^n rather than calling
-// pow(x, -n) directly. This produces results that differ by 1 ULP at extreme
-// exponents (e.g., 10^-307). We match Excel's algorithm intentionally for
-// compatibility, even though direct std::pow is more mathematically correct.
-// Do NOT "fix" this to use std::pow directly.
+// Excel uses two code paths for exponentiation:
+// 1. Positive base (or non-integer exponent): uses std::pow, with 1/pow(x,n)
+//    for negative exponents to match Excel's algorithm.
+// 2. Negative base with integer exponent: uses exponentiation by squaring
+//    (powBySquaring), because exp(n*log(x)) doesn't work for negative x.
+//    The squaring approach produces different rounding at extreme exponents.
+// Do NOT "fix" this to use std::pow directly — the differences are intentional.
 inline double excelPow(double base, double exponent) {
+    if (base < 0.0 && std::floor(exponent) == exponent) {
+        // Negative base with integer exponent: use squaring
+        const double absBase = -base;
+        const double absExp = std::abs(exponent);
+        auto intExp = static_cast<uint64_t>(absExp);
+        double result = powBySquaring(absBase, intExp);
+        // Apply sign: negative base raised to odd exponent is negative
+        if ((intExp & 1) != 0) {
+            result = -result;
+        }
+        // Take reciprocal for negative exponents
+        if (exponent < 0.0) {
+            result = 1.0 / result;
+        }
+        return result;
+    }
     if (exponent < 0.0) {
         return 1.0 / std::pow(base, -exponent);
     }

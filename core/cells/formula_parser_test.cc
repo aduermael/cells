@@ -1295,5 +1295,40 @@ TEST(FormulaParserTest, SpillRangeVsRange) {
     EXPECT_EQ(ast2->type, ASTNodeType::SPILL_RANGE_REF);
 }
 
+// ============================================================================
+// Operator Precedence Tests
+// ============================================================================
+
+TEST(FormulaParserTest, UnaryMinusHigherPrecedenceThanPower) {
+    // In Excel, -2^2 = (-2)^2 = 4, not -(2^2) = -4.
+    // Our parser gives unary minus higher precedence than ^, so -2^2 parses as
+    // POWER(NEGATE(2), 2). This documents the Excel-compatible behavior.
+    FormulaParser parser("-2^2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->op, BinaryOp::POWER);
+
+    // Left operand should be NEGATE(2), not just 2
+    EXPECT_EQ(binOp->left->type, ASTNodeType::UNARY_OP);
+    auto* unary = dynamic_cast<UnaryOpNode*>(binOp->left.get());
+    ASSERT_NE(unary, nullptr);
+    EXPECT_EQ(unary->op, UnaryOp::NEGATE);
+
+    auto* innerNum = dynamic_cast<NumberLiteralNode*>(unary->operand.get());
+    ASSERT_NE(innerNum, nullptr);
+    EXPECT_DOUBLE_EQ(innerNum->value, 2.0);
+
+    // Right operand should be 2
+    EXPECT_EQ(binOp->right->type, ASTNodeType::NUMBER_LITERAL);
+    auto* rightNum = dynamic_cast<NumberLiteralNode*>(binOp->right.get());
+    ASSERT_NE(rightNum, nullptr);
+    EXPECT_DOUBLE_EQ(rightNum->value, 2.0);
+}
+
 }  // namespace
 }  // namespace cells
