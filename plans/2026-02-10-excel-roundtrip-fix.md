@@ -77,7 +77,7 @@ Our `std::pow` produces results that differ from Excel by 1 ULP at extreme expon
 - [x] 7a: Investigate which `std::pow` calls produce different results — `std::pow(10,-307)` gives `0x0031FA182C40C60D` which is actually the correctly-rounded IEEE754 value (verified via Python's arbitrary-precision `decimal`). Excel gives `0x0031FA182C40C60E` which matches `1.0/std::pow(10,307)` — Excel apparently computes `x^(-n)` as `1/x^n`. Our `std::pow` and the C++ literal `1e-307` agree. This single 1-ULP diff in C10 cascades to 159 value differences across the test file. The Docker image also needed rebuilding to include the `--ignore-formula-text` flag from Phase 6.
 - [x] 7b: Fix the power operator to match Excel's behavior — added `excelPow()` inline helper in `formula_eval.h` that computes `1.0/pow(base, -exp)` for negative exponents. Updated both call sites in `formula_eval.cc` (^ operator) and `fn_math.cc` (POWER function). Includes explanatory comment to prevent well-meaning "fixes" back to direct `std::pow`.
 
-### Additional issues discovered during 7a investigation (out of scope for Phase 7)
+### Additional issues discovered during 7a investigation (out of scope)
 
 Full diff of the math-basic round-trip test (with `--ignore-formula-text`) revealed additional categories beyond the pow precision issue:
 
@@ -88,8 +88,27 @@ Full diff of the math-basic round-trip test (with `--ignore-formula-text`) revea
 
 These should be addressed in separate phases once the pow fix lands, to see how many actually resolve from the cascade.
 
+## Phase 8: Use Exponentiation by Squaring for Negative Base
+
+After Phase 7b, C10 (`10^(-307)`) matches Excel but C11 (`-10^(-307)`) still differs by 3 ULP. Investigation revealed:
+
+- Our parser **already** gives unary minus higher precedence than `^` (correct for Excel: `-10^2` = `(-10)^2` = `100`). See `formula_parser.cc`: `power()` → calls `unary()` → handles `-` → calls `primary()`. No parser change needed.
+- So `-10^(-307)` is parsed as `POWER(-10, -307)` — base is -10, exponent is -307.
+- For positive base: `1.0 / std::pow(10, 307)` gives `0x...C60E` ✓ (matches Excel C10)
+- For negative base: `1.0 / std::pow(-10, 307)` gives `0x80...C60E` ✗ (Excel C11 is `0x80...C60B`)
+- Excel uses **exponentiation by squaring** (LSB-first) for negative base with integer exponent, because the standard `exp(n * log(x))` path doesn't work for negative x. This accumulates slightly different rounding errors than `std::pow`.
+- Verified: `1.0 / powBySquaringLSB(10, 307)` gives `0x...C60B` — exact match for C11.
+
+Steps:
+
+- [ ] 8a: Add `powBySquaring` helper to `formula_eval.h` — LSB-first binary exponentiation: square `b` and conditionally multiply `result *= b` for each bit. O(log n) multiplications, comparable to `std::pow`. Add unit test verifying it matches expected hex values for `10^307` and a few other cases.
+- [ ] 8b: Update `excelPow` to use squaring for negative base with integer exponent — when `base < 0` and `exponent` is an integer (checked via `std::floor(exponent) == exponent`), compute `powBySquaring(|base|, |exponent|)`, apply sign based on exponent parity, then take reciprocal if exponent was negative. For positive base or non-integer exponent, keep the current `std::pow` path. Both call sites (`formula_eval.cc` `^` operator and `fn_math.cc` POWER function) already use `excelPow` so they get the fix automatically.
+- [ ] 8c: Add parser precedence test — add a test in `formula_parser_test.cc` confirming `-2^2` parses as `POWER(NEGATE(2), 2)` (not `NEGATE(POWER(2, 2))`). This documents the Excel-compatible precedence behavior.
+
 ## Design Notes
 
 **Phase 2**: Using typed fields on `Sheet` for `defaultRowHeight` and `pageMargins`. These will be usable by the app later (e.g., for print preview, page layout). Values use Excel's native units (points for row height, inches for margins) to avoid lossy conversions.
 
 **Phase 7**: The `std::pow` on macOS arm64 returns the mathematically correctly-rounded IEEE754 result for `10^(-307)` (`0x...C60D`), but Excel computes `1/10^307` and gets a different result (`0x...C60E`, 1 ULP higher). We intentionally match Excel's algorithm rather than mathematical correctness, because Excel compatibility is the goal. This must be clearly commented in the code to prevent well-meaning "fixes".
+
+**Phase 8**: Excel uses two different code paths for exponentiation depending on sign of base. For positive base, it uses its standard pow (which matches `1.0/std::pow` for negative exponents). For negative base with integer exponent, it uses exponentiation by squaring (LSB-first), which accumulates slightly different rounding at extreme exponents. The difference is only observable at extreme scales (e.g., `10^±307`) where intermediate squarings produce values near the limits of double precision. For normal-range exponents (roughly `|exp| < 100`), both paths produce identical results.
