@@ -28,9 +28,9 @@ Running the test produces these categories of differences:
 - `9.99999999999999E+307` becomes `1e+308` (number literal re-serialized with different precision)
 - **Not a bug** — our engine intentionally normalizes formula text for optimization. The comparison tool should ignore formula text.
 
-### 6. Computed value precision differences (intentional — different engine)
-- `1.0000000000000001E-307` vs `9.9999999999999991e-308` — different last-digit rounding
-- **Not a bug** — our formula engine may produce slightly different floating-point results at extreme values. The comparison tool should support a numeric tolerance for values.
+### 6. Computed value precision differences
+- `10^(-307)`: Excel computes `1.0000000000000001E-307` (`0x1.1fa182c40c60e`), we compute `9.9999999999999991E-308` (`0x1.1fa182c40c60d`) — 1 ULP difference
+- Root cause: `std::pow(10.0, -307.0)` on our platform differs by 1 ULP from Excel's result at extreme exponents. These are genuinely different IEEE754 bit patterns.
 
 ---
 
@@ -65,11 +65,17 @@ These properties are not yet in the data model. Add typed fields so they can be 
 
 ## Phase 6: Add Ignore Flags to Comparison Tool
 
-Formula text and minor value precision differences are intentional (our engine normalizes formulas and may compute slightly different results at extreme values). Rather than trying to match Excel exactly, add ignore flags to the comparison infrastructure.
+Formula text differences are intentional (our engine normalizes formulas). Add an ignore flag to the comparison infrastructure.
 
 - [ ] 6a: Add `--ignore-formula-text` flag to the C# comparator (`Program.cs`) — when set, skip the `formula` field when comparing cells. The cell values are still compared, just not the formula text.
-- [ ] 6b: Add `--value-tolerance` flag to the C# comparator — when set with a relative tolerance (e.g., `1e-14`), treat two numeric values as equal if their relative difference is within the tolerance. This handles the `1.0000000000000001E-307` vs `9.9999999999999991E-308` case.
-- [ ] 6c: Wire flags through `compare.sh` and `run-test.sh` — pass `--ignore-formula-text --value-tolerance 1e-14` from `run-test.sh` to `compare.sh` to the Docker evaluator.
+- [ ] 6b: Wire the flag through `compare.sh` and `run-test.sh` — pass `--ignore-formula-text` from `run-test.sh` to `compare.sh` to the Docker evaluator.
+
+## Phase 7: Fix Extreme Value Computation Precision
+
+Our `std::pow` produces results that differ from Excel by 1 ULP at extreme exponents. We should match Excel's results exactly.
+
+- [ ] 7a: Investigate which `std::pow` calls produce different results — the known case is `10^(-307)` where we get `0x1.1fa182c40c60d` but Excel gets `0x1.1fa182c40c60e`. Profile other extreme exponent cases from the test data to determine the scope.
+- [ ] 7b: Fix the power operator precision — likely need to use a more accurate power implementation for the `^` operator and `POWER()` function. Options include: compensated `pow` algorithms, using `exp(y * log(x))` with extended precision intermediates, or a lookup/correction table for `10^n` specifically. The fix should be in `formula_eval.cc` (line 396) and `fn_math.cc` (line 168) where `std::pow` is called.
 
 ## Design Notes
 
