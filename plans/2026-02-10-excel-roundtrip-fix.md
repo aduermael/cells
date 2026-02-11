@@ -61,7 +61,7 @@ These properties are not yet in the data model. Add typed fields so they can be 
 
 ## Phase 5: Fix Number Value Formatting (uppercase E)
 
-- [ ] 5a: Use uppercase `E` in scientific notation for XLSX export — in `xlsx_writer.cc`, when writing numeric cell values (`<v>` elements), convert lowercase `e` to uppercase `E` in the output string. This matches Excel's convention. Only apply this to the XLSX writer, not to the internal `CellValue::raw` representation.
+- [x] 5a: Use uppercase `E` in scientific notation for XLSX export — added `uppercaseExponent()` helper in xlsx_writer.cc, applied at both numeric `<v>` output points (formula cached values and regular values). Internal `CellValue::raw` is unchanged.
 
 ## Phase 6: Add Ignore Flags to Comparison Tool
 

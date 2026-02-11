@@ -30,6 +30,17 @@ std::string formatDouble(double value) {
     return buf;
 }
 
+// Convert lowercase 'e' to uppercase 'E' in numeric strings for Excel compatibility
+std::string uppercaseExponent(const std::string& s) {
+    std::string result = s;
+    for (char& c : result) {
+        if (c == 'e') {
+            c = 'E';
+        }
+    }
+    return result;
+}
+
 // ZIP file writing using miniz
 class ZipWriter {
 public:
@@ -1436,7 +1447,7 @@ std::string generateWorksheet(
                 // Check for both regular types and FORMULA_* result types
                 if (value.type == cells::CellValueType::NUMBER ||
                     value.type == cells::CellValueType::FORMULA_NUMBER) {
-                    xml << "        <v>" << value.raw << "</v>\n";
+                    xml << "        <v>" << uppercaseExponent(value.raw) << "</v>\n";
                 } else if (value.type == cells::CellValueType::BOOLEAN ||
                            value.type == cells::CellValueType::FORMULA_BOOLEAN) {
                     xml << "        <v>" << (value.raw == "true" || value.raw == "1" ? "1" : "0")
@@ -1452,7 +1463,7 @@ std::string generateWorksheet(
                     case cells::CellValueType::NUMBER:
                     case cells::CellValueType::FORMULA_NUMBER:
                         xml << ">\n";
-                        xml << "        <v>" << value.raw << "</v>\n";
+                        xml << "        <v>" << uppercaseExponent(value.raw) << "</v>\n";
                         xml << "      </c>\n";
                         break;
 
