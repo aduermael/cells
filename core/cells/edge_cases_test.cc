@@ -752,15 +752,15 @@ TEST_F(EdgeCasesTest, SmallNumberArithmetic) {
     EXPECT_DOUBLE_EQ(a3->value.asNumber(), 3e-50);
 }
 
-TEST_F(EdgeCasesTest, OverflowToInfinity) {
-    // Multiplying very large numbers should give infinity
+TEST_F(EdgeCasesTest, OverflowToNumError) {
+    // Multiplying very large numbers should give #NUM! (Excel behavior)
     setCellValue(0, 0, 1e200);
     setCellValue(0, 1, 1e200);
 
     Cell* a3 = setCellFormula(0, 2, "=A1*A2");
     ASSERT_NE(a3, nullptr);
     evaluateCell(0, 2);
-    EXPECT_TRUE(std::isinf(a3->value.asNumber()));
+    EXPECT_TRUE(cellHasError(0, 2, CellError::NUM));
 }
 
 TEST_F(EdgeCasesTest, UnderflowToZero) {
@@ -788,16 +788,16 @@ TEST_F(EdgeCasesTest, NaNFromInvalidOperation) {
 }
 
 TEST_F(EdgeCasesTest, InfinityArithmetic) {
-    // Test arithmetic with infinity
+    // Test arithmetic with infinity — Excel returns #NUM!
     double inf = std::numeric_limits<double>::infinity();
     setCellValue(0, 0, inf);
     setCellValue(0, 1, 10.0);
 
-    // Infinity + number = Infinity
+    // Infinity + number = #NUM!
     Cell* a3 = setCellFormula(0, 2, "=A1+A2");
     ASSERT_NE(a3, nullptr);
     evaluateCell(0, 2);
-    EXPECT_TRUE(std::isinf(a3->value.asNumber()));
+    EXPECT_TRUE(cellHasError(0, 2, CellError::NUM));
 }
 
 TEST_F(EdgeCasesTest, NegativeZero) {

@@ -441,6 +441,42 @@ TEST_F(FormulaErrorTest, NumError_PowerOverflow) {
     EXPECT_EQ(CellError::NUM, r.getError());
 }
 
+TEST_F(FormulaErrorTest, NumError_AddOverflow) {
+    // Addition overflow to infinity → #NUM!
+    setCellValue(0, 0, 1.7e308);  // A1
+    setCellValue(0, 1, 1.7e308);  // A2
+    EvalResult r = eval("=A1+A2");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_SubtractOverflow) {
+    // Subtraction overflow to -infinity → #NUM!
+    setCellValue(0, 0, -1.7e308);  // A1
+    setCellValue(0, 1, 1.7e308);   // A2
+    EvalResult r = eval("=A1-A2");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_MultiplyOverflow) {
+    // Multiplication overflow to infinity → #NUM!
+    setCellValue(0, 0, 1e200);  // A1
+    setCellValue(0, 1, 1e200);  // A2
+    EvalResult r = eval("=A1*A2");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_DivideOverflow) {
+    // Division overflow (large / tiny) → #NUM!
+    setCellValue(0, 0, 1.7e308);  // A1
+    setCellValue(0, 1, 0.5);      // A2
+    EvalResult r = eval("=A1/A2");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
 TEST_F(FormulaErrorTest, NumError_NegativeBaseNonIntegerExponent) {
     // Negative base with non-integer exponent (complex result)
     EvalResult r = eval("=POWER(-4, 0.5)");

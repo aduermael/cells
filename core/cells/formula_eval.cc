@@ -338,8 +338,11 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(
-                excelNormalize(leftNum.numberValue + rightNum.numberValue));
+            const double result = leftNum.numberValue + rightNum.numberValue;
+            if (std::isinf(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            return EvalResult::Number(excelNormalize(result));
         }
         case BinaryOp::SUBTRACT: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -352,8 +355,11 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(
-                excelNormalize(leftNum.numberValue - rightNum.numberValue));
+            const double result = leftNum.numberValue - rightNum.numberValue;
+            if (std::isinf(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            return EvalResult::Number(excelNormalize(result));
         }
         case BinaryOp::MULTIPLY: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -366,8 +372,11 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.isError()) {
                 return rightNum;
             }
-            return EvalResult::Number(
-                excelNormalize(leftNum.numberValue * rightNum.numberValue));
+            const double result = leftNum.numberValue * rightNum.numberValue;
+            if (std::isinf(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            return EvalResult::Number(excelNormalize(result));
         }
         case BinaryOp::DIVIDE: {
             // NOLINTNEXTLINE(misc-const-correctness)
@@ -383,8 +392,11 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
             if (rightNum.numberValue == 0.0) {
                 return EvalResult::Error(CellError::DIV);
             }
-            return EvalResult::Number(
-                excelNormalize(leftNum.numberValue / rightNum.numberValue));
+            const double result = leftNum.numberValue / rightNum.numberValue;
+            if (std::isinf(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            return EvalResult::Number(excelNormalize(result));
         }
         case BinaryOp::POWER: {
             // NOLINTNEXTLINE(misc-const-correctness)
