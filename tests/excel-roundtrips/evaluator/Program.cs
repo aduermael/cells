@@ -26,10 +26,11 @@ public class Program
         {
             if (args.Length < 3)
             {
-                Console.Error.WriteLine("Usage: ExcelExtractor --compare <file1.xlsx> <file2.xlsx>");
+                Console.Error.WriteLine("Usage: ExcelExtractor --compare <file1.xlsx> <file2.xlsx> [--ignore-formula-text]");
                 return 1;
             }
-            return CompareFiles(args[1], args[2]);
+            var ignoreFormulaText = args.Contains("--ignore-formula-text");
+            return CompareFiles(args[1], args[2], ignoreFormulaText);
         }
 
         if (args.Length >= 1 && args[0] == "--extract")
@@ -179,7 +180,7 @@ public class Program
         return (count, errorCount);
     }
 
-    private static int CompareFiles(string file1Path, string file2Path)
+    private static int CompareFiles(string file1Path, string file2Path, bool ignoreFormulaText = false)
     {
         if (!File.Exists(file1Path))
         {
@@ -230,7 +231,7 @@ public class Program
             var cells1 = ExtractCellsToList(file1Path);
             var cells2 = ExtractCellsToList(file2Path);
 
-            var diff = FindFirstDifference(cells1, cells2);
+            var diff = FindFirstDifference(cells1, cells2, ignoreFormulaText);
             if (diff == null)
             {
                 // Both properties and cells are identical
@@ -262,7 +263,7 @@ public class Program
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    private static string? FindFirstDifference(List<CellData> cells1, List<CellData> cells2)
+    private static string? FindFirstDifference(List<CellData> cells1, List<CellData> cells2, bool ignoreFormulaText = false)
     {
         var jsonOptions = new JsonSerializerOptions
         {
@@ -292,6 +293,13 @@ public class Program
 
             var dict1 = cells1[i].ToSortedDictionary();
             var dict2 = cells2[i].ToSortedDictionary();
+
+            if (ignoreFormulaText)
+            {
+                dict1.Remove("formula");
+                dict2.Remove("formula");
+            }
+
             var json1 = JsonSerializer.Serialize(dict1, jsonOptions);
             var json2 = JsonSerializer.Serialize(dict2, jsonOptions);
 

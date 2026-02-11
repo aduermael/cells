@@ -67,7 +67,7 @@ These properties are not yet in the data model. Add typed fields so they can be 
 
 Formula text differences are intentional (our engine normalizes formulas). Add an ignore flag to the comparison infrastructure.
 
-- [ ] 6a: Add `--ignore-formula-text` flag to the C# comparator (`Program.cs`) — when set, skip the `formula` field when comparing cells. The cell values are still compared, just not the formula text.
+- [x] 6a: Add `--ignore-formula-text` flag to the C# comparator (`Program.cs`) — when set, skip the `formula` field when comparing cells. The cell values are still compared, just not the formula text. Parsed from args in `--compare` mode, passed through to `FindFirstDifference`, which removes the "formula" key from cell dictionaries before comparison.
 - [ ] 6b: Wire the flag through `compare.sh` and `run-test.sh` — pass `--ignore-formula-text` from `run-test.sh` to `compare.sh` to the Docker evaluator.
 
 ## Phase 7: Fix Extreme Value Computation Precision
