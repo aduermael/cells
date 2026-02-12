@@ -123,22 +123,80 @@ Excel returns `#NUM!` when arithmetic operations overflow to infinity. Our engin
 - [x] 10b: Add overflow checks in math functions — added `std::isinf` → `#NUM!` checks to SUM (final sum), AVERAGE (final result), ROUND (intermediate overflow), and MOD (intermediate overflow). POWER already had the check. ABS, SQRT, FLOOR, CEILING, INT, MIN, MAX can't overflow. COUNT/COUNTA return integer counts.
 - [x] 10c: Run the roundtrip test and count remaining differences. **366 differences remain** (down from 398): 306 `#NAME?` (unimplemented functions), 21 `#NUM!`→number, 10 `0`→nonzero, 7 `number`→`#NUM!`, 6 uppercase-E notation (small numbers), 5 `#DIV/0!`→`#NUM!`, 8 `#REF!` related, 2 precision diffs.
 
-## Phase 11: Error Type Mismatches
+## Phase 11: Implement Missing Math Functions (306 #NAME? diffs)
 
-Some cells produce different error types than Excel. Categories discovered:
-- `#DIV/0!` → `#NAME?` (9 cells) — likely references to unimplemented functions
-- `#NUM!` → `#NAME?` (23 cells) — likely references to unimplemented functions
-- `#NUM!` → `#REF!` (5 cells) — possibly different error propagation rules
+Investigation (11a) revealed that all 306 `#NAME?` diffs come from 10 unimplemented functions. The `#REF!` diffs (9 cells) are caused by `LOG10` being parsed as cell reference `LOG` row `10` (since `LOG` is a valid column name and `10` is a row number). The `_xlfn.` prefix (used by `CEILING.MATH` and `FLOOR.MATH`) is not handled by the formula parser.
 
-- [ ] 11a: Investigate which functions/formulas produce the mismatches — run the roundtrip test with full diff output (not just first difference). Categorize by root cause: unimplemented functions vs different error propagation rules. If it's just missing functions, list them.
-- [ ] 11b: Implement fixes based on 11a findings — this step will be planned after investigation.
+**Unimplemented functions causing #NAME? (by count):**
+- `QUOTIENT(n, d)` — 81 cells — integer division: `INT(n/d)`
+- `ROUNDUP(n, digits)` — 45 cells — round away from zero
+- `ROUNDDOWN(n, digits)` — 45 cells — round toward zero (same as `TRUNC`)
+- `_xlfn.CEILING.MATH(n, sig)` — 45 cells — ceiling to multiple of significance
+- `_xlfn.FLOOR.MATH(n, sig)` — 45 cells — floor to multiple of significance
+- `SIGN(n)` — 9 cells — returns -1, 0, or 1
+- `TRUNC(n, [digits])` — 9 cells — truncate toward zero
+- `EXP(n)` — 9 cells — e^n
+- `LN(n)` — 9 cells — natural logarithm
+- `FACT(n)` — 9 cells — factorial
 
-## Phase 12: Remaining Precision Differences
+**`LOG10` → `#REF!` (9 cells):** The formula parser sees `LOG10(x)` and tokenizes `LOG` as an identifier. Since the next token is `10` (a number, not `(`), it treats `LOG10` as a cell reference (column LOG, row 10). This cell doesn't exist → `#REF!`. Fix: either register `LOG10` as a function, or handle the ambiguity in the parser. Registering it as a function should work because the parser checks `IDENTIFIER(` before falling through to cell reference parsing — the issue is that `LOG10` is tokenized as `LOG` + `10`, so we need the tokenizer to recognize `LOG10` as a single identifier when followed by `(`.
 
-After all previous phases, run a final diff to identify any remaining mismatches. Some may be additional 1-ULP differences at other scales.
+- [x] 11a: Investigate which functions/formulas produce the mismatches. See findings above.
+- [ ] 11b: Implement simple math functions — `SIGN`, `EXP`, `LN`, `TRUNC`, `FACT`, `QUOTIENT` in `fn_math.cc`. These are straightforward one-liners using `std::` math functions.
+- [ ] 11c: Implement `ROUNDUP` and `ROUNDDOWN` in `fn_math.cc` — similar to existing `ROUND` but always round away from / toward zero.
+- [ ] 11d: Handle `_xlfn.` prefix in formula parser or XLSX reader — strip `_xlfn.` prefix so `_xlfn.CEILING.MATH` resolves to `CEILING.MATH`. Then register `CEILING.MATH` and `FLOOR.MATH` as functions. Alternatively, register them under their `_xlfn.` prefixed names. The simplest approach: strip `_xlfn.` in the XLSX reader when reading formula text, since this prefix is an XLSX-specific artifact.
+- [ ] 11e: Implement `CEILING.MATH` and `FLOOR.MATH` — similar to existing `CEILING`/`FLOOR` but with Excel 2013+ semantics (different sign handling).
+- [ ] 11f: Fix `LOG10` parsing — register `LOG10` and `LOG` as functions. The tokenizer needs to handle `LOG10(` as a function call. Since the tokenizer splits `LOG10` into `LOG` + `10`, the fix should be in the tokenizer: when scanning an identifier, include trailing digits (function names like `LOG10` contain digits). Alternatively, fix in the XLSX reader or formula parser.
+- [ ] 11g: Run roundtrip test and count remaining differences.
 
-- [ ] 12a: Run the full roundtrip test and analyze all remaining differences. Categorize and plan fixes if feasible.
-- [ ] 12b: If the test passes (zero differences), celebrate. If not, add new phases.
+## Phase 12: Fix POWER Edge Cases (10 diffs)
+
+Investigation revealed POWER has several edge cases where we differ from Excel:
+
+- `POWER(0, 0)` → we return `1` (IEEE754), Excel returns `#NUM!` (1 cell)
+- `POWER(0, -n)` → we return `#NUM!`, Excel returns `#DIV/0!` (5 cells: base=0, exp is -1, -42.5, -1e-307, -9.99e307)
+- `POWER(-1, ±9.99E+307)` → we return `±1`, Excel returns `#NUM!` (2 cells)
+- `POWER(1e-307, -9.99E+307)` → we return `#NUM!`, Excel returns `0` (1 cell)
+- `POWER(-42.5, -9.99E+307)` → we return `0`, Excel returns `#NUM!` (1 cell: K74)
+
+- [ ] 12a: Fix `POWER(0, 0)` to return `#NUM!` and `POWER(0, neg)` to return `#DIV/0!` — add explicit zero-base checks before calling `excelPow`.
+- [ ] 12b: Fix POWER with extreme exponents — when `|exponent| >= 2^53` (not representable as integer), return `#NUM!` for non-trivial bases. Excel can't compute these.
+- [ ] 12c: Run roundtrip test and verify POWER diffs are fixed.
+
+## Phase 13: Fix ROUND Overflow with Large Numbers (6 diffs)
+
+`ROUND(9.99E+307, 2)` overflows because `9.99E+307 * 100` exceeds `DBL_MAX`. Excel returns the original value unchanged when rounding digits don't affect the result (the number has no digits at the specified precision).
+
+- [ ] 13a: Fix ROUND to handle large numbers — when `multiplier * value` overflows, return the original value (rounding has no effect at that precision). This matches Excel's behavior.
+
+## Phase 14: Fix MOD Edge Cases (24 diffs)
+
+MOD has 24 differences in two categories:
+- **Excel `#NUM!` → our number (14 cells):** MOD with very small divisors (1e-307, -1e-307) — Excel returns `#NUM!` for these, likely because the intermediate computation overflows.
+- **Precision diffs (10 cells):** MOD with extreme values (9.99E+307) — different results due to intermediate computation differences.
+
+- [ ] 14a: Investigate and fix MOD edge cases — Excel's MOD uses `n - d * INT(n/d)`, but for extreme values the intermediate `INT(n/d)` or `d * INT(n/d)` can overflow. Add overflow checks similar to Excel's behavior.
+
+## Phase 15: Fix Scientific Notation for Small Numbers (6 diffs)
+
+Values like `0.023529411764705882` should be written as `2.3529411764705882E-2` in XLSX. Our `uppercaseExponent()` function only converts existing exponents to uppercase — it doesn't force scientific notation for small numbers. Excel uses E-notation for numbers where the exponent is negative (values < 1 with significant digits).
+
+- [ ] 15a: Fix XLSX value formatting for small numbers — use scientific notation with uppercase E when the value would require E-notation to match Excel's format. Specifically, values with negative exponents (like 0.0235...) should be written as `2.35...E-2`.
+
+## Phase 16: Fix Remaining POWER Precision (2 diffs)
+
+Two POWER precision diffs at extreme values:
+- `POWER(42.5, 42.5)`: Excel `1.6089017613873198E+69`, ours `1.6089017613873083E+69`
+- `POWER(42.5, -42.5)`: Excel `6.2154198845411321E-70`, ours `6.2154198845411772E-70`
+
+These may require investigating Excel's algorithm for non-integer exponents with large bases.
+
+- [ ] 16a: Investigate POWER precision differences for non-integer exponents — these are likely due to differences in how `std::pow` and Excel compute `42.5^42.5`. May need a different algorithm path.
+
+## Phase 17: Final Roundtrip Verification
+
+- [ ] 17a: Run the full roundtrip test and verify all differences are resolved.
+- [ ] 17b: If the test passes (zero differences), celebrate. If not, add new phases.
 
 ---
 
