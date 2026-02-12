@@ -78,6 +78,12 @@ EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // CEILING(number) - Rounds up toward positive infinity
 EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// CEILING_MATH(number, [significance], [mode]) - Rounds up to nearest multiple
+EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// FLOOR_MATH(number, [significance], [mode]) - Rounds down to nearest multiple
+EvalResult fn_FLOOR_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // MOD(number, divisor) - Returns remainder after division
 EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 

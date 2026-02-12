@@ -309,6 +309,110 @@ EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return EvalResult::Number(excelNormalize(std::ceil(num.getNumber())));
 }
 
+EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    double significance = 1.0;
+    if (args.size() >= 2) {
+        EvalResult sigResult = evaluateAsNumber(args[1], ctx);
+        if (sigResult.isError()) {
+            return sigResult;
+        }
+        significance = sigResult.getNumber();
+    }
+
+    int mode = 0;
+    if (args.size() >= 3) {
+        EvalResult modeResult = evaluateAsNumber(args[2], ctx);
+        if (modeResult.isError()) {
+            return modeResult;
+        }
+        mode = static_cast<int>(modeResult.getNumber());
+    }
+
+    const double value = num.getNumber();
+    if (significance == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+
+    const double absSig = std::abs(significance);
+    double result = NAN;
+    if (value >= 0.0) {
+        // Positive: always round toward +infinity
+        result = std::ceil(value / absSig) * absSig;
+    } else if (mode != 0) {
+        // Negative number with mode: round away from zero (toward -infinity)
+        result = -std::ceil(-value / absSig) * absSig;
+    } else {
+        // Negative number default: round toward +infinity (toward zero)
+        result = -std::floor(-value / absSig) * absSig;
+    }
+
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_FLOOR_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    double significance = 1.0;
+    if (args.size() >= 2) {
+        EvalResult sigResult = evaluateAsNumber(args[1], ctx);
+        if (sigResult.isError()) {
+            return sigResult;
+        }
+        significance = sigResult.getNumber();
+    }
+
+    int mode = 0;
+    if (args.size() >= 3) {
+        EvalResult modeResult = evaluateAsNumber(args[2], ctx);
+        if (modeResult.isError()) {
+            return modeResult;
+        }
+        mode = static_cast<int>(modeResult.getNumber());
+    }
+
+    const double value = num.getNumber();
+    if (significance == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+
+    const double absSig = std::abs(significance);
+    double result = NAN;
+    if (value >= 0.0) {
+        // Positive: always round toward -infinity (toward zero)
+        result = std::floor(value / absSig) * absSig;
+    } else if (mode != 0) {
+        // Negative number with mode: round toward zero
+        result = -std::floor(-value / absSig) * absSig;
+    } else {
+        // Negative number default: round toward -infinity (away from zero)
+        result = -std::ceil(-value / absSig) * absSig;
+    }
+
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
 EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
@@ -524,6 +628,11 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Math");
     registry.registerFunction("CEILING", fn_CEILING, "(number)", "Rounds up to nearest integer",
                               "Math");
+    registry.registerFunction("CEILING_MATH", fn_CEILING_MATH,
+                              "(number, [significance], [mode])",
+                              "Rounds up to nearest multiple of significance", "Math");
+    registry.registerFunction("FLOOR_MATH", fn_FLOOR_MATH, "(number, [significance], [mode])",
+                              "Rounds down to nearest multiple of significance", "Math");
     registry.registerFunction("MOD", fn_MOD, "(number, divisor)",
                               "Returns remainder after division", "Math");
     registry.registerFunction("INT", fn_INT, "(number)", "Truncates to an integer", "Math");

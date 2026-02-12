@@ -702,6 +702,72 @@ TEST_F(FunctionTest, CeilingInteger) {
 }
 
 // =============================================================================
+// CEILING_MATH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CeilingMathBasic) {
+    EvalResult result = eval("=CEILING_MATH(4.3)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FunctionTest, CeilingMathWithSignificance) {
+    EvalResult result = eval("=CEILING_MATH(4.3, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 6.0);
+}
+
+TEST_F(FunctionTest, CeilingMathNegativeNoMode) {
+    // Without mode: -4.3 rounds away from zero → -5
+    EvalResult result = eval("=CEILING_MATH(-4.3, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -4.0);
+}
+
+TEST_F(FunctionTest, CeilingMathNegativeWithMode) {
+    // With mode: -4.3 rounds away from zero (toward -infinity) → -6
+    EvalResult result = eval("=CEILING_MATH(-4.3, 2, 1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -6.0);
+}
+
+TEST_F(FunctionTest, CeilingMathZeroSignificance) {
+    EvalResult result = eval("=CEILING_MATH(4.3, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+// =============================================================================
+// FLOOR_MATH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, FloorMathBasic) {
+    EvalResult result = eval("=FLOOR_MATH(4.7)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 4.0);
+}
+
+TEST_F(FunctionTest, FloorMathWithSignificance) {
+    EvalResult result = eval("=FLOOR_MATH(5.5, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 4.0);
+}
+
+TEST_F(FunctionTest, FloorMathNegativeNoMode) {
+    // Without mode: -4.3 rounds toward -infinity → -6
+    EvalResult result = eval("=FLOOR_MATH(-4.3, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -6.0);
+}
+
+TEST_F(FunctionTest, FloorMathNegativeWithMode) {
+    // With mode: -4.3 rounds toward zero → -4
+    EvalResult result = eval("=FLOOR_MATH(-4.3, 2, 1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -4.0);
+}
+
+// =============================================================================
 // MOD Function Tests
 // =============================================================================
 
