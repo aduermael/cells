@@ -200,8 +200,8 @@ Investigation revealed 4 remaining diffs (not just 2 POWER diffs):
 
 ## Phase 17: Final Roundtrip Verification
 
-- [ ] 17a: Run the full roundtrip test and verify all differences are resolved.
-- [ ] 17b: If the test passes (zero differences), celebrate. If not, add new phases.
+- [x] 17a: Run the full roundtrip test and verify all differences are resolved. — `./run-test.sh math-basic` passes: "MATCH: Cells and properties are identical" (1913 cells). All 338 unit+E2E tests pass. Formatting clean.
+- [x] 17b: The test passes with zero differences.
 
 ---
 
