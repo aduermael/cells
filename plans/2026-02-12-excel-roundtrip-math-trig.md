@@ -51,8 +51,8 @@ Implement the foundational trig functions. PI is needed first since many input c
 
 ## Phase 3: Implement Hyperbolic Functions
 
-- [ ] 3a: Implement `SINH`, `COSH`, `TANH` — hyperbolic functions using `std::sinh`, `std::cosh`, `std::tanh`. Overflow returns `#NUM!`.
-- [ ] 3b: Implement `ASINH`, `ACOSH`, `ATANH` — inverse hyperbolic functions using `std::asinh`, `std::acosh`, `std::atanh`. Domain errors return `#NUM!` (`ACOSH` requires x >= 1, `ATANH` requires |x| < 1).
+- [x] 3a: Implement `SINH`, `COSH`, `TANH` — hyperbolic functions using `std::sinh`, `std::cosh`, `std::tanh`. Overflow returns `#NUM!`.
+- [x] 3b: Implement `ASINH`, `ACOSH`, `ATANH` — inverse hyperbolic functions using `std::asinh`, `std::acosh`, `std::atanh`. Domain errors return `#NUM!` (`ACOSH` requires x >= 1, `ATANH` requires |x| < 1).
 
 ## Phase 4: Implement RADIANS and DEGREES
 
