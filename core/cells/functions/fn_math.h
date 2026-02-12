@@ -78,6 +78,24 @@ EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // INT(number) - Truncates to integer (rounds down toward negative infinity)
 EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// SIGN(number) - Returns -1, 0, or 1
+EvalResult fn_SIGN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// EXP(number) - Returns e raised to the power of number
+EvalResult fn_EXP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// LN(number) - Returns the natural logarithm
+EvalResult fn_LN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// TRUNC(number, [num_digits]) - Truncates toward zero
+EvalResult fn_TRUNC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// FACT(number) - Returns the factorial
+EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// QUOTIENT(numerator, denominator) - Returns integer portion of division
+EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

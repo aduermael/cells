@@ -286,6 +286,143 @@ EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(excelNormalize(std::floor(num.getNumber())));
 }
 
+EvalResult fn_SIGN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val > 0.0) {
+        return EvalResult::Number(1.0);
+    }
+    if (val < 0.0) {
+        return EvalResult::Number(-1.0);
+    }
+    return EvalResult::Number(0.0);
+}
+
+EvalResult fn_EXP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = std::exp(num.getNumber());
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_LN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::log(val)));
+}
+
+EvalResult fn_TRUNC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    int digits = 0;
+    if (args.size() == 2) {
+        EvalResult digitsResult = evaluateAsNumber(args[1], ctx);
+        if (digitsResult.isError()) {
+            return digitsResult;
+        }
+        digits = static_cast<int>(digitsResult.getNumber());
+    }
+
+    const double multiplier = std::pow(10.0, digits);
+    const double value = num.getNumber();
+    const double truncated = std::trunc(value * multiplier) / multiplier;
+
+    if (std::isinf(truncated)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(truncated));
+}
+
+EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    // Excel truncates to integer, negative values return #NUM!
+    if (val < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    const auto n = static_cast<int>(std::floor(val));
+    // Excel supports up to FACT(170) = 7.257e+306; FACT(171) overflows
+    if (n > 170) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    double result = 1.0;
+    for (int i = 2; i <= n; i++) {
+        result *= i;
+    }
+    return EvalResult::Number(result);
+}
+
+EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult numerator = evaluateAsNumber(args[0], ctx);
+    if (numerator.isError()) {
+        return numerator;
+    }
+
+    EvalResult denominator = evaluateAsNumber(args[1], ctx);
+    if (denominator.isError()) {
+        return denominator;
+    }
+
+    const double d = denominator.getNumber();
+    if (d == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = std::trunc(numerator.getNumber() / d);
+    return EvalResult::Number(excelNormalize(result));
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -319,6 +456,14 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MOD", fn_MOD, "(number, divisor)",
                               "Returns remainder after division", "Math");
     registry.registerFunction("INT", fn_INT, "(number)", "Truncates to an integer", "Math");
+    registry.registerFunction("SIGN", fn_SIGN, "(number)", "Returns the sign of a number", "Math");
+    registry.registerFunction("EXP", fn_EXP, "(number)", "Returns e raised to a power", "Math");
+    registry.registerFunction("LN", fn_LN, "(number)", "Returns the natural logarithm", "Math");
+    registry.registerFunction("TRUNC", fn_TRUNC, "(number, [num_digits])",
+                              "Truncates to specified digits", "Math");
+    registry.registerFunction("FACT", fn_FACT, "(number)", "Returns the factorial", "Math");
+    registry.registerFunction("QUOTIENT", fn_QUOTIENT, "(numerator, denominator)",
+                              "Returns integer portion of division", "Math");
 }
 
 }  // namespace cells

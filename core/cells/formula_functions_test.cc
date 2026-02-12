@@ -702,6 +702,170 @@ TEST_F(FunctionTest, IntInteger) {
 }
 
 // =============================================================================
+// SIGN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SignPositive) {
+    EvalResult result = eval("=SIGN(42)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, SignNegative) {
+    EvalResult result = eval("=SIGN(-7.5)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -1.0);
+}
+
+TEST_F(FunctionTest, SignZero) {
+    EvalResult result = eval("=SIGN(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+// =============================================================================
+// EXP Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ExpZero) {
+    EvalResult result = eval("=EXP(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, ExpOne) {
+    EvalResult result = eval("=EXP(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 2.718281828, 0.0001);
+}
+
+TEST_F(FunctionTest, ExpNegative) {
+    EvalResult result = eval("=EXP(-1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 0.367879441, 0.0001);
+}
+
+TEST_F(FunctionTest, ExpOverflow) {
+    EvalResult result = eval("=EXP(1000)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// LN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, LnOne) {
+    EvalResult result = eval("=LN(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, LnE) {
+    EvalResult result = eval("=LN(2.718281828459045)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 1.0, 0.0001);
+}
+
+TEST_F(FunctionTest, LnZeroReturnsError) {
+    EvalResult result = eval("=LN(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, LnNegativeReturnsError) {
+    EvalResult result = eval("=LN(-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// TRUNC Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TruncPositive) {
+    EvalResult result = eval("=TRUNC(5.9)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FunctionTest, TruncNegative) {
+    // TRUNC(-5.9) = -5 (toward zero, unlike INT which gives -6)
+    EvalResult result = eval("=TRUNC(-5.9)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -5.0);
+}
+
+TEST_F(FunctionTest, TruncWithDigits) {
+    EvalResult result = eval("=TRUNC(3.14159, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.14);
+}
+
+// =============================================================================
+// FACT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, FactZero) {
+    EvalResult result = eval("=FACT(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, FactFive) {
+    EvalResult result = eval("=FACT(5)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 120.0);
+}
+
+TEST_F(FunctionTest, FactNegativeReturnsError) {
+    EvalResult result = eval("=FACT(-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, FactTruncatesDecimal) {
+    // FACT(5.7) should be same as FACT(5)
+    EvalResult result = eval("=FACT(5.7)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 120.0);
+}
+
+TEST_F(FunctionTest, FactOverflow) {
+    EvalResult result = eval("=FACT(171)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// QUOTIENT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, QuotientBasic) {
+    EvalResult result = eval("=QUOTIENT(7, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+TEST_F(FunctionTest, QuotientNegative) {
+    EvalResult result = eval("=QUOTIENT(-7, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -3.0);
+}
+
+TEST_F(FunctionTest, QuotientDivByZero) {
+    EvalResult result = eval("=QUOTIENT(7, 0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+TEST_F(FunctionTest, QuotientExact) {
+    EvalResult result = eval("=QUOTIENT(10, 5)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+// =============================================================================
 // Edge Cases and Type Coercion
 // =============================================================================
 
