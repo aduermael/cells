@@ -487,22 +487,43 @@ EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::DIV);
     }
 
-    // Excel MOD: result has same sign as divisor
-    // MOD(n, d) = n - d * INT(n/d)
-    // Excel returns #NUM! when |n/d| exceeds 2^53 (integer precision limit)
-    // or when intermediate computations overflow.
+    // Excel MOD: result has same sign as divisor.
+    // Excel returns #NUM! when |n/d| exceeds 2^53 (integer precision limit).
     const double rawQuotient = n / d;
     if (std::isinf(rawQuotient) || std::fabs(rawQuotient) > 9007199254740992.0) {
         return EvalResult::Error(CellError::NUM);
     }
-    const double quotient = excelNormalize(rawQuotient);
-    const double intQuotient = std::floor(quotient);
-    const double product = d * intQuotient;
-    if (std::isinf(product)) {
+
+    // Use fmod for the core computation, then adjust sign to match divisor.
+    // fmod gives the IEEE754 remainder with the sign of the numerator.
+    double r = std::fmod(n, d);
+    if (r == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+
+    // Flush subnormal remainder — indicates precision loss at extreme values.
+    // E.g., MOD(1e-307, -1e-307) where magnitudes differ by a few ULP.
+    r = excelNormalize(r);
+    if (r == 0.0) {
         return EvalResult::Error(CellError::NUM);
     }
-    const double result = n - product;
-    return EvalResult::Number(excelNormalize(result));
+
+    // Adjust sign: fmod gives sign of n, Excel MOD gives sign of d.
+    if ((r > 0.0) != (d > 0.0)) {
+        r += d;
+        r = excelNormalize(r);
+        // If n was negligible compared to d, r+d == d exactly in floating
+        // point (e.g., MOD(1e-307, -42.5): fmod=1e-307, r+d=-42.5==d).
+        if (r == d) {
+            return EvalResult::Number(0.0);
+        }
+        // Cancellation produced subnormal — precision lost.
+        if (r == 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+
+    return EvalResult::Number(excelNormalize(r));
 }
 
 EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {

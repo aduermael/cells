@@ -176,7 +176,7 @@ MOD has 24 differences in two categories:
 - **Precision diffs (10 cells):** MOD with extreme values (9.99E+307) — different results due to intermediate computation differences.
 
 - [x] 14a: Fix MOD overflow and QUOTIENT overflow — added `2^53` quotient limit to MOD (returns `#NUM!` when `|n/d|` exceeds integer precision limit), intermediate overflow checks, and `excelNormalize` on intermediate quotients (flushes subnormal intermediates to 0, matching Excel). Fixed QUOTIENT to only return `#NUM!` on actual infinity (not on large-but-finite results). Also normalized intermediate divisions in CEILING_MATH and FLOOR_MATH. Reduced diffs from 66 to 24.
-- [ ] 14b: Remaining MOD edge cases (12 diffs) — involve tiny numerators (±1e-307) with normal divisors, where Excel returns `0` but we return the divisor or a tiny value. Excel may treat MOD differently for extremely small numerators. Also 2 cells where Excel returns `#NUM!` for MOD(±1e-307, ∓1e-307) due to the different magnitudes of our computed values.
+- [x] 14b: Remaining MOD edge cases (12 diffs) — rewrote MOD to use `std::fmod` for the core computation, then adjust sign to match divisor. Three key behaviors: (1) when `fmod` result is subnormal, flush to 0 and return `#NUM!` (precision lost); (2) after sign adjustment, if `result == d` exactly (numerator was negligible), return 0; (3) after sign adjustment, if result is subnormal (cancellation), return `#NUM!`. All 12 MOD diffs resolved: 10 now return 0 (negligible numerator), 2 return `#NUM!` (near-equal magnitudes with opposite signs). Reduced diffs from 24 to 12.
 
 ## Phase 15: Fix Scientific Notation for Small Numbers (6 diffs)
 

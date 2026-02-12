@@ -847,6 +847,34 @@ TEST_F(FunctionTest, ModLargeNumeratorOverflow2) {
     EXPECT_EQ(result.getError(), CellError::NUM);
 }
 
+TEST_F(FunctionTest, ModTinyNumeratorNormalDivisor) {
+    // When |n| is negligible compared to |d|, Excel returns 0.
+    // MOD(1e-307, -1): fmod=1e-307, adjust sign: 1e-307+(-1)=-1==d → 0
+    EXPECT_DOUBLE_EQ(eval("=MOD(1e-307, -1)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(-1e-307, 1)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(1e-307, -42.5)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(-1e-307, 42.5)").getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, ModNormalNumeratorHugeDivisor) {
+    // When |n| << |d|, the sign-adjusted result equals d exactly → 0.
+    EXPECT_DOUBLE_EQ(eval("=MOD(1, -9.99999999999999E+307)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(-1, 9.99999999999999E+307)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(42.5, -9.99999999999999E+307)").getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(eval("=MOD(-42.5, 9.99999999999999E+307)").getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, ModNearEqualMagnitudeOppositeSigns) {
+    // When n and d have nearly equal magnitudes but opposite signs,
+    // the fmod remainder is subnormal → precision lost → #NUM!
+    // C10=1.0000000000000001e-307 and C11=-9.9999999999999951e-308
+    // differ by a few ULP due to POWER computation differences.
+    EXPECT_EQ(eval("=MOD(1.0000000000000001e-307, -9.9999999999999951e-308)").getError(),
+              CellError::NUM);
+    EXPECT_EQ(eval("=MOD(-9.9999999999999951e-308, 1.0000000000000001e-307)").getError(),
+              CellError::NUM);
+}
+
 // =============================================================================
 // INT Function Tests
 // =============================================================================
