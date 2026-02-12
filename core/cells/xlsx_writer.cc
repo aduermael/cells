@@ -958,11 +958,18 @@ private:
 
             case cells::NumberFormatCategory::NUMBER:
                 if (hasThousands) {
-                    // #,##0 or #,##0.00
-                    return decimals >= 2 ? 4 : 3;
+                    if (decimals == 0)
+                        return 3;  // #,##0
+                    if (decimals == 2)
+                        return 4;  // #,##0.00
+                } else {
+                    if (decimals == 0)
+                        return 1;  // 0
+                    if (decimals == 2)
+                        return 2;  // 0.00
                 }
-                // 0 or 0.00
-                return decimals >= 2 ? 2 : 1;
+                // Non-standard decimal count — use custom format
+                return getOrAddCustomNumFmt(formatBuf->toFormatCode());
 
             case cells::NumberFormatCategory::CURRENCY:
                 // Use built-in USD formats if no specific symbol or $ symbol

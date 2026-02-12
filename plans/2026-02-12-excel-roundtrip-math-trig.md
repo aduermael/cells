@@ -62,7 +62,7 @@ Implement the foundational trig functions. PI is needed first since many input c
 
 Cell C151 uses format `"0.000000000000000"` (15 decimal places). The writer maps NUMBER with any decimals >= 2 to built-in format ID 2 (`0.00`), losing the actual precision.
 
-- [ ] 5a: Fix `getNumFmtId` in `xlsx_writer.cc` — for NUMBER category, only use built-in IDs when decimals exactly match (0 → ID 1, 2 → ID 2 with no thousands; 0 → ID 3, 2 → ID 4 with thousands). For other decimal counts, generate a custom format code (e.g., `"0.000000000000000"` for 15 decimals).
+- [x] 5a: Fix `getNumFmtId` in `xlsx_writer.cc` — for NUMBER category, only use built-in IDs when decimals exactly match (0 → ID 1, 2 → ID 2 with no thousands; 0 → ID 3, 2 → ID 4 with thousands). For other decimal counts, generate a custom format code via `getOrAddCustomNumFmt(formatBuf->toFormatCode())`.
 
 ## Phase 6: Run Roundtrip Test and Fix Remaining Differences
 
