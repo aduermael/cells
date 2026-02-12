@@ -66,6 +66,12 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // ROUND(number, [num_digits]) - Rounds to specified number of digits
 EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// ROUNDUP(number, [num_digits]) - Rounds away from zero
+EvalResult fn_ROUNDUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ROUNDDOWN(number, [num_digits]) - Rounds toward zero
+EvalResult fn_ROUNDDOWN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // FLOOR(number) - Rounds down toward negative infinity
 EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 

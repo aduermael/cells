@@ -605,6 +605,59 @@ TEST_F(FunctionTest, RoundNegativeNumber) {
 }
 
 // =============================================================================
+// ROUNDUP Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, RoundUpPositive) {
+    EvalResult result = eval("=ROUNDUP(2.1, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+TEST_F(FunctionTest, RoundUpNegative) {
+    // ROUNDUP rounds away from zero: -2.1 -> -3
+    EvalResult result = eval("=ROUNDUP(-2.1, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -3.0);
+}
+
+TEST_F(FunctionTest, RoundUpWithDigits) {
+    EvalResult result = eval("=ROUNDUP(3.141, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.15);
+}
+
+TEST_F(FunctionTest, RoundUpExact) {
+    // Already exact at that precision — no change
+    EvalResult result = eval("=ROUNDUP(3.0, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+// =============================================================================
+// ROUNDDOWN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, RoundDownPositive) {
+    EvalResult result = eval("=ROUNDDOWN(2.9, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, RoundDownNegative) {
+    // ROUNDDOWN rounds toward zero: -2.9 -> -2
+    EvalResult result = eval("=ROUNDDOWN(-2.9, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -2.0);
+}
+
+TEST_F(FunctionTest, RoundDownWithDigits) {
+    EvalResult result = eval("=ROUNDDOWN(3.149, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.14);
+}
+
+// =============================================================================
 // FLOOR Function Tests
 // =============================================================================
 

@@ -216,6 +216,73 @@ EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(excelNormalize(rounded));
 }
 
+EvalResult fn_ROUNDUP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    int digits = 0;
+    if (args.size() == 2) {
+        EvalResult digitsResult = evaluateAsNumber(args[1], ctx);
+        if (digitsResult.isError()) {
+            return digitsResult;
+        }
+        digits = static_cast<int>(digitsResult.getNumber());
+    }
+
+    const double multiplier = std::pow(10.0, digits);
+    const double value = num.getNumber();
+
+    // Round away from zero
+    double rounded = NAN;
+    if (value >= 0) {
+        rounded = std::ceil(value * multiplier) / multiplier;
+    } else {
+        rounded = std::floor(value * multiplier) / multiplier;
+    }
+
+    if (std::isinf(rounded)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(rounded));
+}
+
+EvalResult fn_ROUNDDOWN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    int digits = 0;
+    if (args.size() == 2) {
+        EvalResult digitsResult = evaluateAsNumber(args[1], ctx);
+        if (digitsResult.isError()) {
+            return digitsResult;
+        }
+        digits = static_cast<int>(digitsResult.getNumber());
+    }
+
+    const double multiplier = std::pow(10.0, digits);
+    const double value = num.getNumber();
+
+    // Round toward zero (same as TRUNC)
+    const double rounded = std::trunc(value * multiplier) / multiplier;
+
+    if (std::isinf(rounded)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(rounded));
+}
+
 EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
@@ -449,6 +516,10 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Returns number raised to a power", "Math");
     registry.registerFunction("ROUND", fn_ROUND, "(number, [num_digits])",
                               "Rounds to specified digits", "Math");
+    registry.registerFunction("ROUNDUP", fn_ROUNDUP, "(number, [num_digits])",
+                              "Rounds away from zero", "Math");
+    registry.registerFunction("ROUNDDOWN", fn_ROUNDDOWN, "(number, [num_digits])",
+                              "Rounds toward zero", "Math");
     registry.registerFunction("FLOOR", fn_FLOOR, "(number)", "Rounds down to nearest integer",
                               "Math");
     registry.registerFunction("CEILING", fn_CEILING, "(number)", "Rounds up to nearest integer",
