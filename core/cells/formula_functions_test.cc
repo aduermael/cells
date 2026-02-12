@@ -899,6 +899,56 @@ TEST_F(FunctionTest, LnNegativeReturnsError) {
 }
 
 // =============================================================================
+// LOG10 Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, Log10One) {
+    EvalResult result = eval("=LOG10(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, Log10Hundred) {
+    EvalResult result = eval("=LOG10(100)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, Log10ZeroReturnsError) {
+    EvalResult result = eval("=LOG10(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, Log10NegativeReturnsError) {
+    EvalResult result = eval("=LOG10(-5)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// LOG Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, LogDefaultBase10) {
+    EvalResult result = eval("=LOG(100)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, LogBase2) {
+    EvalResult result = eval("=LOG(8, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+TEST_F(FunctionTest, LogBase1ReturnsError) {
+    EvalResult result = eval("=LOG(10, 1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
 // TRUNC Function Tests
 // =============================================================================
 

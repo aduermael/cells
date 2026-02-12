@@ -108,6 +108,12 @@ EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // QUOTIENT(numerator, denominator) - Returns integer portion of division
 EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// LOG10(number) - Returns the base-10 logarithm
+EvalResult fn_LOG10(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// LOG(number, [base]) - Returns the logarithm to specified base (default 10)
+EvalResult fn_LOG(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

@@ -594,6 +594,55 @@ EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx
     return EvalResult::Number(excelNormalize(result));
 }
 
+EvalResult fn_LOG10(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::log10(val)));
+}
+
+EvalResult fn_LOG(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    double base = 10.0;  // Default base
+    if (args.size() == 2) {
+        EvalResult baseResult = evaluateAsNumber(args[1], ctx);
+        if (baseResult.isError()) {
+            return baseResult;
+        }
+        base = baseResult.getNumber();
+        if (base <= 0.0 || base == 1.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+
+    const double result = std::log(val) / std::log(base);
+    return EvalResult::Number(excelNormalize(result));
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -628,8 +677,7 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Math");
     registry.registerFunction("CEILING", fn_CEILING, "(number)", "Rounds up to nearest integer",
                               "Math");
-    registry.registerFunction("CEILING_MATH", fn_CEILING_MATH,
-                              "(number, [significance], [mode])",
+    registry.registerFunction("CEILING_MATH", fn_CEILING_MATH, "(number, [significance], [mode])",
                               "Rounds up to nearest multiple of significance", "Math");
     registry.registerFunction("FLOOR_MATH", fn_FLOOR_MATH, "(number, [significance], [mode])",
                               "Rounds down to nearest multiple of significance", "Math");
@@ -644,6 +692,9 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("FACT", fn_FACT, "(number)", "Returns the factorial", "Math");
     registry.registerFunction("QUOTIENT", fn_QUOTIENT, "(numerator, denominator)",
                               "Returns integer portion of division", "Math");
+    registry.registerFunction("LOG10", fn_LOG10, "(number)", "Returns the base-10 logarithm",
+                              "Math");
+    registry.registerFunction("LOG", fn_LOG, "(number, [base])", "Returns the logarithm", "Math");
 }
 
 }  // namespace cells

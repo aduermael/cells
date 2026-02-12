@@ -146,7 +146,7 @@ Investigation (11a) revealed that all 306 `#NAME?` diffs come from 10 unimplemen
 - [x] 11c: Implement `ROUNDUP` and `ROUNDDOWN` in `fn_math.cc` — ROUNDUP rounds away from zero using `ceil`/`floor`, ROUNDDOWN rounds toward zero using `trunc`. Both support `num_digits` parameter like ROUND. Added unit tests.
 - [x] 11d: Handle `_xlfn.` prefix in XLSX reader — `stripXlfnPrefix()` strips `_xlfn.` and replaces dots in the remaining function name with underscores (e.g., `_xlfn.CEILING.MATH` → `CEILING_MATH`). Applied at both formula reading points (shared and regular formulas). Functions will be registered as `CEILING_MATH` and `FLOOR_MATH` in step 11e.
 - [x] 11e: Implement `CEILING_MATH` and `FLOOR_MATH` — registered as `CEILING_MATH`/`FLOOR_MATH` (dots replaced with underscores by the XLSX reader). Support `significance` and `mode` parameters. Mode controls rounding direction for negative numbers. Added unit tests.
-- [ ] 11f: Fix `LOG10` parsing — register `LOG10` and `LOG` as functions. The tokenizer needs to handle `LOG10(` as a function call. Since the tokenizer splits `LOG10` into `LOG` + `10`, the fix should be in the tokenizer: when scanning an identifier, include trailing digits (function names like `LOG10` contain digits). Alternatively, fix in the XLSX reader or formula parser.
+- [x] 11f: Fix `LOG10` parsing and implement LOG/LOG10 — fixed lexer to detect `letters+digits+(` pattern as a function call instead of cell reference. Implemented `LOG10(number)` and `LOG(number, [base])` functions. Added unit tests for both functions.
 - [ ] 11g: Run roundtrip test and count remaining differences.
 
 ## Phase 12: Fix POWER Edge Cases (10 diffs)

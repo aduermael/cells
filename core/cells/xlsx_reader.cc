@@ -68,8 +68,8 @@ std::string stripXlfnPrefix(const std::string& formula) {
         result.erase(pos, prefix.size());
         // Replace dots within the function name that follows
         // (e.g., CEILING.MATH → CEILING_MATH)
-        while (pos < result.size() && (std::isalpha(static_cast<unsigned char>(result[pos])) != 0 ||
-                                       result[pos] == '.')) {
+        while (pos < result.size() &&
+               (std::isalpha(static_cast<unsigned char>(result[pos])) != 0 || result[pos] == '.')) {
             if (result[pos] == '.') {
                 result[pos] = '_';
             }
@@ -2097,8 +2097,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                         // Regular formula (not shared)
                         if (options.readFormulaText) {
                             const std::string formulaTextStr = fNode.text().get();
-                            const std::string fullFormula =
-                                "=" + stripXlfnPrefix(formulaTextStr);
+                            const std::string fullFormula = "=" + stripXlfnPrefix(formulaTextStr);
                             cells::FormulaParser parser(fullFormula);
                             std::unique_ptr<cells::ASTNode> ast = parser.parse();
                             auto* formula = new cells::Formula();

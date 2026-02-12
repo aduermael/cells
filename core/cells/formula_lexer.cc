@@ -547,7 +547,18 @@ Token FormulaLexer::scanIdentifierOrColumn() {
     const bool couldBeColumn = (!letters.empty() && letters.size() <= 3);
 
     // Check if it's followed by digits (making it a cell reference: A1, AA100)
+    // Exception: if the letters+digits are followed by '(', it's a function call
+    // (e.g., LOG10( should be parsed as function LOG10, not cell ref LOG:10)
     if (couldBeColumn && isDigit(peek())) {
+        size_t scanPos = pos_;
+        while (scanPos < source_.size() && isDigit(source_[scanPos])) {
+            scanPos++;
+        }
+        if (scanPos < source_.size() && source_[scanPos] == '(') {
+            // It's a function call: consume digits and return as IDENTIFIER
+            pos_ = scanPos;
+            return makeToken(TokenType::IDENTIFIER, start);
+        }
         return makeToken(TokenType::COLUMN, start);
     }
 
