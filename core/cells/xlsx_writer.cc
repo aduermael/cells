@@ -1,5 +1,7 @@
 #include "core/cells/xlsx_writer.h"
 
+#include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include <algorithm>
@@ -30,13 +32,86 @@ std::string formatDouble(double value) {
     return buf;
 }
 
-// Convert lowercase 'e' to uppercase 'E' in numeric strings for Excel compatibility
-std::string uppercaseExponent(const std::string& s) {
-    std::string result = s;
-    for (char& c : result) {
-        if (c == 'e') {
-            c = 'E';
+// Format a numeric string for Excel XLSX <v> elements.
+// Excel uses specific formatting conventions:
+// - Uppercase 'E' in scientific notation
+// - No leading zeros in exponent (E-2 not E-02)
+// - E-notation for small numbers that have many significant digits (e.g., 0.023... -> 2.35...E-2)
+//   but keeps short fixed forms like 0.01
+// Strip leading zeros from the exponent part of a string like "...E-05" -> "...E-5"
+void stripExponentLeadingZeros(std::string& result, size_t epos) {
+    const size_t signPos = epos + 1;
+    if (signPos < result.size() && (result[signPos] == '+' || result[signPos] == '-')) {
+        size_t firstDigit = signPos + 1;
+        while (firstDigit < result.size() - 1 && result[firstDigit] == '0') {
+            firstDigit++;
         }
+        if (firstDigit > signPos + 1) {
+            result.erase(signPos + 1, firstDigit - signPos - 1);
+        }
+    }
+}
+
+std::string excelFormatNumber(const std::string& s) {
+    // Check if the fixed-point form has leading zeros after decimal and many significant
+    // digits. If so, convert to E-notation. This matches Excel's formatting behavior where
+    // values like 0.023529411764705882 are stored as 2.3529411764705882E-2.
+    const char* p = s.c_str();
+    if (*p == '-') {
+        p++;
+    }
+    const bool hasLeadingZeros = (p[0] == '0' && p[1] == '.' && p[2] == '0');
+
+    if (hasLeadingZeros) {
+        // Count significant digits (digits after leading zeros)
+        const char* q = p + 3;  // skip "0.0"
+        while (*q == '0') {
+            q++;
+        }
+        int sigDigits = 0;
+        const char* r = q;
+        while (*r >= '0' && *r <= '9') {
+            sigDigits++;
+            r++;
+        }
+
+        if (sigDigits > 4) {
+            // Reformat as E-notation: parse the double and use %.16e (17 sig digits)
+            const double val = std::strtod(s.c_str(), nullptr);
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "%.16e", val);
+            // buf is like "2.35294117647058820e-02" or "-2.35294117647058820e-02"
+            std::string result(buf);
+            // Strip trailing zeros from mantissa
+            size_t epos = result.find('e');
+            if (epos != std::string::npos) {
+                size_t lastNonZero = result.find_last_not_of('0', epos - 1);
+                if (lastNonZero != std::string::npos && result[lastNonZero] == '.') {
+                    lastNonZero--;
+                }
+                result.erase(lastNonZero + 1, epos - lastNonZero - 1);
+                // Uppercase 'e' and strip leading zeros from exponent
+                epos = result.find('e');
+                result[epos] = 'E';
+                stripExponentLeadingZeros(result, epos);
+            }
+            return result;
+        }
+    }
+
+    // For values already in E-notation or normal fixed-point: uppercase E and strip
+    // leading zeros from exponent
+    std::string result = s;
+    size_t epos = std::string::npos;
+    for (size_t i = 0; i < result.size(); i++) {
+        if (result[i] == 'e' || result[i] == 'E') {
+            result[i] = 'E';
+            epos = i;
+            break;
+        }
+    }
+    if (epos != std::string::npos) {
+        stripExponentLeadingZeros(result, epos);
     }
     return result;
 }
@@ -1447,7 +1522,7 @@ std::string generateWorksheet(
                 // Check for both regular types and FORMULA_* result types
                 if (value.type == cells::CellValueType::NUMBER ||
                     value.type == cells::CellValueType::FORMULA_NUMBER) {
-                    xml << "        <v>" << uppercaseExponent(value.raw) << "</v>\n";
+                    xml << "        <v>" << excelFormatNumber(value.raw) << "</v>\n";
                 } else if (value.type == cells::CellValueType::BOOLEAN ||
                            value.type == cells::CellValueType::FORMULA_BOOLEAN) {
                     xml << "        <v>" << (value.raw == "true" || value.raw == "1" ? "1" : "0")
@@ -1463,7 +1538,7 @@ std::string generateWorksheet(
                     case cells::CellValueType::NUMBER:
                     case cells::CellValueType::FORMULA_NUMBER:
                         xml << ">\n";
-                        xml << "        <v>" << uppercaseExponent(value.raw) << "</v>\n";
+                        xml << "        <v>" << excelFormatNumber(value.raw) << "</v>\n";
                         xml << "      </c>\n";
                         break;
 

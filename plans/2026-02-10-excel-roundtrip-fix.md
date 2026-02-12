@@ -182,7 +182,7 @@ MOD has 24 differences in two categories:
 
 Values like `0.023529411764705882` should be written as `2.3529411764705882E-2` in XLSX. Our `uppercaseExponent()` function only converts existing exponents to uppercase — it doesn't force scientific notation for small numbers. Excel uses E-notation for numbers where the exponent is negative (values < 1 with significant digits).
 
-- [ ] 15a: Fix XLSX value formatting for small numbers — use scientific notation with uppercase E when the value would require E-notation to match Excel's format. Specifically, values with negative exponents (like 0.0235...) should be written as `2.35...E-2`.
+- [x] 15a: Fix XLSX value formatting for small numbers — replaced `uppercaseExponent()` with `excelFormatNumber()` in xlsx_writer.cc. The new function handles three cases: (1) values starting with "0.0" with >4 significant digits are reformatted using `%.16e` then stripped of trailing zeros and leading exponent zeros; (2) values already in E-notation get uppercase E and stripped leading exponent zeros; (3) other values pass through unchanged. Fixed all 8 formatting diffs: 6 scientific notation (0.023... → 2.35...E-2) and 2 exponent leading zeros (E-05 → E-5). Down from 12 to 4 remaining diffs.
 
 ## Phase 16: Fix Remaining POWER Precision (2 diffs)
 
