@@ -130,6 +130,59 @@ EvalResult fn_COS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // TAN(number) - Returns the tangent of an angle in radians
 EvalResult fn_TAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// ASIN(number) - Returns the arcsine
+EvalResult fn_ASIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ACOS(number) - Returns the arccosine
+EvalResult fn_ACOS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ATAN(number) - Returns the arctangent
+EvalResult fn_ATAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ATAN2(x_num, y_num) - Returns the arctangent of x and y coordinates
+EvalResult fn_ATAN2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// CSC(number) - Returns the cosecant
+EvalResult fn_CSC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// SEC(number) - Returns the secant
+EvalResult fn_SEC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// COT(number) - Returns the cotangent
+EvalResult fn_COT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// =============================================================================
+// Hyperbolic Functions
+// =============================================================================
+
+// SINH(number) - Returns the hyperbolic sine
+EvalResult fn_SINH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// COSH(number) - Returns the hyperbolic cosine
+EvalResult fn_COSH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// TANH(number) - Returns the hyperbolic tangent
+EvalResult fn_TANH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ASINH(number) - Returns the inverse hyperbolic sine
+EvalResult fn_ASINH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ACOSH(number) - Returns the inverse hyperbolic cosine
+EvalResult fn_ACOSH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ATANH(number) - Returns the inverse hyperbolic tangent
+EvalResult fn_ATANH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// =============================================================================
+// Angle Conversion Functions
+// =============================================================================
+
+// RADIANS(angle) - Converts degrees to radians
+EvalResult fn_RADIANS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// DEGREES(angle) - Converts radians to degrees
+EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

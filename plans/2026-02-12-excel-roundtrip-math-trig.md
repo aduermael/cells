@@ -45,7 +45,7 @@ Implement the foundational trig functions. PI is needed first since many input c
 
 ## Phase 2: Implement Inverse and Reciprocal Trig Functions
 
-- [ ] 2a: Implement `ASIN`, `ACOS`, `ATAN` — inverse trig using `std::asin`, `std::acos`, `std::atan`. Domain errors (e.g., `ASIN(2)`) return `#NUM!`.
+- [x] 2a: Implement `ASIN`, `ACOS`, `ATAN` — inverse trig using `std::asin`, `std::acos`, `std::atan`. Domain errors (e.g., `ASIN(2)`) return `#NUM!`.
 - [ ] 2b: Implement `ATAN2(x_num, y_num)` — two-argument arctangent. Note: Excel's `ATAN2(x, y)` computes `atan2(y, x)` (args are reversed compared to C). `ATAN2(0, 0)` returns `#DIV/0!` in Excel.
 - [ ] 2c: Implement `CSC`, `SEC`, `COT` — reciprocal trig functions: `1/sin(x)`, `1/cos(x)`, `cos(x)/sin(x)`. Return `#DIV/0!` when the denominator is zero. These arrive from XLSX as `_xlfn.CSC`, `_xlfn.SEC`, `_xlfn.COT` — the `_xlfn.` prefix stripping already handles removing the prefix (from math-basic work).
 

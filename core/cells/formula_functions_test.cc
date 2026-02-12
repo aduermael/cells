@@ -1208,6 +1208,303 @@ TEST_F(FunctionTest, TanPiOver4) {
 }
 
 // =============================================================================
+// ASIN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AsinZero) {
+    EvalResult result = eval("=ASIN(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AsinOne) {
+    EvalResult result = eval("=ASIN(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI / 2.0);
+}
+
+TEST_F(FunctionTest, AsinDomainError) {
+    EvalResult result = eval("=ASIN(2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// ACOS Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AcosOne) {
+    EvalResult result = eval("=ACOS(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AcosZero) {
+    EvalResult result = eval("=ACOS(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI / 2.0);
+}
+
+TEST_F(FunctionTest, AcosDomainError) {
+    EvalResult result = eval("=ACOS(-2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// ATAN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AtanZero) {
+    EvalResult result = eval("=ATAN(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AtanOne) {
+    EvalResult result = eval("=ATAN(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), M_PI / 4.0, 1e-15);
+}
+
+// =============================================================================
+// ATAN2 Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, Atan2Basic) {
+    // ATAN2(1, 1) = atan2(1, 1) = PI/4
+    EvalResult result = eval("=ATAN2(1, 1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), M_PI / 4.0, 1e-15);
+}
+
+TEST_F(FunctionTest, Atan2XAxisPositive) {
+    // ATAN2(1, 0) = atan2(0, 1) = 0
+    EvalResult result = eval("=ATAN2(1, 0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, Atan2YAxisPositive) {
+    // ATAN2(0, 1) = atan2(1, 0) = PI/2
+    EvalResult result = eval("=ATAN2(0, 1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI / 2.0);
+}
+
+TEST_F(FunctionTest, Atan2BothZero) {
+    EvalResult result = eval("=ATAN2(0, 0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// CSC Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CscPiOver2) {
+    // CSC(PI/2) = 1/sin(PI/2) = 1
+    EvalResult result = eval("=CSC(PI()/2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, CscZero) {
+    // CSC(0) = 1/sin(0) = 1/0 = #DIV/0!
+    EvalResult result = eval("=CSC(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// SEC Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SecZero) {
+    // SEC(0) = 1/cos(0) = 1
+    EvalResult result = eval("=SEC(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+// =============================================================================
+// COT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CotPiOver4) {
+    // COT(PI/4) = cos(PI/4)/sin(PI/4) = 1
+    EvalResult result = eval("=COT(PI()/4)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 1.0, 1e-15);
+}
+
+TEST_F(FunctionTest, CotZero) {
+    // COT(0) = cos(0)/sin(0) = #DIV/0!
+    EvalResult result = eval("=COT(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// SINH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SinhZero) {
+    EvalResult result = eval("=SINH(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, SinhOne) {
+    EvalResult result = eval("=SINH(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), std::sinh(1.0));
+}
+
+TEST_F(FunctionTest, SinhOverflow) {
+    EvalResult result = eval("=SINH(1000)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// COSH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CoshZero) {
+    EvalResult result = eval("=COSH(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, CoshOne) {
+    EvalResult result = eval("=COSH(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), std::cosh(1.0));
+}
+
+TEST_F(FunctionTest, CoshOverflow) {
+    EvalResult result = eval("=COSH(1000)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// TANH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TanhZero) {
+    EvalResult result = eval("=TANH(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, TanhLarge) {
+    // TANH of large value approaches 1
+    EvalResult result = eval("=TANH(100)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+// =============================================================================
+// ASINH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AsinhZero) {
+    EvalResult result = eval("=ASINH(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AsinhOne) {
+    EvalResult result = eval("=ASINH(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), std::asinh(1.0));
+}
+
+// =============================================================================
+// ACOSH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AcoshOne) {
+    EvalResult result = eval("=ACOSH(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AcoshDomainError) {
+    EvalResult result = eval("=ACOSH(0.5)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// ATANH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AtanhZero) {
+    EvalResult result = eval("=ATANH(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, AtanhHalf) {
+    EvalResult result = eval("=ATANH(0.5)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), std::atanh(0.5));
+}
+
+TEST_F(FunctionTest, AtanhDomainError) {
+    EvalResult result = eval("=ATANH(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// =============================================================================
+// RADIANS Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, Radians180) {
+    EvalResult result = eval("=RADIANS(180)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI);
+}
+
+TEST_F(FunctionTest, Radians90) {
+    EvalResult result = eval("=RADIANS(90)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI / 2.0);
+}
+
+TEST_F(FunctionTest, RadiansZero) {
+    EvalResult result = eval("=RADIANS(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+// =============================================================================
+// DEGREES Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, DegreesPi) {
+    EvalResult result = eval("=DEGREES(PI())");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 180.0);
+}
+
+TEST_F(FunctionTest, DegreesHalfPi) {
+    EvalResult result = eval("=DEGREES(PI()/2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 90.0);
+}
+
+TEST_F(FunctionTest, DegreesZero) {
+    EvalResult result = eval("=DEGREES(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+// =============================================================================
 // Edge Cases and Type Coercion
 // =============================================================================
 

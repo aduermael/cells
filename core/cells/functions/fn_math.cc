@@ -790,6 +790,277 @@ EvalResult fn_TAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(excelNormalize(result));
 }
 
+EvalResult fn_ASIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val < -1.0 || val > 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::asin(val)));
+}
+
+EvalResult fn_ACOS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val < -1.0 || val > 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::acos(val)));
+}
+
+EvalResult fn_ATAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    return EvalResult::Number(excelNormalize(std::atan(num.getNumber())));
+}
+
+EvalResult fn_ATAN2(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult xNum = evaluateAsNumber(args[0], ctx);
+    if (xNum.isError()) {
+        return xNum;
+    }
+
+    EvalResult yNum = evaluateAsNumber(args[1], ctx);
+    if (yNum.isError()) {
+        return yNum;
+    }
+
+    const double x = xNum.getNumber();
+    const double y = yNum.getNumber();
+
+    if (x == 0.0 && y == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    // Excel ATAN2(x_num, y_num) = atan2(y_num, x_num) — args reversed vs C
+    return EvalResult::Number(excelNormalize(std::atan2(y, x)));
+}
+
+EvalResult fn_CSC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double sinVal = std::sin(num.getNumber());
+    if (sinVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = 1.0 / sinVal;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_SEC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double cosVal = std::cos(num.getNumber());
+    if (cosVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = 1.0 / cosVal;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_COT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double sinVal = std::sin(num.getNumber());
+    if (sinVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = std::cos(num.getNumber()) / sinVal;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_SINH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = std::sinh(num.getNumber());
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_COSH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = std::cosh(num.getNumber());
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_TANH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    return EvalResult::Number(excelNormalize(std::tanh(num.getNumber())));
+}
+
+EvalResult fn_ASINH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    return EvalResult::Number(excelNormalize(std::asinh(num.getNumber())));
+}
+
+EvalResult fn_ACOSH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val < 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::acosh(val)));
+}
+
+EvalResult fn_ATANH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val <= -1.0 || val >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(excelNormalize(std::atanh(val)));
+}
+
+EvalResult fn_RADIANS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = num.getNumber() * M_PI / 180.0;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = num.getNumber() * 180.0 / M_PI;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -848,6 +1119,28 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("SIN", fn_SIN, "(number)", "Returns the sine of an angle", "Math");
     registry.registerFunction("COS", fn_COS, "(number)", "Returns the cosine of an angle", "Math");
     registry.registerFunction("TAN", fn_TAN, "(number)", "Returns the tangent of an angle", "Math");
+    registry.registerFunction("ASIN", fn_ASIN, "(number)", "Returns the arcsine", "Math");
+    registry.registerFunction("ACOS", fn_ACOS, "(number)", "Returns the arccosine", "Math");
+    registry.registerFunction("ATAN", fn_ATAN, "(number)", "Returns the arctangent", "Math");
+    registry.registerFunction("ATAN2", fn_ATAN2, "(x_num, y_num)",
+                              "Returns the arctangent of x and y coordinates", "Math");
+    registry.registerFunction("CSC", fn_CSC, "(number)", "Returns the cosecant", "Math");
+    registry.registerFunction("SEC", fn_SEC, "(number)", "Returns the secant", "Math");
+    registry.registerFunction("COT", fn_COT, "(number)", "Returns the cotangent", "Math");
+    registry.registerFunction("SINH", fn_SINH, "(number)", "Returns the hyperbolic sine", "Math");
+    registry.registerFunction("COSH", fn_COSH, "(number)", "Returns the hyperbolic cosine", "Math");
+    registry.registerFunction("TANH", fn_TANH, "(number)", "Returns the hyperbolic tangent",
+                              "Math");
+    registry.registerFunction("ASINH", fn_ASINH, "(number)", "Returns the inverse hyperbolic sine",
+                              "Math");
+    registry.registerFunction("ACOSH", fn_ACOSH, "(number)",
+                              "Returns the inverse hyperbolic cosine", "Math");
+    registry.registerFunction("ATANH", fn_ATANH, "(number)",
+                              "Returns the inverse hyperbolic tangent", "Math");
+    registry.registerFunction("RADIANS", fn_RADIANS, "(angle)", "Converts degrees to radians",
+                              "Math");
+    registry.registerFunction("DEGREES", fn_DEGREES, "(angle)", "Converts radians to degrees",
+                              "Math");
 }
 
 }  // namespace cells
