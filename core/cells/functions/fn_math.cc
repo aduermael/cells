@@ -183,18 +183,34 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         if (e < 0.0) {
             return EvalResult::Error(CellError::DIV);  // POWER(0, -n) = #DIV/0!
         }
+        return EvalResult::Number(0.0);  // POWER(0, positive) = 0
     }
 
-    // Excel can't compute POWER with extreme exponents (|exp| >= 2^53)
-    // where the exponent is not exactly representable as an integer.
-    // For non-trivial bases (not 0 or ±1 with integer exp), return #NUM!.
+    // Base 1: always returns 1 regardless of exponent
+    if (b == 1.0) {
+        return EvalResult::Number(1.0);
+    }
+
+    // For extreme exponents (|exp| >= 2^53), Excel returns #NUM! for most cases.
+    // Exception: positive base > 1 with large negative exponent underflows to 0.
+    // Negative base with extreme exponent always returns #NUM! (parity unknown).
     const double absExp = std::abs(e);
     if (absExp >= 9007199254740992.0) {  // 2^53
+        if (b > 1.0 && e < 0.0) {
+            return EvalResult::Number(0.0);  // Underflow to zero
+        }
         return EvalResult::Error(CellError::NUM);
     }
 
     const double result = excelPow(b, e);
-    if (std::isnan(result) || std::isinf(result)) {
+    if (std::isnan(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (std::isinf(result)) {
+        // Overflow from reciprocal (1/0) is #DIV/0!, other overflow is #NUM!
+        if (e < 0.0) {
+            return EvalResult::Error(CellError::DIV);
+        }
         return EvalResult::Error(CellError::NUM);
     }
 

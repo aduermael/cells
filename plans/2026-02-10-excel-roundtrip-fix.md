@@ -161,7 +161,7 @@ Investigation revealed POWER has several edge cases where we differ from Excel:
 
 - [x] 12a: Fix `POWER(0, 0)` to return `#NUM!` and `POWER(0, neg)` to return `#DIV/0!` — added explicit zero-base checks in both `fn_POWER` and the `^` operator before calling `excelPow`. Updated existing test from `#NUM!` to `#DIV/0!` expectation, added new tests for both POWER function and `^` operator.
 - [x] 12b: Fix POWER with extreme exponents — when `|exponent| >= 2^53` (9007199254740992.0), return `#NUM!`. Applied in both `fn_POWER` and the `^` operator. Added tests for `POWER(-1, ±9.99E+307)`.
-- [ ] 12c: Run roundtrip test and verify POWER diffs are fixed.
+- [x] 12c: Run roundtrip test — **66 differences remain** (down from 78). Fixed 12 POWER diffs: zero base (0^0, 0^neg), base=1, extreme exponents with positive base > 1 (underflow to 0), negative base (parity unknown → #NUM!), and inf-from-reciprocal returns #DIV/0!. One outlier remains: K75 POWER(1e-307, -9.99E307) where Excel returns 0 but math gives ∞.
 
 ## Phase 13: Fix ROUND Overflow with Large Numbers (6 diffs)
 

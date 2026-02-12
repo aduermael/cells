@@ -419,13 +419,28 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
                 if (e < 0.0) {
                     return EvalResult::Error(CellError::DIV);  // 0^(-n) = #DIV/0!
                 }
+                return EvalResult::Number(0.0);  // 0^(positive) = 0
             }
-            // Excel can't compute with extreme exponents (|exp| >= 2^53)
+            // Base 1: always returns 1
+            if (b == 1.0) {
+                return EvalResult::Number(1.0);
+            }
+            // Extreme exponents (|exp| >= 2^53): Excel returns #NUM!
+            // Exception: positive base > 1 with large negative exp underflows to 0
             if (std::abs(e) >= 9007199254740992.0) {  // 2^53
+                if (b > 1.0 && e < 0.0) {
+                    return EvalResult::Number(0.0);
+                }
                 return EvalResult::Error(CellError::NUM);
             }
             const double result = excelPow(b, e);
-            if (std::isnan(result) || std::isinf(result)) {
+            if (std::isnan(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            if (std::isinf(result)) {
+                if (e < 0.0) {
+                    return EvalResult::Error(CellError::DIV);
+                }
                 return EvalResult::Error(CellError::NUM);
             }
             return EvalResult::Number(excelNormalize(result));
