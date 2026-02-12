@@ -54,6 +54,31 @@ pugi::xml_node xmlChild(const pugi::xml_document& doc, const char* name) {
     return xmlChild(static_cast<const pugi::xml_node&>(doc), name);
 }
 
+// Strip Excel's _xlfn. prefix from formula text and normalize dotted function names.
+// Excel uses _xlfn. prefix for functions added after Excel 2007 (e.g.,
+// _xlfn.CEILING.MATH). We strip the prefix and replace dots in function names
+// with underscores so our parser can tokenize them as single identifiers
+// (e.g., _xlfn.CEILING.MATH → CEILING_MATH).
+std::string stripXlfnPrefix(const std::string& formula) {
+    std::string result = formula;
+    const std::string prefix = "_xlfn.";
+    size_t pos = 0;
+    while ((pos = result.find(prefix, pos)) != std::string::npos) {
+        // Remove _xlfn. prefix
+        result.erase(pos, prefix.size());
+        // Replace dots within the function name that follows
+        // (e.g., CEILING.MATH → CEILING_MATH)
+        while (pos < result.size() && (std::isalpha(static_cast<unsigned char>(result[pos])) != 0 ||
+                                       result[pos] == '.')) {
+            if (result[pos] == '.') {
+                result[pos] = '_';
+            }
+            pos++;
+        }
+    }
+    return result;
+}
+
 // Iterator adapter for children by local name (ignoring namespace prefix).
 // Usage: for (auto node : xmlChildren(parent, "sheet")) { ... }
 struct XmlChildrenRange {
@@ -2038,7 +2063,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                                     if (options.readFormulaText) {
                                         // Parse formula text to create AST
                                         const std::string fullFormula =
-                                            "=" + std::string(formulaText);
+                                            "=" + stripXlfnPrefix(std::string(formulaText));
                                         cells::FormulaParser parser(fullFormula);
                                         std::unique_ptr<cells::ASTNode> ast = parser.parse();
                                         auto* formula = new cells::Formula();
@@ -2072,7 +2097,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                         // Regular formula (not shared)
                         if (options.readFormulaText) {
                             const std::string formulaTextStr = fNode.text().get();
-                            const std::string fullFormula = "=" + formulaTextStr;
+                            const std::string fullFormula =
+                                "=" + stripXlfnPrefix(formulaTextStr);
                             cells::FormulaParser parser(fullFormula);
                             std::unique_ptr<cells::ASTNode> ast = parser.parse();
                             auto* formula = new cells::Formula();
