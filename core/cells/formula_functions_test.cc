@@ -1,6 +1,7 @@
 #include "core/cells/formula_functions.h"
 
 #include <cmath>
+#include <cstring>
 
 #include <gtest/gtest.h>
 #include <limits>
@@ -1082,6 +1083,17 @@ TEST_F(FunctionTest, FactOverflow) {
     EvalResult result = eval("=FACT(171)");
     EXPECT_TRUE(result.isError());
     EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, FactPrecisionMatchesExcel) {
+    // FACT(42) = 42! — Excel computes in descending order (42*41*...*2)
+    // which gives 0x4A8E0AC0EA48D949, not the ascending order 0x...D947.
+    EvalResult result = eval("=FACT(42)");
+    EXPECT_TRUE(result.isNumber());
+    uint64_t bits = 0;
+    double val = result.getNumber();
+    std::memcpy(&bits, &val, sizeof(bits));
+    EXPECT_EQ(0x4A8E0AC0EA48D949ULL, bits) << "FACT(42) should match Excel's exact value";
 }
 
 // =============================================================================

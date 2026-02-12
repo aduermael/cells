@@ -1758,10 +1758,26 @@ TEST(PowBySquaringTest, SmallExponents) {
 // EXCEL POW TESTS (negative base with integer exponent)
 // =============================================================================
 
-TEST(ExcelPowTest, PositiveBaseUnchanged) {
-    // Positive base should use the std::pow path (same as before)
+TEST(ExcelPowTest, PositiveBaseIntegerExponent) {
+    // Positive base with integer exponent uses std::pow path
     EXPECT_DOUBLE_EQ(1024.0, excelPow(2.0, 10.0));
     EXPECT_DOUBLE_EQ(0.25, excelPow(4.0, -1.0));
+}
+
+TEST(ExcelPowTest, PositiveBaseNonIntegerExponent) {
+    // Positive base with non-integer exponent uses exp-log path
+    // (matches Excel's internal computation)
+    // 42.5^42.5: Excel gives 0x4E4DD6B7C415A50B
+    double result = excelPow(42.5, 42.5);
+    uint64_t bits = 0;
+    std::memcpy(&bits, &result, sizeof(bits));
+    EXPECT_EQ(0x4E4DD6B7C415A50BULL, bits) << "excelPow(42.5, 42.5) should match Excel exactly";
+
+    // 42.5^-42.5: Excel gives 0x319128ADB59138A4
+    double resultNeg = excelPow(42.5, -42.5);
+    uint64_t bitsNeg = 0;
+    std::memcpy(&bitsNeg, &resultNeg, sizeof(bitsNeg));
+    EXPECT_EQ(0x319128ADB59138A4ULL, bitsNeg) << "excelPow(42.5, -42.5) should match Excel exactly";
 }
 
 TEST(ExcelPowTest, NegativeBaseIntegerExponent) {

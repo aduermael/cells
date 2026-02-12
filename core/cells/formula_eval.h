@@ -386,15 +386,20 @@ inline double powBySquaring(double base, uint64_t exp) {
 }
 
 // Excel-compatible power function.
-// Excel uses two code paths for exponentiation:
-// 1. Positive base (or non-integer exponent): uses std::pow, with 1/pow(x,n)
-//    for negative exponents to match Excel's algorithm.
-// 2. Negative base with integer exponent: uses exponentiation by squaring
+// Excel uses three code paths for exponentiation:
+// 1. Negative base with integer exponent: exponentiation by squaring
 //    (powBySquaring), because exp(n*log(x)) doesn't work for negative x.
 //    The squaring approach produces different rounding at extreme exponents.
-// Do NOT "fix" this to use std::pow directly — the differences are intentional.
+// 2. Positive base with integer exponent: std::pow, with 1/pow(x,n)
+//    for negative exponents to match Excel's algorithm.
+// 3. Positive base with non-integer exponent: exp(y * log(x)).
+//    Excel internally uses exp-log decomposition for fractional exponents.
+//    This produces different rounding than std::pow (e.g., 60 ULPs for
+//    42.5^42.5), but matches Excel exactly.
+// Do NOT "simplify" — each path matches a specific Excel behavior.
 inline double excelPow(double base, double exponent) {
-    if (base < 0.0 && std::floor(exponent) == exponent) {
+    const bool isIntegerExp = std::floor(exponent) == exponent;
+    if (base < 0.0 && isIntegerExp) {
         // Negative base with integer exponent: use squaring
         const double absBase = -base;
         const double absExp = std::abs(exponent);
@@ -410,10 +415,15 @@ inline double excelPow(double base, double exponent) {
         }
         return result;
     }
-    if (exponent < 0.0) {
-        return 1.0 / std::pow(base, -exponent);
+    if (isIntegerExp) {
+        // Positive base with integer exponent: use std::pow with reciprocal
+        if (exponent < 0.0) {
+            return 1.0 / std::pow(base, -exponent);
+        }
+        return std::pow(base, exponent);
     }
-    return std::pow(base, exponent);
+    // Non-integer exponent: use exp-log decomposition (matches Excel)
+    return std::exp(exponent * std::log(base));
 }
 
 // Excel numeric normalization.

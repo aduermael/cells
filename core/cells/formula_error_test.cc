@@ -520,10 +520,22 @@ TEST_F(FormulaErrorTest, NumError_ExtremeExponent) {
 }
 
 TEST_F(FormulaErrorTest, NumError_ExtremeNegativeExponent) {
-    // |exponent| >= 2^53 with negative exponent → #NUM!
+    // |exponent| >= 2^53 with negative base → #NUM!
     EvalResult r = eval("=POWER(-1, -9.99E+307)");
     ASSERT_TRUE(r.isError());
     EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, ExtremeNegativeExponent_PositiveBaseUnderflows) {
+    // 0 < base < 1 with extreme negative exponent → 0 (Excel behavior)
+    EvalResult r = eval("=POWER(1E-307, -9.99E+307)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_EQ(0.0, r.getNumber());
+
+    // base > 1 with extreme negative exponent → 0 (underflow)
+    EvalResult r2 = eval("=POWER(42.5, -9.99E+307)");
+    ASSERT_TRUE(r2.isNumber());
+    EXPECT_EQ(0.0, r2.getNumber());
 }
 
 TEST_F(FormulaErrorTest, NumError_PropagatedFromCell) {

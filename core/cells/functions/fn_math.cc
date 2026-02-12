@@ -192,11 +192,14 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     }
 
     // For extreme exponents (|exp| >= 2^53), Excel returns #NUM! for most cases.
-    // Exception: positive base > 1 with large negative exponent underflows to 0.
+    // Exceptions for large negative exponent:
+    //   - base > 1: underflows to 0 (large base ^ huge negative exp → 0)
+    //   - 0 < base < 1: underflows to 0 (small base ^ huge negative exp overflows
+    //     in theory, but Excel's intermediate computation underflows to 0)
     // Negative base with extreme exponent always returns #NUM! (parity unknown).
     const double absExp = std::abs(e);
     if (absExp >= 9007199254740992.0) {  // 2^53
-        if (b > 1.0 && e < 0.0) {
+        if (b > 0.0 && e < 0.0) {
             return EvalResult::Number(0.0);  // Underflow to zero
         }
         return EvalResult::Error(CellError::NUM);
@@ -645,8 +648,12 @@ EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::NUM);
     }
 
+    // Multiply in descending order (n * (n-1) * ... * 2) to match Excel's
+    // rounding behavior. The order of floating-point multiplications affects
+    // intermediate rounding, and descending order matches Excel exactly
+    // (e.g., FACT(42) = 0x4A8E0AC0EA48D949 vs 0x...D947 ascending).
     double result = 1.0;
-    for (int i = 2; i <= n; i++) {
+    for (int i = n; i >= 2; i--) {
         result *= i;
     }
     return EvalResult::Number(result);

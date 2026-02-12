@@ -426,9 +426,11 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
                 return EvalResult::Number(1.0);
             }
             // Extreme exponents (|exp| >= 2^53): Excel returns #NUM!
-            // Exception: positive base > 1 with large negative exp underflows to 0
+            // Exceptions for large negative exponent:
+            //   - base > 0: underflows to 0 (Excel's intermediate computation)
+            // Negative base with extreme exponent always returns #NUM!
             if (std::abs(e) >= 9007199254740992.0) {  // 2^53
-                if (b > 1.0 && e < 0.0) {
+                if (b > 0.0 && e < 0.0) {
                     return EvalResult::Number(0.0);
                 }
                 return EvalResult::Error(CellError::NUM);

@@ -184,15 +184,19 @@ Values like `0.023529411764705882` should be written as `2.3529411764705882E-2` 
 
 - [x] 15a: Fix XLSX value formatting for small numbers — replaced `uppercaseExponent()` with `excelFormatNumber()` in xlsx_writer.cc. The new function handles three cases: (1) values starting with "0.0" with >4 significant digits are reformatted using `%.16e` then stripped of trailing zeros and leading exponent zeros; (2) values already in E-notation get uppercase E and stripped leading exponent zeros; (3) other values pass through unchanged. Fixed all 8 formatting diffs: 6 scientific notation (0.023... → 2.35...E-2) and 2 exponent leading zeros (E-05 → E-5). Down from 12 to 4 remaining diffs.
 
-## Phase 16: Fix Remaining POWER Precision (2 diffs)
+## Phase 16: Fix Remaining Precision Diffs (4 diffs)
 
-Two POWER precision diffs at extreme values:
-- `POWER(42.5, 42.5)`: Excel `1.6089017613873198E+69`, ours `1.6089017613873083E+69`
-- `POWER(42.5, -42.5)`: Excel `6.2154198845411321E-70`, ours `6.2154198845411772E-70`
+Investigation revealed 4 remaining diffs (not just 2 POWER diffs):
 
-These may require investigating Excel's algorithm for non-integer exponents with large bases.
+1. **F73/G73**: `POWER(42.5, ±42.5)` — 60/35 ULP diff. Root cause: `std::pow` on macOS ARM64 gives the correctly-rounded IEEE754 value, but Excel computes `pow(x,y)` as `exp(y * log(x))` which accumulates different error. Verified: `exp(42.5 * log(42.5))` gives `0x...A50B`, exactly matching Excel.
+2. **K75**: `POWER(1e-307, -9.99E307)` — Excel returns `0`, we return `#NUM!`. This is a special case: `0 < base < 1` with extreme negative exponent. Excel's intermediate computation leads to 0 (underflow) rather than overflow.
+3. **K113**: `FACT(42)` — 2 ULP diff. Root cause: our forward multiplication (`1*2*3*...*42`) gives `0x...D947`, but backward multiplication (`42*41*...*1`) gives `0x...D949` matching Excel. Excel computes factorials in descending order.
 
-- [ ] 16a: Investigate POWER precision differences for non-integer exponents — these are likely due to differences in how `std::pow` and Excel compute `42.5^42.5`. May need a different algorithm path.
+- [x] 16a: Investigate POWER precision differences for non-integer exponents — Excel uses `exp(y * log(x))` for non-integer exponents (not `std::pow`). This is 60 ULPs less accurate than `std::pow` for `42.5^42.5`, but matches Excel exactly. For negative exponents, `exp(y * log(x))` with negative y also matches. The exp-log path should only be used for non-integer exponents to avoid breaking integer exponent cases (where `1/pow(x,n)` and `powBySquaring` are correct).
+- [x] 16b: Fix POWER to use exp-log for non-integer exponents — in `excelPow()`, added third code path for positive base with non-integer exponent: `exp(exponent * log(base))`. This matches Excel's internal exp-log decomposition exactly (verified at bit level for `42.5^±42.5`). Integer exponent paths unchanged.
+- [x] 16c: Fix POWER(0<base<1, extreme negative exp) to return 0 — in both `fn_POWER` and `^` operator, broadened the extreme exponent underflow-to-zero condition from `b > 1.0` to `b > 0.0` when `exp < 0` and `|exp| >= 2^53`. Excel's intermediate computation underflows to 0 for any positive base with extreme negative exponent.
+- [x] 16d: Fix FACT to compute in descending order — changed loop from `for (i = 2; i <= n)` to `for (i = n; i >= 2)` to match Excel's multiplication order. Fixes FACT(42) from `0x...D947` to `0x...D949` (2 ULP correction).
+- [x] 16e: Run roundtrip test — **0 differences remain!** `./run-test.sh math-basic` passes: "MATCH: Cells and properties are identical" (1913 cells).
 
 ## Phase 17: Final Roundtrip Verification
 
