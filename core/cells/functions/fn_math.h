@@ -115,6 +115,22 @@ EvalResult fn_LOG10(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_LOG(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
+// Trigonometric Functions
+// =============================================================================
+
+// PI() - Returns the value of Pi
+EvalResult fn_PI(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// SIN(number) - Returns the sine of an angle in radians
+EvalResult fn_SIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// COS(number) - Returns the cosine of an angle in radians
+EvalResult fn_COS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// TAN(number) - Returns the tangent of an angle in radians
+EvalResult fn_TAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// =============================================================================
 // Registration
 // =============================================================================
 

@@ -737,6 +737,60 @@ EvalResult fn_LOG(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 }
 
 // =============================================================================
+// Trigonometric Functions
+// =============================================================================
+
+EvalResult fn_PI(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) {
+    if (!args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Number(M_PI);
+}
+
+EvalResult fn_SIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    return EvalResult::Number(excelNormalize(std::sin(num.getNumber())));
+}
+
+EvalResult fn_COS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    return EvalResult::Number(excelNormalize(std::cos(num.getNumber())));
+}
+
+EvalResult fn_TAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double result = std::tan(num.getNumber());
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+// =============================================================================
 // Registration
 // =============================================================================
 
@@ -788,6 +842,12 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("LOG10", fn_LOG10, "(number)", "Returns the base-10 logarithm",
                               "Math");
     registry.registerFunction("LOG", fn_LOG, "(number, [base])", "Returns the logarithm", "Math");
+
+    // Trigonometric functions
+    registry.registerFunction("PI", fn_PI, "()", "Returns the value of Pi", "Math");
+    registry.registerFunction("SIN", fn_SIN, "(number)", "Returns the sine of an angle", "Math");
+    registry.registerFunction("COS", fn_COS, "(number)", "Returns the cosine of an angle", "Math");
+    registry.registerFunction("TAN", fn_TAN, "(number)", "Returns the tangent of an angle", "Math");
 }
 
 }  // namespace cells

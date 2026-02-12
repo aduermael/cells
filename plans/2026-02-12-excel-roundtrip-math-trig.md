@@ -40,8 +40,8 @@ Cell C151 has format `"0.000000000000000"` (15 decimal places). The writer maps 
 
 Implement the foundational trig functions. PI is needed first since many input cells use `PI()/6`, `PI()/4`, etc.
 
-- [ ] 1a: Implement `PI()` — returns `M_PI` (3.14159265358979323846). Zero arguments required.
-- [ ] 1b: Implement `SIN`, `COS`, `TAN` — basic trig functions using `std::sin`, `std::cos`, `std::tan`. Single argument (radians). Apply `excelNormalize` to results. TAN at π/2 should return a very large number (not error), matching Excel behavior.
+- [x] 1a: Implement `PI()` — returns `M_PI` (3.14159265358979323846). Zero arguments required.
+- [x] 1b: Implement `SIN`, `COS`, `TAN` — basic trig functions using `std::sin`, `std::cos`, `std::tan`. Single argument (radians). Apply `excelNormalize` to results. TAN returns #NUM! on overflow (inf).
 
 ## Phase 2: Implement Inverse and Reciprocal Trig Functions
 

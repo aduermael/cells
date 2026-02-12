@@ -1138,6 +1138,76 @@ TEST_F(FunctionTest, QuotientLargeResult) {
 }
 
 // =============================================================================
+// PI Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, PiValue) {
+    EvalResult result = eval("=PI()");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), M_PI);
+}
+
+TEST_F(FunctionTest, PiWithArgsReturnsError) {
+    EvalResult result = eval("=PI(1)");
+    EXPECT_TRUE(result.isError());
+}
+
+// =============================================================================
+// SIN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SinZero) {
+    EvalResult result = eval("=SIN(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, SinPiOver2) {
+    EvalResult result = eval("=SIN(PI()/2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, SinPi) {
+    // SIN(PI()) is not exactly 0 in floating point, but very close
+    EvalResult result = eval("=SIN(PI())");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 0.0, 1e-15);
+}
+
+// =============================================================================
+// COS Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CosZero) {
+    EvalResult result = eval("=COS(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, CosPi) {
+    EvalResult result = eval("=COS(PI())");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -1.0);
+}
+
+// =============================================================================
+// TAN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TanZero) {
+    EvalResult result = eval("=TAN(0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, TanPiOver4) {
+    EvalResult result = eval("=TAN(PI()/4)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 1.0, 1e-15);
+}
+
+// =============================================================================
 // Edge Cases and Type Coercion
 // =============================================================================
 
