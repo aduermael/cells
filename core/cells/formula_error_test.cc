@@ -484,9 +484,44 @@ TEST_F(FormulaErrorTest, NumError_NegativeBaseNonIntegerExponent) {
     EXPECT_EQ(CellError::NUM, r.getError());
 }
 
-TEST_F(FormulaErrorTest, NumError_ZeroToNegativePower) {
-    // 0 raised to negative power (undefined)
+TEST_F(FormulaErrorTest, DivError_ZeroToNegativePower) {
+    // 0 raised to negative power → #DIV/0! (Excel behavior)
     EvalResult r = eval("=POWER(0, -1)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_ZeroToZeroPower) {
+    // 0^0 → #NUM! (Excel behavior, not IEEE754's 1)
+    EvalResult r = eval("=POWER(0, 0)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_ZeroToZeroPowerOperator) {
+    // 0^0 via ^ operator → #NUM!
+    EvalResult r = eval("=0^0");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, DivError_ZeroToNegativePowerOperator) {
+    // 0^(-1) via ^ operator → #DIV/0!
+    EvalResult r = eval("=0^-1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_ExtremeExponent) {
+    // |exponent| >= 2^53 → #NUM!
+    EvalResult r = eval("=POWER(-1, 9.99E+307)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NUM, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NumError_ExtremeNegativeExponent) {
+    // |exponent| >= 2^53 with negative exponent → #NUM!
+    EvalResult r = eval("=POWER(-1, -9.99E+307)");
     ASSERT_TRUE(r.isError());
     EXPECT_EQ(CellError::NUM, r.getError());
 }

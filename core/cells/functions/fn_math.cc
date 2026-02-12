@@ -172,7 +172,28 @@ EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return exponent;
     }
 
-    const double result = excelPow(base.getNumber(), exponent.getNumber());
+    const double b = base.getNumber();
+    const double e = exponent.getNumber();
+
+    // Excel edge cases for zero base
+    if (b == 0.0) {
+        if (e == 0.0) {
+            return EvalResult::Error(CellError::NUM);  // POWER(0, 0) = #NUM!
+        }
+        if (e < 0.0) {
+            return EvalResult::Error(CellError::DIV);  // POWER(0, -n) = #DIV/0!
+        }
+    }
+
+    // Excel can't compute POWER with extreme exponents (|exp| >= 2^53)
+    // where the exponent is not exactly representable as an integer.
+    // For non-trivial bases (not 0 or ±1 with integer exp), return #NUM!.
+    const double absExp = std::abs(e);
+    if (absExp >= 9007199254740992.0) {  // 2^53
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    const double result = excelPow(b, e);
     if (std::isnan(result) || std::isinf(result)) {
         return EvalResult::Error(CellError::NUM);
     }
