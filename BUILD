@@ -65,6 +65,12 @@ sh_binary(
     data = ["tools/guard.sh"],
 )
 
+sh_binary(
+    name = "xlsx-roundtrip",
+    srcs = ["tools/xlsx-roundtrip.sh"],
+    data = ["tools/guard.sh"],
+)
+
 # Code quality scripts
 sh_binary(
     name = "check",

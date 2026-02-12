@@ -5,7 +5,7 @@
 #   bazel run :check          # Run all checks
 #   bazel run :check -- --fix # Run checks and fix what's possible
 #
-# Order: Unit tests -> Linter -> Type checks -> Integration tests -> Formatter
+# Order: Unit tests -> XLSX roundtrip -> Linter -> Type checks -> Integration tests -> Formatter
 # Rationale: Faster checks run first for quick feedback
 
 set -euo pipefail
@@ -75,7 +75,18 @@ fi
 
 echo ""
 
-# 2. Lint
+# 2. XLSX roundtrip tests
+echo -e "${BOLD}=== XLSX Roundtrip Tests ===${NC}"
+roundtrip_cmd() {
+    "$SCRIPT_DIR/xlsx-roundtrip.sh"
+}
+if ! time_cmd roundtrip_cmd; then
+    FAILED=1
+fi
+
+echo ""
+
+# 3. Lint
 echo -e "${BOLD}=== Lint Check ($JOBS parallel) ===${NC}"
 lint_cmd() {
     if $FIX_MODE; then
@@ -90,7 +101,7 @@ fi
 
 echo ""
 
-# 3. Type checks (TypeScript)
+# 4. Type checks (TypeScript)
 echo -e "${BOLD}=== Type Check (TypeScript) ===${NC}"
 typecheck_cmd() {
     if [ -f "$REPO_ROOT/apps/wasm/scripts/check-types.mjs" ]; then
@@ -107,7 +118,7 @@ fi
 
 echo ""
 
-# 4. Integration tests (E2E)
+# 5. Integration tests (E2E)
 echo -e "${BOLD}=== Integration Tests (E2E, $JOBS parallel) ===${NC}"
 e2e_cmd() {
     if [ -f "$REPO_ROOT/apps/wasm/scripts/test-parallel.mjs" ]; then
@@ -124,7 +135,7 @@ fi
 
 echo ""
 
-# 5. Format check (last, easiest to fix)
+# 6. Format check (last, easiest to fix)
 echo -e "${BOLD}=== Format Check ($JOBS parallel) ===${NC}"
 format_cmd() {
     if $FIX_MODE; then
