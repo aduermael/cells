@@ -56,7 +56,7 @@ Implement the foundational trig functions. PI is needed first since many input c
 
 ## Phase 4: Implement RADIANS and DEGREES
 
-- [ ] 4a: Implement `RADIANS(angle)` and `DEGREES(angle)` — conversion between degrees and radians. `RADIANS(x) = x * PI / 180`, `DEGREES(x) = x * 180 / PI`.
+- [x] 4a: Implement `RADIANS(angle)` and `DEGREES(angle)` — conversion between degrees and radians. `RADIANS(x) = x * PI / 180`, `DEGREES(x) = x * 180 / PI`.
 
 ## Phase 5: Fix Number Format Precision for High Decimal Counts
 
