@@ -167,7 +167,7 @@ Investigation revealed POWER has several edge cases where we differ from Excel:
 
 `ROUND(9.99E+307, 2)` overflows because `9.99E+307 * 100` exceeds `DBL_MAX`. Excel returns the original value unchanged when rounding digits don't affect the result (the number has no digits at the specified precision).
 
-- [ ] 13a: Fix ROUND to handle large numbers — when `multiplier * value` overflows, return the original value (rounding has no effect at that precision). This matches Excel's behavior.
+- [x] 13a: Fix ROUND to handle large numbers — added overflow guard to ROUND, ROUNDUP, and ROUNDDOWN: when `value * multiplier` is infinite but `value` is finite, return the original value unchanged. Added unit tests for all three functions with positive and negative large values.
 
 ## Phase 14: Fix MOD Edge Cases (24 diffs)
 

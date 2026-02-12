@@ -239,6 +239,11 @@ EvalResult fn_ROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     const double multiplier = std::pow(10.0, digits);
     const double value = num.getNumber();
 
+    // If scaling overflows, rounding has no effect — return original value
+    if (std::isinf(value * multiplier) && !std::isinf(value)) {
+        return EvalResult::Number(value);
+    }
+
     // Round away from zero (Excel behavior)
     double rounded = NAN;
     if (value >= 0) {
@@ -275,6 +280,11 @@ EvalResult fn_ROUNDUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     const double multiplier = std::pow(10.0, digits);
     const double value = num.getNumber();
 
+    // If scaling overflows, rounding has no effect — return original value
+    if (std::isinf(value * multiplier) && !std::isinf(value)) {
+        return EvalResult::Number(value);
+    }
+
     // Round away from zero
     double rounded = NAN;
     if (value >= 0) {
@@ -310,6 +320,11 @@ EvalResult fn_ROUNDDOWN(const std::vector<const ASTNode*>& args, EvalContext& ct
 
     const double multiplier = std::pow(10.0, digits);
     const double value = num.getNumber();
+
+    // If scaling overflows, rounding has no effect — return original value
+    if (std::isinf(value * multiplier) && !std::isinf(value)) {
+        return EvalResult::Number(value);
+    }
 
     // Round toward zero (same as TRUNC)
     const double rounded = std::trunc(value * multiplier) / multiplier;

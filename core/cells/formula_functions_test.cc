@@ -658,6 +658,35 @@ TEST_F(FunctionTest, RoundDownWithDigits) {
 }
 
 // =============================================================================
+// ROUND/ROUNDUP/ROUNDDOWN Overflow Tests
+// =============================================================================
+
+TEST_F(FunctionTest, RoundOverflowReturnsOriginal) {
+    // ROUND(9.99E+307, 2) — scaling overflows, return original value
+    EvalResult result = eval("=ROUND(9.9999999999999E+307, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 9.9999999999999e+307);
+}
+
+TEST_F(FunctionTest, RoundUpOverflowReturnsOriginal) {
+    EvalResult result = eval("=ROUNDUP(9.9999999999999E+307, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 9.9999999999999e+307);
+}
+
+TEST_F(FunctionTest, RoundDownOverflowReturnsOriginal) {
+    EvalResult result = eval("=ROUNDDOWN(9.9999999999999E+307, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 9.9999999999999e+307);
+}
+
+TEST_F(FunctionTest, RoundNegativeOverflowReturnsOriginal) {
+    EvalResult result = eval("=ROUND(-9.9999999999999E+307, 2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -9.9999999999999e+307);
+}
+
+// =============================================================================
 // FLOOR Function Tests
 // =============================================================================
 
