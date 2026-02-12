@@ -175,7 +175,8 @@ MOD has 24 differences in two categories:
 - **Excel `#NUM!` → our number (14 cells):** MOD with very small divisors (1e-307, -1e-307) — Excel returns `#NUM!` for these, likely because the intermediate computation overflows.
 - **Precision diffs (10 cells):** MOD with extreme values (9.99E+307) — different results due to intermediate computation differences.
 
-- [ ] 14a: Investigate and fix MOD edge cases — Excel's MOD uses `n - d * INT(n/d)`, but for extreme values the intermediate `INT(n/d)` or `d * INT(n/d)` can overflow. Add overflow checks similar to Excel's behavior.
+- [x] 14a: Fix MOD overflow and QUOTIENT overflow — added `2^53` quotient limit to MOD (returns `#NUM!` when `|n/d|` exceeds integer precision limit), intermediate overflow checks, and `excelNormalize` on intermediate quotients (flushes subnormal intermediates to 0, matching Excel). Fixed QUOTIENT to only return `#NUM!` on actual infinity (not on large-but-finite results). Also normalized intermediate divisions in CEILING_MATH and FLOOR_MATH. Reduced diffs from 66 to 24.
+- [ ] 14b: Remaining MOD edge cases (12 diffs) — involve tiny numerators (±1e-307) with normal divisors, where Excel returns `0` but we return the divisor or a tiny value. Excel may treat MOD differently for extremely small numerators. Also 2 cells where Excel returns `#NUM!` for MOD(±1e-307, ∓1e-307) due to the different magnitudes of our computed values.
 
 ## Phase 15: Fix Scientific Notation for Small Numbers (6 diffs)
 

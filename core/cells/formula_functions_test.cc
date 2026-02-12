@@ -826,6 +826,27 @@ TEST_F(FunctionTest, ModNegativeDivisor) {
     EXPECT_DOUBLE_EQ(result.getNumber(), -2.0);
 }
 
+TEST_F(FunctionTest, ModSmallDivisorOverflow) {
+    // MOD(1, 1e-307) — n/d overflows to inf, Excel returns #NUM!
+    EvalResult result = eval("=MOD(1, 1e-307)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, ModLargeNumeratorOverflow) {
+    // MOD(9.99E+307, 1) — d * INT(n/d) overflows, Excel returns #NUM!
+    EvalResult result = eval("=MOD(9.99999999999999E+307, 1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, ModLargeNumeratorOverflow2) {
+    // MOD(9.99E+307, 42.5) — d * INT(n/d) overflows, Excel returns #NUM!
+    EvalResult result = eval("=MOD(9.99999999999999E+307, 42.5)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
 // =============================================================================
 // INT Function Tests
 // =============================================================================
@@ -1061,6 +1082,19 @@ TEST_F(FunctionTest, QuotientExact) {
     EvalResult result = eval("=QUOTIENT(10, 5)");
     EXPECT_TRUE(result.isNumber());
     EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, QuotientOverflow) {
+    // QUOTIENT(9.99E+307, 1e-307) — n/d overflows to inf, returns #NUM!
+    EvalResult result = eval("=QUOTIENT(9.99999999999999E+307, 1e-307)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, QuotientLargeResult) {
+    // QUOTIENT(1, 1e-307) — large but finite result, not #NUM!
+    EvalResult result = eval("=QUOTIENT(1, 1e-307)");
+    EXPECT_TRUE(result.isNumber());
 }
 
 // =============================================================================

@@ -398,13 +398,13 @@ EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext&
     double result = NAN;
     if (value >= 0.0) {
         // Positive: always round toward +infinity
-        result = std::ceil(value / absSig) * absSig;
+        result = std::ceil(excelNormalize(value / absSig)) * absSig;
     } else if (mode != 0) {
         // Negative number with mode: round away from zero (toward -infinity)
-        result = -std::ceil(-value / absSig) * absSig;
+        result = -std::ceil(excelNormalize(-value / absSig)) * absSig;
     } else {
         // Negative number default: round toward +infinity (toward zero)
-        result = -std::floor(-value / absSig) * absSig;
+        result = -std::floor(excelNormalize(-value / absSig)) * absSig;
     }
 
     if (std::isinf(result)) {
@@ -450,13 +450,13 @@ EvalResult fn_FLOOR_MATH(const std::vector<const ASTNode*>& args, EvalContext& c
     double result = NAN;
     if (value >= 0.0) {
         // Positive: always round toward -infinity (toward zero)
-        result = std::floor(value / absSig) * absSig;
+        result = std::floor(excelNormalize(value / absSig)) * absSig;
     } else if (mode != 0) {
         // Negative number with mode: round toward zero
-        result = -std::floor(-value / absSig) * absSig;
+        result = -std::floor(excelNormalize(-value / absSig)) * absSig;
     } else {
         // Negative number default: round toward -infinity (away from zero)
-        result = -std::ceil(-value / absSig) * absSig;
+        result = -std::ceil(excelNormalize(-value / absSig)) * absSig;
     }
 
     if (std::isinf(result)) {
@@ -489,10 +489,19 @@ EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
     // Excel MOD: result has same sign as divisor
     // MOD(n, d) = n - d * INT(n/d)
-    const double result = n - d * std::floor(n / d);
-    if (std::isinf(result)) {
+    // Excel returns #NUM! when |n/d| exceeds 2^53 (integer precision limit)
+    // or when intermediate computations overflow.
+    const double rawQuotient = n / d;
+    if (std::isinf(rawQuotient) || std::fabs(rawQuotient) > 9007199254740992.0) {
         return EvalResult::Error(CellError::NUM);
     }
+    const double quotient = excelNormalize(rawQuotient);
+    const double intQuotient = std::floor(quotient);
+    const double product = d * intQuotient;
+    if (std::isinf(product)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double result = n - product;
     return EvalResult::Number(excelNormalize(result));
 }
 
@@ -642,7 +651,11 @@ EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx
         return EvalResult::Error(CellError::DIV);
     }
 
-    const double result = std::trunc(numerator.getNumber() / d);
+    const double quotient = numerator.getNumber() / d;
+    if (std::isinf(quotient)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double result = std::trunc(quotient);
     return EvalResult::Number(excelNormalize(result));
 }
 
