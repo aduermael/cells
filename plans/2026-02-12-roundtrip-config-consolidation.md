@@ -32,7 +32,7 @@ The single config applies to all roundtrip test categories:
 
 Remove per-category config auto-detection. Always pass `tests/excel-roundtrips/config.json`.
 
-- [ ] 1c: Update C# `ComparisonConfig` to use the new field name
+- [x] 1c: Update C# `ComparisonConfig` to use the new field name
 
 Rename `NumericToleranceUlp` → `MaxUlpError`.
 

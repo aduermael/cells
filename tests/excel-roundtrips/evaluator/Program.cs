@@ -26,12 +26,12 @@ public class Program
         {
             if (args.Length < 3)
             {
-                Console.Error.WriteLine("Usage: ExcelExtractor --compare <file1.xlsx> <file2.xlsx> [--ignore-formula-text]");
+                Console.Error.WriteLine("Usage: ExcelExtractor --compare <file1.xlsx> <file2.xlsx> [--config <path>] [--all]");
                 return 1;
             }
-            var ignoreFormulaText = args.Contains("--ignore-formula-text");
+            var config = ComparisonConfig.FromArgs(args);
             var showAll = args.Contains("--all");
-            return CompareFiles(args[1], args[2], ignoreFormulaText, showAll);
+            return CompareFiles(args[1], args[2], config, showAll);
         }
 
         if (args.Length >= 1 && args[0] == "--extract")
@@ -181,7 +181,7 @@ public class Program
         return (count, errorCount);
     }
 
-    private static int CompareFiles(string file1Path, string file2Path, bool ignoreFormulaText = false, bool showAll = false)
+    private static int CompareFiles(string file1Path, string file2Path, ComparisonConfig? config = null, bool showAll = false)
     {
         if (!File.Exists(file1Path))
         {
@@ -234,7 +234,7 @@ public class Program
 
             if (showAll)
             {
-                var allDiffs = FindAllDifferences(cells1, cells2, ignoreFormulaText);
+                var allDiffs = FindAllDifferences(cells1, cells2, config);
                 if (allDiffs.Count == 0)
                 {
                     Console.WriteLine("MATCH: Cells and properties are identical");
@@ -255,7 +255,7 @@ public class Program
                 return 1;
             }
 
-            var diff = FindFirstDifference(cells1, cells2, ignoreFormulaText);
+            var diff = FindFirstDifference(cells1, cells2, config);
             if (diff == null)
             {
                 // Both properties and cells are identical
@@ -287,7 +287,7 @@ public class Program
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    private static string? FindFirstDifference(List<CellData> cells1, List<CellData> cells2, bool ignoreFormulaText = false)
+    private static string? FindFirstDifference(List<CellData> cells1, List<CellData> cells2, ComparisonConfig? config = null)
     {
         var jsonOptions = new JsonSerializerOptions
         {
@@ -296,6 +296,8 @@ public class Program
             WriteIndented = false
         };
 
+        var ignoreFormulaText = config?.IgnoreFormulaText ?? false;
+        var maxUlp = config?.MaxUlpError ?? 0;
         var maxLen = Math.Max(cells1.Count, cells2.Count);
 
         for (int i = 0; i < maxLen; i++)
@@ -329,6 +331,9 @@ public class Program
 
             if (json1 != json2)
             {
+                if (maxUlp > 0 && AreCellsEqualWithinUlp(dict1, dict2, maxUlp))
+                    continue;
+
                 var cell = cells1[i];
                 var location = $"{cell.Sheet}!{cell.Address}";
                 var fieldDiffs = FindFieldDifferences(dict1, dict2, jsonOptions);
@@ -340,7 +345,7 @@ public class Program
         return null; // No difference found
     }
 
-    private static List<string> FindAllDifferences(List<CellData> cells1, List<CellData> cells2, bool ignoreFormulaText = false)
+    private static List<string> FindAllDifferences(List<CellData> cells1, List<CellData> cells2, ComparisonConfig? config = null)
     {
         var diffs = new List<string>();
         var jsonOptions = new JsonSerializerOptions
@@ -350,6 +355,8 @@ public class Program
             WriteIndented = false
         };
 
+        var ignoreFormulaText = config?.IgnoreFormulaText ?? false;
+        var maxUlp = config?.MaxUlpError ?? 0;
         var maxLen = Math.Max(cells1.Count, cells2.Count);
 
         for (int i = 0; i < maxLen; i++)
@@ -385,6 +392,9 @@ public class Program
 
             if (json1 != json2)
             {
+                if (maxUlp > 0 && AreCellsEqualWithinUlp(dict1, dict2, maxUlp))
+                    continue;
+
                 var cell = cells1[i];
                 var location = $"{cell.Sheet}!{cell.Address}";
                 var fieldDiffs = FindFieldDifferences(dict1, dict2, jsonOptions);
@@ -394,6 +404,51 @@ public class Program
         }
 
         return diffs;
+    }
+
+    private static bool AreEqualWithinUlp(double a, double b, int maxUlp)
+    {
+        if (a == b) return true;
+        long bitsA = BitConverter.DoubleToInt64Bits(a);
+        long bitsB = BitConverter.DoubleToInt64Bits(b);
+        if ((bitsA < 0) != (bitsB < 0)) return false;
+        return Math.Abs(bitsA - bitsB) <= maxUlp;
+    }
+
+    private static bool AreCellsEqualWithinUlp(
+        SortedDictionary<string, object> dict1,
+        SortedDictionary<string, object> dict2,
+        int maxUlp)
+    {
+        // Both must be number type
+        if (!dict1.TryGetValue("type", out var type1) || type1 as string != "number") return false;
+        if (!dict2.TryGetValue("type", out var type2) || type2 as string != "number") return false;
+
+        // Only the value field should differ
+        var keys1 = dict1.Keys.ToHashSet();
+        var keys2 = dict2.Keys.ToHashSet();
+        if (!keys1.SetEquals(keys2)) return false;
+
+        foreach (var key in keys1)
+        {
+            if (key == "value") continue;
+            var v1 = JsonSerializer.Serialize(dict1[key]);
+            var v2 = JsonSerializer.Serialize(dict2[key]);
+            if (v1 != v2) return false;
+        }
+
+        // Compare values within ULP tolerance
+        if (!dict1.TryGetValue("value", out var val1Obj) || !dict2.TryGetValue("value", out var val2Obj))
+            return false;
+
+        var val1Str = val1Obj as string;
+        var val2Str = val2Obj as string;
+        if (val1Str == null || val2Str == null) return false;
+
+        if (!double.TryParse(val1Str, NumberStyles.Float, CultureInfo.InvariantCulture, out var d1)) return false;
+        if (!double.TryParse(val2Str, NumberStyles.Float, CultureInfo.InvariantCulture, out var d2)) return false;
+
+        return AreEqualWithinUlp(d1, d2, maxUlp);
     }
 
     private static string? FindFirstPropertyDifference(
@@ -1871,5 +1926,26 @@ public class HeaderFooterData
         if (OddFooter != null) dict["oddFooter"] = OddFooter;
         if (OddHeader != null) dict["oddHeader"] = OddHeader;
         return dict;
+    }
+}
+
+public class ComparisonConfig
+{
+    [JsonPropertyName("maxUlpError")]
+    public int MaxUlpError { get; set; }
+
+    [JsonPropertyName("ignoreFormulaText")]
+    public bool IgnoreFormulaText { get; set; }
+
+    public static ComparisonConfig? FromArgs(string[] args)
+    {
+        var configIndex = Array.IndexOf(args, "--config");
+        if (configIndex >= 0 && configIndex + 1 < args.Length)
+        {
+            var configPath = args[configIndex + 1];
+            var json = File.ReadAllText(configPath);
+            return JsonSerializer.Deserialize<ComparisonConfig>(json);
+        }
+        return null;
     }
 }
