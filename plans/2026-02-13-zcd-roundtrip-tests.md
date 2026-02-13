@@ -42,7 +42,7 @@ After this phase, re-run roundtrip test to check progress.
 
 The XLSX writer uses `sizeOriginal` (original Excel-unit widths/heights) for lossless column/row sizing. Currently only the pixel-based `size` is serialized via `w:`/`h:`.
 
-- [ ] 3a: Add `sizeOriginal` as a short key on axis lines — e.g., `C <id> <pos> w:100 wo:8.43` (columns), `R <id> <pos> h:24 ho:16` (rows). Extend `COL_SET`/`ROW_SET` op payloads.
+- [x] 3a: Add `sizeOriginal` as a short key on axis lines — e.g., `C <id> <pos> w:100 wo:8.43` (columns), `R <id> <pos> h:24 ho:16` (rows). Extend `COL_SET`/`ROW_SET` op payloads with `"sizeOriginal":D`. Added `extractJSONDouble` to CRDT JSON utilities. Serializer writes `wo:`/`ho:`, parser reads them back, and `bootstrapOpLog` includes `sizeOriginal` in op payloads.
 
 After this phase, re-run roundtrip test to check progress.
 

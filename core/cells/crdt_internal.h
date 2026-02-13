@@ -45,6 +45,10 @@ int extractJSONInt(const std::string& json, const std::string& key, int defaultV
 // Extract a boolean from JSON for the given key
 bool extractJSONBool(const std::string& json, const std::string& key, bool defaultValue = false);
 
+// Extract a double from JSON for the given key
+double extractJSONDouble(const std::string& json, const std::string& key,
+                         double defaultValue = 0.0);
+
 // =============================================================================
 // Cell operations (crdt_cell.cc)
 // =============================================================================

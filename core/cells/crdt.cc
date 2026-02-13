@@ -23,8 +23,10 @@
 #include "core/cells/crdt.h"
 
 #include <cstdio>
+#include <cstdlib>
 
 #include <algorithm>
+#include <charconv>
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
@@ -226,6 +228,32 @@ bool extractJSONBool(const std::string& json, const std::string& key, bool defau
         return false;
     }
     return defaultValue;
+}
+
+double extractJSONDouble(const std::string& json, const std::string& key, double defaultValue) {
+    const std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += searchKey.length();
+
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+
+    const char* start = json.c_str() + pos;
+    char* endPtr = nullptr;  // NOLINT(misc-const-correctness)
+    const double value = std::strtod(start, &endPtr);
+    if (endPtr == start) {
+        return defaultValue;
+    }
+    return value;
 }
 
 }  // namespace internal
@@ -852,6 +880,12 @@ size_t bootstrapOpLog(Workbook& workbook) {
             if (axis->sizeSet()) {
                 payload += ",\"size\":" + std::to_string(axis->size);
             }
+            if (axis->sizeOriginal > 0) {
+                char buf[32];
+                auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), axis->sizeOriginal);
+                payload += ",\"sizeOriginal\":";
+                payload.append(buf, static_cast<size_t>(ptr - buf));
+            }
             if (!axis->name.empty()) {
                 payload += ",\"name\":\"" + internal::jsonEscape(axis->name) + "\"";
             }
@@ -893,6 +927,12 @@ size_t bootstrapOpLog(Workbook& workbook) {
             // Only include size if explicitly set (sizeSet=true)
             if (axis->sizeSet()) {
                 payload += ",\"size\":" + std::to_string(axis->size);
+            }
+            if (axis->sizeOriginal > 0) {
+                char buf[32];
+                auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), axis->sizeOriginal);
+                payload += ",\"sizeOriginal\":";
+                payload.append(buf, static_cast<size_t>(ptr - buf));
             }
             if (axis->hasStyle()) {
                 const StyleBuffer* sty = workbook.getEntityStyle(axis->id);

@@ -427,6 +427,12 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
         out << " h:" << axis.size;
     }
 
+    // Original Excel-unit size (char-widths for columns, points for rows)
+    if (axis.sizeOriginal > 0) {
+        out << (axis.isColumn() ? " wo:" : " ho:");
+        writeDouble(out, axis.sizeOriginal);
+    }
+
     if (!axis.name.empty()) {
         out << " name:\"" << escapeString(axis.name) << "\"";
     }

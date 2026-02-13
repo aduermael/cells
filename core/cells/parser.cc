@@ -671,6 +671,19 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis,
             } else {
                 props = props.substr(endPos);
             }
+        } else if (key == "wo" || key == "ho") {
+            // Original Excel-unit size (char-widths for columns, points for rows)
+            const size_t endPos = props.find_first_of(" \t");
+            const std::string_view valueStr =
+                (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
+
+            axis.sizeOriginal = std::strtod(std::string(valueStr).c_str(), nullptr);
+
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
         } else if (key == "name") {
             // Quoted string value
             std::string name;

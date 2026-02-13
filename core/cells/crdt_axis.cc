@@ -32,8 +32,9 @@ namespace internal {
 // =============================================================================
 // COL_SET - Create or update column
 // =============================================================================
-// Payload: {"pos":N,"size":N,"name":"...","sty":"base64","fmt":"base64","hidden":bool}
-// All fields optional except pos is required when creating
+// Payload:
+// {"pos":N,"size":N,"sizeOriginal":D,"name":"...","sty":"base64","fmt":"base64","hidden":bool} All
+// fields optional except pos is required when creating
 
 ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     // Use sheetId from operation if available, otherwise fall back to first sheet
@@ -89,6 +90,10 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
         axis->size = static_cast<uint32_t>(size);
         axis->setSizeSet(true);  // Mark as explicitly set
         sheet->getColumnAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
+    }
+
+    if (op.payload.find("\"sizeOriginal\":") != std::string::npos) {
+        axis->sizeOriginal = extractJSONDouble(op.payload, "sizeOriginal");
     }
 
     const std::string name = extractJSONString(op.payload, "name");
@@ -214,7 +219,7 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
 // =============================================================================
 // ROW_SET - Create or update row
 // =============================================================================
-// Payload: {"pos":N,"size":N,"sty":"base64","fmt":"base64","hidden":bool}
+// Payload: {"pos":N,"size":N,"sizeOriginal":D,"sty":"base64","fmt":"base64","hidden":bool}
 // All fields optional except pos is required when creating
 
 ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
@@ -271,6 +276,10 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
         axis->size = static_cast<uint32_t>(size);
         axis->setSizeSet(true);  // Mark as explicitly set
         sheet->getRowAxisIndex().resize(op.target_id, static_cast<uint32_t>(size));
+    }
+
+    if (op.payload.find("\"sizeOriginal\":") != std::string::npos) {
+        axis->sizeOriginal = extractJSONDouble(op.payload, "sizeOriginal");
     }
 
     const std::string style_str = extractJSONString(op.payload, "sty");

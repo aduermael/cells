@@ -317,6 +317,92 @@ TEST(SerializerTest, SerializeRowHeight) {
     EXPECT_NE(output.find("h:48"), std::string::npos);
 }
 
+TEST(SerializerTest, SerializeColumnSizeOriginal) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->size = 200;
+    col->sizeOriginal = 8.43;
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_NE(output.find("w:200"), std::string::npos);
+    EXPECT_NE(output.find("wo:8.43"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeRowSizeOriginal) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->size = 48;
+    row->sizeOriginal = 16.5;
+
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::move(row));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_NE(output.find("h:48"), std::string::npos);
+    EXPECT_NE(output.find("ho:16.5"), std::string::npos);
+}
+
+TEST(SerializerTest, RoundtripColumnSizeOriginal) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->size = 200;
+    col->sizeOriginal = 8.43;
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    Parser parser;
+    auto result = parser.parse(output);
+    ASSERT_TRUE(result.ok());
+
+    const Axis* col2 = result.workbook->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(col2, nullptr);
+    EXPECT_EQ(col2->size, 200u);
+    EXPECT_DOUBLE_EQ(col2->sizeOriginal, 8.43);
+}
+
+TEST(SerializerTest, RoundtripRowSizeOriginal) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->size = 48;
+    row->sizeOriginal = 16.5;
+
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::move(row));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    Parser parser;
+    auto result = parser.parse(output);
+    ASSERT_TRUE(result.ok());
+
+    const Axis* row2 = result.workbook->getRow(ID("rA1bC2dE"));
+    ASSERT_NE(row2, nullptr);
+    EXPECT_EQ(row2->size, 48u);
+    EXPECT_DOUBLE_EQ(row2->sizeOriginal, 16.5);
+}
+
 TEST(SerializerTest, SerializeShowGridLinesDefault) {
     // When showGridLines is true (default), V line should not be emitted
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
