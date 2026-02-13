@@ -28,7 +28,7 @@ The single config applies to all roundtrip test categories:
 
 `maxUlpError` is the maximum allowed difference in ULPs (Units in the Last Place) between two numeric cell values. ULP is a relative measure — 1 ULP is always ~2.2e-16 relative error regardless of the number's magnitude, because the "last place" scales with the number. A value of 2 tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations) while catching any real computation bug (which would differ by thousands+ ULPs).
 
-- [ ] 1b: Update `run-test.sh` to always pass the global config
+- [x] 1b: Update `run-test.sh` to always pass the global config
 
 Remove per-category config auto-detection. Always pass `tests/excel-roundtrips/config.json`.
 
