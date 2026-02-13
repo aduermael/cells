@@ -22,11 +22,11 @@ The single config applies to all roundtrip test categories:
 ```json
 {
   "ignoreFormulaText": true,
-  "maxUlpError": 4
+  "maxUlpError": 2
 }
 ```
 
-`maxUlpError` is the maximum allowed difference in ULPs (Units in the Last Place) between two numeric cell values. ULP is a relative measure — 1 ULP is always ~2.2e-16 relative error regardless of the number's magnitude, because the "last place" scales with the number. A value of 4 tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations, std::pow vs Excel's powBySquaring for integer exponents) while catching any real computation bug (which would differ by thousands+ ULPs).
+`maxUlpError` is the maximum allowed difference in ULPs (Units in the Last Place) between two numeric cell values. ULP is a relative measure — 1 ULP is always ~2.2e-16 relative error regardless of the number's magnitude, because the "last place" scales with the number. A value of 2 tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations) while catching any real computation bug (which would differ by thousands+ ULPs).
 
 - [x] 1b: Update `run-test.sh` to always pass the global config
 
@@ -56,42 +56,31 @@ Unit tests pass. math-trig roundtrip passes. math-basic roundtrip has 4 pre-exis
 
 ## Phase 3: Fix remaining math-basic roundtrip failures
 
-4 pre-existing value differences remain in the math-basic roundtrip. These are all extreme-value edge cases involving very small numbers (~1e-308) near the boundary of IEEE 754 normalized range. The formulas reference shared input cells via `$C$10`, `$C$11` etc — further investigation is needed to determine the exact input values at the bit level.
+4 value differences in math-basic caused by the step 2a simplification of `excelPow`. The simplification replaced `powBySquaring` (negative base) and the reciprocal trick (`1/pow(x,n)` for negative exponents) with plain `std::pow`, but these paths produce different bit-level results that cascade into completely different downstream values.
 
-### Failing cells
+### Root cause
 
-**H63** — Division: `A / B` where A ≈ -1e-307, B ≈ 1e-307
-- Excel: `-0.99999999999999944` (not exactly -1 due to precision loss)
-- Ours: `-1`
-- The stored doubles for A and B may differ at the bit level despite displaying identically. Excel's division preserves this difference; our IEEE 754 division with identical inputs gives exactly -1.
+Input cells `$C$10` (`10^(-307)`) and `$C$11` (`-10^(-307)`) are computed by two different code paths because our parser treats `-10^(-307)` as `POWER(-10, -307)` (negative base), not `NEGATE(POWER(10, -307))`:
 
-**I88** — `MOD(-42.5, -1e-307)`
-- Excel: `#NUM!`
-- Ours: `0`
-- The quotient `-42.5 / -1e-307` overflows to inf, so the `std::isinf` guard at line 500 of `fn_math.cc` should return `#NUM!`. Need to investigate why it doesn't — the formula references `$C$10`/`$C$11` so the actual cell values may differ from what the grid headers suggest.
+- **C10** (`10^(-307)`): positive base path → old code used `1/std::pow(10,307)` = `0x...C60E`, matching Excel. New code uses `std::pow(10,-307)` = `0x...C60D` (1 ULP off).
+- **C11** (`-10^(-307)` = `(-10)^(-307)`): negative base path → old code used `1/powBySquaring(10,307)` then negated = `0x8...C60B`, matching Excel. New code uses `std::pow(-10,-307)` = `0x8...C60E` (3 ULPs off).
 
-**H89** — `MOD(1e-307, 1e-307)`
-- Excel: `#NUM!`
-- Ours: `0`
-- `fmod` returns 0.0 and we early-return at line 507 before any subnormal/precision checks. Excel may detect precision loss at this scale and return `#NUM!` instead.
-
-**H102** — `QUOTIENT(-1e-307, 1e-307)`
-- Excel: `0`
-- Ours: `-1`
-- Same root cause as H63: if the division result is `-0.9999...` (not -1), `trunc()` gives `0`. Our exact `-1.0` truncates to `-1`.
+The 1-3 ULP difference in intermediate values cascades: `C11/C10` evaluates to exactly `-1.0` with our values but `-0.9999...` with Excel's, causing division, MOD, and QUOTIENT to cross critical thresholds.
 
 ### Steps
 
-- [ ] 3a: Investigate the actual bit-level cell values
+- [x] 3a: Investigate the actual bit-level cell values
 
-Dump the hex representation of the input cells (`$C$10`, `$C$11`, etc.) from the XLSX to determine whether the "identical-looking" values are actually different doubles. This will clarify whether H63/H102 are solvable in our code or are inherent to how the test spreadsheet was authored.
+C10 and C11 hex dumps confirmed: Excel's values are consistent and match the old `powBySquaring` + reciprocal code paths exactly. The 2a simplification broke this by using `std::pow` for all integer exponents.
 
-- [ ] 3b: Fix MOD edge cases (I88, H89)
+- [x] 3b: Restore `excelPow` with `powBySquaring` and reciprocal trick
 
-Investigate why `MOD(-42.5, -1e-307)` returns `0` instead of `#NUM!` — the overflow guard should catch this. For `MOD(1e-307, 1e-307)`, determine whether Excel expects `#NUM!` for same-magnitude modulo near the denormalized boundary, and if so, add a check before the early `r == 0.0` return.
+Revert to the pre-2a `excelPow` implementation: `powBySquaring` for negative base + integer exponent, `1/std::pow(base, -exp)` for positive base + negative integer exponent. Keep `exp(y*log(x))` for non-integer exponents.
 
-- [ ] 3c: Fix division/QUOTIENT precision (H63, H102) if feasible
+- [x] 3c: Reduce `maxUlpError` from 4 back to 2
 
-If 3a reveals the input values are identical doubles, this may require matching Excel's internal division algorithm for near-denormalized values. If the inputs are different doubles, the fix may involve how we read/store cell values from XLSX.
+The 4 ULP tolerance was added in 2c to accommodate `std::pow` vs `powBySquaring` differences at extreme values (e.g., `10^307`). With `powBySquaring` restored, these differences disappear and 2 ULP suffices for platform-level libm trig differences.
 
-- [ ] 3d: Run full test suite to confirm math-basic passes
+- [x] 3d: Run full test suite to confirm math-basic passes
+
+All unit tests pass, math-basic and math-trig roundtrips pass, E2E 338/338 pass.

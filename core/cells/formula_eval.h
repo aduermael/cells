@@ -365,13 +365,58 @@ struct EvalResult {
     }
 };
 
-// Power function using std::pow for integer exponents and exp-log for
-// non-integer exponents. Excel uses exp(y*log(x)) for fractional powers,
-// which differs from std::pow by up to 60 ULPs — we must match Excel here.
+// Exponentiation by squaring — matches Excel's internal algorithm for
+// negative base with integer exponent. The squaring approach accumulates
+// slightly different rounding errors than std::pow at extreme exponents
+// (e.g., 10^307 differs by 4 ULPs), which cascades into observable
+// differences in downstream formulas like division and MOD.
+// Do NOT replace with std::pow — the rounding differences are intentional.
+inline double powBySquaring(double base, uint64_t exp) {
+    double result = 1.0;
+    double b = base;
+    while (exp > 0) {
+        if ((exp & 1) != 0) {
+            result *= b;
+        }
+        b *= b;
+        exp >>= 1;
+    }
+    return result;
+}
+
+// Excel-compatible power function with three code paths:
+// 1. Negative base + integer exponent: powBySquaring (exp-log doesn't work
+//    for negative bases, and std::pow rounds differently than Excel).
+// 2. Positive base + integer exponent: std::pow, with 1/pow(x,n) reciprocal
+//    for negative exponents (matches Excel's algorithm).
+// 3. Non-integer exponent: exp(y * log(x)). Excel uses exp-log decomposition
+//    for fractional powers, which differs from std::pow by up to 60 ULPs.
 // Edge cases (0^0, 0^-n, base=1, extreme exponents, overflow) are handled
 // by the callers (BinaryOp::POWER and fn_POWER), not here.
+// Do NOT simplify — each path matches a specific Excel behavior.
 inline double excelPow(double base, double exponent) {
-    if (std::floor(exponent) == exponent) {
+    const bool isIntegerExp = std::floor(exponent) == exponent;
+    if (base < 0.0 && isIntegerExp) {
+        // Negative base with integer exponent: use squaring
+        const double absBase = -base;
+        const double absExp = std::abs(exponent);
+        auto intExp = static_cast<uint64_t>(absExp);
+        double result = powBySquaring(absBase, intExp);
+        // Apply sign: negative base raised to odd exponent is negative
+        if ((intExp & 1) != 0) {
+            result = -result;
+        }
+        // Take reciprocal for negative exponents
+        if (exponent < 0.0) {
+            result = 1.0 / result;
+        }
+        return result;
+    }
+    if (isIntegerExp) {
+        // Positive base with integer exponent: use std::pow with reciprocal
+        if (exponent < 0.0) {
+            return 1.0 / std::pow(base, -exponent);
+        }
         return std::pow(base, exponent);
     }
     // Non-integer exponent: use exp-log decomposition (matches Excel)
