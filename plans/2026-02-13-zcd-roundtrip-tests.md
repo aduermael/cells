@@ -8,6 +8,14 @@ Add a second roundtrip flow that tests the .zcd (native) format as an intermedia
 **New flow (add):**
 `no_cached_results.xlsx → eval → .zcd → reopen .zcd → .xlsx → compare with reference`
 
+### Naming conventions
+
+Map property names to the app's existing conventions — do NOT mirror XLSX/OpenXML names blindly:
+
+- **V line properties** (sheet-level): `camelCase` keys — e.g., `showGridLines:0`, `zoomScale:100`, `freezeCol:2`
+- **Axis properties** (col/row): short lowercase keys — e.g., `w:100`, `h:24`, `hidden:1`, `name:"A"`, `sty:...`, `fmt:...`
+- **CRDT ops**: reuse existing op types where possible (`SHEET_SET` for sheet props, `COL_SET`/`ROW_SET` for axis props, `WORKBOOK_SET` for workbook props) — add new payload fields rather than new op types
+
 ## Phase 1: Add ZCD roundtrip to run-test.sh
 
 - [x] 1a: Add a second test pass in `run-test.sh` that takes the evaluated workbook, saves it as `.zcd`, reopens the `.zcd`, saves as `.xlsx`, and compares against the same Excel reference — reusing the existing compare.sh infrastructure. Currently fails on `math-basic` due to missing sheet properties in ZCD.
@@ -20,20 +28,20 @@ Both must pass for the category to be marked PASS. Labels in output should disti
 
 ## Phase 2: Serialize sheet properties to ZCD
 
-The ZCD roundtrip currently loses these sheet-level properties. Add serialization, parsing, and CRDT operations for each.
+The ZCD roundtrip currently loses these sheet-level properties. Add serialization, parsing, and extend `SHEET_SET` payload for each.
 
-Properties stored on the `Sheet` struct via `V` (view/value) lines in ZCD:
+Properties on the `V` line (camelCase, consistent with `showGridLines`/`zoomScale`/etc.):
 
-- [ ] 2a: `defaultRowHeight` — serialize as `V defaultRowHeight:<double>`, add CRDT op `SetSheetDefaultRowHeight`
-- [ ] 2b: `pageMargins` — serialize as `V pageMargins:<left>,<right>,<top>,<bottom>,<header>,<footer>`, add CRDT op `SetSheetPageMargins`
+- [ ] 2a: `defaultRowHeight` — serialize as `V defaultRowHeight:<double>`, extend `SHEET_SET` op payload
+- [ ] 2b: `pageMargins` — serialize as `V pageMargins:<left>,<right>,<top>,<bottom>,<header>,<footer>`, extend `SHEET_SET` op payload
 
 After this phase, re-run roundtrip test to check progress.
 
 ## Phase 3: Serialize axis `sizeOriginal` to ZCD
 
-The XLSX writer uses `sizeOriginal` (original Excel-unit widths/heights) for lossless column/row sizing. Currently only the pixel-based `size` is serialized.
+The XLSX writer uses `sizeOriginal` (original Excel-unit widths/heights) for lossless column/row sizing. Currently only the pixel-based `size` is serialized via `w:`/`h:`.
 
-- [ ] 3a: Add `sizeOriginal` to axis (`C`/`R`) lines — e.g., `C <id> <pos> w:100 wo:8.43` for columns, `R <id> <pos> h:24 ho:16` for rows. Add CRDT op for setting original size.
+- [ ] 3a: Add `sizeOriginal` as a short key on axis lines — e.g., `C <id> <pos> w:100 wo:8.43` (columns), `R <id> <pos> h:24 ho:16` (rows). Extend `COL_SET`/`ROW_SET` op payloads.
 
 After this phase, re-run roundtrip test to check progress.
 
@@ -42,7 +50,6 @@ After this phase, re-run roundtrip test to check progress.
 The theme (12-color scheme + font scheme) is used to resolve theme-based color references in cell styles. Without it, re-exported XLSX files get default Office theme colors instead of the originals.
 
 - [ ] 4a: Design ZCD line format for theme data (color scheme: 12 named colors; font scheme: major/minor font names)
-- [ ] 4b: Serialize theme to ZCD and parse it back
-- [ ] 4c: Add CRDT operation for theme changes
+- [ ] 4b: Serialize theme to ZCD and parse it back, extend `WORKBOOK_SET` op payload
 
 After this phase, re-run roundtrip test — `math-basic` should now PASS on ZCD roundtrip.
