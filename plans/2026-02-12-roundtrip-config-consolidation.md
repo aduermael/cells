@@ -53,3 +53,45 @@ Replaced manual `atan(y/x)` + quadrant adjustment with `std::atan2(y, x)`. Kept 
 - [x] 2c: Run full test and roundtrip suite
 
 Unit tests pass. math-trig roundtrip passes. math-basic roundtrip has 4 pre-existing differences in MOD/QUOTIENT/division (not related to power simplification) — these need separate fixes. Added `--config` support to `compare.sh` and enabled math-trig in the roundtrip suite.
+
+## Phase 3: Fix remaining math-basic roundtrip failures
+
+4 pre-existing value differences remain in the math-basic roundtrip. These are all extreme-value edge cases involving very small numbers (~1e-308) near the boundary of IEEE 754 normalized range. The formulas reference shared input cells via `$C$10`, `$C$11` etc — further investigation is needed to determine the exact input values at the bit level.
+
+### Failing cells
+
+**H63** — Division: `A / B` where A ≈ -1e-307, B ≈ 1e-307
+- Excel: `-0.99999999999999944` (not exactly -1 due to precision loss)
+- Ours: `-1`
+- The stored doubles for A and B may differ at the bit level despite displaying identically. Excel's division preserves this difference; our IEEE 754 division with identical inputs gives exactly -1.
+
+**I88** — `MOD(-42.5, -1e-307)`
+- Excel: `#NUM!`
+- Ours: `0`
+- The quotient `-42.5 / -1e-307` overflows to inf, so the `std::isinf` guard at line 500 of `fn_math.cc` should return `#NUM!`. Need to investigate why it doesn't — the formula references `$C$10`/`$C$11` so the actual cell values may differ from what the grid headers suggest.
+
+**H89** — `MOD(1e-307, 1e-307)`
+- Excel: `#NUM!`
+- Ours: `0`
+- `fmod` returns 0.0 and we early-return at line 507 before any subnormal/precision checks. Excel may detect precision loss at this scale and return `#NUM!` instead.
+
+**H102** — `QUOTIENT(-1e-307, 1e-307)`
+- Excel: `0`
+- Ours: `-1`
+- Same root cause as H63: if the division result is `-0.9999...` (not -1), `trunc()` gives `0`. Our exact `-1.0` truncates to `-1`.
+
+### Steps
+
+- [ ] 3a: Investigate the actual bit-level cell values
+
+Dump the hex representation of the input cells (`$C$10`, `$C$11`, etc.) from the XLSX to determine whether the "identical-looking" values are actually different doubles. This will clarify whether H63/H102 are solvable in our code or are inherent to how the test spreadsheet was authored.
+
+- [ ] 3b: Fix MOD edge cases (I88, H89)
+
+Investigate why `MOD(-42.5, -1e-307)` returns `0` instead of `#NUM!` — the overflow guard should catch this. For `MOD(1e-307, 1e-307)`, determine whether Excel expects `#NUM!` for same-magnitude modulo near the denormalized boundary, and if so, add a check before the early `r == 0.0` return.
+
+- [ ] 3c: Fix division/QUOTIENT precision (H63, H102) if feasible
+
+If 3a reveals the input values are identical doubles, this may require matching Excel's internal division algorithm for near-denormalized values. If the inputs are different doubles, the fix may involve how we read/store cell values from XLSX.
+
+- [ ] 3d: Run full test suite to confirm math-basic passes
