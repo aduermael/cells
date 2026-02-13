@@ -22,11 +22,11 @@ The single config applies to all roundtrip test categories:
 ```json
 {
   "ignoreFormulaText": true,
-  "maxNumericPrecisionError": 2
+  "maxUlpError": 2
 }
 ```
 
-`maxNumericPrecisionError` is the maximum allowed difference between two numeric cell values, measured in ULPs (Units in the Last Place — the smallest representable step between adjacent doubles). A value of 2 means the results may differ by at most 2 steps in the last bit of precision, which is a relative error of ~4.4e-16 (essentially the limit of 64-bit floating-point). This tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations) while catching any real computation bug.
+`maxUlpError` is the maximum allowed difference in ULPs (Units in the Last Place) between two numeric cell values. ULP is a relative measure — 1 ULP is always ~2.2e-16 relative error regardless of the number's magnitude, because the "last place" scales with the number. A value of 2 tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations) while catching any real computation bug (which would differ by thousands+ ULPs).
 
 - [ ] 1b: Update `run-test.sh` to always pass the global config
 
@@ -34,7 +34,7 @@ Remove per-category config auto-detection. Always pass `tests/excel-roundtrips/c
 
 - [ ] 1c: Update C# `ComparisonConfig` to use the new field name
 
-Rename `NumericToleranceUlp` → `MaxNumericPrecisionError`. Drop the nested `minMagnitude` — unnecessary since `excelNormalize` already flushes subnormals to zero.
+Rename `NumericToleranceUlp` → `MaxUlpError`.
 
 - [ ] 1d: Delete per-category config files (`data/math-basic/config.json`, `data/math-trig/config.json`)
 
