@@ -32,22 +32,49 @@ if [ ! -f "$CLI" ]; then
     (cd "$REPO_ROOT" && bazel build //apps/cli:cells && mkdir -p dist/cli && cp bazel-bin/apps/cli/cells dist/cli/cells)
 fi
 
-# Create temp file for evaluated output
-TMPFILE="$(mktemp /tmp/cells-roundtrip-${CATEGORY}-XXXXXX.xlsx)"
-trap "rm -f '$TMPFILE'" EXIT
+# Create temp files
+TMPXLSX="$(mktemp /tmp/cells-roundtrip-${CATEGORY}-XXXXXX.xlsx)"
+TMPZCD="$(mktemp /tmp/cells-roundtrip-${CATEGORY}-XXXXXX.zcd)"
+TMPXLSX2="$(mktemp /tmp/cells-roundtrip-${CATEGORY}-zcd-XXXXXX.xlsx)"
+trap "rm -f '$TMPXLSX' '$TMPZCD' '$TMPXLSX2'" EXIT
 
-# Evaluate formulas
+FAILED=0
+
+# --- Flow 1: Direct XLSX roundtrip ---
+echo "=== XLSX roundtrip [$CATEGORY] ==="
 echo "Running: cells --eval on $CATEGORY..."
-"$CLI" -i "$NO_CACHE" --eval -y "$TMPFILE"
+"$CLI" -i "$NO_CACHE" --eval -y "$TMPXLSX"
 
-# Compare against original
 echo "Comparing against Excel reference..."
-"$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPFILE" --config "$SCRIPT_DIR/config.json"
-RESULT=$?
-
-if [ $RESULT -eq 0 ]; then
-    echo "PASS [$CATEGORY]"
+if "$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPXLSX" --config "$SCRIPT_DIR/config.json"; then
+    echo "PASS [$CATEGORY] XLSX roundtrip"
 else
-    echo "FAIL [$CATEGORY]"
+    echo "FAIL [$CATEGORY] XLSX roundtrip"
+    FAILED=1
+fi
+
+# --- Flow 2: ZCD roundtrip ---
+echo ""
+echo "=== ZCD roundtrip [$CATEGORY] ==="
+echo "Running: cells --eval → .zcd on $CATEGORY..."
+"$CLI" -i "$NO_CACHE" --eval -y "$TMPZCD"
+
+echo "Running: cells .zcd → .xlsx..."
+"$CLI" -i "$TMPZCD" -y "$TMPXLSX2"
+
+echo "Comparing against Excel reference..."
+if "$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPXLSX2" --config "$SCRIPT_DIR/config.json"; then
+    echo "PASS [$CATEGORY] ZCD roundtrip"
+else
+    echo "FAIL [$CATEGORY] ZCD roundtrip"
+    FAILED=1
+fi
+
+# --- Summary ---
+echo ""
+if [ $FAILED -eq 0 ]; then
+    echo "PASS [$CATEGORY] (all flows)"
+else
+    echo "FAIL [$CATEGORY] (one or more flows failed)"
     exit 1
 fi
