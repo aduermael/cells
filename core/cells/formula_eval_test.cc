@@ -1722,66 +1722,20 @@ TEST_F(FormulaEvalTest, CrossSheetRange_SUMEvaluates) {
 }
 
 // =============================================================================
-// POW BY SQUARING TESTS
-// =============================================================================
-
-TEST(PowBySquaringTest, BasicCases) {
-    EXPECT_DOUBLE_EQ(1.0, powBySquaring(10.0, 0));     // x^0 = 1
-    EXPECT_DOUBLE_EQ(10.0, powBySquaring(10.0, 1));    // x^1 = x
-    EXPECT_DOUBLE_EQ(100.0, powBySquaring(10.0, 2));   // 10^2 = 100
-    EXPECT_DOUBLE_EQ(1024.0, powBySquaring(2.0, 10));  // 2^10 = 1024
-}
-
-TEST(PowBySquaringTest, MatchesExcelAt10Pow307) {
-    // 10^307 via squaring should produce the same bit pattern as Excel.
-    // Excel's C11 cell (-10^-307) implies 1/powBySquaring(10,307) = 0x0031FA182C40C60B
-    // whereas 1/std::pow(10,307) = 0x0031FA182C40C60E (the C10 value).
-    double sqResult = powBySquaring(10.0, 307);
-    double reciprocal = 1.0 / sqResult;
-
-    // Verify the reciprocal matches the expected hex value for Excel's C11
-    uint64_t bits = 0;
-    static_assert(sizeof(double) == sizeof(uint64_t), "double must be 8 bytes");
-    std::memcpy(&bits, &reciprocal, sizeof(bits));
-    EXPECT_EQ(0x0031FA182C40C60BULL, bits)
-        << "1/powBySquaring(10,307) should match Excel's C11 hex pattern";
-}
-
-TEST(PowBySquaringTest, SmallExponents) {
-    // For small exponents, squaring should match std::pow exactly
-    EXPECT_DOUBLE_EQ(std::pow(2.0, 20), powBySquaring(2.0, 20));
-    EXPECT_DOUBLE_EQ(std::pow(3.0, 15), powBySquaring(3.0, 15));
-    EXPECT_DOUBLE_EQ(std::pow(7.0, 5), powBySquaring(7.0, 5));
-}
-
-// =============================================================================
-// EXCEL POW TESTS (negative base with integer exponent)
+// EXCEL POW TESTS (now delegates to std::pow)
 // =============================================================================
 
 TEST(ExcelPowTest, PositiveBaseIntegerExponent) {
-    // Positive base with integer exponent uses std::pow path
     EXPECT_DOUBLE_EQ(1024.0, excelPow(2.0, 10.0));
     EXPECT_DOUBLE_EQ(0.25, excelPow(4.0, -1.0));
 }
 
 TEST(ExcelPowTest, PositiveBaseNonIntegerExponent) {
-    // Positive base with non-integer exponent uses exp-log path
-    // (matches Excel's internal computation)
-    // 42.5^42.5: Excel gives 0x4E4DD6B7C415A50B
-    double result = excelPow(42.5, 42.5);
-    uint64_t bits = 0;
-    std::memcpy(&bits, &result, sizeof(bits));
-    EXPECT_EQ(0x4E4DD6B7C415A50BULL, bits) << "excelPow(42.5, 42.5) should match Excel exactly";
-
-    // 42.5^-42.5: Excel gives 0x319128ADB59138A4
-    double resultNeg = excelPow(42.5, -42.5);
-    uint64_t bitsNeg = 0;
-    std::memcpy(&bitsNeg, &resultNeg, sizeof(bitsNeg));
-    EXPECT_EQ(0x319128ADB59138A4ULL, bitsNeg) << "excelPow(42.5, -42.5) should match Excel exactly";
+    EXPECT_DOUBLE_EQ(std::pow(42.5, 42.5), excelPow(42.5, 42.5));
+    EXPECT_DOUBLE_EQ(std::pow(42.5, -42.5), excelPow(42.5, -42.5));
 }
 
 TEST(ExcelPowTest, NegativeBaseIntegerExponent) {
-    // Negative base with integer exponent should use squaring
     EXPECT_DOUBLE_EQ(100.0, excelPow(-10.0, 2.0));    // (-10)^2 = 100
     EXPECT_DOUBLE_EQ(-1000.0, excelPow(-10.0, 3.0));  // (-10)^3 = -1000
     EXPECT_DOUBLE_EQ(-8.0, excelPow(-2.0, 3.0));      // (-2)^3 = -8
@@ -1789,26 +1743,13 @@ TEST(ExcelPowTest, NegativeBaseIntegerExponent) {
 }
 
 TEST(ExcelPowTest, NegativeBaseNegativeIntegerExponent) {
-    // (-10)^(-2) = 1/100 = 0.01
     EXPECT_DOUBLE_EQ(0.01, excelPow(-10.0, -2.0));
-    // (-2)^(-3) = 1/(-8) = -0.125
     EXPECT_DOUBLE_EQ(-0.125, excelPow(-2.0, -3.0));
 }
 
 TEST(ExcelPowTest, NegativeBaseNonIntegerExponent) {
-    // Non-integer exponent with negative base should produce NaN (std::pow path)
     double result = excelPow(-2.0, 0.5);
     EXPECT_TRUE(std::isnan(result));
-}
-
-TEST(ExcelPowTest, NegativeBaseExtremeExponent) {
-    // -10^(-307): Excel uses squaring, giving a different result from std::pow
-    double result = excelPow(-10.0, -307.0);
-    // Should be negative (odd exponent) and match Excel's C11 hex pattern
-    uint64_t bits = 0;
-    std::memcpy(&bits, &result, sizeof(bits));
-    // Expected: 0x8031FA182C40C60B (negative of 0x0031FA182C40C60B)
-    EXPECT_EQ(0x8031FA182C40C60BULL, bits) << "excelPow(-10, -307) should match Excel's C11 value";
 }
 
 // =============================================================================

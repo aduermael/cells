@@ -42,9 +42,9 @@ Rename `NumericToleranceUlp` → `MaxUlpError`.
 
 With 2-ULP tolerance accepted globally, the three-path `excelPow` and manual ATAN2 can be simplified to use standard library functions (`std::pow`, `std::atan2`).
 
-- [ ] 2a: Simplify `excelPow` to use `std::pow`
+- [x] 2a: Simplify `excelPow` to use `std::pow`
 
-Replace the three-path logic with just `std::pow(base, exponent)`. Keep the edge-case handling in the `BinaryOp::POWER` caller (0^0, 0^-n, base=1, extreme exponents, overflow to #NUM!) — only the core computation changes. Remove `powBySquaring` which is now unused.
+Replaced three-path logic (powBySquaring, reciprocal, exp-log) with `std::pow(base, exponent)`. Removed `powBySquaring` helper. Updated tests to remove exact bit-pattern checks that depended on the old algorithm.
 
 - [ ] 2b: Simplify ATAN2 to use `std::atan2`
 
