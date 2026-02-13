@@ -958,15 +958,19 @@ private:
 
             case cells::NumberFormatCategory::NUMBER:
                 if (hasThousands) {
-                    if (decimals == 0)
+                    if (decimals == 0) {
                         return 3;  // #,##0
-                    if (decimals == 2)
+                    }
+                    if (decimals == 2) {
                         return 4;  // #,##0.00
+                    }
                 } else {
-                    if (decimals == 0)
+                    if (decimals == 0) {
                         return 1;  // 0
-                    if (decimals == 2)
+                    }
+                    if (decimals == 2) {
                         return 2;  // 0.00
+                    }
                 }
                 // Non-standard decimal count — use custom format
                 return getOrAddCustomNumFmt(formatBuf->toFormatCode());

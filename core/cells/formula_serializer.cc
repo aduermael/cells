@@ -1,5 +1,6 @@
 #include "core/cells/formula_serializer.h"
 
+#include <charconv>
 #include <sstream>
 
 namespace cells {
@@ -32,9 +33,9 @@ std::string FormulaSerializer::nodeToUuidString(const ASTNode* node) {
     switch (node->type) {
         case ASTNodeType::NUMBER_LITERAL: {
             auto* numNode = static_cast<const NumberLiteralNode*>(node);
-            std::ostringstream oss;
-            oss << numNode->value;
-            return oss.str();
+            char buf[32];
+            auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), numNode->value);
+            return {buf, static_cast<size_t>(ptr - buf)};
         }
         case ASTNodeType::STRING_LITERAL: {
             auto* strNode = static_cast<const StringLiteralNode*>(node);

@@ -12,6 +12,7 @@
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
+#include "core/cells/theme.h"
 
 namespace cells {
 
@@ -150,6 +151,9 @@ std::string Serializer::serialize(const Workbook& workbook) const {
 void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     serializeHeader(workbook, out);
 
+    // Serialize theme (after header, before named ranges/sheets)
+    serializeTheme(workbook, out);
+
     // NOTE: Formats are now content-addressed (like styles) and serialized directly
     // on entities as base64. No separate F lines needed.
 
@@ -174,6 +178,33 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
 void Serializer::serializeHeader(const Workbook& workbook, std::ostream& out) const {
     // Document ID and name
     out << "D " << workbook.id.toString() << " \"" << escapeString(workbook.name) << "\"\n";
+}
+
+void Serializer::serializeTheme(const Workbook& workbook, std::ostream& out) const {
+    const Theme* theme = workbook.getTheme();
+    if (theme == nullptr) {
+        return;
+    }
+
+    // Format: T "<name>" colors:<12 hex values> fonts:"<major>","<minor>"
+    out << "T \"" << escapeString(theme->name) << "\" colors:";
+
+    // 12 colors in index order (0-11), no # prefix, comma-separated
+    for (int i = 0; i < 12; ++i) {
+        if (i > 0) {
+            out << ",";
+        }
+        const std::string& color = theme->colorScheme.colors[i];
+        // Strip leading '#' if present
+        if (!color.empty() && color[0] == '#') {
+            out << color.substr(1);
+        } else {
+            out << color;
+        }
+    }
+
+    out << " fonts:\"" << escapeString(theme->fontScheme.majorFont) << "\",\""
+        << escapeString(theme->fontScheme.minorFont) << "\"\n";
 }
 
 void Serializer::serializeCustomFormats(const Workbook& /*workbook*/, std::ostream& /*out*/) const {

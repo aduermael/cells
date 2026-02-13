@@ -60,7 +60,7 @@ echo "Running: cells --eval → .zcd on $CATEGORY..."
 "$CLI" -i "$NO_CACHE" --eval -y "$TMPZCD"
 
 echo "Running: cells .zcd → .xlsx..."
-"$CLI" -i "$TMPZCD" -y "$TMPXLSX2"
+"$CLI" -i "$TMPZCD" --eval -y "$TMPXLSX2"
 
 echo "Comparing against Excel reference..."
 if "$SCRIPT_DIR/compare.sh" "$ORIGINAL" "$TMPXLSX2" --config "$SCRIPT_DIR/config.json"; then

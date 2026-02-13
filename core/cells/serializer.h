@@ -34,6 +34,7 @@
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/oplog.h"
+#include "core/cells/theme.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -64,6 +65,9 @@ private:
 
     // Serialize custom number formats
     void serializeCustomFormats(const Workbook& workbook, std::ostream& out) const;
+
+    // Serialize workbook theme
+    void serializeTheme(const Workbook& workbook, std::ostream& out) const;
 
     // Serialize named ranges
     void serializeNamedRanges(const Workbook& workbook, std::ostream& out) const;

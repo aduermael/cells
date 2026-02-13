@@ -10,6 +10,7 @@
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
+#include "core/cells/theme.h"
 
 namespace cells {
 
@@ -128,6 +129,9 @@ bool Parser::parseLine(std::string_view line) {
             // F lines are legacy and can be safely ignored during parsing.
             return true;
 
+        case 'T':  // Theme
+            return parseTheme(line.substr(firstNonSpace));
+
         case 'S':  // Sheet
             return parseSheet(line.substr(firstNonSpace));
 
@@ -188,6 +192,102 @@ bool Parser::parseDocument(std::string_view line) {
     }
 
     workbook_->name = std::move(name);
+    return true;
+}
+
+bool Parser::parseTheme(std::string_view line) {
+    // Format: T "<name>" colors:<12 hex values> fonts:"<major>","<minor>"
+    if (line.size() < 2 || line[0] != 'T' || line[1] != ' ') {
+        return setError("Invalid theme line");
+    }
+
+    line = line.substr(2);  // Skip "T "
+
+    // Skip leading whitespace
+    const size_t start = line.find_first_not_of(" \t");
+    if (start == std::string_view::npos) {
+        return setError("Missing theme name");
+    }
+    line = line.substr(start);
+
+    // Parse quoted name
+    std::string themeName;
+    size_t consumed = 0;
+    if (!parseQuotedString(line, themeName, consumed)) {
+        return setError("Invalid theme name, expected quoted string");
+    }
+    line = line.substr(consumed);
+
+    auto theme = std::make_unique<Theme>();
+    theme->name = std::move(themeName);
+
+    // Parse key:value pairs
+    while (!line.empty()) {
+        const size_t kvStart = line.find_first_not_of(" \t");
+        if (kvStart == std::string_view::npos) {
+            break;
+        }
+        line = line.substr(kvStart);
+
+        const size_t colonPos = line.find(':');
+        if (colonPos == std::string_view::npos) {
+            break;
+        }
+
+        const std::string_view key = line.substr(0, colonPos);
+        line = line.substr(colonPos + 1);
+
+        if (key == "colors") {
+            // Parse 12 comma-separated hex values (no # prefix)
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            const std::string valStr(valueStr);
+            int count = 0;
+            size_t pos = 0;
+            while (count < 12 && pos < valStr.size()) {
+                size_t commaPos = valStr.find(',', pos);
+                if (commaPos == std::string::npos) {
+                    commaPos = valStr.size();
+                }
+                theme->colorScheme.colors[count] = "#" + valStr.substr(pos, commaPos - pos);
+                count++;
+                pos = commaPos + 1;
+            }
+
+            line = (end == std::string_view::npos) ? "" : line.substr(end);
+        } else if (key == "fonts") {
+            // Parse two quoted strings: "<major>","<minor>"
+            std::string majorFont;
+            size_t majorConsumed = 0;
+            if (!parseQuotedString(line, majorFont, majorConsumed)) {
+                return setError("Invalid theme major font");
+            }
+            line = line.substr(majorConsumed);
+
+            // Skip comma
+            if (!line.empty() && line[0] == ',') {
+                line = line.substr(1);
+            }
+
+            std::string minorFont;
+            size_t minorConsumed = 0;
+            if (!parseQuotedString(line, minorFont, minorConsumed)) {
+                return setError("Invalid theme minor font");
+            }
+            line = line.substr(minorConsumed);
+
+            theme->fontScheme.majorFont = std::move(majorFont);
+            theme->fontScheme.minorFont = std::move(minorFont);
+        } else {
+            // Unknown property - skip value
+            const size_t end = line.find_first_of(" \t");
+            line = (end == std::string_view::npos) ? "" : line.substr(end);
+        }
+    }
+
+    workbook_->setTheme(std::move(theme));
     return true;
 }
 
@@ -665,6 +765,7 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis,
             }
 
             axis.size = static_cast<uint32_t>(value);
+            axis.setSizeSet(true);
 
             if (endPos == std::string_view::npos) {
                 props = "";

@@ -50,7 +50,7 @@ After this phase, re-run roundtrip test to check progress.
 
 The theme (12-color scheme + font scheme) is used to resolve theme-based color references in cell styles. Without it, re-exported XLSX files get default Office theme colors instead of the originals.
 
-- [ ] 4a: Design ZCD line format for theme data (color scheme: 12 named colors; font scheme: major/minor font names)
-- [ ] 4b: Serialize theme to ZCD and parse it back, extend `WORKBOOK_SET` op payload
+- [x] 4a: Design ZCD line format for theme data. Uses `T` line prefix after `D` line: `T "<name>" colors:<12 hex values comma-separated, no # prefix, in index order 0-11> fonts:"<majorFont>","<minorFont>"`. Only serialized when workbook has a theme.
+- [x] 4b: Serialize theme to ZCD and parse it back. Added `T` line serializer in `serializer.cc` and parser in `parser.cc`. WORKBOOK_SET payload extension deferred (same as view props — theme is preserved in ZCD file format but not yet synced via CRDT). Also fixed three pre-existing bugs exposed by ZCD roundtrip: (1) parser didn't call `setSizeSet(true)` when reading `w:`/`h:` keys, (2) formula serializer used default precision (6 digits) for number literals causing roundtrip loss, (3) xlsx_writer had missing braces flagged by linter. Added `--eval` to ZCD→XLSX step in `run-test.sh`.
 
-After this phase, re-run roundtrip test — `math-basic` should now PASS on ZCD roundtrip.
+After this phase, re-run roundtrip test — `math-basic` now PASSes on ZCD roundtrip.

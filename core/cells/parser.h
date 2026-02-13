@@ -37,6 +37,7 @@
 
 #include "core/cells/model.h"
 #include "core/cells/oplog.h"
+#include "core/cells/theme.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -105,6 +106,7 @@ private:
     bool parseStyle(std::string_view line);       // Y <id> <json-props>
     bool parseNamedRange(std::string_view line);  // N "<name>" <scope> <target>
     bool parseSheet(std::string_view line);       // S <id> "<name>"
+    bool parseTheme(std::string_view line);       // T "<name>" colors:... fonts:...
     bool parseSheetView(std::string_view line);   // V <properties...>
     bool parseColumn(std::string_view line);      // C <id> <pos> [props]
     bool parseRow(std::string_view line);         // R <id> <pos> [props]

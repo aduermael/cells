@@ -34,6 +34,7 @@ A ZCD file contains the following sections in order:
 
 ```
 D <doc-id> "<name>"                   # Document declaration (required)
+T "<name>" colors:<hex...> fonts:"<major>","<minor>"  # Workbook theme (optional)
 N "<name>" <scope> <scope-sheet-id> <target-type> <target-data>  # Named ranges (optional)
 
 S <sheet-id> "<name>"                 # Sheet declaration
@@ -60,6 +61,22 @@ Declares the workbook with a unique ID and name.
 **Example:**
 ```
 D tY8pL3mK "Budget 2024"
+```
+
+### Theme (T)
+
+Optional line defining the workbook theme. Appears after the document declaration and before named ranges.
+
+**Format:** `T "<name>" colors:<12 hex values> fonts:"<majorFont>","<minorFont>"`
+
+**Fields:**
+- `name`: Theme name (quoted string, e.g. "Office Theme")
+- `colors`: 12 comma-separated 6-character hex color values (no `#` prefix), in index order: lt1, dk1, lt2, dk2, accent1-6, hlink, folHlink
+- `fonts`: Two quoted strings for major (headings) and minor (body) font names
+
+**Example:**
+```
+T "Office Theme" colors:FFFFFF,000000,E7E6E6,44546A,4472C4,ED7D31,A5A5A5,FFC000,5B9BD5,70AD47,0563C1,954F72 fonts:"Calibri Light","Calibri"
 ```
 
 ### Named Range (N)
