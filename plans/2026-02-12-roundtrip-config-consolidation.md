@@ -36,7 +36,7 @@ Remove per-category config auto-detection. Always pass `tests/excel-roundtrips/c
 
 Rename `NumericToleranceUlp` → `MaxUlpError`.
 
-- [ ] 1d: Delete per-category config files (`data/math-basic/config.json`, `data/math-trig/config.json`)
+- [x] 1d: Delete per-category config files (`data/math-basic/config.json`, `data/math-trig/config.json`)
 
 ## Phase 2: Simplify math for performance
 
