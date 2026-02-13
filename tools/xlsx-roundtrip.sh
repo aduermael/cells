@@ -7,14 +7,21 @@
 # Tests evaluate formulas via CLI, then compare output against Excel-computed
 # reference files. Only enabled categories are tested.
 set -euo pipefail
-source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
-cd "$REPO_ROOT"
 
 # Categories that are known to pass (add new ones here as they're fixed)
 ENABLED_CATEGORIES=(
     math-basic
     math-trig
 )
+
+# --count: print number of enabled categories (no build environment needed)
+if [ "${1:-}" = "--count" ]; then
+    echo "${#ENABLED_CATEGORIES[@]}"
+    exit 0
+fi
+
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
+cd "$REPO_ROOT"
 
 # Build CLI
 echo "Building CLI..."

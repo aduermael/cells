@@ -32,24 +32,28 @@ if ! command -v cloc &> /dev/null; then
     exit 1
 fi
 
-CLOC_EXCLUDE="bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,.git"
+CLOC_EXCLUDE="bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,.git,tests"
 
 # Run CLOC and get JSON output for source files (excluding tests)
 get_cloc_source_json() {
     cloc --json \
          --exclude-dir="$CLOC_EXCLUDE" \
-         --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)|/tests/' \
+         --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)' \
          --quiet \
          "$PROJECT_ROOT" 2>/dev/null
 }
 
-# Run CLOC for test files in /tests/ directories
+# Run CLOC for test files in dedicated test directories
 get_cloc_tests_dir_json() {
-    if [ -d "$PROJECT_ROOT/apps/wasm/tests" ]; then
+    local dirs=()
+    [ -d "$PROJECT_ROOT/apps/wasm/tests" ] && dirs+=("$PROJECT_ROOT/apps/wasm/tests")
+    [ -d "$PROJECT_ROOT/tests" ] && dirs+=("$PROJECT_ROOT/tests")
+
+    if [ ${#dirs[@]} -gt 0 ]; then
         cloc --json \
              --exclude-dir=node_modules \
              --quiet \
-             "$PROJECT_ROOT/apps/wasm/tests" 2>/dev/null
+             "${dirs[@]}" 2>/dev/null
     else
         echo '{}'
     fi
@@ -134,6 +138,8 @@ js_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "JavaScript") + $(extract_li
 ts_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "TypeScript") + $(extract_lines "$TESTS_DIR_JSON" "TypeScript")))
 go_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Go") + $(extract_lines "$TESTS_DIR_JSON" "Go")))
 luau_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Luau") + $(extract_lines "$TESTS_DIR_JSON" "Luau")))
+csharp_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "C#") + $(extract_lines "$TESTS_DIR_JSON" "C#")))
+sh_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Bourne Shell") + $(extract_lines "$TESTS_DIR_JSON" "Bourne Shell")))
 
 # Count C++ unit tests (TEST and TEST_F macros)
 cpp_unit_tests=0
@@ -171,7 +177,14 @@ for f in "$PROJECT_ROOT"/apps/wasm/tests/unit/*.test.mjs; do
     fi
 done
 
-total_tests=$((cpp_unit_tests + go_unit_tests + js_unit_tests + e2e_tests))
+# Count XLSX roundtrip tests (each category has 2 flows: XLSX + ZCD)
+roundtrip_categories=0
+if [ -x "$SCRIPT_DIR/xlsx-roundtrip.sh" ]; then
+    roundtrip_categories=$("$SCRIPT_DIR/xlsx-roundtrip.sh" --count 2>/dev/null) || roundtrip_categories=0
+fi
+roundtrip_tests=$((roundtrip_categories * 2))
+
+total_tests=$((cpp_unit_tests + go_unit_tests + js_unit_tests + e2e_tests + roundtrip_tests))
 
 # Git stats
 commit_count=$(git rev-list --count HEAD)
@@ -226,6 +239,8 @@ generate_readme_section() {
     [ "$ts_test_lines" -gt 0 ] && echo "$ts_test_lines TypeScript" >> "$TEMP_TEST_FILE"
     [ "$go_test_lines" -gt 0 ] && echo "$go_test_lines Go" >> "$TEMP_TEST_FILE"
     [ "$luau_test_lines" -gt 0 ] && echo "$luau_test_lines Luau" >> "$TEMP_TEST_FILE"
+    [ "$csharp_test_lines" -gt 0 ] && echo "$csharp_test_lines C#" >> "$TEMP_TEST_FILE"
+    [ "$sh_test_lines" -gt 0 ] && echo "$sh_test_lines Shell" >> "$TEMP_TEST_FILE"
 
     echo "## Project Stats"
     echo ""
@@ -280,6 +295,7 @@ generate_readme_section() {
     [ "$go_unit_tests" -gt 0 ] && echo "| Unit (Go) | $go_unit_tests |"
     [ "$js_unit_tests" -gt 0 ] && echo "| Unit (JavaScript) | $js_unit_tests |"
     echo "| E2E (Puppeteer) | $e2e_tests |"
+    [ "$roundtrip_tests" -gt 0 ] && echo "| Roundtrip (Excel) | $roundtrip_tests |"
     echo "| **Total** | **$total_tests** |"
 
     echo ""
