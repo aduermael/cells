@@ -15,7 +15,7 @@ Since math-basic currently achieves exact bit-identical results through careful 
 
 ## Phase 1: Consolidate config to a single global file
 
-- [ ] 1a: Create `tests/excel-roundtrips/config.json` with clear field names
+- [x] 1a: Create `tests/excel-roundtrips/config.json` with clear field names
 
 The single config applies to all roundtrip test categories:
 
