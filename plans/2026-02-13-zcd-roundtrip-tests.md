@@ -15,6 +15,7 @@ Map property names to the app's existing conventions — do NOT mirror XLSX/Open
 - **V line properties** (sheet-level): `camelCase` keys — e.g., `showGridLines:0`, `zoomScale:100`, `freezeCol:2`
 - **Axis properties** (col/row): short lowercase keys — e.g., `w:100`, `h:24`, `hidden:1`, `name:"A"`, `sty:...`, `fmt:...`
 - **CRDT ops**: reuse existing op types where possible (`SHEET_SET` for sheet props, `COL_SET`/`ROW_SET` for axis props, `WORKBOOK_SET` for workbook props) — add new payload fields rather than new op types
+- **Full-state SETs**: each SET op payload must contain ALL properties of the entity, not just the changed one. This allows a SET after DELETE to fully resurrect the entity without replaying history.
 
 ## Phase 1: Add ZCD roundtrip to run-test.sh
 
