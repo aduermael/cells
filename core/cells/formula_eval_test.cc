@@ -1722,7 +1722,7 @@ TEST_F(FormulaEvalTest, CrossSheetRange_SUMEvaluates) {
 }
 
 // =============================================================================
-// EXCEL POW TESTS (now delegates to std::pow)
+// EXCEL POW TESTS (std::pow for integer exponents, exp-log for non-integer)
 // =============================================================================
 
 TEST(ExcelPowTest, PositiveBaseIntegerExponent) {
@@ -1731,8 +1731,18 @@ TEST(ExcelPowTest, PositiveBaseIntegerExponent) {
 }
 
 TEST(ExcelPowTest, PositiveBaseNonIntegerExponent) {
-    EXPECT_DOUBLE_EQ(std::pow(42.5, 42.5), excelPow(42.5, 42.5));
-    EXPECT_DOUBLE_EQ(std::pow(42.5, -42.5), excelPow(42.5, -42.5));
+    // Non-integer exponents use exp(y*log(x)) to match Excel's computation.
+    // 42.5^42.5: Excel gives 0x4E4DD6B7C415A50B
+    double result = excelPow(42.5, 42.5);
+    uint64_t bits = 0;
+    std::memcpy(&bits, &result, sizeof(bits));
+    EXPECT_EQ(0x4E4DD6B7C415A50BULL, bits) << "excelPow(42.5, 42.5) should match Excel exactly";
+
+    // 42.5^-42.5: Excel gives 0x319128ADB59138A4
+    double resultNeg = excelPow(42.5, -42.5);
+    uint64_t bitsNeg = 0;
+    std::memcpy(&bitsNeg, &resultNeg, sizeof(bitsNeg));
+    EXPECT_EQ(0x319128ADB59138A4ULL, bitsNeg) << "excelPow(42.5, -42.5) should match Excel exactly";
 }
 
 TEST(ExcelPowTest, NegativeBaseIntegerExponent) {

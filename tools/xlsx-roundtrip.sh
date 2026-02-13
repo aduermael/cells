@@ -13,6 +13,7 @@ cd "$REPO_ROOT"
 # Categories that are known to pass (add new ones here as they're fixed)
 ENABLED_CATEGORIES=(
     math-basic
+    math-trig
 )
 
 # Build CLI

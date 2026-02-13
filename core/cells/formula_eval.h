@@ -365,11 +365,17 @@ struct EvalResult {
     }
 };
 
-// Power function — delegates to std::pow for all cases.
+// Power function using std::pow for integer exponents and exp-log for
+// non-integer exponents. Excel uses exp(y*log(x)) for fractional powers,
+// which differs from std::pow by up to 60 ULPs — we must match Excel here.
 // Edge cases (0^0, 0^-n, base=1, extreme exponents, overflow) are handled
 // by the callers (BinaryOp::POWER and fn_POWER), not here.
 inline double excelPow(double base, double exponent) {
-    return std::pow(base, exponent);
+    if (std::floor(exponent) == exponent) {
+        return std::pow(base, exponent);
+    }
+    // Non-integer exponent: use exp-log decomposition (matches Excel)
+    return std::exp(exponent * std::log(base));
 }
 
 // Excel numeric normalization.
