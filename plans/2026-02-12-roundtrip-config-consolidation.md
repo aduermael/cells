@@ -2,9 +2,9 @@
 
 ## Context
 
-The XLSX roundtrip comparison currently uses per-category `config.json` files (`data/math-basic/config.json`, `data/math-trig/config.json`). These should be consolidated into a single global config with clear, documented rules. The ULP tolerance should also specify the magnitude range where tolerance applies, since small ULP differences at large magnitudes are meaningless while at small magnitudes they could mask real bugs.
+The XLSX roundtrip comparison currently uses per-category `config.json` files (`data/math-basic/config.json`, `data/math-trig/config.json`). These should be consolidated into a single global config with clear, documented rules.
 
-Additionally, since math-basic currently achieves exact bit-identical results through careful Excel-algorithm-matching code paths (three separate power algorithms, manual ATAN2 quadrant logic), accepting a small tolerance opens the door to simplifying these for performance.
+Since math-basic currently achieves exact bit-identical results through careful Excel-algorithm-matching code paths (three separate power algorithms, manual ATAN2 quadrant logic), accepting a small tolerance opens the door to simplifying these to use `std::pow` / `std::atan2` for performance.
 
 ## Current state
 
@@ -15,62 +15,41 @@ Additionally, since math-basic currently achieves exact bit-identical results th
 
 ## Phase 1: Consolidate config to a single global file
 
-- [ ] 1a: Move config to `tests/excel-roundtrips/config.json` with magnitude-aware tolerance
+- [ ] 1a: Create `tests/excel-roundtrips/config.json` with clear field names
 
 The single config applies to all roundtrip test categories:
 
 ```json
 {
   "ignoreFormulaText": true,
-  "numericTolerance": {
-    "maxUlp": 2,
-    "minMagnitude": 1e-100
-  }
+  "maxNumericPrecisionError": 2
 }
 ```
 
-`numericTolerance.minMagnitude` means: only apply ULP tolerance to values whose absolute value is >= `minMagnitude`. Below that threshold, require exact equality. This prevents tolerating differences in small numbers where a 2-ULP gap could represent a proportionally large error.
+`maxNumericPrecisionError` is the maximum allowed difference between two numeric cell values, measured in ULPs (Units in the Last Place — the smallest representable step between adjacent doubles). A value of 2 means the results may differ by at most 2 steps in the last bit of precision, which is a relative error of ~4.4e-16 (essentially the limit of 64-bit floating-point). This tolerates platform-level libm differences (e.g., macOS ARM vs Windows MSVC trigonometric implementations) while catching any real computation bug.
 
-Rationale for `1e-100`: all observed ULP differences are in trig/power results at normal magnitudes (e.g., `SIN(PI/6)` ≈ 0.5, `42.5^42.5` ≈ 1e69). Values near zero (like subnormals near 1e-308) are already handled by `excelNormalize` flushing to zero.
+- [ ] 1b: Update `run-test.sh` to always pass the global config
 
-- [ ] 1b: Update `run-test.sh` to use global config from `tests/excel-roundtrips/config.json`
+Remove per-category config auto-detection. Always pass `tests/excel-roundtrips/config.json`.
 
-Remove per-category config auto-detection. Always pass the single global config.
+- [ ] 1c: Update C# `ComparisonConfig` to use the new field name
 
-- [ ] 1c: Update `compare.sh` to accept config path (already done, no changes needed — just verify)
+Rename `NumericToleranceUlp` → `MaxNumericPrecisionError`. Drop the nested `minMagnitude` — unnecessary since `excelNormalize` already flushes subnormals to zero.
 
-- [ ] 1d: Update C# `ComparisonConfig` and `AreCellsEqualWithinUlp` to support `minMagnitude`
-
-Add `NumericToleranceMinMagnitude` (double, default 0) to the config class. In `AreCellsEqualWithinUlp`, check `Math.Abs(d1) >= minMagnitude && Math.Abs(d2) >= minMagnitude` before applying ULP tolerance.
-
-- [ ] 1e: Delete per-category config files (`data/math-basic/config.json`, `data/math-trig/config.json`)
+- [ ] 1d: Delete per-category config files (`data/math-basic/config.json`, `data/math-trig/config.json`)
 
 ## Phase 2: Simplify math for performance
 
-With 2-ULP tolerance accepted globally, the three-path `excelPow` and manual ATAN2 can be simplified to use standard library functions.
+With 2-ULP tolerance accepted globally, the three-path `excelPow` and manual ATAN2 can be simplified to use standard library functions (`std::pow`, `std::atan2`).
 
-- [ ] 2a: Simplify `excelPow` to use `std::pow` for all cases
+- [ ] 2a: Simplify `excelPow` to use `std::pow`
 
-Replace the three-path logic with:
-```cpp
-inline double excelPow(double base, double exponent) {
-    return std::pow(base, exponent);
-}
-```
-
-Keep the edge-case handling in the `BinaryOp::POWER` caller (0^0, 0^-n, base=1, extreme exponents, overflow→#NUM!) — only the core computation changes.
-
-Verify against math-basic and math-trig test suites. If any differences exceed 2 ULP, investigate individually.
+Replace the three-path logic with just `std::pow(base, exponent)`. Keep the edge-case handling in the `BinaryOp::POWER` caller (0^0, 0^-n, base=1, extreme exponents, overflow to #NUM!) — only the core computation changes. Remove `powBySquaring` which is now unused.
 
 - [ ] 2b: Simplify ATAN2 to use `std::atan2`
 
-Replace the manual quadrant logic with:
-```cpp
-result = std::atan2(y, x);
-```
+Replace the manual `atan(y/x)` + quadrant adjustment with `std::atan2(y, x)`. Keep the `(x==0 && y==0) → #DIV/0!` guard.
 
-Keep the `(x==0 && y==0) → #DIV/0!` guard.
+- [ ] 2c: Run full test and roundtrip suite to verify everything passes
 
-- [ ] 2c: Run full roundtrip suite to verify all tests pass within tolerance
-
-Run `bazel run :xlsx-roundtrip` and confirm math-basic and math-trig both pass.
+Run `bazel run :check` (unit tests) and `bazel run :xlsx-roundtrip` (math-basic, math-trig). Confirm all pass within tolerance.
