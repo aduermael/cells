@@ -216,44 +216,47 @@ bazel run :check            # All checks (test + lint + types)
 
 | Language | Lines |
 |----------|------:|
-| C++ | 45,661 |
-| TypeScript | 23,795 |
-| CSS | 2,706 |
-| Starlark | 1,953 |
-| JavaScript | 1,683 |
+| C++ | 49,321 |
+| TypeScript | 24,498 |
+| CSS | 2,884 |
+| Starlark | 2,088 |
+| Shell | 1,512 |
 | Go | 1,363 |
-| Shell | 1,168 |
-| HTML | 1,051 |
+| HTML | 1,069 |
 | Objective-C++ | 1,007 |
+| JavaScript | 826 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 43,681 |
+| C++ | 44,958 |
 | JavaScript | 13,978 |
+| C# | 1,855 |
 | Go | 315 |
+| Shell | 191 |
 
 ### Documentation
 
 | Type | Lines |
 |------|------:|
-| Markdown | 19,762 |
-| Inline Comments | 19,579 |
+| Markdown | 20,377 |
+| Inline Comments | 20,106 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 3506 |
+| Unit (C++) | 3676 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
 | E2E (Puppeteer) | 391 |
-| **Total** | **3940** |
+| Roundtrip (Excel) | 4 |
+| **Total** | **4114** |
 
-- **Commits**: 1577
-- **WASM Module**: 5.17 MB
-- **Total Web Bundle**: 7.27 MB
+- **Commits**: 1694
+- **WASM Module**: 5.46 MB
+- **Total Web Bundle**: 7.64 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 

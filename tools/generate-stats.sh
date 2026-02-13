@@ -32,12 +32,13 @@ if ! command -v cloc &> /dev/null; then
     exit 1
 fi
 
-CLOC_EXCLUDE="bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,.git,tests"
+CLOC_EXCLUDE="bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,.git,tests,testdata"
 
 # Run CLOC and get JSON output for source files (excluding tests)
 get_cloc_source_json() {
     cloc --json \
          --exclude-dir="$CLOC_EXCLUDE" \
+         --exclude-ext=csv \
          --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)' \
          --quiet \
          "$PROJECT_ROOT" 2>/dev/null

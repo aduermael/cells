@@ -91,9 +91,9 @@ get_commit_count_until_date() {
 run_cloc_product() {
     local path="$1"
     cloc --json \
-         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party \
+         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,testdata \
          --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)|/tests/' \
-         --exclude-ext=md \
+         --exclude-ext=md,csv \
          --quiet \
          "$path" 2>/dev/null | jq -r '.SUM.code // 0'
 }
@@ -101,7 +101,7 @@ run_cloc_product() {
 run_cloc_docs() {
     local path="$1"
     cloc --json \
-         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party \
+         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,testdata \
          --include-ext=md \
          --quiet \
          "$path" 2>/dev/null | jq -r '.SUM.code // 0'
@@ -120,7 +120,7 @@ run_cloc_test() {
 
     # Then count _test.* and *.test.* files elsewhere
     local test_file_count=$(cloc --json \
-         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,tests \
+         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,testdata,tests \
          --match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)' \
          --quiet \
          "$path" 2>/dev/null | jq -r '.SUM.code // 0')
