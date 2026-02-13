@@ -7,6 +7,10 @@
 
 namespace cells {
 
+// Pre-computed conversion constants (matches Excel's computation order)
+constexpr double kDegreesToRadians = M_PI / 180.0;
+constexpr double kRadiansToDegrees = 180.0 / M_PI;
+
 // =============================================================================
 // Aggregate Functions
 // =============================================================================
@@ -1037,7 +1041,7 @@ EvalResult fn_RADIANS(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return num;
     }
 
-    const double result = num.getNumber() * M_PI / 180.0;
+    const double result = num.getNumber() * kDegreesToRadians;
     if (std::isinf(result)) {
         return EvalResult::Error(CellError::NUM);
     }
@@ -1054,7 +1058,7 @@ EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return num;
     }
 
-    const double result = num.getNumber() * 180.0 / M_PI;
+    const double result = num.getNumber() * kRadiansToDegrees;
     if (std::isinf(result)) {
         return EvalResult::Error(CellError::NUM);
     }

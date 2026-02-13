@@ -46,9 +46,9 @@ With 2-ULP tolerance accepted globally, the three-path `excelPow` and manual ATA
 
 Replaced three-path logic (powBySquaring, reciprocal, exp-log) with `std::pow(base, exponent)`. Removed `powBySquaring` helper. Updated tests to remove exact bit-pattern checks that depended on the old algorithm.
 
-- [ ] 2b: Simplify ATAN2 to use `std::atan2`
+- [x] 2b: Simplify ATAN2 to use `std::atan2`
 
-Replace the manual `atan(y/x)` + quadrant adjustment with `std::atan2(y, x)`. Keep the `(x==0 && y==0) → #DIV/0!` guard.
+Replaced manual `atan(y/x)` + quadrant adjustment with `std::atan2(y, x)`. Kept the `(x==0 && y==0) → #DIV/0!` guard.
 
 - [ ] 2c: Run full test and roundtrip suite to verify everything passes
 
