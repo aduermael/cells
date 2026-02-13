@@ -495,6 +495,58 @@ bool Parser::parseSheetView(std::string_view line) {
             } else {
                 line = line.substr(end);
             }
+        } else if (key == "defaultRowHeight") {
+            // Double value: default row height in points
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            currentSheet_->defaultRowHeight = std::strtod(std::string(valueStr).c_str(), nullptr);
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
+        } else if (key == "pageMargins") {
+            // Comma-separated doubles: left,right,top,bottom,header,footer
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            // Parse 6 comma-separated doubles
+            const std::string valStr(valueStr);
+            double margins[6] = {0};
+            int count = 0;
+            size_t pos = 0;
+            while (count < 6 && pos < valStr.size()) {
+                char* endPtr = nullptr;  // NOLINT(misc-const-correctness)
+                margins[count] = std::strtod(valStr.c_str() + pos, &endPtr);
+                if (endPtr == valStr.c_str() + pos) {
+                    break;  // Parse error
+                }
+                count++;
+                pos = static_cast<size_t>(endPtr - valStr.c_str());
+                if (pos < valStr.size() && valStr[pos] == ',') {
+                    pos++;  // Skip comma
+                }
+            }
+
+            if (count == 6) {
+                currentSheet_->hasPageMargins = true;
+                currentSheet_->pageMargins.left = margins[0];
+                currentSheet_->pageMargins.right = margins[1];
+                currentSheet_->pageMargins.top = margins[2];
+                currentSheet_->pageMargins.bottom = margins[3];
+                currentSheet_->pageMargins.header = margins[4];
+                currentSheet_->pageMargins.footer = margins[5];
+            }
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
         } else {
             // Unknown property - skip value
             const size_t end = line.find_first_of(" \t");

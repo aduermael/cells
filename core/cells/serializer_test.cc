@@ -442,6 +442,64 @@ TEST(SerializerTest, SerializeAllViewProperties) {
     EXPECT_NE(output.find("freezeRow:2"), std::string::npos);
 }
 
+TEST(SerializerTest, SerializeDefaultRowHeightDefault) {
+    // When defaultRowHeight is 0 (default), V line should not include it
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_EQ(output.find("defaultRowHeight"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeDefaultRowHeightNonDefault) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+    sheet->defaultRowHeight = 16.0;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_NE(output.find("defaultRowHeight:16"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializePageMarginsDefault) {
+    // When hasPageMargins is false (default), V line should not include it
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_EQ(output.find("pageMargins"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializePageMarginsNonDefault) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
+    sheet->hasPageMargins = true;
+    sheet->pageMargins.left = 0.7;
+    sheet->pageMargins.right = 0.7;
+    sheet->pageMargins.top = 0.75;
+    sheet->pageMargins.bottom = 0.75;
+    sheet->pageMargins.header = 0.3;
+    sheet->pageMargins.footer = 0.3;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    EXPECT_NE(output.find("pageMargins:0.7"), std::string::npos);
+}
+
 // --- Convenience Functions ---
 
 TEST(SerializerTest, ConvenienceSerializeFunction) {

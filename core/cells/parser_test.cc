@@ -822,6 +822,92 @@ R xY9zA1bC 0
     }
 }
 
+TEST(ParserTest, ParseDefaultRowHeight) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V defaultRowHeight:16
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_DOUBLE_EQ(sheet->defaultRowHeight, 16.0);
+    }
+}
+
+TEST(ParserTest, ParsePageMargins) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V pageMargins:0.7,0.7,0.75,0.75,0.3,0.3
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_TRUE(sheet->hasPageMargins);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.left, 0.7);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.right, 0.7);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.top, 0.75);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.bottom, 0.75);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.header, 0.3);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.footer, 0.3);
+    }
+}
+
+TEST(ParserTest, ParseAllSheetProperties) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V showGridLines:0 zoomScale:115 freezeCol:1 freezeRow:2 defaultRowHeight:16 pageMargins:0.7,0.7,0.75,0.75,0.3,0.3
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_FALSE(sheet->showGridLines);
+        EXPECT_EQ(sheet->zoomScale, 115);
+        EXPECT_EQ(sheet->freezeCol, 1);
+        EXPECT_EQ(sheet->freezeRow, 2);
+        EXPECT_DOUBLE_EQ(sheet->defaultRowHeight, 16.0);
+        EXPECT_TRUE(sheet->hasPageMargins);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.left, 0.7);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.right, 0.7);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.top, 0.75);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.bottom, 0.75);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.header, 0.3);
+        EXPECT_DOUBLE_EQ(sheet->pageMargins.footer, 0.3);
+    }
+}
+
 // Convenience function
 TEST(ParserTest, ParseConvenienceFunction) {
     const std::string content = R"(#cells v1

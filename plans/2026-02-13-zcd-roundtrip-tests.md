@@ -33,8 +33,8 @@ The ZCD roundtrip currently loses these sheet-level properties. Add serializatio
 
 Properties on the `V` line (camelCase, consistent with `showGridLines`/`zoomScale`/etc.):
 
-- [ ] 2a: `defaultRowHeight` — serialize as `V defaultRowHeight:<double>`, extend `SHEET_SET` op payload
-- [ ] 2b: `pageMargins` — serialize as `V pageMargins:<left>,<right>,<top>,<bottom>,<header>,<footer>`, extend `SHEET_SET` op payload
+- [x] 2a: `defaultRowHeight` — serialize as `V defaultRowHeight:<double>` on the V line. Uses `std::to_chars` for shortest exact representation. SHEET_SET payload extension deferred (existing view props like showGridLines don't use it either).
+- [x] 2b: `pageMargins` — serialize as `V pageMargins:<left>,<right>,<top>,<bottom>,<header>,<footer>` on the V line. Parser handles comma-separated doubles via `strtod`. SHEET_SET payload extension deferred.
 
 After this phase, re-run roundtrip test to check progress.
 

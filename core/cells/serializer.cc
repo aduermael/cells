@@ -1,6 +1,7 @@
 #include "core/cells/serializer.h"
 
 #include <algorithm>
+#include <charconv>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -13,6 +14,17 @@
 #include "core/cells/style_buffer.h"
 
 namespace cells {
+
+namespace {
+
+// Format a double using shortest exact representation (via std::to_chars)
+void writeDouble(std::ostream& out, double value) {
+    char buf[32];
+    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), value);
+    out.write(buf, ptr - buf);
+}
+
+}  // namespace
 
 // --- String escaping ---
 
@@ -247,13 +259,11 @@ void Serializer::serializeSheet(const Workbook& workbook, const Sheet& sheet,
     // Sheet ID and name
     out << "S " << sheet.id.toString() << " \"" << escapeString(sheet.name) << "\"\n";
 
-    // Sheet view properties (only if non-default)
+    // Sheet view/format properties (only if non-default)
     // Format: V <key:value...>
-    // showGridLines is true by default, only output if false
-    // zoomScale is 100 by default, only output if different
-    // freezeCol/freezeRow are 0 by default, only output if non-zero
     const bool hasViewProps = !sheet.showGridLines || sheet.zoomScale != 100 ||
-                              sheet.freezeCol > 0 || sheet.freezeRow > 0;
+                              sheet.freezeCol > 0 || sheet.freezeRow > 0 ||
+                              sheet.defaultRowHeight > 0 || sheet.hasPageMargins;
     if (hasViewProps) {
         out << "V";
         if (!sheet.showGridLines) {
@@ -267,6 +277,24 @@ void Serializer::serializeSheet(const Workbook& workbook, const Sheet& sheet,
         }
         if (sheet.freezeRow > 0) {
             out << " freezeRow:" << sheet.freezeRow;
+        }
+        if (sheet.defaultRowHeight > 0) {
+            out << " defaultRowHeight:";
+            writeDouble(out, sheet.defaultRowHeight);
+        }
+        if (sheet.hasPageMargins) {
+            out << " pageMargins:";
+            writeDouble(out, sheet.pageMargins.left);
+            out << ",";
+            writeDouble(out, sheet.pageMargins.right);
+            out << ",";
+            writeDouble(out, sheet.pageMargins.top);
+            out << ",";
+            writeDouble(out, sheet.pageMargins.bottom);
+            out << ",";
+            writeDouble(out, sheet.pageMargins.header);
+            out << ",";
+            writeDouble(out, sheet.pageMargins.footer);
         }
         out << "\n";
     }
