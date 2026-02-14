@@ -47,7 +47,7 @@ Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 
 ## Phase 4: Strip _xlpm. prefix and implement LET + LAMBDA
 
-- [ ] 4a: Extend `stripXlfnPrefix` in `xlsx_reader.cc` to also strip `_xlpm.` prefix from parameter names (e.g., `_xlpm.x` → `x`, `_xlpm.name` → `name`).
+- [x] 4a: Extend `stripXlfnPrefix` in `xlsx_reader.cc` to also strip `_xlpm.` prefix from parameter names (e.g., `_xlpm.x` → `x`, `_xlpm.name` → `name`). Strip _xlpm. before _xlfn. since parameter names don't need dot normalization.
 - [ ] 4b: Implement `LET(name1, value1, [name2, value2, ...], calculation)` — binds named variables and evaluates the final expression with those bindings. Requires a variable scope mechanism in the eval context.
 - [ ] 4c: Implement `LAMBDA([param1, param2, ...], body)(args...)` — creates a callable that binds args to params and evaluates body. Invoked immediately with trailing `(args)`.
 
