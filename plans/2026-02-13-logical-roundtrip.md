@@ -43,7 +43,7 @@ Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 ## Phase 3: Implement SWITCH and IFS
 
 - [x] 3a: Implement `SWITCH(expression, value1, result1, ..., [default])` — evaluates expression, compares against each value (case-insensitive for strings), returns matching result. With default (odd remaining args after expression), returns default when no match; without default, returns #N/A. If expression or case value is error, propagate it.
-- [ ] 3b: Implement `IFS(condition1, value1, condition2, value2, ...)` — evaluates conditions in order, returns value for first TRUE condition. Must have even number of args (pairs). Returns #N/A if no condition is TRUE. Error in condition propagates.
+- [x] 3b: Implement `IFS(condition1, value1, condition2, value2, ...)` — evaluates conditions in order, returns value for first TRUE condition. Must have even number of args (pairs). Returns #N/A if no condition is TRUE. Error in condition propagates. Added unit tests for both SWITCH and IFS.
 
 ## Phase 4: Strip _xlpm. prefix and implement LET + LAMBDA
 
