@@ -38,7 +38,7 @@ Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 
 ## Phase 2: Implement NA() and XOR
 
-- [ ] 2a: Implement `NA()` (zero args, returns #N/A) and `XOR(logical1, ...)` (exclusive OR — returns TRUE if odd count of TRUE values, same text/empty/error handling as fixed AND/OR). Register both in `fn_logic.cc`.
+- [x] 2a: Implement `NA()` (zero args, returns #N/A) and `XOR(logical1, ...)` (exclusive OR — returns TRUE if odd count of TRUE values, same text/empty/error handling as fixed AND/OR). Register both in `fn_logic.cc`. Added unit tests for both functions in formula_error_test.cc.
 
 ## Phase 3: Implement SWITCH and IFS
 

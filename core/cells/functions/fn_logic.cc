@@ -304,6 +304,97 @@ EvalResult fn_ISNA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 }
 
 // =============================================================================
+// XOR Function
+// =============================================================================
+
+EvalResult fn_XOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    int trueCount = 0;
+    EvalResult firstError = EvalResult::Boolean(false);  // placeholder
+    bool hasError = false;
+    bool hasLogical = false;
+
+    for (const ASTNode* arg : args) {
+        const EvalResult result = evaluate(arg, ctx);
+        if (result.isError()) {
+            if (!hasError) {
+                firstError = result;
+                hasError = true;
+            }
+            continue;
+        }
+
+        if (result.isRange()) {
+            const std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
+            for (const EvalResult& val : rangeValues) {
+                if (val.isError()) {
+                    if (!hasError) {
+                        firstError = val;
+                        hasError = true;
+                    }
+                    continue;
+                }
+                if (val.isEmpty() || val.isString()) {
+                    continue;
+                }
+                const EvalResult boolVal = val.toBoolean();
+                if (boolVal.isError()) {
+                    if (!hasError) {
+                        firstError = boolVal;
+                        hasError = true;
+                    }
+                    continue;
+                }
+                hasLogical = true;
+                if (boolVal.getBoolean()) {
+                    trueCount++;
+                }
+            }
+        } else {
+            if (result.isEmpty() || result.isString()) {
+                continue;
+            }
+            const EvalResult boolVal = result.toBoolean();
+            if (boolVal.isError()) {
+                if (!hasError) {
+                    firstError = boolVal;
+                    hasError = true;
+                }
+                continue;
+            }
+            hasLogical = true;
+            if (boolVal.getBoolean()) {
+                trueCount++;
+            }
+        }
+    }
+
+    if (hasError) {
+        return firstError;
+    }
+
+    if (!hasLogical) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    return EvalResult::Boolean((trueCount % 2) == 1);
+}
+
+// =============================================================================
+// NA Function
+// =============================================================================
+
+EvalResult fn_NA(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) {
+    if (!args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Error(CellError::NA);
+}
+
+// =============================================================================
 // Boolean Constants
 // =============================================================================
 
@@ -335,6 +426,9 @@ void registerLogicFunctions(FunctionRegistry& registry) {
                               "Returns TRUE if any argument is true", "Logic");
     registry.registerFunction("NOT", fn_NOT, "(logical)", "Reverses the value of its argument",
                               "Logic");
+    registry.registerFunction("XOR", fn_XOR, "(logical1, [logical2], ...)",
+                              "Returns TRUE if an odd number of arguments are true", "Logic");
+    registry.registerFunction("NA", fn_NA, "()", "Returns the error value #N/A", "Logic");
 
     // Error handling
     registry.registerFunction("IFERROR", fn_IFERROR, "(value, value_if_error)",

@@ -893,5 +893,120 @@ TEST_F(FormulaErrorTest, ErrorString_Conversion) {
     EXPECT_TRUE(r.getBoolean());
 }
 
+// =============================================================================
+// NA() Function
+// =============================================================================
+
+TEST_F(FormulaErrorTest, NA_ReturnsNAError) {
+    EvalResult r = eval("=NA()");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NA, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NA_WithArgsReturnsError) {
+    EvalResult r = eval("=NA(1)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NA_PropagatesInFormula) {
+    EvalResult r = eval("=NA()+1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NA, r.getError());
+}
+
+TEST_F(FormulaErrorTest, NA_DetectedByISNA) {
+    EvalResult r = eval("=ISNA(NA())");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, NA_CaughtByIFERROR) {
+    EvalResult r = eval("=IFERROR(NA(), 42)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(42.0, r.getNumber());
+}
+
+// =============================================================================
+// XOR() Function
+// =============================================================================
+
+TEST_F(FormulaErrorTest, XOR_SingleTrue) {
+    EvalResult r = eval("=XOR(TRUE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, XOR_SingleFalse) {
+    EvalResult r = eval("=XOR(FALSE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, XOR_TwoTrue) {
+    EvalResult r = eval("=XOR(TRUE, TRUE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, XOR_TrueFalse) {
+    EvalResult r = eval("=XOR(TRUE, FALSE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, XOR_ThreeTrue) {
+    // Odd count of TRUE → TRUE
+    EvalResult r = eval("=XOR(TRUE, TRUE, TRUE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, XOR_NumericCoercion) {
+    // 1 = TRUE, 0 = FALSE
+    EvalResult r = eval("=XOR(1, 0, 1)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());  // 2 TRUE values → even → FALSE
+}
+
+TEST_F(FormulaErrorTest, XOR_ErrorPropagation) {
+    setCellError(0, 0, CellError::NA);  // A1 = #N/A
+    EvalResult r = eval("=XOR(TRUE, A1)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NA, r.getError());
+}
+
+TEST_F(FormulaErrorTest, XOR_SkipsTextInRange) {
+    setCellValue(0, 0, true);     // A1 = TRUE
+    setCellValue(0, 1, "hello");  // A2 = "hello"
+    setCellValue(0, 2, false);    // A3 = FALSE
+    EvalResult r = eval("=XOR(A1:A3)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());  // 1 TRUE → odd → TRUE
+}
+
+TEST_F(FormulaErrorTest, XOR_SkipsEmptyInRange) {
+    setCellValue(0, 0, true);  // A1 = TRUE
+    // A2 is empty
+    setCellValue(0, 2, true);  // A3 = TRUE
+    EvalResult r = eval("=XOR(A1:A3)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());  // 2 TRUE → even → FALSE
+}
+
+TEST_F(FormulaErrorTest, XOR_NoArgs) {
+    EvalResult r = eval("=XOR()");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaErrorTest, XOR_AllTextNoLogical) {
+    setCellValue(0, 0, "hello");  // A1 = "hello"
+    setCellValue(0, 1, "world");  // A2 = "world"
+    EvalResult r = eval("=XOR(A1:A2)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
 }  // namespace
 }  // namespace cells

@@ -46,6 +46,12 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // NOT(logical) - Returns the opposite boolean value
 EvalResult fn_NOT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// XOR(logical1, [logical2], ...) - Returns TRUE if an odd number of args are TRUE
+EvalResult fn_XOR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// NA() - Returns the error value #N/A
+EvalResult fn_NA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Error Handling Functions
 // =============================================================================
