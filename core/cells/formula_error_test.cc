@@ -1178,5 +1178,57 @@ TEST_F(FormulaErrorTest, LET_ErrorInValue) {
     EXPECT_EQ(CellError::DIV, r.getError());
 }
 
+// =============================================================================
+// LAMBDA Tests
+// =============================================================================
+
+TEST_F(FormulaErrorTest, LAMBDA_Basic) {
+    EvalResult r = eval("=LAMBDA(x, x*2)(5)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(10.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_TwoParams) {
+    EvalResult r = eval("=LAMBDA(x, y, x+y)(3, 7)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(10.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_ThreeParams) {
+    EvalResult r = eval("=LAMBDA(a, b, c, a*b+c)(2, 3, 4)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(10.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_String) {
+    EvalResult r = eval("=LAMBDA(name, \"Hi \"&name)(\"World\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("Hi World", r.getString());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_WithBoolean) {
+    EvalResult r = eval("=LAMBDA(a, b, AND(a, b))(TRUE, FALSE)");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_Identity) {
+    EvalResult r = eval("=LAMBDA(x, x+1)(0)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_NestedWithLET) {
+    EvalResult r = eval("=LAMBDA(x, LET(doubled, x*2, doubled+1))(5)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(11.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LAMBDA_ErrorInArg) {
+    EvalResult r = eval("=LAMBDA(x, x+1)(1/0)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
 }  // namespace
 }  // namespace cells

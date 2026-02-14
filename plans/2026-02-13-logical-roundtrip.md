@@ -49,7 +49,7 @@ Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 
 - [x] 4a: Extend `stripXlfnPrefix` in `xlsx_reader.cc` to also strip `_xlpm.` prefix from parameter names (e.g., `_xlpm.x` → `x`, `_xlpm.name` → `name`). Strip _xlpm. before _xlfn. since parameter names don't need dot normalization.
 - [x] 4b: Implement `LET(name1, value1, [name2, value2, ...], calculation)` — binds named variables and evaluates the final expression with those bindings. Added `localVariables` map to EvalContext, modified evaluateNamedRef to check local scope first. Supports nested LET, dependent bindings, and error propagation.
-- [ ] 4c: Implement `LAMBDA([param1, param2, ...], body)(args...)` — creates a callable that binds args to params and evaluates body. Invoked immediately with trailing `(args)`.
+- [x] 4c: Implement `LAMBDA([param1, param2, ...], body)(args...)` — creates a callable that binds args to params and evaluates body. Extended parser to handle trailing `(args)` invocation syntax by appending invocation args to the function call node.
 
 ## Phase 5: Run Roundtrip Test and Fix Remaining Issues
 

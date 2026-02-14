@@ -6,6 +6,18 @@
 
 namespace cells {
 
+// Check if a function name is "LAMBDA" (case-insensitive)
+static bool isLambdaName(const std::string& name) {
+    if (name.size() != 6) {
+        return false;
+    }
+    std::string upper = name;
+    for (auto& c : upper) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    return upper == "LAMBDA";
+}
+
 FormulaParser::FormulaParser(std::string_view source) : lexer_(source), source_(source) {
     advance();
 }
@@ -703,6 +715,22 @@ std::unique_ptr<ASTNode> FormulaParser::parseFunctionCall(const std::string& nam
     }
 
     expect(TokenType::RPAREN, "Expected ')' after function arguments");
+
+    // Handle LAMBDA(params..., body)(args...) — trailing invocation args
+    // are appended to the function call node for the LAMBDA implementation
+    if (isLambdaName(name) && match(TokenType::LPAREN)) {
+        if (!check(TokenType::RPAREN)) {
+            do {
+                auto arg = expression();
+                if (!arg) {
+                    arg = errorNode("Expected expression in LAMBDA invocation");
+                }
+                func->args.push_back(std::move(arg));
+            } while (match(TokenType::COMMA));
+        }
+        expect(TokenType::RPAREN, "Expected ')' after LAMBDA invocation arguments");
+    }
+
     return func;
 }
 

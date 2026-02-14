@@ -545,6 +545,54 @@ EvalResult fn_LET(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return result;
 }
 
+// LAMBDA(param1, [param2, ...], body)(arg1, [arg2, ...])
+// Creates and immediately invokes an anonymous function.
+// The parser appends invocation args after the definition args, so:
+//   args[0..N-1] = parameter names, args[N] = body, args[N+1..end] = invocation args
+//   where N = (total_args - 1) / 2
+EvalResult fn_LAMBDA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Must have odd number of args >= 3 (at least 1 param + body + 1 invocation arg)
+    if (args.size() < 3 || args.size() % 2 == 0) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const size_t numParams = (args.size() - 1) / 2;
+    const size_t bodyIndex = numParams;
+
+    // Build variable scope with param bindings
+    std::unordered_map<std::string, EvalResult> scope;
+    if (ctx.localVariables) {
+        scope = *ctx.localVariables;
+    }
+
+    const auto* prevScope = ctx.localVariables;
+    ctx.localVariables = &scope;
+
+    // Bind each parameter to its corresponding invocation argument
+    for (size_t i = 0; i < numParams; i++) {
+        const auto* nameNode = dynamic_cast<const NamedRefNode*>(args[i]);
+        if (!nameNode) {
+            ctx.localVariables = prevScope;
+            return EvalResult::Error(CellError::VALUE);
+        }
+
+        // Evaluate the invocation argument
+        EvalResult value = evaluate(args[numParams + 1 + i], ctx);
+        if (value.isError()) {
+            ctx.localVariables = prevScope;
+            return value;
+        }
+
+        scope[nameNode->name] = std::move(value);
+    }
+
+    // Evaluate the body with parameter bindings in scope
+    EvalResult result = evaluate(args[bodyIndex], ctx);
+
+    ctx.localVariables = prevScope;
+    return result;
+}
+
 // =============================================================================
 // Boolean Constants
 // =============================================================================
@@ -587,6 +635,8 @@ void registerLogicFunctions(FunctionRegistry& registry) {
                               "Returns value for first TRUE condition", "Logic");
     registry.registerFunction("LET", fn_LET, "(name1, value1, [name2, value2, ...], calculation)",
                               "Defines named variables and returns calculation result", "Logic");
+    registry.registerFunction("LAMBDA", fn_LAMBDA, "([param1, param2, ...], body)(args...)",
+                              "Creates and immediately invokes anonymous function", "Logic");
 
     // Error handling
     registry.registerFunction("IFERROR", fn_IFERROR, "(value, value_if_error)",
