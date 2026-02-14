@@ -3556,5 +3556,53 @@ TEST_F(FunctionTest, HourMinuteSecondRoundTrip) {
     EXPECT_DOUBLE_EQ(second.getNumber(), 45.0);
 }
 
+// =============================================================================
+// Logic Function Tests - AND/OR error propagation and text/empty skipping
+// =============================================================================
+
+TEST_F(FunctionTest, AndErrorPropagationOverFalse) {
+    // AND(FALSE, #N/A) should return #N/A, not FALSE
+    setCellError(0, 0, CellError::NA);  // A1 = #N/A
+    EvalResult result = eval("=AND(FALSE,A1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NA);
+}
+
+TEST_F(FunctionTest, AndSkipsTextInDirectArgs) {
+    // AND(TRUE, "hello", TRUE) — text should be skipped, result TRUE
+    EvalResult result = eval("=AND(TRUE,\"hello\",TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndSkipsEmptyInDirectArgs) {
+    // AND(TRUE, <empty cell>, TRUE) — empty should be skipped
+    EvalResult result = eval("=AND(TRUE,A5,TRUE)");  // A5 is empty
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrErrorPropagationOverTrue) {
+    // OR(TRUE, #N/A) should return #N/A, not TRUE
+    setCellError(0, 0, CellError::NA);  // A1 = #N/A
+    EvalResult result = eval("=OR(TRUE,A1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NA);
+}
+
+TEST_F(FunctionTest, OrSkipsTextInDirectArgs) {
+    // OR(FALSE, "hello", FALSE) — text should be skipped, result FALSE
+    EvalResult result = eval("=OR(FALSE,\"hello\",FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrSkipsEmptyInDirectArgs) {
+    // OR(FALSE, <empty cell>, TRUE) — empty should be skipped
+    EvalResult result = eval("=OR(FALSE,A5,TRUE)");  // A5 is empty
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
 }  // namespace
 }  // namespace cells

@@ -34,7 +34,7 @@ XLSX formulas use `_xlpm.varname` for LET/LAMBDA parameter names. The XLSX reade
 
 Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 
-- [ ] 1a: Fix text/empty skipping in direct args AND short-circuit error propagation. For direct (non-range) args: skip text and empty values (match range behavior). Collect all args first, propagate any errors found, then compute the boolean result. Same fix for both AND and OR.
+- [x] 1a: Fix text/empty skipping in direct args AND short-circuit error propagation. Rewrote both fn_AND and fn_OR to evaluate all args first, skip text/empty in both direct and range args, collect first error, and propagate errors over boolean results.
 
 ## Phase 2: Implement NA() and XOR
 

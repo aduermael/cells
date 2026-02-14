@@ -223,12 +223,12 @@ TEST_F(FormulaErrorTest, ValueError_FunctionWrongArgCount) {
 }
 
 TEST_F(FormulaErrorTest, ValueError_TextToBoolean) {
-    // Converting a text string to boolean in a boolean context
+    // Excel's AND/OR skip text values in direct args (same as ranges)
     setCellValue(0, 0, "hello");  // A1 = "hello"
-    // AND/OR require boolean arguments
+    // AND(text, TRUE) skips text, returns TRUE
     EvalResult r = eval("=AND(A1, TRUE)");
-    ASSERT_TRUE(r.isError());
-    EXPECT_EQ(CellError::VALUE, r.getError());
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
 }
 
 TEST_F(FormulaErrorTest, ValueError_RangeToScalar) {

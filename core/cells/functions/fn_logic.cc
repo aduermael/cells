@@ -42,10 +42,18 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Boolean(true);  // Vacuous truth
     }
 
+    bool foundFalse = false;
+    EvalResult firstError = EvalResult::Boolean(true);  // placeholder
+    bool hasError = false;
+
     for (const ASTNode* arg : args) {
-        EvalResult result = evaluate(arg, ctx);
+        const EvalResult result = evaluate(arg, ctx);
         if (result.isError()) {
-            return result;
+            if (!hasError) {
+                firstError = result;
+                hasError = true;
+            }
+            continue;
         }
 
         // Handle ranges by checking all values
@@ -53,31 +61,52 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
             const std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
             for (const EvalResult& val : rangeValues) {
                 if (val.isError()) {
-                    return val;
+                    if (!hasError) {
+                        firstError = val;
+                        hasError = true;
+                    }
+                    continue;
                 }
-                if (val.isEmpty()) {
-                    continue;  // Skip empty cells
+                if (val.isEmpty() || val.isString()) {
+                    continue;  // Skip empty cells and text values
                 }
-                EvalResult boolVal = val.toBoolean();
+                const EvalResult boolVal = val.toBoolean();
                 if (boolVal.isError()) {
-                    return boolVal;
+                    if (!hasError) {
+                        firstError = boolVal;
+                        hasError = true;
+                    }
+                    continue;
                 }
                 if (!boolVal.getBoolean()) {
-                    return EvalResult::Boolean(false);
+                    foundFalse = true;
                 }
             }
         } else {
-            EvalResult boolVal = result.toBoolean();
+            // Direct args: skip text and empty (same as range behavior)
+            if (result.isEmpty() || result.isString()) {
+                continue;
+            }
+            const EvalResult boolVal = result.toBoolean();
             if (boolVal.isError()) {
-                return boolVal;
+                if (!hasError) {
+                    firstError = boolVal;
+                    hasError = true;
+                }
+                continue;
             }
             if (!boolVal.getBoolean()) {
-                return EvalResult::Boolean(false);
+                foundFalse = true;
             }
         }
     }
 
-    return EvalResult::Boolean(true);
+    // Errors take priority over the boolean result
+    if (hasError) {
+        return firstError;
+    }
+
+    return EvalResult::Boolean(!foundFalse);
 }
 
 EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -85,10 +114,18 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Boolean(false);  // No true values found
     }
 
+    bool foundTrue = false;
+    EvalResult firstError = EvalResult::Boolean(false);  // placeholder
+    bool hasError = false;
+
     for (const ASTNode* arg : args) {
-        EvalResult result = evaluate(arg, ctx);
+        const EvalResult result = evaluate(arg, ctx);
         if (result.isError()) {
-            return result;
+            if (!hasError) {
+                firstError = result;
+                hasError = true;
+            }
+            continue;
         }
 
         // Handle ranges by checking all values
@@ -96,31 +133,52 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
             const std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
             for (const EvalResult& val : rangeValues) {
                 if (val.isError()) {
-                    return val;
+                    if (!hasError) {
+                        firstError = val;
+                        hasError = true;
+                    }
+                    continue;
                 }
-                if (val.isEmpty()) {
-                    continue;  // Skip empty cells
+                if (val.isEmpty() || val.isString()) {
+                    continue;  // Skip empty cells and text values
                 }
-                EvalResult boolVal = val.toBoolean();
+                const EvalResult boolVal = val.toBoolean();
                 if (boolVal.isError()) {
-                    return boolVal;
+                    if (!hasError) {
+                        firstError = boolVal;
+                        hasError = true;
+                    }
+                    continue;
                 }
                 if (boolVal.getBoolean()) {
-                    return EvalResult::Boolean(true);
+                    foundTrue = true;
                 }
             }
         } else {
-            EvalResult boolVal = result.toBoolean();
+            // Direct args: skip text and empty (same as range behavior)
+            if (result.isEmpty() || result.isString()) {
+                continue;
+            }
+            const EvalResult boolVal = result.toBoolean();
             if (boolVal.isError()) {
-                return boolVal;
+                if (!hasError) {
+                    firstError = boolVal;
+                    hasError = true;
+                }
+                continue;
             }
             if (boolVal.getBoolean()) {
-                return EvalResult::Boolean(true);
+                foundTrue = true;
             }
         }
     }
 
-    return EvalResult::Boolean(false);
+    // Errors take priority over the boolean result
+    if (hasError) {
+        return firstError;
+    }
+
+    return EvalResult::Boolean(foundTrue);
 }
 
 EvalResult fn_NOT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
