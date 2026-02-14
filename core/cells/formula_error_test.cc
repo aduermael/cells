@@ -1119,5 +1119,64 @@ TEST_F(FormulaErrorTest, IFS_OddArgCount) {
     EXPECT_EQ(CellError::VALUE, r.getError());
 }
 
+// =============================================================================
+// LET Tests
+// =============================================================================
+
+TEST_F(FormulaErrorTest, LET_BasicBinding) {
+    EvalResult r = eval("=LET(x, 10, x*2)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(20.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LET_MultipleBindings) {
+    EvalResult r = eval("=LET(x, 5, y, 3, x+y)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(8.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LET_ThreeBindings) {
+    EvalResult r = eval("=LET(a, 2, b, 3, c, 4, a*b*c)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(24.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LET_DependentBindings) {
+    // y depends on x
+    EvalResult r = eval("=LET(x, 5, y, x*2, y+1)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(11.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LET_StringBinding) {
+    EvalResult r = eval("=LET(name, \"World\", \"Hello \"&name)");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("Hello World", r.getString());
+}
+
+TEST_F(FormulaErrorTest, LET_Nested) {
+    EvalResult r = eval("=LET(x, 5, LET(y, x+1, y*2))");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(12.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, LET_TooFewArgs) {
+    EvalResult r = eval("=LET(x, 10)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaErrorTest, LET_EvenArgCount) {
+    EvalResult r = eval("=LET(x, 10, y, 20)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaErrorTest, LET_ErrorInValue) {
+    EvalResult r = eval("=LET(x, 1/0, x+1)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
 }  // namespace
 }  // namespace cells

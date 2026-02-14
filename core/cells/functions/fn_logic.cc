@@ -496,6 +496,56 @@ EvalResult fn_NA(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) 
 }
 
 // =============================================================================
+// LET / LAMBDA
+// =============================================================================
+
+// LET(name1, value1, [name2, value2, ...], calculation)
+// Binds named variables and evaluates the final expression with those bindings.
+EvalResult fn_LET(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Must have odd number of args >= 3 (pairs of name/value + final calculation)
+    if (args.size() < 3 || args.size() % 2 == 0) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Build a new variable scope inheriting any existing bindings
+    std::unordered_map<std::string, EvalResult> scope;
+    if (ctx.localVariables) {
+        scope = *ctx.localVariables;
+    }
+
+    // Set up context with the new scope
+    const auto* prevScope = ctx.localVariables;
+    ctx.localVariables = &scope;
+
+    // Bind each name/value pair
+    const size_t numPairs = (args.size() - 1) / 2;
+    for (size_t i = 0; i < numPairs; i++) {
+        // Extract variable name from NamedRefNode
+        const auto* nameNode = dynamic_cast<const NamedRefNode*>(args[i * 2]);
+        if (!nameNode) {
+            ctx.localVariables = prevScope;
+            return EvalResult::Error(CellError::VALUE);
+        }
+
+        // Evaluate the value (can reference previously bound variables)
+        EvalResult value = evaluate(args[i * 2 + 1], ctx);
+        if (value.isError()) {
+            ctx.localVariables = prevScope;
+            return value;
+        }
+
+        scope[nameNode->name] = std::move(value);
+    }
+
+    // Evaluate the calculation expression with all bindings in scope
+    EvalResult result = evaluate(args.back(), ctx);
+
+    // Restore previous scope
+    ctx.localVariables = prevScope;
+    return result;
+}
+
+// =============================================================================
 // Boolean Constants
 // =============================================================================
 
@@ -535,6 +585,8 @@ void registerLogicFunctions(FunctionRegistry& registry) {
                               "Logic");
     registry.registerFunction("IFS", fn_IFS, "(condition1, value1, condition2, value2, ...)",
                               "Returns value for first TRUE condition", "Logic");
+    registry.registerFunction("LET", fn_LET, "(name1, value1, [name2, value2, ...], calculation)",
+                              "Defines named variables and returns calculation result", "Logic");
 
     // Error handling
     registry.registerFunction("IFERROR", fn_IFERROR, "(value, value_if_error)",

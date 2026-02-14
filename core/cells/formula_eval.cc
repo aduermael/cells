@@ -1295,6 +1295,14 @@ static EvalResult evaluateSpillRangeRef(const SpillRangeRefNode* node, EvalConte
 // Evaluate a named range reference
 // Looks up the named range in the registry and returns the appropriate value/range
 static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx) {
+    // Check local variable bindings first (from LET/LAMBDA)
+    if (ctx.localVariables) {
+        auto it = ctx.localVariables->find(node->name);
+        if (it != ctx.localVariables->end()) {
+            return it->second;
+        }
+    }
+
     if (!ctx.namedRanges) {
         // No named range registry available
         return EvalResult::Error(CellError::NAME);

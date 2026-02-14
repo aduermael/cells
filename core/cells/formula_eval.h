@@ -35,6 +35,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -453,6 +454,9 @@ struct EvalContext {
 
     // Circular reference detection during evaluation
     std::unordered_set<ID>* evaluatingCells{nullptr};
+
+    // Local variable bindings for LET/LAMBDA (stack-allocated, owned by caller)
+    const std::unordered_map<std::string, EvalResult>* localVariables{nullptr};
 };
 
 // Main evaluation function (implemented in formula_eval.cc)
