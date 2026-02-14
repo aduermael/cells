@@ -384,6 +384,107 @@ EvalResult fn_XOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 }
 
 // =============================================================================
+// SWITCH Function
+// =============================================================================
+
+EvalResult fn_SWITCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // SWITCH(expression, value1, result1, [value2, result2, ...], [default])
+    // Minimum 3 args: expression, value1, result1
+    if (args.size() < 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate the expression to match against
+    EvalResult expr = evaluate(args[0], ctx);
+    if (expr.isError()) {
+        return expr;
+    }
+
+    // After expression, remaining args are value/result pairs + optional default
+    const size_t remaining = args.size() - 1;
+    const bool hasDefault = (remaining % 2) == 1;
+    const size_t pairCount = remaining / 2;
+
+    // Compare expression against each value
+    for (size_t i = 0; i < pairCount; i++) {
+        EvalResult caseVal = evaluate(args[1 + i * 2], ctx);
+        if (caseVal.isError()) {
+            return caseVal;
+        }
+
+        // Check equality: same type required, case-insensitive for strings
+        bool match = false;
+        if (expr.type == caseVal.type) {
+            switch (expr.type) {
+                case EvalResult::Type::NUMBER:
+                    match = expr.numberValue == caseVal.numberValue;
+                    break;
+                case EvalResult::Type::STRING: {
+                    // Case-insensitive comparison (Excel behavior)
+                    if (expr.stringValue.size() == caseVal.stringValue.size()) {
+                        match = true;
+                        for (size_t j = 0; j < expr.stringValue.size(); j++) {
+                            if (std::toupper(static_cast<unsigned char>(expr.stringValue[j])) !=
+                                std::toupper(static_cast<unsigned char>(caseVal.stringValue[j]))) {
+                                match = false;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+                case EvalResult::Type::BOOLEAN:
+                    match = expr.boolValue == caseVal.boolValue;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (match) {
+            return evaluate(args[2 + i * 2], ctx);
+        }
+    }
+
+    // No match found — return default or #N/A
+    if (hasDefault) {
+        return evaluate(args[args.size() - 1], ctx);
+    }
+    return EvalResult::Error(CellError::NA);
+}
+
+// =============================================================================
+// IFS Function
+// =============================================================================
+
+EvalResult fn_IFS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // IFS(condition1, value1, [condition2, value2, ...])
+    // Must have even number of args (condition/value pairs), minimum 2
+    if (args.size() < 2 || (args.size() % 2) != 0) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    for (size_t i = 0; i < args.size(); i += 2) {
+        EvalResult condition = evaluate(args[i], ctx);
+        if (condition.isError()) {
+            return condition;
+        }
+
+        EvalResult condBool = condition.toBoolean();
+        if (condBool.isError()) {
+            return condBool;
+        }
+
+        if (condBool.getBoolean()) {
+            return evaluate(args[i + 1], ctx);
+        }
+    }
+
+    // No condition was TRUE
+    return EvalResult::Error(CellError::NA);
+}
+
+// =============================================================================
 // NA Function
 // =============================================================================
 
@@ -429,6 +530,11 @@ void registerLogicFunctions(FunctionRegistry& registry) {
     registry.registerFunction("XOR", fn_XOR, "(logical1, [logical2], ...)",
                               "Returns TRUE if an odd number of arguments are true", "Logic");
     registry.registerFunction("NA", fn_NA, "()", "Returns the error value #N/A", "Logic");
+    registry.registerFunction("SWITCH", fn_SWITCH, "(expression, value1, result1, ..., [default])",
+                              "Compares expression against values and returns matching result",
+                              "Logic");
+    registry.registerFunction("IFS", fn_IFS, "(condition1, value1, condition2, value2, ...)",
+                              "Returns value for first TRUE condition", "Logic");
 
     // Error handling
     registry.registerFunction("IFERROR", fn_IFERROR, "(value, value_if_error)",

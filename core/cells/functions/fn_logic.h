@@ -52,6 +52,12 @@ EvalResult fn_XOR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // NA() - Returns the error value #N/A
 EvalResult fn_NA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// SWITCH(expression, value1, result1, ..., [default]) - Matches expression against values
+EvalResult fn_SWITCH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// IFS(condition1, value1, ...) - Returns value for first TRUE condition
+EvalResult fn_IFS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Error Handling Functions
 // =============================================================================

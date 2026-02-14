@@ -1008,5 +1008,116 @@ TEST_F(FormulaErrorTest, XOR_AllTextNoLogical) {
     EXPECT_EQ(CellError::VALUE, r.getError());
 }
 
+// =============================================================================
+// SWITCH Tests
+// =============================================================================
+
+TEST_F(FormulaErrorTest, SWITCH_MatchFirst) {
+    EvalResult r = eval("=SWITCH(1, 1, \"one\", 2, \"two\", 3, \"three\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("one", r.getString());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_MatchMiddle) {
+    EvalResult r = eval("=SWITCH(2, 1, \"one\", 2, \"two\", 3, \"three\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("two", r.getString());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_MatchLast) {
+    EvalResult r = eval("=SWITCH(3, 1, \"one\", 2, \"two\", 3, \"three\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("three", r.getString());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_NoMatchWithDefault) {
+    EvalResult r = eval("=SWITCH(99, 1, \"one\", 2, \"two\", \"none\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("none", r.getString());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_NoMatchNoDefault) {
+    EvalResult r = eval("=SWITCH(99, 1, \"one\", 2, \"two\")");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NA, r.getError());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_StringMatch) {
+    EvalResult r = eval("=SWITCH(\"B\", \"a\", 1, \"b\", 2, \"c\", 3)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(2.0, r.getNumber());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_BooleanMatch) {
+    EvalResult r = eval("=SWITCH(TRUE, FALSE, \"no\", TRUE, \"yes\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("yes", r.getString());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_ErrorInExpression) {
+    EvalResult r = eval("=SWITCH(1/0, 1, \"one\")");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_ErrorInCaseValue) {
+    EvalResult r = eval("=SWITCH(1, 1/0, \"one\", 2, \"two\")");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaErrorTest, SWITCH_TooFewArgs) {
+    EvalResult r = eval("=SWITCH(1, 2)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+// =============================================================================
+// IFS Tests
+// =============================================================================
+
+TEST_F(FormulaErrorTest, IFS_FirstTrue) {
+    EvalResult r = eval("=IFS(TRUE, \"first\", TRUE, \"second\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("first", r.getString());
+}
+
+TEST_F(FormulaErrorTest, IFS_SecondTrue) {
+    EvalResult r = eval("=IFS(FALSE, \"first\", TRUE, \"second\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("second", r.getString());
+}
+
+TEST_F(FormulaErrorTest, IFS_NoneTrue) {
+    EvalResult r = eval("=IFS(FALSE, \"first\", FALSE, \"second\")");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NA, r.getError());
+}
+
+TEST_F(FormulaErrorTest, IFS_NumericCondition) {
+    EvalResult r = eval("=IFS(0, \"zero\", 1, \"one\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("one", r.getString());
+}
+
+TEST_F(FormulaErrorTest, IFS_ErrorInCondition) {
+    EvalResult r = eval("=IFS(1/0, \"first\", TRUE, \"second\")");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaErrorTest, IFS_WithExpressions) {
+    setCellValue(0, 0, 85.0);  // A1 = 85
+    EvalResult r = eval("=IFS(A1>=90, \"A\", A1>=80, \"B\", A1>=70, \"C\", TRUE, \"F\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("B", r.getString());
+}
+
+TEST_F(FormulaErrorTest, IFS_OddArgCount) {
+    EvalResult r = eval("=IFS(TRUE, \"first\", FALSE)");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
 }  // namespace
 }  // namespace cells
