@@ -45,6 +45,7 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     bool foundFalse = false;
     EvalResult firstError = EvalResult::Boolean(true);  // placeholder
     bool hasError = false;
+    bool hasLogical = false;
 
     for (const ASTNode* arg : args) {
         const EvalResult result = evaluate(arg, ctx);
@@ -78,6 +79,7 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
                     }
                     continue;
                 }
+                hasLogical = true;
                 if (!boolVal.getBoolean()) {
                     foundFalse = true;
                 }
@@ -95,6 +97,7 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
                 }
                 continue;
             }
+            hasLogical = true;
             if (!boolVal.getBoolean()) {
                 foundFalse = true;
             }
@@ -104,6 +107,11 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     // Errors take priority over the boolean result
     if (hasError) {
         return firstError;
+    }
+
+    // If no valid logical values were found (all args were text/empty), return #VALUE!
+    if (!hasLogical) {
+        return EvalResult::Error(CellError::VALUE);
     }
 
     return EvalResult::Boolean(!foundFalse);
@@ -117,6 +125,7 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     bool foundTrue = false;
     EvalResult firstError = EvalResult::Boolean(false);  // placeholder
     bool hasError = false;
+    bool hasLogical = false;
 
     for (const ASTNode* arg : args) {
         const EvalResult result = evaluate(arg, ctx);
@@ -150,6 +159,7 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
                     }
                     continue;
                 }
+                hasLogical = true;
                 if (boolVal.getBoolean()) {
                     foundTrue = true;
                 }
@@ -167,6 +177,7 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
                 }
                 continue;
             }
+            hasLogical = true;
             if (boolVal.getBoolean()) {
                 foundTrue = true;
             }
@@ -176,6 +187,11 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     // Errors take priority over the boolean result
     if (hasError) {
         return firstError;
+    }
+
+    // If no valid logical values were found (all args were text/empty), return #VALUE!
+    if (!hasLogical) {
+        return EvalResult::Error(CellError::VALUE);
     }
 
     return EvalResult::Boolean(foundTrue);
