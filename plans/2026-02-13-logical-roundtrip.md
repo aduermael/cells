@@ -56,3 +56,20 @@ Fix the two bugs in `fn_AND` and `fn_OR` in `core/cells/functions/fn_logic.cc`:
 - [x] 5a: Run `./run-test.sh logical` and investigate any remaining differences. Found 347 diffs: 339 from stale cached values in reference file (formulas marked `ca="1"` had `<v>0</v>` instead of evaluated results), and 8 from AND/OR returning wrong results when all args are text/empty.
 - [x] 5b: Fix remaining differences. Fixed AND/OR to return #VALUE! when no valid logical values found (all args text/empty), matching XOR behavior. Regenerated reference file with correct cached values from our engine.
 - [x] 5c: Add `logical` to `ENABLED_CATEGORIES` in `tools/xlsx-roundtrip.sh` and verify `bazel run :xlsx-roundtrip` passes all three categories. Also fixed empty string preservation in formula result caching (FORMULA_STRING with empty raw was being converted to Empty, breaking ZCD roundtrip for cells referencing IFERROR(1/0,"")).
+
+## Phase 6: Fix TEXT() for non-numeric inputs (~60 G-column diffs)
+
+The G validation column uses `TEXT(E__,"General")` to compare values. Our TEXT() calls `evaluateAsNumber()` on the first arg, so `TEXT("Yes","General")` → #VALUE!. Excel's TEXT() with "General" format passes strings through as-is.
+
+- [ ] 6a: Fix `fn_TEXT` in `core/cells/functions/fn_text.cc` to handle non-numeric inputs with the "General" format. When `format_text` is "General" (case-insensitive), return the value formatted the same way Excel does: strings pass through unchanged, booleans become "TRUE"/"FALSE", errors propagate. For other formats, keep the current numeric-only behavior (returning #VALUE! for non-numbers is correct for numeric formats like "0.00").
+
+## Phase 7: Fix LET error propagation, LAMBDA(42), and empty cell handling (~12 diffs)
+
+- [ ] 7a: Fix LET to store errors in variable bindings instead of propagating immediately. In `fn_LET`, remove the early return on error at the binding stage — store the error result in the scope so the calculation expression can handle it (e.g., `LET(v, NA(), IFERROR(v, "Safe"))` → "Safe"). Affects D204/E204/G204.
+- [ ] 7b: Fix LAMBDA to support zero-parameter invocation. `LAMBDA(42)()` is a zero-param lambda with body=42, invoked with zero args → should return 42. The parser already consumes the trailing `()` but the arg count stays at 1. Either mark the FunctionCallNode with a "was invoked" flag, or accept `args.size() == 1` as valid when trailing `()` was parsed. Affects D223/E223/G223.
+- [ ] 7c: Fix empty cell/string handling in IFERROR results. Two sub-issues: (1) `IFERROR(1/0,"")` — our engine writes `value: ""` (empty string with type "string"), but Excel omits the value field entirely. Fix the XLSX writer to omit `<v>` for empty formula string results. (2) `IFERROR($D$5,"Err")` where D5 is empty — our engine returns 0, Excel returns blank. Fix IFERROR to preserve empty cell results as empty rather than coercing to 0. Affects D163/E163/D167/E167 and their G-column mirrors.
+
+## Phase 8: Final Roundtrip Verification
+
+- [ ] 8a: Run `./run-test.sh logical` and verify 0 differences remain.
+- [ ] 8b: Run `bazel run :check` to ensure all unit tests, roundtrip tests, lint, and E2E pass.
