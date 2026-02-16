@@ -97,10 +97,13 @@ static EvalResult cellValueToEvalResult(const CellValue& value) {
         case CellValueType::FORMULA_NUMBER:
             return EvalResult::Number(std::strtod(value.raw.c_str(), nullptr));
         case CellValueType::STRING:
-        case CellValueType::FORMULA_STRING:
             if (value.raw.empty()) {
                 return EvalResult::Empty();
             }
+            return EvalResult::String(value.asString());
+        case CellValueType::FORMULA_STRING:
+            // Preserve empty strings from formula results (e.g., IFERROR(1/0,""))
+            // so that referencing cells maintain the FORMULA_STRING type
             return EvalResult::String(value.asString());
         case CellValueType::BOOLEAN:
         case CellValueType::FORMULA_BOOLEAN:

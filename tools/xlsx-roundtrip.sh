@@ -12,6 +12,7 @@ set -euo pipefail
 ENABLED_CATEGORIES=(
     math-basic
     math-trig
+    logical
 )
 
 # --count: print number of enabled categories (no build environment needed)
