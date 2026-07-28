@@ -2258,7 +2258,7 @@ void StyleBuffer::merge(const StyleBuffer& other) {
 
     // Merge borders (preserving color types)
     auto mergeBorderSide = [this, &other](uint8_t sideBit) {
-        if (!(other.getBorderSideMask() & sideBit)) {
+        if ((other.getBorderSideMask() & sideBit) == 0) {
             return;
         }
         const uint8_t ct = other.getBorderSideColorType(sideBit);
@@ -2300,7 +2300,7 @@ void StyleBuffer::merge(const StyleBuffer& other) {
             other.getBorderSideColor(sideBit, r, g, b);
             setBorderSide(sideBit, other.getBorderSideStyle(sideBit), r, g, b);
             // Clear any existing theme/indexed type for this side
-            if (getExtFlags() & STYLE_EXT_BORDER_THEME) {
+            if ((getExtFlags() & STYLE_EXT_BORDER_THEME) != 0) {
                 uint8_t ctByte = getBorderColorTypeByte();
                 int sideIdx = 0;
                 for (int i = 0; i < 4; ++i) {

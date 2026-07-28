@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <sstream>
@@ -100,11 +101,11 @@ std::string stripXlfnPrefix(const std::string& formula) {
 // Iterator adapter for children by local name (ignoring namespace prefix).
 // Usage: for (auto node : xmlChildren(parent, "sheet")) { ... }
 struct XmlChildrenRange {
-    pugi::xml_node parent_;
+    pugi::xml_node parent_{};
     const char* name_{nullptr};
 
     struct Iterator {
-        pugi::xml_node current_;
+        pugi::xml_node current_{};
         const char* name_{nullptr};
 
         Iterator(pugi::xml_node node, const char* name) : current_(node), name_(name) {
@@ -299,11 +300,11 @@ std::string argbToRgb(const char* argb) {
 // 0: lt1 (background 1), 1: dk1 (text 1), 2: lt2 (background 2), 3: dk2 (text 2)
 // 4-9: accent1-6, 10: hlink, 11: folHlink
 struct XLSXThemeColors {
-    std::string colors[12];  // RGB values as "#RRGGBB"
+    std::array<std::string, 12> colors{};  // RGB values as "#RRGGBB"
 
     [[nodiscard]] std::string getColor(int index) const {
         if (index >= 0 && index < 12) {
-            return colors[index];
+            return colors[static_cast<size_t>(index)];
         }
         return {};
     }
@@ -504,7 +505,7 @@ cells::Theme parseThemeXml(const std::string& content) {
 // is updated to use Theme directly in step 2b)
 XLSXThemeColors themeColorsFromTheme(const cells::Theme& theme) {
     XLSXThemeColors colors;
-    for (int i = 0; i < 12; ++i) {
+    for (size_t i = 0; i < 12; ++i) {
         colors.colors[i] = theme.colorScheme.colors[i];
     }
     return colors;
@@ -756,11 +757,11 @@ XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode, const XLSXThemeColors& t
 
 // Container for all parsed styles from styles.xml
 struct XLSXStyles {
-    std::vector<XLSXFont> fonts;
-    std::vector<XLSXFill> fills;
-    std::vector<XLSXBorder> borders;
-    std::vector<XLSXCellFormat> cellFormats;                // cellXfs entries
-    std::unordered_map<int, std::string> customNumFormats;  // numFmtId -> format code
+    std::vector<XLSXFont> fonts{};
+    std::vector<XLSXFill> fills{};
+    std::vector<XLSXBorder> borders{};
+    std::vector<XLSXCellFormat> cellFormats{};                // cellXfs entries
+    std::unordered_map<int, std::string> customNumFormats{};  // numFmtId -> format code
 
     // Convert an XLSX cell format index to our CellStyle
     // Returns true if any non-default style properties were found

@@ -1118,11 +1118,8 @@ size_t getRangeSize(const RangeBounds& bounds, Sheet* sheet) {
             return colCount * rowCount;
         }
         case RangeType::COLUMN:
-            [[fallthrough]];
         case RangeType::ROW:
-            [[fallthrough]];
         case RangeType::COLUMN_RANGE:
-            [[fallthrough]];
         case RangeType::ROW_RANGE: {
             // For unbounded ranges, count populated cells
             size_t count = 0;

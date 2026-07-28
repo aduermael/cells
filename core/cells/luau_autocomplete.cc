@@ -430,9 +430,9 @@ private:
         return std::nullopt;
     }
 
-    InMemoryFileResolver fileResolver_;
-    DefaultConfigResolver configResolver_;
-    std::unique_ptr<Luau::Frontend> frontend_;
+    InMemoryFileResolver fileResolver_{};
+    DefaultConfigResolver configResolver_{};
+    std::unique_ptr<Luau::Frontend> frontend_{};
 };
 
 // Public interface implementation

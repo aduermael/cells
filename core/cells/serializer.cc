@@ -190,7 +190,7 @@ void Serializer::serializeTheme(const Workbook& workbook, std::ostream& out) con
     out << "T \"" << escapeString(theme->name) << "\" colors:";
 
     // 12 colors in index order (0-11), no # prefix, comma-separated
-    for (int i = 0; i < 12; ++i) {
+    for (size_t i = 0; i < 12; ++i) {
         if (i > 0) {
             out << ",";
         }
