@@ -36,20 +36,47 @@ fi
 # Must cd to REPO_ROOT first so bazel info works correctly
 cd "$REPO_ROOT"
 BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
-PUGIXML_INCLUDE=""
-LUAU_INCLUDE=""
-if [ -n "$BAZEL_OUTPUT_BASE" ]; then
-    PUGIXML_DIR=$(find "$BAZEL_OUTPUT_BASE/external" -name "pugixml.hpp" -type f 2>/dev/null | grep -v openxlsx | head -1 | xargs dirname 2>/dev/null || echo "")
-    if [ -n "$PUGIXML_DIR" ]; then
-        PUGIXML_INCLUDE="-I$PUGIXML_DIR"
+
+# Locate pugixml / Luau headers under Bazel's external tree.
+# On a clean CI checkout these repos are not present until something fetches them.
+find_third_party_includes() {
+    PUGIXML_INCLUDE=""
+    LUAU_INCLUDE=""
+    if [ -z "$BAZEL_OUTPUT_BASE" ]; then
+        return
+    fi
+    local pugixml_dir
+    pugixml_dir=$(find "$BAZEL_OUTPUT_BASE/external" -name "pugixml.hpp" -type f 2>/dev/null | grep -v openxlsx | head -1 | xargs dirname 2>/dev/null || echo "")
+    if [ -n "$pugixml_dir" ]; then
+        PUGIXML_INCLUDE="-I$pugixml_dir"
     fi
     # Find Luau headers (VM, Compiler, Ast, Analysis, Config)
-    # First find the VM/include directory, then go up two levels to get the luau root
-    LUAU_VM_INC=$(find "$BAZEL_OUTPUT_BASE/external" -path "*luau*/VM/include" -type d 2>/dev/null | head -1 || echo "")
-    if [ -n "$LUAU_VM_INC" ]; then
-        LUAU_DIR=$(dirname "$(dirname "$LUAU_VM_INC")")
-        LUAU_INCLUDE="-I$LUAU_DIR/VM/include -I$LUAU_DIR/Compiler/include -I$LUAU_DIR/Ast/include -I$LUAU_DIR/Common/include -I$LUAU_DIR/Analysis/include -I$LUAU_DIR/Config/include"
+    local luau_vm_inc
+    luau_vm_inc=$(find "$BAZEL_OUTPUT_BASE/external" -path "*luau*/VM/include" -type d 2>/dev/null | head -1 || echo "")
+    if [ -n "$luau_vm_inc" ]; then
+        local luau_dir
+        luau_dir=$(dirname "$(dirname "$luau_vm_inc")")
+        LUAU_INCLUDE="-I$luau_dir/VM/include -I$luau_dir/Compiler/include -I$luau_dir/Ast/include -I$luau_dir/Common/include -I$luau_dir/Analysis/include -I$luau_dir/Config/include"
     fi
+}
+
+find_third_party_includes
+
+# If headers are missing, fetch external deps so clang-tidy can resolve includes.
+# (bazel fetch only downloads; no full product build required.)
+if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ]; then
+    echo -e "${YELLOW}Third-party headers not found; fetching @pugixml and @luau...${NC}"
+    # Fetch may fail offline; continue and report missing includes below.
+    bazel fetch @pugixml//... @luau//... >/dev/null 2>&1 || true
+    # Refresh output_base in case fetch populated a new path layout
+    BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
+    find_third_party_includes
+fi
+
+if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ]; then
+    echo -e "${YELLOW}Warning: missing third-party includes for clang-tidy:${NC}"
+    [ -z "${PUGIXML_INCLUDE:-}" ] && echo "  - pugixml.hpp (build/fetch @pugixml)"
+    [ -z "${LUAU_INCLUDE:-}" ] && echo "  - Luau headers (build/fetch @luau)"
 fi
 
 # Parse arguments

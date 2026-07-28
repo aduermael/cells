@@ -32,6 +32,14 @@ config_setting(
 # These objc_library targets compile .mm files and are only used on Apple platforms.
 # =============================================================================
 
+# Only analyzable/buildable on Apple platforms. Without this, `bazel test //core/...`
+# on Linux fails analysis: objc_library requires the Apple CC toolchain.
+_APPLE_ONLY = select({
+    ":is_macos": [],
+    ":is_ios": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
 objc_library(
     name = "http_request_apple",
     srcs = ["apple/HttpRequest.mm"],
@@ -39,6 +47,7 @@ objc_library(
     copts = ["-std=c++17"],
     includes = ["."],
     sdk_frameworks = ["Foundation"],
+    target_compatible_with = _APPLE_ONLY,
     deps = [
         ":http_request_common",
         ":http_response",
@@ -55,6 +64,7 @@ objc_library(
     sdk_frameworks = [
         "Foundation",
     ],
+    target_compatible_with = _APPLE_ONLY,
     deps = [
         ":connection",
         ":url",

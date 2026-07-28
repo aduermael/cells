@@ -1,0 +1,43 @@
+# Strict vet config for agent-era code quality.
+# Scoped to languages/paths vet can analyze: Go (tools/serve) and
+# GitHub Actions workflow pinning. C++/TS continue to use clang-tidy/format.
+version: 1
+rules:
+  max-function-parameters:
+    enabled: true
+    max: 5
+  source-file-header:
+    required: true
+    min-length: 40
+    max-length: 400
+  # 0 disables the limit. File/function size for tools/serve is gated
+  # separately by review; enabling low limits would require a large rewrite.
+  max-source-file-lines:
+    max: 0
+  max-function-body-lines:
+    max: 0
+  function-docstring:
+    policy: optional
+  indent:
+    type: language-default
+    width: 0
+  casing:
+    enabled: true
+    functions: language-default
+    variables: language-default
+    types: language-default
+    constants: language-default
+    ignore-names: []
+    ignore-patterns: []
+  github-actions-pinned:
+    enabled: true
+languages:
+  go:
+    files:
+      - tools/serve/...
+    exclude:
+      - "**/*_test.go"
+    rules:
+      indent:
+        type: tabs
+        width: 0

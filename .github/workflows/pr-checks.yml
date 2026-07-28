@@ -1,0 +1,98 @@
+# Minimum PR quality gates for open-source readiness.
+# Runs unit tests, C++ linter, format check, and gdevillele/vet.
+# Uses the same Bazel entry points documented in AGENTS.md where applicable.
+
+name: PR Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: pr-checks-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Run unit tests
+        run: bazel run :test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy
+
+      - name: Run linter
+        run: bazel run :lint
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          # Pin to the Ubuntu package default for this runner image and print
+          # the version so local tooling can match if check fails.
+          sudo apt-get install -y clang-format
+          clang-format --version
+
+      - name: Check formatting
+        run: bazel run :format -- --check
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          submodules: true
+
+      # actions/setup-go@v5.5.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: "1.22.x"
+          cache: false
+
+      - name: Run vet
+        run: ./tools/vet.sh

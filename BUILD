@@ -91,6 +91,11 @@ sh_binary(
 )
 
 sh_binary(
+    name = "vet",
+    srcs = ["tools/vet.sh"],
+)
+
+sh_binary(
     name = "check-types",
     srcs = ["tools/check-types.sh"],
     data = ["tools/guard.sh"],

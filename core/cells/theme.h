@@ -19,6 +19,7 @@
 #include <cstdio>
 
 #include <algorithm>
+#include <array>
 #include <string>
 
 namespace cells {
@@ -102,19 +103,21 @@ inline const char* const kIndexedColors[64] = {
 //   10: hlink (Hyperlink)
 //   11: folHlink (Followed hyperlink)
 struct ThemeColorScheme {
-    std::string colors[12];
+    // std::array avoids clang-tidy bugprone-reserved-identifier false positives
+    // on C arrays of non-trivial types (compiler-synthesized __iN names).
+    std::array<std::string, 12> colors{};
 
     [[nodiscard]] const std::string& getColor(int index) const {
         static const std::string empty;
         if (index >= 0 && index < 12) {
-            return colors[index];
+            return colors[static_cast<size_t>(index)];
         }
         return empty;
     }
 
     void setColor(int index, const std::string& color) {
         if (index >= 0 && index < 12) {
-            colors[index] = color;
+            colors[static_cast<size_t>(index)] = color;
         }
     }
 
@@ -132,14 +135,7 @@ struct ThemeColorScheme {
     [[nodiscard]] const std::string& hlink() const { return colors[10]; }
     [[nodiscard]] const std::string& folHlink() const { return colors[11]; }
 
-    bool operator==(const ThemeColorScheme& other) const {
-        for (int i = 0; i < 12; ++i) {
-            if (colors[i] != other.colors[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool operator==(const ThemeColorScheme& other) const { return colors == other.colors; }
     bool operator!=(const ThemeColorScheme& other) const { return !(*this == other); }
 };
 

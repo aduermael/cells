@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+
 #include <limits>
 
 #include "core/cells/formula_ast.h"
@@ -1671,8 +1672,7 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Returns the inverse hyperbolic cotangent", "Math");
     registry.registerFunction("CSCH", fn_CSCH, "(number)", "Returns the hyperbolic cosecant",
                               "Math");
-    registry.registerFunction("SECH", fn_SECH, "(number)", "Returns the hyperbolic secant",
-                              "Math");
+    registry.registerFunction("SECH", fn_SECH, "(number)", "Returns the hyperbolic secant", "Math");
     registry.registerFunction("COTH", fn_COTH, "(number)", "Returns the hyperbolic cotangent",
                               "Math");
     registry.registerFunction("RADIANS", fn_RADIANS, "(angle)", "Converts degrees to radians",

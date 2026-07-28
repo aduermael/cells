@@ -37,7 +37,7 @@ inline Theme makeTheme(const std::string& name, const std::string (&colors)[12],
                        const std::string& majorFont, const std::string& minorFont) {
     Theme t;
     t.name = name;
-    for (int i = 0; i < 12; ++i) {
+    for (size_t i = 0; i < 12; ++i) {
         t.colorScheme.colors[i] = colors[i];
     }
     t.fontScheme.majorFont = majorFont;

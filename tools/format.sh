@@ -22,6 +22,16 @@ if ! command -v clang-format &> /dev/null; then
     exit 1
 fi
 
+echo "Using $(command -v clang-format) ($(clang-format --version | head -1))"
+
+# Always use the repo .clang-format (style=file). Falling back to a built-in
+# style (e.g. Google/LLVM defaults) causes CI/local version skew failures.
+CLANG_FORMAT_STYLE="file:${REPO_ROOT}/.clang-format"
+if [ ! -f "$REPO_ROOT/.clang-format" ]; then
+    echo -e "${RED}Error: .clang-format not found at $REPO_ROOT/.clang-format${NC}"
+    exit 1
+fi
+
 # Parse arguments
 CHECK_MODE=false
 FILES=()
@@ -71,6 +81,7 @@ format_one_file() {
     local file="$1"
     local tmpdir="$2"
     local check_mode="$3"
+    local style="$4"
 
     if [ ! -f "$file" ]; then
         return 0
@@ -80,13 +91,18 @@ format_one_file() {
 
     if [ "$check_mode" = "true" ]; then
         # Check mode: verify formatting without changes
-        if ! clang-format --dry-run --Werror "$file" 2>/dev/null; then
+        if ! clang-format --style="$style" --dry-run --Werror "$file" 2>/dev/null; then
             echo "FAIL:$file"
             echo "1" > "$exitfile"
+            # Surface a short unified diff for CI diagnosis (version skew, etc.)
+            if command -v diff >/dev/null 2>&1; then
+                clang-format --style="$style" "$file" 2>/dev/null | diff -u "$file" - 2>/dev/null | head -n 40 \
+                    > "$tmpdir/$(echo "$file" | tr '/' '_').diff" || true
+            fi
         fi
     else
         # Format mode: apply changes
-        clang-format -i "$file"
+        clang-format --style="$style" -i "$file"
         echo "OK:$file"
     fi
 }
@@ -96,7 +112,7 @@ export -f format_one_file
 echo -e "${GREEN}Processing ${#FILES[@]} files with $NPROCS parallel jobs...${NC}"
 
 OUTPUT=$(printf '%s\n' "${FILES[@]}" | xargs -P "$NPROCS" -I {} bash -c \
-    'format_one_file "$1" "$2" "$3"' _ {} "$TMPDIR" "$CHECK_MODE")
+    'format_one_file "$1" "$2" "$3" "$4"' _ {} "$TMPDIR" "$CHECK_MODE" "$CLANG_FORMAT_STYLE")
 
 # Process output
 FAILED=0
@@ -108,6 +124,11 @@ while IFS= read -r line; do
         file="${line#FAIL:}"
         echo -e "${RED}✗${NC} $file"
         FAILED=1
+        difffile="$TMPDIR/$(echo "$file" | tr '/' '_').diff"
+        if [ -s "$difffile" ]; then
+            echo "  ($(clang-format --version 2>/dev/null | head -1))"
+            sed 's/^/  /' "$difffile"
+        fi
     elif [[ "$line" == OK:* ]]; then
         file="${line#OK:}"
         echo -e "${GREEN}Formatted:${NC} $file"
@@ -118,6 +139,7 @@ if [ $FAILED -ne 0 ]; then
     echo ""
     echo -e "${RED}Formatting check failed!${NC}"
     echo "Run 'bazel run :format' to fix formatting issues."
+    echo "Note: use the same clang-format major version as CI (ubuntu-latest apt package)."
     exit 1
 fi
 

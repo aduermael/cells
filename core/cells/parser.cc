@@ -244,7 +244,7 @@ bool Parser::parseTheme(std::string_view line) {
                 (end == std::string_view::npos) ? line : line.substr(0, end);
 
             const std::string valStr(valueStr);
-            int count = 0;
+            size_t count = 0;
             size_t pos = 0;
             while (count < 12 && pos < valStr.size()) {
                 size_t commaPos = valStr.find(',', pos);

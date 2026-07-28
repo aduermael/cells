@@ -1,11 +1,11 @@
 #include "core/cells/functions/fn_math.h"
 
 #include <cmath>
+
+#include <gtest/gtest.h>
 #include <memory>
 #include <string>
 #include <unordered_set>
-
-#include <gtest/gtest.h>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_eval.h"
@@ -411,11 +411,10 @@ TEST_F(FnMathTest, IsoCeilingMatchesCeilingPrecise) {
 
 TEST_F(FnMathTest, AllNewFunctionsRegistered) {
     const char* names[] = {
-        "PRODUCT",       "SUMSQ",         "EVEN",       "ODD",
-        "MROUND",        "SQRTPI",        "CSCH",       "SECH",
-        "COTH",          "ACOT",          "ACOTH",      "GCD",
-        "LCM",           "FACTDOUBLE",    "FLOOR_PRECISE", "CEILING_PRECISE",
-        "ISO_CEILING",
+        "PRODUCT",         "SUMSQ",       "EVEN", "ODD",        "MROUND",
+        "SQRTPI",          "CSCH",        "SECH", "COTH",       "ACOT",
+        "ACOTH",           "GCD",         "LCM",  "FACTDOUBLE", "FLOOR_PRECISE",
+        "CEILING_PRECISE", "ISO_CEILING",
     };
     FunctionRegistry& reg = FunctionRegistry::instance();
     for (const char* name : names) {
