@@ -1,3 +1,6 @@
+// Signaling room and peer management for WebRTC collaboration.
+// Tracks peers per room, broadcasts presence, and cleans up idle rooms.
+
 package main
 
 import (
