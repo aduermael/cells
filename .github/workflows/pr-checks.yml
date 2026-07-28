@@ -71,7 +71,10 @@ jobs:
       - name: Install clang-format
         run: |
           sudo apt-get update
+          # Pin to the Ubuntu package default for this runner image and print
+          # the version so local tooling can match if check fails.
           sudo apt-get install -y clang-format
+          clang-format --version
 
       - name: Check formatting
         run: bazel run :format -- --check

@@ -641,6 +641,8 @@ cc_test(
     name = "large_file_test",
     srcs = ["large_file_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
+    # Loads ~500k cells; keep a longer timeout so slow CI hosts don't mis-size it.
+    size = "large",
     deps = [
         ":viewport_index",
         ":xlsx_reader",
