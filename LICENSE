@@ -1,0 +1,28 @@
+Cells Dual License
+==================
+
+Copyright (c) 2025-2026 Adrian Duermael
+
+Cells is dual-licensed. You may choose either of the following licenses:
+
+1. Open Source License (GPL-3.0)
+--------------------------------
+You may use, copy, modify, and distribute this software under the terms of
+the GNU General Public License, version 3 (GPL-3.0).
+
+Under the GPL-3.0, if you distribute Cells (or a modified version, or a
+larger work that incorporates Cells), you must make the complete corresponding
+source code available under the GPL-3.0 as well. In practice, this means
+projects that use Cells under this license must themselves be open source
+under GPL-compatible terms.
+
+See the full license text in LICENSE-GPL-3.0.
+
+2. Commercial License
+---------------------
+If you wish to use Cells in a proprietary or closed-source product, or under
+terms other than the GPL-3.0, you may obtain a commercial license.
+
+See LICENSE-COMMERCIAL for details.
+
+SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Cells-Commercial
