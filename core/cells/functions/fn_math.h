@@ -6,9 +6,10 @@
 // Includes SUM, AVERAGE, MIN, MAX, ABS, SQRT, ROUND, etc.
 //
 // Categories:
-// - Aggregate: SUM, AVERAGE, COUNT, COUNTA, MIN, MAX
-// - Basic math: ABS, SQRT, POWER, MOD, INT
-// - Rounding: ROUND, FLOOR, CEILING
+// - Aggregate: SUM, PRODUCT, SUMSQ, AVERAGE, COUNT, COUNTA, MIN, MAX
+// - Basic math: ABS, SQRT, POWER, MOD, INT, GCD, LCM, FACT, FACTDOUBLE
+// - Rounding: ROUND, FLOOR, CEILING, MROUND, EVEN, ODD (+ PRECISE/ISO aliases)
+// - Trig / hyperbolic: SIN/COS/... plus CSCH/SECH/COTH/ACOT/ACOTH
 //
 // Dependencies: formula_eval.h
 // Used by: FunctionRegistry initialization
@@ -35,6 +36,12 @@ class FunctionRegistry;
 // SUM(value1, [value2], ...) - Adds all numbers in the argument list
 EvalResult fn_SUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// PRODUCT(value1, [value2], ...) - Multiplies all numbers in the argument list
+EvalResult fn_PRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// SUMSQ(value1, [value2], ...) - Sum of squares of numbers
+EvalResult fn_SUMSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // AVERAGE(value1, [value2], ...) - Returns arithmetic mean of numbers
 EvalResult fn_AVERAGE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
@@ -60,6 +67,9 @@ EvalResult fn_ABS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // SQRT(number) - Returns square root
 EvalResult fn_SQRT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// SQRTPI(number) - Returns square root of (number * pi)
+EvalResult fn_SQRTPI(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // POWER(number, power) - Returns number raised to power
 EvalResult fn_POWER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
@@ -72,10 +82,10 @@ EvalResult fn_ROUNDUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // ROUNDDOWN(number, [num_digits]) - Rounds toward zero
 EvalResult fn_ROUNDDOWN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
-// FLOOR(number) - Rounds down toward negative infinity
+// FLOOR(number, [significance]) - Rounds down (1-arg: toward -inf; 2-arg: classic)
 EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
-// CEILING(number) - Rounds up toward positive infinity
+// CEILING(number, [significance]) - Rounds up (1-arg: toward +inf; 2-arg: classic)
 EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // CEILING_MATH(number, [significance], [mode]) - Rounds up to nearest multiple
@@ -83,6 +93,24 @@ EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext&
 
 // FLOOR_MATH(number, [significance], [mode]) - Rounds down to nearest multiple
 EvalResult fn_FLOOR_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// FLOOR_PRECISE(number, [significance]) - Floor using abs(significance) toward -inf
+EvalResult fn_FLOOR_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// CEILING_PRECISE(number, [significance]) - Ceiling using abs(significance) toward +inf
+EvalResult fn_CEILING_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ISO_CEILING(number, [significance]) - Alias of CEILING_PRECISE
+EvalResult fn_ISO_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// MROUND(number, multiple) - Rounds to nearest multiple
+EvalResult fn_MROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// EVEN(number) - Rounds away from zero to nearest even integer
+EvalResult fn_EVEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ODD(number) - Rounds away from zero to nearest odd integer
+EvalResult fn_ODD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // MOD(number, divisor) - Returns remainder after division
 EvalResult fn_MOD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
@@ -104,6 +132,15 @@ EvalResult fn_TRUNC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // FACT(number) - Returns the factorial
 EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// FACTDOUBLE(number) - Returns the double factorial
+EvalResult fn_FACTDOUBLE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// GCD(number1, [number2], ...) - Greatest common divisor
+EvalResult fn_GCD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// LCM(number1, [number2], ...) - Least common multiple
+EvalResult fn_LCM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // QUOTIENT(numerator, denominator) - Returns integer portion of division
 EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
@@ -142,6 +179,9 @@ EvalResult fn_ATAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // ATAN2(x_num, y_num) - Returns the arctangent of x and y coordinates
 EvalResult fn_ATAN2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// ACOT(number) - Returns the arccotangent
+EvalResult fn_ACOT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // CSC(number) - Returns the cosecant
 EvalResult fn_CSC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
@@ -172,6 +212,18 @@ EvalResult fn_ACOSH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // ATANH(number) - Returns the inverse hyperbolic tangent
 EvalResult fn_ATANH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ACOTH(number) - Returns the inverse hyperbolic cotangent
+EvalResult fn_ACOTH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// CSCH(number) - Returns the hyperbolic cosecant
+EvalResult fn_CSCH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// SECH(number) - Returns the hyperbolic secant
+EvalResult fn_SECH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// COTH(number) - Returns the hyperbolic cotangent
+EvalResult fn_COTH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Angle Conversion Functions

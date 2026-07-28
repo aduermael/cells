@@ -3,7 +3,7 @@
 Living status of Cells vs Microsoft Excel: formulas, spreadsheet features, file I/O, and UI.
 
 **Last reviewed:** 2026-07-28  
-**Function count:** **120** registered (Excel has ~484 worksheet functions ≈ **25%**)  
+**Function count:** **137** registered (Excel has ~484 worksheet functions ≈ **28%**)  
 **Source of truth for implementations:** `core/cells/functions/fn_*.cc`
 
 Update this document when adding functions, shipping features, or changing XLSX fidelity. Cross-check the function list against the registry if counts drift.
@@ -15,7 +15,7 @@ Update this document when adding functions, shipping features, or changing XLSX 
 | Area | Status | Notes |
 |------|--------|-------|
 | Formula engine (parse / eval / deps / spill) | ✅ Solid | AST-native C++; UUID-stable refs |
-| Function library breadth | 🟡 Partial | 120 / ~484 Excel functions |
+| Function library breadth | 🟡 Partial | 137 / ~484 Excel functions |
 | Grid editing & selection | ✅ Solid | Fill handle, multi-range, formula bar |
 | Cell / range formatting | ✅ Solid | Fonts, fills, borders, number formats, themes |
 | XLSX import / export | 🟡 Partial | Values, formulas, styles, merges; fidelity still improving |
@@ -58,7 +58,7 @@ Details: [Formula Engine](./formula-engine.md).
 
 | Category | Implemented | Excel (approx.) | Coverage (rough) |
 |----------|------------:|----------------:|------------------:|
-| Math & trig | 47 | ~80 | High for core + trig |
+| Math & trig | 64 | ~80 | High for core + trig + common extras |
 | Logic / information (subset) | 21 | ~40 | Strong modern set (`LET`, `LAMBDA`, `IFS`, …) |
 | Text | 19 | ~50 | Core string ops |
 | Date / time | 14 | ~40 | Core extractors; missing workday helpers |
@@ -69,7 +69,7 @@ Details: [Formula Engine](./formula-engine.md).
 | Engineering | 0 | ~50 | Entire category missing |
 | Database | 0 | ~12 | Entire category missing |
 | Cube / web / other | 0 | many | Out of scope for now |
-| **Total registered** | **120** | **~484** | **~25%** |
+| **Total registered** | **137** | **~484** | **~28%** |
 
 Excel totals vary by version (Microsoft 365 adds functions over time). Counts above are directional, not exact product marketing numbers.
 
@@ -87,33 +87,39 @@ Categories currently green in that harness: **logical**, **math-basic**, **math-
 
 ---
 
-### Implemented functions (120)
+### Implemented functions (137)
 
 Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → `CEILING_MATH` on XLSX import via `_xlfn.` stripping). Some aliases omit the underscore (`STDEVS` for `STDEV.S`, `PERCENTILEINC` for `PERCENTILE.INC`).
 
-#### Math (47)
+#### Math (64)
 
 | Function | Description |
 |----------|-------------|
 | `SUM` | Adds all numbers in a range |
+| `PRODUCT` | Multiplies all numbers |
+| `SUMSQ` | Sum of squares |
 | `AVERAGE` | Arithmetic mean |
 | `COUNT` | Counts cells containing numbers |
 | `COUNTA` | Counts non-empty cells |
 | `MIN` / `MAX` | Smallest / largest value |
 | `ABS` | Absolute value |
-| `SQRT` | Square root |
+| `SQRT` / `SQRTPI` | Square root; √(n·π) |
 | `POWER` | Raise to a power |
 | `ROUND` / `ROUNDUP` / `ROUNDDOWN` | Rounding |
-| `FLOOR` / `CEILING` | Round toward −∞ / +∞ (integer) |
+| `MROUND` / `EVEN` / `ODD` | Round to multiple / even / odd |
+| `FLOOR` / `CEILING` | 1-arg: toward −∞ / +∞; 2-arg classic significance |
 | `FLOOR_MATH` / `CEILING_MATH` | Round to significance (`FLOOR.MATH` / `CEILING.MATH`) |
+| `FLOOR_PRECISE` / `CEILING_PRECISE` / `ISO_CEILING` | Precise/ISO significance (abs) |
 | `MOD` / `INT` / `TRUNC` / `QUOTIENT` | Integer arithmetic |
+| `GCD` / `LCM` | Greatest common divisor / least common multiple |
 | `SIGN` | Sign of a number |
 | `EXP` / `LN` / `LOG` / `LOG10` | Exponentials and logs |
-| `FACT` | Factorial |
+| `FACT` / `FACTDOUBLE` | Factorial / double factorial |
 | `PI` | π |
-| `SIN` / `COS` / `TAN` / `ASIN` / `ACOS` / `ATAN` / `ATAN2` | Trig |
+| `SIN` / `COS` / `TAN` / `ASIN` / `ACOS` / `ATAN` / `ATAN2` / `ACOT` | Trig |
 | `CSC` / `SEC` / `COT` | Reciprocal trig |
-| `SINH` / `COSH` / `TANH` / `ASINH` / `ACOSH` / `ATANH` | Hyperbolic |
+| `SINH` / `COSH` / `TANH` / `ASINH` / `ACOSH` / `ATANH` / `ACOTH` | Hyperbolic |
+| `CSCH` / `SECH` / `COTH` | Reciprocal hyperbolic |
 | `RADIANS` / `DEGREES` | Angle conversion |
 | `RAND` / `RANDBETWEEN` | Random (volatile) |
 

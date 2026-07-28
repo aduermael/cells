@@ -10,7 +10,7 @@
 | AST Parser | ✅ Implemented |
 | Execution Engine | ✅ Implemented |
 | Dependency Graph | ✅ Implemented |
-| Function Library | ✅ 120 functions |
+| Function Library | ✅ 137 functions |
 | Dynamic Arrays (Spill) | ✅ Implemented |
 
 For the full function inventory, missing Excel functions, and product/feature parity, see [Excel Parity](./excel-parity.md).
@@ -154,18 +154,18 @@ Excel-compatible coercion rules:
 
 ## Function Library
 
-**120 functions** registered in `core/cells/functions/fn_*.cc`.
+**137 functions** registered in `core/cells/functions/fn_*.cc`.
 
 | Category | Count |
 |----------|------:|
-| Math (incl. trig + random) | 47 |
+| Math (incl. trig + random) | 64 |
 | Logic | 21 |
 | Text | 19 |
 | Date / time | 14 |
 | Statistics | 10 |
 | Array / dynamic | 5 |
 | Lookup | 4 |
-| **Total** | **120** |
+| **Total** | **137** |
 
 Full inventory, Excel aliases (`CEILING.MATH` → `CEILING_MATH`, etc.), and the missing-function backlog live in [Excel Parity](./excel-parity.md).
 

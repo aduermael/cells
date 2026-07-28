@@ -51,6 +51,19 @@ cc_test(
 )
 
 cc_test(
+    name = "fn_math_test",
+    srcs = ["fn_math_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "fn_stats_test",
     srcs = ["fn_stats_test.cc"],
     deps = [

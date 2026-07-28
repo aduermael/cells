@@ -1,15 +1,123 @@
 #include "core/cells/functions/fn_math.h"
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
 
 namespace cells {
+namespace {
 
 // Pre-computed conversion constants (matches Excel's computation order)
 constexpr double kDegreesToRadians = M_PI / 180.0;
 constexpr double kRadiansToDegrees = 180.0 / M_PI;
+
+// Round half away from zero to nearest integer (Excel ROUND(..., 0)).
+double roundHalfAwayFromZero(double value) {
+    if (value >= 0.0) {
+        return std::floor(value + 0.5);
+    }
+    return std::ceil(value - 0.5);
+}
+
+// Euclidean GCD on non-negative integers.
+std::int64_t gcdInt64(std::int64_t a, std::int64_t b) {
+    while (b != 0) {
+        const std::int64_t t = a % b;
+        a = b;
+        b = t;
+    }
+    return a;
+}
+
+// FLOOR.PRECISE / ISO floor: toward -inf using |significance|.
+EvalResult floorPreciseImpl(double value, double significance) {
+    if (significance == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    const double absSig = std::abs(significance);
+    const double result = std::floor(excelNormalize(value / absSig)) * absSig;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+// CEILING.PRECISE / ISO.CEILING: toward +inf using |significance|.
+EvalResult ceilingPreciseImpl(double value, double significance) {
+    if (significance == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    const double absSig = std::abs(significance);
+    const double result = std::ceil(excelNormalize(value / absSig)) * absSig;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+// Classic Excel FLOOR(number, significance): toward zero; same sign required.
+EvalResult floorClassic(double value, double significance) {
+    if (significance == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    if (value == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    // Mixed signs → #NUM! (Excel classic FLOOR).
+    if ((value > 0.0) != (significance > 0.0)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double result = std::trunc(value / significance) * significance;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+// Classic Excel CEILING(number, significance): away from zero; same sign required.
+EvalResult ceilingClassic(double value, double significance) {
+    if (significance == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    if (value == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    if ((value > 0.0) != (significance > 0.0)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double quotient = value / significance;
+    double result = NAN;
+    if (quotient == std::trunc(quotient)) {
+        result = value;
+    } else if (quotient > 0.0) {
+        result = std::ceil(quotient) * significance;
+    } else {
+        result = std::floor(quotient) * significance;
+    }
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+// Parse optional significance for PRECISE-style functions (default 1).
+EvalResult parseOptionalSignificance(const std::vector<const ASTNode*>& args, EvalContext& ctx,
+                                     double& significance) {
+    significance = 1.0;
+    if (args.size() >= 2) {
+        EvalResult sigResult = evaluateAsNumber(args[1], ctx);
+        if (sigResult.isError()) {
+            return sigResult;
+        }
+        significance = sigResult.getNumber();
+    }
+    return EvalResult::Number(0.0);  // ok marker (caller checks isError)
+}
+
+}  // namespace
 
 // =============================================================================
 // Aggregate Functions
@@ -27,6 +135,43 @@ EvalResult fn_SUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     }
     if (std::isinf(sum)) {
         return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(sum));
+}
+
+EvalResult fn_PRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+
+    // Excel: PRODUCT with no numeric values returns 0.
+    if (values.empty()) {
+        return EvalResult::Number(0.0);
+    }
+
+    double product = 1.0;
+    for (const double val : values) {
+        product *= val;
+        if (std::isinf(product)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    return EvalResult::Number(excelNormalize(product));
+}
+
+EvalResult fn_SUMSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+
+    double sum = 0.0;
+    for (const double val : values) {
+        sum += val * val;
+        if (std::isinf(sum)) {
+            return EvalResult::Error(CellError::NUM);
+        }
     }
     return EvalResult::Number(excelNormalize(sum));
 }
@@ -343,7 +488,7 @@ EvalResult fn_ROUNDDOWN(const std::vector<const ASTNode*>& args, EvalContext& ct
 }
 
 EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
-    if (args.size() != 1) {
+    if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
 
@@ -352,10 +497,113 @@ EvalResult fn_FLOOR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return num;
     }
 
-    return EvalResult::Number(excelNormalize(std::floor(num.getNumber())));
+    // One-arg: mathematical floor (toward -inf) — preserved for existing callers.
+    if (args.size() == 1) {
+        return EvalResult::Number(excelNormalize(std::floor(num.getNumber())));
+    }
+
+    EvalResult sig = evaluateAsNumber(args[1], ctx);
+    if (sig.isError()) {
+        return sig;
+    }
+    return floorClassic(num.getNumber(), sig.getNumber());
 }
 
 EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    // One-arg: mathematical ceil (toward +inf) — preserved for existing callers.
+    if (args.size() == 1) {
+        return EvalResult::Number(excelNormalize(std::ceil(num.getNumber())));
+    }
+
+    EvalResult sig = evaluateAsNumber(args[1], ctx);
+    if (sig.isError()) {
+        return sig;
+    }
+    return ceilingClassic(num.getNumber(), sig.getNumber());
+}
+
+EvalResult fn_FLOOR_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    double significance = 1.0;
+    EvalResult sigOk = parseOptionalSignificance(args, ctx, significance);
+    if (sigOk.isError()) {
+        return sigOk;
+    }
+    return floorPreciseImpl(num.getNumber(), significance);
+}
+
+EvalResult fn_CEILING_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    double significance = 1.0;
+    EvalResult sigOk = parseOptionalSignificance(args, ctx, significance);
+    if (sigOk.isError()) {
+        return sigOk;
+    }
+    return ceilingPreciseImpl(num.getNumber(), significance);
+}
+
+EvalResult fn_ISO_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // ISO.CEILING is identical to CEILING.PRECISE.
+    return fn_CEILING_PRECISE(args, ctx);
+}
+
+EvalResult fn_MROUND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+    EvalResult multiple = evaluateAsNumber(args[1], ctx);
+    if (multiple.isError()) {
+        return multiple;
+    }
+
+    const double value = num.getNumber();
+    const double mult = multiple.getNumber();
+    if (mult == 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    // Different signs → #NUM!
+    if ((value > 0.0) != (mult > 0.0) && value != 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    const double result = roundHalfAwayFromZero(value / mult) * mult;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_EVEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
@@ -365,7 +613,70 @@ EvalResult fn_CEILING(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return num;
     }
 
-    return EvalResult::Number(excelNormalize(std::ceil(num.getNumber())));
+    const double value = num.getNumber();
+    double result = NAN;
+    if (value >= 0.0) {
+        result = std::ceil(value);
+        if (std::fmod(result, 2.0) != 0.0) {
+            result += 1.0;
+        }
+    } else {
+        result = std::floor(value);
+        if (std::fmod(result, 2.0) != 0.0) {
+            result -= 1.0;
+        }
+    }
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_ODD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double value = num.getNumber();
+    double result = NAN;
+    if (value >= 0.0) {
+        result = std::ceil(value);
+        if (std::fmod(result, 2.0) == 0.0) {
+            result += 1.0;
+        }
+    } else {
+        result = std::floor(value);
+        // fmod of negative is negative or zero; treat even as |result| even.
+        if (std::fmod(result, 2.0) == 0.0) {
+            result -= 1.0;
+        }
+    }
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_SQRTPI(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    if (val < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(std::sqrt(val * M_PI)));
 }
 
 EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -661,6 +972,92 @@ EvalResult fn_FACT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         result *= i;
     }
     return EvalResult::Number(result);
+}
+
+EvalResult fn_FACTDOUBLE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    // Excel: negative → #NUM!
+    if (val < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    const auto n = static_cast<int>(std::floor(val));
+    double result = 1.0;
+    for (int i = n; i >= 2; i -= 2) {
+        result *= static_cast<double>(i);
+        if (std::isinf(result)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_GCD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    std::int64_t acc = 0;
+    for (const double val : values) {
+        // Excel: any argument < 0 → #NUM!; non-integers are truncated toward zero.
+        if (val < 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        const auto n = static_cast<std::int64_t>(std::trunc(val));
+        acc = gcdInt64(acc, n);
+    }
+    return EvalResult::Number(static_cast<double>(acc));
+}
+
+EvalResult fn_LCM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    std::int64_t acc = 1;
+    for (const double val : values) {
+        // Excel: any argument < 0 → #NUM!; non-integers are truncated toward zero.
+        if (val < 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        const auto n = static_cast<std::int64_t>(std::trunc(val));
+        if (n == 0) {
+            return EvalResult::Number(0.0);
+        }
+        // LCM(a,b) = a / GCD(a,b) * b  (order avoids intermediate overflow when possible)
+        const std::int64_t g = gcdInt64(acc, n);
+        // Check overflow before multiplying.
+        if (acc / g > (std::numeric_limits<std::int64_t>::max() / n)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        acc = (acc / g) * n;
+    }
+    return EvalResult::Number(static_cast<double>(acc));
 }
 
 EvalResult fn_QUOTIENT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -1031,6 +1428,110 @@ EvalResult fn_ATANH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(excelNormalize(std::atanh(val)));
 }
 
+EvalResult fn_ACOT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    // Excel ACOT range is (0, π]: π/2 - atan(x).
+    return EvalResult::Number(excelNormalize(M_PI_2 - std::atan(num.getNumber())));
+}
+
+EvalResult fn_ACOTH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double val = num.getNumber();
+    // Domain: |x| > 1
+    if (std::abs(val) <= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    // ACOTH(x) = atanh(1/x)
+    const double result = std::atanh(1.0 / val);
+    if (std::isnan(result) || std::isinf(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_CSCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double sinhVal = std::sinh(num.getNumber());
+    if (sinhVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = 1.0 / sinhVal;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_SECH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double coshVal = std::cosh(num.getNumber());
+    // cosh is always >= 1 for real inputs; still guard overflow of cosh itself.
+    if (std::isinf(coshVal)) {
+        return EvalResult::Number(0.0);
+    }
+    if (coshVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(1.0 / coshVal));
+}
+
+EvalResult fn_COTH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+
+    const double x = num.getNumber();
+    const double sinhVal = std::sinh(x);
+    if (sinhVal == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+
+    const double result = std::cosh(x) / sinhVal;
+    if (std::isinf(result)) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
 EvalResult fn_RADIANS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
@@ -1073,6 +1574,10 @@ void registerMathFunctions(FunctionRegistry& registry) {
     // Aggregate functions
     registry.registerFunction("SUM", fn_SUM, "(number1, [number2], ...)",
                               "Adds all numbers in a range", "Math");
+    registry.registerFunction("PRODUCT", fn_PRODUCT, "(number1, [number2], ...)",
+                              "Multiplies all numbers", "Math");
+    registry.registerFunction("SUMSQ", fn_SUMSQ, "(number1, [number2], ...)",
+                              "Returns the sum of squares", "Math");
     registry.registerFunction("AVERAGE", fn_AVERAGE, "(number1, [number2], ...)",
                               "Returns the arithmetic mean", "Math");
     registry.registerFunction("COUNT", fn_COUNT, "(value1, [value2], ...)",
@@ -1087,6 +1592,8 @@ void registerMathFunctions(FunctionRegistry& registry) {
     // Basic math functions
     registry.registerFunction("ABS", fn_ABS, "(number)", "Returns the absolute value", "Math");
     registry.registerFunction("SQRT", fn_SQRT, "(number)", "Returns the square root", "Math");
+    registry.registerFunction("SQRTPI", fn_SQRTPI, "(number)",
+                              "Returns the square root of (number * pi)", "Math");
     registry.registerFunction("POWER", fn_POWER, "(number, power)",
                               "Returns number raised to a power", "Math");
     registry.registerFunction("ROUND", fn_ROUND, "(number, [num_digits])",
@@ -1095,14 +1602,26 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Rounds away from zero", "Math");
     registry.registerFunction("ROUNDDOWN", fn_ROUNDDOWN, "(number, [num_digits])",
                               "Rounds toward zero", "Math");
-    registry.registerFunction("FLOOR", fn_FLOOR, "(number)", "Rounds down to nearest integer",
-                              "Math");
-    registry.registerFunction("CEILING", fn_CEILING, "(number)", "Rounds up to nearest integer",
-                              "Math");
+    registry.registerFunction("FLOOR", fn_FLOOR, "(number, [significance])",
+                              "Rounds down (1-arg toward -inf; 2-arg classic)", "Math");
+    registry.registerFunction("CEILING", fn_CEILING, "(number, [significance])",
+                              "Rounds up (1-arg toward +inf; 2-arg classic)", "Math");
     registry.registerFunction("CEILING_MATH", fn_CEILING_MATH, "(number, [significance], [mode])",
                               "Rounds up to nearest multiple of significance", "Math");
     registry.registerFunction("FLOOR_MATH", fn_FLOOR_MATH, "(number, [significance], [mode])",
                               "Rounds down to nearest multiple of significance", "Math");
+    registry.registerFunction("FLOOR_PRECISE", fn_FLOOR_PRECISE, "(number, [significance])",
+                              "Rounds down using absolute significance", "Math");
+    registry.registerFunction("CEILING_PRECISE", fn_CEILING_PRECISE, "(number, [significance])",
+                              "Rounds up using absolute significance", "Math");
+    registry.registerFunction("ISO_CEILING", fn_ISO_CEILING, "(number, [significance])",
+                              "Rounds up using absolute significance (ISO)", "Math");
+    registry.registerFunction("MROUND", fn_MROUND, "(number, multiple)",
+                              "Rounds to the nearest multiple", "Math");
+    registry.registerFunction("EVEN", fn_EVEN, "(number)",
+                              "Rounds away from zero to nearest even integer", "Math");
+    registry.registerFunction("ODD", fn_ODD, "(number)",
+                              "Rounds away from zero to nearest odd integer", "Math");
     registry.registerFunction("MOD", fn_MOD, "(number, divisor)",
                               "Returns remainder after division", "Math");
     registry.registerFunction("INT", fn_INT, "(number)", "Truncates to an integer", "Math");
@@ -1112,6 +1631,12 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("TRUNC", fn_TRUNC, "(number, [num_digits])",
                               "Truncates to specified digits", "Math");
     registry.registerFunction("FACT", fn_FACT, "(number)", "Returns the factorial", "Math");
+    registry.registerFunction("FACTDOUBLE", fn_FACTDOUBLE, "(number)",
+                              "Returns the double factorial", "Math");
+    registry.registerFunction("GCD", fn_GCD, "(number1, [number2], ...)",
+                              "Returns the greatest common divisor", "Math");
+    registry.registerFunction("LCM", fn_LCM, "(number1, [number2], ...)",
+                              "Returns the least common multiple", "Math");
     registry.registerFunction("QUOTIENT", fn_QUOTIENT, "(numerator, denominator)",
                               "Returns integer portion of division", "Math");
     registry.registerFunction("LOG10", fn_LOG10, "(number)", "Returns the base-10 logarithm",
@@ -1128,6 +1653,7 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("ATAN", fn_ATAN, "(number)", "Returns the arctangent", "Math");
     registry.registerFunction("ATAN2", fn_ATAN2, "(x_num, y_num)",
                               "Returns the arctangent of x and y coordinates", "Math");
+    registry.registerFunction("ACOT", fn_ACOT, "(number)", "Returns the arccotangent", "Math");
     registry.registerFunction("CSC", fn_CSC, "(number)", "Returns the cosecant", "Math");
     registry.registerFunction("SEC", fn_SEC, "(number)", "Returns the secant", "Math");
     registry.registerFunction("COT", fn_COT, "(number)", "Returns the cotangent", "Math");
@@ -1141,6 +1667,14 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Returns the inverse hyperbolic cosine", "Math");
     registry.registerFunction("ATANH", fn_ATANH, "(number)",
                               "Returns the inverse hyperbolic tangent", "Math");
+    registry.registerFunction("ACOTH", fn_ACOTH, "(number)",
+                              "Returns the inverse hyperbolic cotangent", "Math");
+    registry.registerFunction("CSCH", fn_CSCH, "(number)", "Returns the hyperbolic cosecant",
+                              "Math");
+    registry.registerFunction("SECH", fn_SECH, "(number)", "Returns the hyperbolic secant",
+                              "Math");
+    registry.registerFunction("COTH", fn_COTH, "(number)", "Returns the hyperbolic cotangent",
+                              "Math");
     registry.registerFunction("RADIANS", fn_RADIANS, "(angle)", "Converts degrees to radians",
                               "Math");
     registry.registerFunction("DEGREES", fn_DEGREES, "(angle)", "Converts radians to degrees",
