@@ -4,7 +4,7 @@ A modern spreadsheet engine!
 
 Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
 
-**[Demo](https://cells-app.fly.dev/)** | [Documentation](./docs/)
+**[Demo](https://cells-app.fly.dev/)** | [GitHub Pages](https://aduermael.github.io/cells/) | [Documentation](./docs/)
 
 ## What is Cells?
 
@@ -196,6 +196,44 @@ bazel run :e2e-headed       # E2E tests (visible browser)
 bazel run :lint             # Run linter
 bazel run :format           # Format code
 bazel run :check            # All checks (test + lint + types)
+
+# Landing site (GitHub Pages artifact)
+./tools/prepare-pages.sh    # → dist/pages/
+```
+
+## Deploy 🚀
+
+Production deploys are **manual** GitHub Actions workflows (no auto-deploy on push):
+
+| Workflow | What it deploys |
+|----------|-----------------|
+| **Deploy server (Fly.io)** | Collaboration server + WASM app → [cells-app.fly.dev](https://cells-app.fly.dev/) |
+| **Deploy website (GitHub Pages)** | Minimal landing page (iframe demo + links) → GitHub Pages |
+| **Deploy all** | Both of the above (reuses the same workflows) |
+
+### GitHub `production` environment secrets
+
+| Secret | Where | Required | Purpose |
+|--------|-------|----------|---------|
+| `FLY_API_TOKEN` | GitHub Environment **production** | Yes (server) | `flyctl deploy` |
+
+### Fly app secrets (not GitHub)
+
+Set with `fly secrets set` on the `cells-app` app:
+
+| Secret | Required | Purpose |
+|--------|----------|---------|
+| `ANTHROPIC_API_KEY` | No | Enables the AI agent (`-enable-agent`) |
+
+### One-time GitHub Pages setting
+
+**Settings → Pages → Build and deployment → Source: GitHub Actions**
+
+Local preview of the landing page:
+
+```bash
+./tools/prepare-pages.sh
+# open dist/pages/index.html (iframe still loads the live Fly app)
 ```
 
 ## Documentation 📚

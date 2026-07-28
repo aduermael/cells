@@ -1,23 +1,55 @@
-# Manual production deploy to Fly.io.
-# Requires the `production` GitHub Environment (approval + FLY_API_TOKEN secret).
-# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+# Deploy the collaboration server (Go + static WASM) to Fly.io.
+# Manual only. Also callable from deploy-all.yml (workflow_call).
+#
+# GitHub Environment: production
+#   Secrets:
+#     FLY_API_TOKEN — flyctl deploy token (required)
+# Fly app secrets (set via `fly secrets set`, not GitHub):
+#   ANTHROPIC_API_KEY — optional; enables the AI agent endpoint
 
-name: Fly Deploy
+name: Deploy server (Fly.io)
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   deploy:
-    name: Deploy app
+    name: Deploy server
     runs-on: ubuntu-latest
     environment: production
-    concurrency: deploy-group
+    concurrency:
+      group: deploy-server
+      cancel-in-progress: false
     steps:
       # actions/checkout@v4.2.2
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-wasm
+          repository-cache: true
+
+      # actions/setup-node@v4.4.0 — esbuild step inside wasm-dist
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/wasm/package-lock.json
+
+      - name: Install WASM frontend deps
+        working-directory: apps/wasm
+        run: npm ci
+
+      - name: Build production WASM (dist/wasm)
+        run: bazel run :wasm-dist
+
       # superfly/flyctl-actions/setup-flyctl@v1.6
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
-      - run: flyctl deploy --remote-only
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
