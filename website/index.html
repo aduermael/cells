@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cells — spreadsheet engine</title>
+  <meta name="description" content="A modern spreadsheet engine: browser UI with real-time collaboration, or a headless CLI.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="{{REPO_URL}}">
+      <img class="logo" src="favicon.svg" width="28" height="28" alt="">
+      <span>Cells</span>
+    </a>
+    <nav class="links">
+      <a href="{{APP_URL}}" target="_blank" rel="noopener">Open app</a>
+      <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
+      <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>A modern spreadsheet engine</h1>
+      <p class="tagline">
+        Browser UI with real-time collaboration, or a lightweight CLI —
+        same core engine either way.
+      </p>
+      <p class="cta">
+        <a class="btn primary" href="{{APP_URL}}" target="_blank" rel="noopener">Try the demo</a>
+        <a class="btn" href="{{REPO_URL}}" target="_blank" rel="noopener">View on GitHub</a>
+      </p>
+    </section>
+
+    <section class="demo" aria-label="Live demo">
+      <iframe
+        title="Cells spreadsheet demo"
+        src="{{APP_URL}}"
+        loading="lazy"
+        allow="clipboard-read; clipboard-write"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+    </section>
+
+    <section class="features">
+      <ul>
+        <li><strong>Real-time collaboration</strong> — peer-to-peer sync with CRDTs</li>
+        <li><strong>Excel compatible</strong> — import and export <code>.xlsx</code></li>
+        <li><strong>Scriptable</strong> — Luau scripts, headless CLI pipelines</li>
+        <li><strong>Git-friendly</strong> — text-based <code>.zcd</code> format</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="{{REPO_URL}}">aduermael/cells</a>
+      · dual-licensed (GPL-3.0 / commercial)
+    </p>
+  </footer>
+</body>
+</html>

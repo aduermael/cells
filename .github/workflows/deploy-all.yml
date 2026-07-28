@@ -1,0 +1,24 @@
+# Manually deploy both the Fly.io server and the GitHub Pages website.
+# Reuses the same workflows as the individual deploy entrypoints (DRY).
+
+name: Deploy all (server + website)
+
+on:
+  workflow_dispatch:
+
+# Called website workflow needs these; caller must grant them explicitly.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  server:
+    name: Server
+    uses: ./.github/workflows/fly-deploy.yml
+    secrets: inherit
+
+  website:
+    name: Website
+    uses: ./.github/workflows/website-deploy.yml
+    secrets: inherit

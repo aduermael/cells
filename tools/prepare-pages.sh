@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Assemble the static GitHub Pages site from website/ sources.
+#
+# Usage:
+#   ./tools/prepare-pages.sh [out_dir]
+#
+# Env (optional):
+#   APP_URL   iframe / demo URL (default: https://cells-app.fly.dev)
+#   REPO_URL  GitHub repository URL (default: https://github.com/aduermael/cells)
+#
+# Output: a clean directory suitable for actions/upload-pages-artifact.
+# Fails if any {{PLACEHOLDER}} tokens remain after substitution.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_DIR="$REPO_ROOT/website"
+OUT_DIR="${1:-$REPO_ROOT/dist/pages}"
+
+APP_URL="${APP_URL:-https://cells-app.fly.dev}"
+REPO_URL="${REPO_URL:-https://github.com/aduermael/cells}"
+
+# Normalize: strip trailing slash so iframe/src joins cleanly.
+APP_URL="${APP_URL%/}"
+REPO_URL="${REPO_URL%/}"
+
+if [[ ! -d "$SRC_DIR" ]]; then
+  echo "error: website sources not found at $SRC_DIR" >&2
+  exit 1
+fi
+
+if [[ ! -f "$SRC_DIR/index.html" || ! -f "$SRC_DIR/styles.css" ]]; then
+  echo "error: expected website/index.html and website/styles.css" >&2
+  exit 1
+fi
+
+rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR"
+
+# Substitute known placeholders only (KISS: sed, fixed token set).
+# Use | as delimiter so URLs with / do not break the expression.
+subst() {
+  local file="$1"
+  sed \
+    -e "s|{{APP_URL}}|${APP_URL}|g" \
+    -e "s|{{REPO_URL}}|${REPO_URL}|g" \
+    "$file"
+}
+
+subst "$SRC_DIR/index.html" >"$OUT_DIR/index.html"
+cp "$SRC_DIR/styles.css" "$OUT_DIR/styles.css"
+
+# Prefer the app favicon; fall back to shared icon.
+if [[ -f "$REPO_ROOT/apps/shared/favicons/favicon.svg" ]]; then
+  cp "$REPO_ROOT/apps/shared/favicons/favicon.svg" "$OUT_DIR/favicon.svg"
+elif [[ -f "$REPO_ROOT/apps/shared/icon.svg" ]]; then
+  cp "$REPO_ROOT/apps/shared/icon.svg" "$OUT_DIR/favicon.svg"
+else
+  echo "error: no favicon.svg source under apps/shared/" >&2
+  exit 1
+fi
+
+# Fail closed on unresolved template tokens.
+if grep -R -n -E '\{\{[A-Z0-9_]+\}\}|__PLACEHOLDER__' "$OUT_DIR" >/dev/null; then
+  echo "error: unresolved placeholders in $OUT_DIR:" >&2
+  grep -R -n -E '\{\{[A-Z0-9_]+\}\}|__PLACEHOLDER__' "$OUT_DIR" >&2 || true
+  exit 1
+fi
+
+# Basic structure checks so a broken assemble fails in CI.
+if ! grep -q '<iframe' "$OUT_DIR/index.html"; then
+  echo "error: assembled index.html is missing an <iframe>" >&2
+  exit 1
+fi
+if ! grep -q "src=\"${APP_URL}\"" "$OUT_DIR/index.html"; then
+  echo "error: iframe src does not match APP_URL=${APP_URL}" >&2
+  exit 1
+fi
+if ! grep -q "$REPO_URL" "$OUT_DIR/index.html"; then
+  echo "error: assembled index.html is missing REPO_URL" >&2
+  exit 1
+fi
+
+echo "Pages artifact ready: $OUT_DIR"
+ls -la "$OUT_DIR"
