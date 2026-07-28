@@ -1,8 +1,8 @@
 #!/bin/bash
-# Generate project stats for README
+# Generate project stats for docs/project-stats.md
 # Usage: ./tools/generate-stats.sh [--build] [--update]
 # Use --build to rebuild WASM before calculating sizes
-# Use --update to update README.md and commit
+# Use --update to update docs/project-stats.md and commit
 
 set -e
 
@@ -12,7 +12,7 @@ cd "$PROJECT_ROOT"
 
 # Parse arguments
 BUILD_WASM=false
-UPDATE_README=false
+UPDATE_DOCS=false
 for arg in "$@"; do
     case $arg in
         --build)
@@ -20,7 +20,7 @@ for arg in "$@"; do
             shift
             ;;
         --update)
-            UPDATE_README=true
+            UPDATE_DOCS=true
             shift
             ;;
     esac
@@ -212,10 +212,10 @@ if [ -d "$PROJECT_ROOT/dist/wasm" ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Generate README section
+# Generate docs/project-stats.md body (without title)
 # -----------------------------------------------------------------------------
 
-generate_readme_section() {
+generate_stats_body() {
     # Create temp files for sorting
     local TEMP_FILE=$(mktemp)
     local TEMP_TEST_FILE=$(mktemp)
@@ -243,9 +243,7 @@ generate_readme_section() {
     [ "$csharp_test_lines" -gt 0 ] && echo "$csharp_test_lines C#" >> "$TEMP_TEST_FILE"
     [ "$sh_test_lines" -gt 0 ] && echo "$sh_test_lines Shell" >> "$TEMP_TEST_FILE"
 
-    echo "## Project Stats"
-    echo ""
-    echo "### Source Code"
+    echo "## Source Code"
     echo ""
     echo "| Language | Lines |"
     echo "|----------|------:|"
@@ -256,7 +254,7 @@ generate_readme_section() {
     done
 
     echo ""
-    echo "### Test Code"
+    echo "## Test Code"
     echo ""
     echo "| Language | Lines |"
     echo "|----------|------:|"
@@ -271,7 +269,7 @@ generate_readme_section() {
     fi
 
     echo ""
-    echo "### Documentation"
+    echo "## Documentation"
     echo ""
     echo "| Type | Lines |"
     echo "|------|------:|"
@@ -288,7 +286,7 @@ generate_readme_section() {
     fi
 
     echo ""
-    echo "### Test Counts"
+    echo "## Test Counts"
     echo ""
     echo "| Category | Tests |"
     echo "|----------|------:|"
@@ -306,44 +304,50 @@ generate_readme_section() {
     echo ""
     echo "<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with \`./tools/generate-stats.sh\`</sub>"
     echo ""
-    echo "### LOC Evolution"
+    echo "## LOC Evolution"
     echo ""
-    echo '<img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">'
+    # Paths relative to docs/project-stats.md
+    echo '<img src="../stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">'
     echo ""
     echo "<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with \`./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs\`</sub>"
     echo ""
-    echo "### Diff Size Evolution"
+    echo "## Diff Size Evolution"
     echo ""
-    echo '<img src="stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">'
+    echo '<img src="../stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">'
     echo ""
     echo "<sub>Average diff size per commit (lines added + removed, code files only). Generate with \`./tools/diff-tracker.sh && node tools/generate-diff-svg.mjs\`</sub>"
+}
+
+generate_stats_document() {
+    echo "# Project Stats"
+    echo ""
+    echo "Generated snapshot of codebase size, test coverage, and build artifacts."
+    echo ""
+    echo "To regenerate this page and commit:"
+    echo ""
+    echo '```bash'
+    echo "./tools/generate-stats.sh --update"
+    echo '```'
+    echo ""
+    echo "Use \`--build\` to rebuild the WASM distribution before measuring sizes."
+    echo ""
+    generate_stats_body
 }
 
 # -----------------------------------------------------------------------------
 # Output
 # -----------------------------------------------------------------------------
 
-if [ "$UPDATE_README" = true ]; then
-    README_FILE="$PROJECT_ROOT/README.md"
-    TEMP_SECTION=$(mktemp)
+STATS_DOC="$PROJECT_ROOT/docs/project-stats.md"
+
+if [ "$UPDATE_DOCS" = true ]; then
     TEMP_OUTPUT=$(mktemp)
-    trap "rm -f $TEMP_SECTION $TEMP_OUTPUT" EXIT
+    trap "rm -f $TEMP_OUTPUT" EXIT
 
-    # Generate new stats section to temp file
-    generate_readme_section > "$TEMP_SECTION"
+    generate_stats_document > "$TEMP_OUTPUT"
+    mv "$TEMP_OUTPUT" "$STATS_DOC"
 
-    # Replace section in README using awk with file input
-    awk '
-        /^## Project Stats/ {
-            in_section=1
-            while ((getline line < "'"$TEMP_SECTION"'") > 0) print line
-            next
-        }
-        /^## / && in_section { in_section=0 }
-        !in_section { print }
-    ' "$README_FILE" > "$TEMP_OUTPUT" && mv "$TEMP_OUTPUT" "$README_FILE"
-
-    echo "Updated README.md tables"
+    echo "Updated docs/project-stats.md"
 
     # Update LOC evolution graph
     echo "Updating LOC evolution graph..."
@@ -356,29 +360,22 @@ if [ "$UPDATE_README" = true ]; then
     node "$SCRIPT_DIR/generate-diff-svg.mjs"
 
     # Commit all changes
-    git add README.md stats/
+    git add docs/project-stats.md stats/
     git commit -m "Update project stats
 
 - Source: $(echo "$cpp_lines" | awk '{printf "%'\''d", $1}') C++, $(echo "$ts_lines" | awk '{printf "%'\''d", $1}') TypeScript
 - Tests: $total_tests total ($cpp_unit_tests C++ unit, $e2e_tests E2E)
 - Commits: $commit_count
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
     echo "Committed changes"
 else
     # CLI output format
-    echo "# Project Stats"
-    echo ""
-    echo "Generated: $(date '+%Y-%m-%d')"
-    echo ""
-
-    generate_readme_section | tail -n +2  # Skip the "## Project Stats" line for CLI
+    generate_stats_document
 
     echo ""
     echo "---"
     echo ""
-    echo "To update README and commit: \`./tools/generate-stats.sh --update\`"
+    echo "To update docs/project-stats.md and commit: \`./tools/generate-stats.sh --update\`"
 fi

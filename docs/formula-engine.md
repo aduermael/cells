@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-**Current state (January 2026):** Fully implemented.
+**Current state (July 2026):** Fully implemented.
 
 | Component | Status |
 |-----------|--------|
@@ -10,8 +10,10 @@
 | AST Parser | ✅ Implemented |
 | Execution Engine | ✅ Implemented |
 | Dependency Graph | ✅ Implemented |
-| Function Library | ✅ 83 functions |
+| Function Library | ✅ 120 functions |
 | Dynamic Arrays (Spill) | ✅ Implemented |
+
+For the full function inventory, missing Excel functions, and product/feature parity, see [Excel Parity](./excel-parity.md).
 
 ---
 
@@ -152,130 +154,20 @@ Excel-compatible coercion rules:
 
 ## Function Library
 
-83 functions organized by category. Functions are registered in `core/cells/functions/fn_*.cc`.
+**120 functions** registered in `core/cells/functions/fn_*.cc`.
 
-### Math (14 functions)
+| Category | Count |
+|----------|------:|
+| Math (incl. trig + random) | 47 |
+| Logic | 21 |
+| Text | 19 |
+| Date / time | 14 |
+| Statistics | 10 |
+| Array / dynamic | 5 |
+| Lookup | 4 |
+| **Total** | **120** |
 
-| Function | Description |
-|----------|-------------|
-| SUM | Adds all numbers in a range |
-| AVERAGE | Returns the arithmetic mean |
-| COUNT | Counts cells containing numbers |
-| COUNTA | Counts non-empty cells |
-| MIN | Returns the smallest value |
-| MAX | Returns the largest value |
-| ABS | Returns the absolute value |
-| SQRT | Returns the square root |
-| POWER | Returns number raised to a power |
-| ROUND | Rounds to specified digits |
-| FLOOR | Rounds down to nearest integer |
-| CEILING | Rounds up to nearest integer |
-| MOD | Returns remainder after division |
-| INT | Truncates to an integer |
-
-### Logic (15 functions)
-
-| Function | Description |
-|----------|-------------|
-| IF | Conditional evaluation |
-| AND | TRUE if all arguments are true |
-| OR | TRUE if any argument is true |
-| NOT | Reverses boolean value |
-| IFERROR | Returns alternate value if error |
-| IFNA | Returns alternate value if #N/A |
-| EXACT | Case-sensitive string comparison |
-| ISBLANK | TRUE if cell is empty |
-| ISNUMBER | TRUE if value is a number |
-| ISTEXT | TRUE if value is text |
-| ISERROR | TRUE if value is any error |
-| ISLOGICAL | TRUE if value is boolean |
-| ISNA | TRUE if value is #N/A |
-| TRUE | Returns TRUE |
-| FALSE | Returns FALSE |
-
-### Text (19 functions)
-
-| Function | Description |
-|----------|-------------|
-| LEN | Returns number of characters |
-| LEFT | Returns leftmost characters |
-| RIGHT | Returns rightmost characters |
-| MID | Returns characters from middle |
-| TRIM | Removes extra spaces |
-| UPPER | Converts to uppercase |
-| LOWER | Converts to lowercase |
-| PROPER | Capitalizes first letter of each word |
-| FIND | Case-sensitive text search |
-| SEARCH | Case-insensitive text search |
-| SUBSTITUTE | Replaces text occurrences |
-| REPLACE | Replaces characters by position |
-| CONCAT | Joins text strings |
-| CONCATENATE | Joins text strings (legacy) |
-| REPT | Repeats text N times |
-| TEXT | Formats number as text |
-| VALUE | Converts text to number |
-| CHAR | Returns character for ASCII code |
-| CODE | Returns ASCII code of first character |
-
-### Lookup (4 functions)
-
-| Function | Description |
-|----------|-------------|
-| INDEX | Returns value at position in range |
-| MATCH | Returns position of value in range |
-| VLOOKUP | Vertical lookup in first column |
-| HLOOKUP | Horizontal lookup in first row |
-
-### Date/Time (14 functions)
-
-| Function | Description | Volatile |
-|----------|-------------|----------|
-| NOW | Current date and time | ✅ |
-| TODAY | Current date | ✅ |
-| DATE | Creates date from year/month/day | |
-| TIME | Creates time from hour/min/sec | |
-| DATEVALUE | Converts text to date | |
-| TIMEVALUE | Converts text to time | |
-| YEAR | Extracts year from date | |
-| MONTH | Extracts month (1-12) | |
-| DAY | Extracts day of month | |
-| HOUR | Extracts hour (0-23) | |
-| MINUTE | Extracts minute (0-59) | |
-| SECOND | Extracts second (0-59) | |
-| WEEKDAY | Returns day of week | |
-| EOMONTH | Last day of month N months away | |
-
-### Statistics (10 functions)
-
-| Function | Description |
-|----------|-------------|
-| MEDIAN | Returns the median value |
-| STDEV | Sample standard deviation |
-| STDEVS | Sample standard deviation (alias) |
-| STDEVP | Population standard deviation |
-| VAR | Sample variance |
-| VARS | Sample variance (alias) |
-| VARP | Population variance |
-| PERCENTILE | Returns k-th percentile (inclusive) |
-| PERCENTILEINC | Inclusive percentile |
-| PERCENTILEEXC | Exclusive percentile |
-
-### Random (2 functions)
-
-| Function | Description | Volatile |
-|----------|-------------|----------|
-| RAND | Random number 0-1 | ✅ |
-| RANDBETWEEN | Random integer in range | ✅ |
-
-### Array (5 functions)
-
-| Function | Description |
-|----------|-------------|
-| UNIQUE | Returns unique values from range |
-| SORT | Sorts a range of data |
-| FILTER | Filters range based on criteria |
-| SEQUENCE | Generates number sequence |
-| TRANSPOSE | Transposes rows and columns |
+Full inventory, Excel aliases (`CEILING.MATH` → `CEILING_MATH`, etc.), and the missing-function backlog live in [Excel Parity](./excel-parity.md).
 
 ## Dependency Graph
 
