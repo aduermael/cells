@@ -1,8 +1,11 @@
 # Build and deploy the static landing site to GitHub Pages.
 # Manual only. Also callable from deploy-all.yml (workflow_call).
 #
-# Repo setting (one-time): Settings → Pages → Source: GitHub Actions
-# No extra GitHub secrets required (uses GITHUB_TOKEN + pages permissions).
+# Requires Pages build type "GitHub Actions" (Settings → Pages → Source).
+# No extra secrets (GITHUB_TOKEN + pages/id-token permissions).
+# We intentionally skip actions/configure-pages: this site uses absolute
+# URLs and does not need base_path metadata; configure-pages also hard-fails
+# when Pages has never been enabled (GITHUB_TOKEN cannot enable it).
 
 name: Deploy website (GitHub Pages)
 
@@ -32,9 +35,6 @@ jobs:
         env:
           APP_URL: https://cells-app.fly.dev
           REPO_URL: https://github.com/${{ github.repository }}
-
-      # actions/configure-pages@v5.0.0
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
 
       # actions/upload-pages-artifact@v3.0.1
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
