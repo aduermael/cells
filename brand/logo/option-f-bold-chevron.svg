@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo bold chevron">
+  <!--
+    Option F — solid cell + thicker chevron cutout (small-size bold, still `>`)
+    Arms thickness 12 (vs 8 in A); tip (56,42), throat (38,42)
+  -->
+  <path
+    fill="#058601"
+    fill-rule="evenodd"
+    d="M10 10H74V74H10ZM28 24L56 42L28 60V48L38 42L28 36Z"
+  />
+  <rect x="68" y="68" width="12" height="12" fill="#058601"/>
+</svg>
