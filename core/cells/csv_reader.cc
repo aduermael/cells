@@ -1,13 +1,42 @@
 #include "core/cells/csv_reader.h"
 
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 
 #include <algorithm>
-#include <charconv>
 #include <sstream>
 #include <utility>
 
 #include "core/cells/id.h"
+
+namespace {
+
+// Parse a double from the entire string (no leading/trailing junk).
+// Uses strtod instead of std::from_chars: Apple's libc++ still lacks floating
+// from_chars overloads, and the rest of the codebase already prefers strtod
+// for WASM (no exceptions).
+bool parseDoubleFull(std::string_view s, double& value) {
+    if (s.empty()) {
+        return false;
+    }
+    // from_chars rejects leading whitespace; match that for CSV detection.
+    if (std::isspace(static_cast<unsigned char>(s.front()))) {
+        return false;
+    }
+    // strtod needs a null-terminated C string.
+    const std::string tmp(s);
+    char* end = nullptr;
+    errno = 0;
+    value = std::strtod(tmp.c_str(), &end);
+    if (errno == ERANGE) {
+        return false;
+    }
+    // Must convert something and consume the whole input.
+    return end != tmp.c_str() && end == tmp.c_str() + tmp.size();
+}
+
+}  // namespace
 
 namespace cells {
 
@@ -59,16 +88,8 @@ std::string_view CSVReader::skipBOM(std::string_view content) {
 }
 
 bool CSVReader::looksLikeNumber(const std::string& s) {
-    if (s.empty()) {
-        return false;
-    }
-
-    // Try to parse as double
     double value = 0;
-    auto result = std::from_chars(s.data(), s.data() + s.size(), value);
-
-    // Must consume entire string and succeed
-    return result.ec == std::errc{} && result.ptr == s.data() + s.size();
+    return parseDoubleFull(s, value);
 }
 
 bool CSVReader::looksLikeBoolean(const std::string& s) {
@@ -143,9 +164,8 @@ CellValue CSVReader::detectValue(const std::string& raw, bool autoDetect) {
     }
 
     // Check for number
-    if (looksLikeNumber(raw)) {
-        double value = 0;
-        std::from_chars(raw.data(), raw.data() + raw.size(), value);
+    double value = 0;
+    if (parseDoubleFull(raw, value)) {
         return CellValue(value);
     }
 
