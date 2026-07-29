@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo outline">
   <!--
-    Outline cell + prompt chevron + selection handle centered on BR border corner
-    Cell outer edge: (12,12)–(76,76) size 64  (stroke 8 → centerline (16,16) 56×56)
-    BR corner C = (76, 76)
-    Handle 12×12 centered on C → (70, 70)–(82, 82)
-    Content bbox (12,12)–(82,82) sits in square viewBox with pad
+    Alias / primary outline mark (same as option-b-outline)
+    Handle centered on outer BR border corner — spreadsheet engines do this
+    Cell outer (12,12)–(76,76); C=(76,76); handle 12×12 @ (70,70)
   -->
   <rect
     x="16"
@@ -19,6 +17,5 @@
     fill="#0A0A0A"
     d="M32 28L56 44L32 60V52L44 44L32 36Z"
   />
-  <!-- selection handle: center = cell outer BR corner -->
   <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
 </svg>

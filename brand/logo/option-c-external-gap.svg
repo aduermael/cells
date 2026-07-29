@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo external handle gap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo centered handle">
   <!--
-    C — solid cell + prompt chevron + handle outside with gap (sketch-like)
-    Content square (8,8)–(88,88): cell 64 + gap 4 + handle 12
-    Cell (8,8) 64×64 ends 72; handle (76,76) 12×12 ends 88
+    Solid cell + prompt chevron + handle centered on BR (no gap ring)
+    Classic spreadsheet knob: half in / half out, center on corner C
+    Cell (12,12)–(76,76); handle (70,70) 12×12 centered on (76,76)
   -->
   <path
     fill="#0A0A0A"
     fill-rule="evenodd"
-    d="M8 8H72V72H8ZM28 24L52 40L28 56V48L40 40L28 32Z"
+    d="M12 12H76V76H12ZM32 28L56 44L32 60V52L44 44L32 36Z"
   />
-  <rect x="76" y="76" width="12" height="12" fill="#0A0A0A"/>
+  <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
 </svg>

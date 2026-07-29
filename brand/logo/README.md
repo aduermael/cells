@@ -1,25 +1,26 @@
 # Cells logo options
 
-Black SVG marks: **cell** + **prompt chevron (`>`)** + **selection handle with gap**.
+Black SVG marks: **cell** + **prompt chevron (`>`)** + **selection handle**.
 
-Square bounds throughout. Monochrome (`#0A0A0A`) — recolor per context.
+Handle is **centered on the bottom-right border corner** (spreadsheet convention). Monochrome `#0A0A0A`.
 
 ## Options
 
 | | File | Notes |
 |---|------|--------|
-| **A** | [`option-a-solid.svg`](option-a-solid.svg) | Solid square silhouette, **6u** gap around BR handle |
-| **E** | [`option-e-tight-gap.svg`](option-e-tight-gap.svg) | Same idea, **4u** gap (tighter, better at small sizes) |
-| **C** | [`option-c-external-gap.svg`](option-c-external-gap.svg) | Handle outside the cell (sketch-like) |
-| **B** | [`option-b-outline.svg`](option-b-outline.svg) | Outline cell + solid chevron |
-| **D** | [`option-d-rotated.svg`](option-d-rotated.svg) | A with rigid −12° |
+| **A** | [`option-a-solid.svg`](option-a-solid.svg) | Solid cell, gap ring around handle, handle centered on corner |
+| **E** | [`option-e-tight-gap.svg`](option-e-tight-gap.svg) | Same, tighter gap |
+| **C** | [`option-c-external-gap.svg`](option-c-external-gap.svg) | Solid, no gap ring — classic half-out knob |
+| **D** | [`option-d-outline.svg`](option-d-outline.svg) | **Outline** cell + solid `>` + handle on border corner |
+| **B** | [`option-b-outline.svg`](option-b-outline.svg) | Same geometry as D |
+| **R** | [`option-d-rotated.svg`](option-d-rotated.svg) | A with −12° tilt |
 
-Previews: [`previews/`](previews/). Geometry: [`CONSTRUCTION.md`](CONSTRUCTION.md).
+Previews: [`previews/`](previews/). Math: [`CONSTRUCTION.md`](CONSTRUCTION.md).
 
-## Suggested shortlist
+## Shortlist
 
-1. **E** — primary (square mark, clear gap, small-size friendly)  
-2. **A** — if you want more air around the handle  
-3. **B** or **C** — outline / detached variants  
+1. **D / outline** — airy, handle clearly on the border  
+2. **C** — solid classic selection knob  
+3. **A / E** — solid with explicit gap channel around the handle  
 
 Does not replace production `apps/shared/icon.svg` yet.

@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo tight gap">
   <!--
-    E — same as A with tighter 4-unit gap (more cohesive at small sizes)
-    Well: (72,72)–(88,88) size 16
-    Handle: (76,76)–(88,88) size 12  → 4-unit gap from cell
+    Same as A with tighter gap ring (well 14 → 1u gap each side)
+    Cell BR C = (76,76); handle 12×12 @ (70,70); well 14×14 @ (69,69)
   -->
   <path
     fill="#0A0A0A"
     fill-rule="evenodd"
-    d="M8 8H88V88H8ZM28 24L52 40L28 56V48L40 40L28 32ZM72 72H88V88H72Z"
+    d="M12 12H76V76H12ZM32 28L56 44L32 60V52L44 44L32 36ZM69 69H83V83H69Z"
   />
-  <rect x="76" y="76" width="12" height="12" fill="#0A0A0A"/>
+  <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
 </svg>
