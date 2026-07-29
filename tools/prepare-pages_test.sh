@@ -41,8 +41,25 @@ APP_URL="https://example.test/app" REPO_URL="https://github.com/example/cells" \
 assert_ok "index.html exists" test -f "$OUT/index.html"
 assert_ok "styles.css exists" test -f "$OUT/styles.css"
 assert_ok "favicon.svg exists" test -f "$OUT/favicon.svg"
-assert_ok "iframe points at APP_URL" grep -q 'src="https://example.test/app"' "$OUT/index.html"
+assert_ok "APP_URL present for demo" grep -q 'https://example.test/app' "$OUT/index.html"
+assert_ok "data-app-url present" grep -q 'data-app-url="https://example.test/app"' "$OUT/index.html"
 assert_ok "GitHub link present" grep -q 'https://github.com/example/cells' "$OUT/index.html"
+assert_ok "title is agent-focused" grep -q 'A spreadsheet engine for agents' "$OUT/index.html"
+assert_ok "CTA is try it right here" grep -q 'Try it right here' "$OUT/index.html"
+assert_ok "CTA is plain text not a button" \
+  bash -c "! grep -E 'class=\"btn[^\"]*\"[^>]*>Try it right here' '$OUT/index.html'"
+assert_ok "Lua/Luau feature copy" grep -q 'Lua/Luau' "$OUT/index.html"
+assert_ok "headless CLI (no pipelines)" \
+  bash -c "grep -q 'headless CLI' '$OUT/index.html' && ! grep -q 'pipelines' '$OUT/index.html'"
+assert_ok ".zcd links to file-format docs" \
+  grep -q 'docs/file-format.md' "$OUT/index.html"
+assert_ok "no Open app nav" bash -c "! grep -q 'Open app' '$OUT/index.html'"
+assert_ok "Open in new page below demo" grep -q 'Open in new page' "$OUT/index.html"
+assert_ok "no dual-license footer" bash -c "! grep -qi 'dual-licensed' '$OUT/index.html'"
+assert_ok "theme toggle present" grep -q 'id="theme-toggle"' "$OUT/index.html"
+assert_ok "brand green link token" grep -q '#0a9208' "$OUT/styles.css"
+assert_ok "data-theme dark tokens" grep -q 'data-theme="dark"' "$OUT/styles.css"
+assert_ok "demo uses theme-aware background" grep -q -- '--demo-bg' "$OUT/styles.css"
 assert_ok "no leftover {{tokens}}" \
   bash -c "! grep -E '\\{\\{[A-Z0-9_]+\\}\\}' '$OUT/index.html'"
 assert_ok "no __PLACEHOLDER__" \
@@ -52,8 +69,8 @@ assert_ok "no __PLACEHOLDER__" \
 OUT2="$WORKDIR/out2"
 APP_URL="https://example.test/app/" REPO_URL="https://github.com/example/cells/" \
   "$SCRIPT" "$OUT2" >/dev/null
-assert_ok "trailing slash stripped from iframe src" \
-  grep -q 'src="https://example.test/app"' "$OUT2/index.html"
+assert_ok "trailing slash stripped from app url" \
+  grep -q 'data-app-url="https://example.test/app"' "$OUT2/index.html"
 assert_ok "trailing slash stripped from repo links" \
   grep -q 'href="https://github.com/example/cells"' "$OUT2/index.html"
 
@@ -62,7 +79,7 @@ OUT3="$WORKDIR/out3"
 unset APP_URL REPO_URL || true
 "$SCRIPT" "$OUT3" >/dev/null
 assert_ok "default APP_URL is cells-app.fly.dev" \
-  grep -q 'src="https://cells-app.fly.dev"' "$OUT3/index.html"
+  grep -q 'https://cells-app.fly.dev' "$OUT3/index.html"
 assert_ok "default REPO_URL is aduermael/cells" \
   grep -q 'https://github.com/aduermael/cells' "$OUT3/index.html"
 

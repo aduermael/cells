@@ -3,9 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cells — spreadsheet engine</title>
-  <meta name="description" content="A modern spreadsheet engine: browser UI with real-time collaboration, or a headless CLI.">
+  <title>Cells — A spreadsheet engine for agents</title>
+  <meta name="description" content="A lightweight and fully scriptable CLI primarily, with a web UI for humans to see and collaborate.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- Apply theme before paint to avoid flash -->
+  <script>
+    (function () {
+      try {
+        var key = "cells.site.theme";
+        var t = localStorage.getItem(key);
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+        document.documentElement.style.colorScheme = t;
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,7 +29,22 @@
       <span>Cells</span>
     </a>
     <nav class="links">
-      <a href="{{APP_URL}}" target="_blank" rel="noopener">Open app</a>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle color theme" title="Toggle color theme">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
       <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
       <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
     </nav>
@@ -23,42 +52,119 @@
 
   <main>
     <section class="hero">
-      <h1>A modern spreadsheet engine</h1>
+      <h1>A spreadsheet engine for agents</h1>
       <p class="tagline">
-        Browser UI with real-time collaboration, or a lightweight CLI —
-        same core engine either way.
+        A lightweight and fully scriptable CLI primarily, with a web UI for
+        humans to see and collaborate.
       </p>
-      <p class="cta">
-        <a class="btn primary" href="{{APP_URL}}" target="_blank" rel="noopener">Try the demo</a>
-        <a class="btn" href="{{REPO_URL}}" target="_blank" rel="noopener">View on GitHub</a>
-      </p>
+      <p class="cta">Try it right here 👇</p>
     </section>
 
-    <section class="demo" aria-label="Live demo">
+    <section class="demo" id="demo" aria-label="Live demo">
       <iframe
+        id="demo-frame"
         title="Cells spreadsheet demo"
-        src="{{APP_URL}}"
-        loading="lazy"
+        data-app-url="{{APP_URL}}"
+        src="about:blank"
         allow="clipboard-read; clipboard-write"
         referrerpolicy="no-referrer-when-downgrade"
       ></iframe>
     </section>
+    <p class="demo-actions">
+      <a class="btn" id="open-app" href="{{APP_URL}}" target="_blank" rel="noopener">Open in new page</a>
+    </p>
 
     <section class="features">
       <ul>
         <li><strong>Real-time collaboration</strong> — peer-to-peer sync with CRDTs</li>
         <li><strong>Excel compatible</strong> — import and export <code>.xlsx</code></li>
-        <li><strong>Scriptable</strong> — Luau scripts, headless CLI pipelines</li>
-        <li><strong>Git-friendly</strong> — text-based <code>.zcd</code> format</li>
+        <li><strong>Scriptable</strong> — Lua/Luau scripts, headless CLI</li>
+        <li><strong>Git-friendly</strong> — text-based <a href="{{REPO_URL}}/blob/main/docs/file-format.md" target="_blank" rel="noopener"><code>.zcd</code></a> format</li>
       </ul>
     </section>
   </main>
 
   <footer>
     <p>
-      <a href="{{REPO_URL}}">aduermael/cells</a>
-      · dual-licensed (GPL-3.0 / commercial)
+      <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
+      ·
+      <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
     </p>
   </footer>
+
+  <script>
+    (function () {
+      var THEME_KEY = "cells.site.theme";
+      var frame = document.getElementById("demo-frame");
+      var openApp = document.getElementById("open-app");
+      var baseUrl = (frame && frame.getAttribute("data-app-url")) || "";
+
+      function currentTheme() {
+        var t = document.documentElement.getAttribute("data-theme");
+        return t === "dark" ? "dark" : "light";
+      }
+
+      function withTheme(url, theme) {
+        if (!url) return url;
+        try {
+          var u = new URL(url, window.location.href);
+          u.searchParams.set("theme", theme);
+          return u.toString();
+        } catch (e) {
+          var sep = url.indexOf("?") >= 0 ? "&" : "?";
+          return url + sep + "theme=" + theme;
+        }
+      }
+
+      function postTheme(theme) {
+        if (!frame) return;
+        try {
+          frame.contentWindow && frame.contentWindow.postMessage(
+            { type: "cells-set-theme", theme: theme },
+            "*"
+          );
+        } catch (e) { /* cross-origin until loaded */ }
+      }
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.style.colorScheme = theme;
+        try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* ignore */ }
+        postTheme(theme);
+        if (openApp && baseUrl) {
+          openApp.href = withTheme(baseUrl, theme);
+        }
+      }
+
+      function setDemoSrc(theme) {
+        if (!frame || !baseUrl) return;
+        var next = withTheme(baseUrl, theme);
+        if (frame.getAttribute("src") !== next) {
+          frame.setAttribute("src", next);
+        }
+      }
+
+      // First paint: load demo with page theme (avoids default white shell).
+      var initial = currentTheme();
+      setDemoSrc(initial);
+      if (openApp && baseUrl) {
+        openApp.href = withTheme(baseUrl, initial);
+      }
+
+      var toggle = document.getElementById("theme-toggle");
+      if (toggle) {
+        toggle.addEventListener("click", function () {
+          applyTheme(currentTheme() === "light" ? "dark" : "light");
+        });
+      }
+
+      // Re-sync if the iframe (re)loads.
+      if (frame) {
+        frame.addEventListener("load", function () {
+          postTheme(currentTheme());
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

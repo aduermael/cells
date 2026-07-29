@@ -1,33 +1,38 @@
-/* Minimal landing page — sfae.io-inspired: clean, readable, no chrome. */
+/* Minimal landing page — clean, readable, light/dark via data-theme. */
 
-:root {
+:root,
+[data-theme="light"] {
   --bg: #fafafa;
   --fg: #1a1a1a;
   --muted: #5c5c5c;
   --border: #e5e5e5;
-  --link: #0b57d0;
-  --btn-bg: #1a1a1a;
-  --btn-fg: #fafafa;
+  /* Brand green (logo / --color-primary) */
+  --link: #0a9208;
+  --link-hover: #087a06;
+  --demo-bg: #ffffff;
   --frame-h: min(72vh, 720px);
   --max: 960px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111;
-    --fg: #f0f0f0;
-    --muted: #a0a0a0;
-    --border: #2a2a2a;
-    --link: #8ab4f8;
-    --btn-bg: #f0f0f0;
-    --btn-fg: #111;
-  }
+[data-theme="dark"] {
+  --bg: #111;
+  --fg: #f0f0f0;
+  --muted: #a0a0a0;
+  --border: #2a2a2a;
+  --link: #4ade80;
+  --link-hover: #86efac;
+  --demo-bg: #1a1a1a;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+  background: var(--bg);
 }
 
 html, body {
@@ -45,6 +50,7 @@ a {
 }
 
 a:hover {
+  color: var(--link-hover);
   text-decoration: underline;
 }
 
@@ -68,6 +74,7 @@ a:hover {
 }
 
 .brand:hover {
+  color: var(--fg);
   text-decoration: none;
   opacity: 0.85;
 }
@@ -79,8 +86,41 @@ a:hover {
 .links {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.85rem 1.1rem;
   font-size: 0.95rem;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--muted);
+}
+
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon {
+  display: none;
+}
+
+/* Show the icon for the *other* theme (action affordance) */
+[data-theme="light"] .theme-toggle .icon-moon {
+  display: block;
+}
+
+[data-theme="dark"] .theme-toggle .icon-sun {
+  display: block;
 }
 
 main {
@@ -103,16 +143,15 @@ main {
 
 .tagline {
   margin: 0 0 1.25rem;
-  max-width: 36rem;
+  max-width: 38rem;
   color: var(--muted);
   font-size: 1.05rem;
 }
 
 .cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin: 0;
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 1.05rem;
 }
 
 .btn {
@@ -128,29 +167,21 @@ main {
 }
 
 .btn:hover {
+  color: var(--fg);
   text-decoration: none;
   border-color: var(--muted);
-}
-
-.btn.primary {
-  background: var(--btn-bg);
-  border-color: var(--btn-bg);
-  color: var(--btn-fg);
 }
 
 .demo {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
-  background: #fff;
+  background: var(--demo-bg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  .demo {
-    background: #0a0a0a;
-    box-shadow: none;
-  }
+[data-theme="dark"] .demo {
+  box-shadow: none;
 }
 
 .demo iframe {
@@ -158,7 +189,14 @@ main {
   width: 100%;
   height: var(--frame-h);
   border: 0;
-  background: #fff;
+  background: var(--demo-bg);
+  color-scheme: light dark;
+}
+
+.demo-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.65rem 0 0;
 }
 
 .features {
