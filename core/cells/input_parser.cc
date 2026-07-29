@@ -1,11 +1,12 @@
 #include "core/cells/input_parser.h"
 
 #include <cctype>
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 
 #include <algorithm>
-#include <charconv>
 #include <regex>
 
 namespace cells {
@@ -59,16 +60,25 @@ static std::string removeChar(const std::string& str, char c) {
     return result;
 }
 
-// Helper: parse a double from string (handles commas)
+// Helper: parse a double from string (handles commas).
+// Uses strtod: Apple's libc++ lacks floating std::from_chars, and strtod is
+// already the project-wide convention (WASM-safe, no exceptions).
 static bool parseDouble(const std::string& str, double& value) {
     const std::string clean = removeChar(str, ',');
     if (clean.empty()) {
         return false;
     }
-
-    // Use std::from_chars for fast, locale-independent parsing
-    const auto result = std::from_chars(clean.data(), clean.data() + clean.size(), value);
-    return result.ec == std::errc{} && result.ptr == clean.data() + clean.size();
+    // Match from_chars: no leading whitespace, full-string consumption.
+    if (std::isspace(static_cast<unsigned char>(clean.front())) != 0) {
+        return false;
+    }
+    char* end = nullptr;
+    errno = 0;
+    value = std::strtod(clean.c_str(), &end);
+    if (errno == ERANGE) {
+        return false;
+    }
+    return end != clean.c_str() && end == clean.c_str() + clean.size();
 }
 
 // Helper: count decimal places in a number string
