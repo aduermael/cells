@@ -1,24 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo outline">
-  <!--
-    Outline cell + prompt chevron + selection handle centered on BR border corner
-    Cell outer edge: (12,12)–(76,76) size 64  (stroke 8 → centerline (16,16) 56×56)
-    BR corner C = (76, 76)
-    Handle 12×12 centered on C → (70, 70)–(82, 82)
-    Content bbox (12,12)–(82,82) sits in square viewBox with pad
-  -->
-  <rect
-    x="16"
-    y="16"
-    width="56"
-    height="56"
-    stroke="#0A0A0A"
-    stroke-width="8"
-    fill="none"
-  />
-  <path
-    fill="#0A0A0A"
-    d="M32 28L56 44L32 60V52L44 44L32 36Z"
-  />
-  <!-- selection handle: center = cell outer BR corner -->
-  <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
+  <!-- Same as option-d-outline -->
+  <rect x="8" y="8" width="80" height="8" fill="#0A0A0A"/>
+  <rect x="8" y="8" width="8" height="80" fill="#0A0A0A"/>
+  <rect x="80" y="8" width="8" height="60" fill="#0A0A0A"/>
+  <rect x="8" y="80" width="60" height="8" fill="#0A0A0A"/>
+  <path fill="#0A0A0A" d="M32 28L56 44L32 60V52L44 44L32 36Z"/>
+  <rect x="72" y="72" width="12" height="12" fill="#0A0A0A"/>
 </svg>

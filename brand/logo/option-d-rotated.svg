@@ -1,13 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo rotated">
-  <!--
-    Option A geometry (centered handle + gap ring), rigid −12°, scale 0.9
-  -->
-  <g transform="translate(48 48) rotate(-12) scale(0.9) translate(-48 -48)">
+  <!-- Option A geometry, −12°, scale 0.88 to keep inside square viewBox -->
+  <g transform="translate(48 48) rotate(-12) scale(0.88) translate(-48 -48)">
     <path
       fill="#0A0A0A"
       fill-rule="evenodd"
-      d="M12 12H76V76H12ZM32 28L56 44L32 60V52L44 44L32 36ZM68 68H84V84H68Z"
+      d="M8 8H88V88H8ZM28 24L52 40L28 56V48L40 40L28 32ZM68 68H88V88H68Z"
     />
-    <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
+    <rect x="72" y="72" width="12" height="12" fill="#0A0A0A"/>
   </g>
 </svg>

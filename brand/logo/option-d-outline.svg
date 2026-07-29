@@ -1,21 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo outline">
   <!--
-    Alias / primary outline mark (same as option-b-outline)
-    Handle centered on outer BR border corner — spreadsheet engines do this
-    Cell outer (12,12)–(76,76); C=(76,76); handle 12×12 @ (70,70)
+    Outline square — handle inside main bounds, gap around it, on BR border
+
+    Main square outer: (8,8)–(88,88) size 80
+    Frame stroke 8 as four bars that stop at the BR well (same pocket as solid A)
+    Well zone: (68,68)–(88,88)
+    Handle: (72,72)–(84,84) size 12, gap 4 on all sides within the well
+    Handle center (78,78) in the BR border zone, fully inside the square
   -->
-  <rect
-    x="16"
-    y="16"
-    width="56"
-    height="56"
-    stroke="#0A0A0A"
-    stroke-width="8"
-    fill="none"
-  />
-  <path
-    fill="#0A0A0A"
-    d="M32 28L56 44L32 60V52L44 44L32 36Z"
-  />
-  <rect x="70" y="70" width="12" height="12" fill="#0A0A0A"/>
+  <!-- top -->
+  <rect x="8" y="8" width="80" height="8" fill="#0A0A0A"/>
+  <!-- left -->
+  <rect x="8" y="8" width="8" height="80" fill="#0A0A0A"/>
+  <!-- right (stops at well y=68) -->
+  <rect x="80" y="8" width="8" height="60" fill="#0A0A0A"/>
+  <!-- bottom (stops at well x=68) -->
+  <rect x="8" y="80" width="60" height="8" fill="#0A0A0A"/>
+  <!-- prompt chevron -->
+  <path fill="#0A0A0A" d="M32 28L56 44L32 60V52L44 44L32 36Z"/>
+  <!-- handle inside square -->
+  <rect x="72" y="72" width="12" height="12" fill="#0A0A0A"/>
 </svg>
