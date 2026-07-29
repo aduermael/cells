@@ -1,46 +1,25 @@
 ---
 name: cells
-description: Use the Cells CLI for spreadsheet conversion (.xlsx/.csv/.zcd), Luau scripting, headless automation, and real-time collaboration sync against a server URL.
+description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal.
 ---
 
-# Cells spreadsheet CLI
+# Cells — Excel CLI equivalent
 
-## Principles
+`cells` is a command-line tool for spreadsheet work with `.xlsx`, `.csv`, and `.zcd`.
 
-- Prefer the `cells` CLI for spreadsheet conversion, inspection, scripting, and collaboration sync.
-- Install the CLI if it is missing (see below) before inventing ad-hoc converters.
-- Use the native `.zcd` format when round-tripping full fidelity; use `.xlsx` / `.csv` for interchange.
-- For collaboration, point the CLI at a server URL with `cells sync` (or `--server`).
+## Check availability
 
-## CLI availability
+```bash
+which cells
+```
 
-Use `cells` from `PATH` when available.
-
-If `cells` is not available and this skill folder contains `install.sh`, run that
-script to install the CLI. The installer tries **Homebrew first**, then the
-**direct release installer** (no npm):
+If `cells` is missing and this skill folder contains `install.sh`, install the CLI with it. The installer tries **Homebrew first**, then the **direct release installer**:
 
 ```bash
 sh ./install.sh
 ```
 
-In this repository, build a local binary if needed:
-
-```bash
-bazel run :cli
-# → dist/cli/cells
-```
-
-Release builds:
-
-```bash
-bazel run :cli-release
-# → dist/cli/cells (optimized)
-```
-
-Then run `./dist/cli/cells` directly.
-
-### Environment overrides (install)
+### Install environment overrides
 
 | Variable | Purpose |
 |----------|---------|
@@ -49,14 +28,16 @@ Then run `./dist/cli/cells` directly.
 | `CELLS_REPO` | GitHub `owner/repo` for release assets |
 | `CELLS_FORCE_INSTALL` | Set `1` to reinstall even if `cells` is on PATH |
 
-## Common commands
+## How to use
+
+Prefer `cells --help` for full flags and modes. Common workflows:
 
 ```bash
-# Version / help
-cells --version
+# Help / version
 cells --help
+cells --version
 
-# Convert formats (auto-detect by extension)
+# Convert (format from extension)
 cells -i data.xlsx output.zcd
 cells -i budget.xlsx report.csv --eval
 cells -i data.csv report.xlsx
@@ -64,40 +45,31 @@ cells -i data.csv report.xlsx
 # Inspect
 cells -I spreadsheet.zcd
 
-# Luau scripting
-cells -i data.xlsx output.csv --script transform.luau
-cells -i data.csv out.xlsx -e 'setCell("A1", 100)'
-
 # Create empty workbook
 cells output.zcd
+
+# Script while converting (or script-only with no output path)
+cells -i data.xlsx output.csv --script transform.luau
+cells -i data.csv out.xlsx -e 'setCell("A1", 100)'
+cells -i report.csv -e 'print(getCell("A1").value)'
 ```
 
-## Collaboration (server URL)
-
-Join a live room using a full app URL (copy from the browser address bar), or
-pass the server URL with `--server`:
-
-```bash
-# Positional URL
-cells sync 'https://cells-app.fly.dev/?room=abc123'
-
-# Explicit --server flag (same meaning)
-cells sync --server 'https://cells-app.fly.dev/?room=abc123'
-
-# Apply remote ops into a local workbook
-cells sync --server 'https://example.com/?room=abc' --apply workbook.zcd
-
-# Broadcast local workbook as operations
-cells sync --server 'https://example.com/?room=abc' --send workbook.zcd
-```
-
-Default public demo server: `https://cells-app.fly.dev/`. Self-host options are
-documented in the repository README (Docker / `tools/serve`).
-
-## When to use which format
+### Formats
 
 | Format | Use when |
 |--------|----------|
-| `.zcd` | Full fidelity, git-friendly, collaboration ops |
+| `.zcd` | Full fidelity (formulas, multi-sheet, styles) |
 | `.xlsx` | Excel interchange |
-| `.csv` / `.tsv` | Simple tabular export/import (values; limited fidelity) |
+| `.csv` / `.tsv` | Simple tabular import/export (values; limited fidelity) |
+
+## Scripting
+
+Scripts run with `--script <file>` or `-e '<code>'`. They use the Cells scripting API (`getCell`, `setCell`, sheets, ranges, and more).
+
+- **API reference:** [SCRIPTING.md](SCRIPTING.md) — load this before inventing API names
+- **Sample scripts:** [samples/](samples/)
+
+```bash
+cells -i data.xlsx out.xlsx --script samples/set-values.luau
+cells -i data.csv -e 'local c = getCell("A1"); print(c and c.value)'
+```

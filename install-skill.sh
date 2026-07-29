@@ -13,6 +13,17 @@ targets="${CELLS_SKILL_TARGETS:-}"
 mode="install"
 install_cli="${CELLS_INSTALL_CLI:-0}"
 
+# Relative paths under skill/ that make up the installed package (single source of truth).
+# Keep in sync when adding skill assets.
+SKILL_PACKAGE_FILES="
+SKILL.md
+install.sh
+SCRIPTING.md
+samples/set-values.luau
+samples/read-print.luau
+samples/transform.luau
+"
+
 if [ -n "${CELLS_SKILL_BASE_URL:-}" ]; then
   base_url="$CELLS_SKILL_BASE_URL"
 else
@@ -106,27 +117,68 @@ cleanup() {
 }
 trap cleanup EXIT INT HUP TERM
 
+package_dir="$tmpdir/package"
+mkdir -p "$package_dir"
+
 script_dir=""
 case "$0" in
   */*) script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd) ;;
 esac
 
-if [ -n "$script_dir" ] && [ -f "$script_dir/skill/SKILL.md" ] && [ -f "$script_dir/skill/install.sh" ]; then
-  cp "$script_dir/skill/SKILL.md" "$tmpdir/SKILL.md"
-  cp "$script_dir/skill/install.sh" "$tmpdir/install.sh"
-else
+stage_local_package() {
+  # Copy the whole skill/ tree so new assets ship without per-file curl lists
+  # when installing from a checkout. Still iterate SKILL_PACKAGE_FILES for
+  # remote installs and change detection.
+  cp -a "$script_dir/skill/." "$package_dir/"
+}
+
+stage_remote_package() {
   if ! have curl; then
     err "Missing required command: curl"
     exit 1
   fi
-  curl -fsSL "$base_url/SKILL.md" -o "$tmpdir/SKILL.md"
-  curl -fsSL "$base_url/install.sh" -o "$tmpdir/install.sh"
+  for rel in $SKILL_PACKAGE_FILES; do
+    dest_file="$package_dir/$rel"
+    mkdir -p "$(dirname "$dest_file")"
+    curl -fsSL "$base_url/$rel" -o "$dest_file"
+  done
+}
+
+if [ -n "$script_dir" ] && [ -d "$script_dir/skill" ] && [ -f "$script_dir/skill/SKILL.md" ]; then
+  stage_local_package
+else
+  stage_remote_package
 fi
+
+if [ ! -f "$package_dir/install.sh" ]; then
+  err "Skill package missing install.sh"
+  exit 1
+fi
+chmod 0755 "$package_dir/install.sh"
 
 installed_paths=""
 updated_paths=""
 unchanged_paths=""
 first_path=""
+
+install_file() {
+  # $1 = relative path within package
+  rel="$1"
+  src="$package_dir/$rel"
+  dst="$dest/$rel"
+  if [ ! -f "$src" ]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$dst")"
+  if ! cmp -s "$src" "$dst" 2>/dev/null; then
+    cp "$src" "$dst"
+    changed="1"
+  fi
+  if [ "$rel" = "install.sh" ] && [ ! -x "$dst" ]; then
+    chmod 0755 "$dst"
+    changed="1"
+  fi
+}
 
 for target in $targets; do
   dest=$(target_path "$target")
@@ -152,20 +204,13 @@ for target in $targets; do
 
   mkdir -p "$dest"
   changed="0"
-  installer_changed="0"
 
-  if ! cmp -s "$tmpdir/SKILL.md" "$dest/SKILL.md" 2>/dev/null; then
-    cp "$tmpdir/SKILL.md" "$dest/SKILL.md"
-    changed="1"
-  fi
+  for rel in $SKILL_PACKAGE_FILES; do
+    install_file "$rel"
+  done
 
-  if ! cmp -s "$tmpdir/install.sh" "$dest/install.sh" 2>/dev/null; then
-    cp "$tmpdir/install.sh" "$dest/install.sh"
-    installer_changed="1"
-    changed="1"
-  fi
-
-  if [ "$installer_changed" = "1" ] || [ ! -x "$dest/install.sh" ]; then
+  # Ensure install.sh is executable even if already byte-identical
+  if [ -f "$dest/install.sh" ] && [ ! -x "$dest/install.sh" ]; then
     chmod 0755 "$dest/install.sh"
     changed="1"
   fi

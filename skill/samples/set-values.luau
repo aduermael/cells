@@ -1,0 +1,11 @@
+-- Create a small header + values block.
+setDocumentTitle("Sample values")
+setCell("A1", "Item")
+setCell("B1", "Amount")
+setCell("A2", "Apples")
+setCell("B2", 12)
+setCell("A3", "Oranges")
+setCell("B3", 8)
+setCell("A4", "Total")
+setCell("B4", "=B2+B3")
+setStyle("A1:B1", { bold = true })
