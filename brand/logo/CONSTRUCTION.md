@@ -1,55 +1,59 @@
 # Cells logo construction
 
-Concept from sketch `IMG_3036.heic`: a **cell** (spreadsheet selection), a **chevron** (`>` CLI / scriptable), and a **bottom-right square handle** (selection drag handle).
+Concept: **cell** + **prompt chevron (`>`)** + **BR selection handle with gap**.
+
+## Rules (locked)
+
+- **Black only** (`#0A0A0A`) — recolor in context as needed  
+- **Prompt chevron**, not a triangle (parallel-arm `>` cutout)  
+- **Gap** between cell body and handle  
+- **Square bounds** — full mark fits a square viewBox; solid options use a square outer silhouette  
 
 ## Grid
 
 | Token | Value |
 |-------|-------|
 | viewBox | `0 0 96 96` |
-| unit | 4 |
-| cell origin | `(10, 10)` |
-| cell size | `64 × 64` (ends `74, 74`) |
-| handle size | `12 × 12` |
-| handle origin (attached) | `(68, 68)` — centered on cell BR corner |
-| handle origin (gap, opt E) | `(78, 78)` — 4-unit gap |
-| brand green | `#058601` (matches `apps/shared/icon.svg`) |
-| mono | `#0A0A0A` |
+| outer square | `(8,8)–(88,88)` size **80** |
+| brand / ink | `#0A0A0A` |
 
-Content bounding box for attached handle: `(10,10)–(80,80)`. Extra SE padding balances handle mass.
+### Solid square options (A, E, D)
 
-## Chevron (CLI) — options A–E
+| Token | A (wide gap) | E (tight gap) |
+|-------|--------------|---------------|
+| well cutout | `(70,70)` 18×18 | `(72,72)` 16×16 |
+| handle | `(76,76)` 12×12 flush BR | same |
+| gap (cell → handle) | **6** | **4** |
 
-Right-pointing thick chevron (arm thickness 8):
+Outer path uses `fill-rule="evenodd"`: outer square − chevron − well, then a filled handle rect flush to the outer BR corner.
+
+### External-gap option (C)
+
+Cell `(8,8)` 64×64, gap 4, handle `(76,76)` 12×12 — content still spans the same 80×80 square, handle sits outside the cell fill.
+
+### Outline option (B)
+
+Stroke-8 frame on cell outer 8–72; solid chevron; external handle with gap 4.
+
+## Chevron (prompt `>`)
+
+```
+M28 24 L52 40 L28 56 V48 L40 40 L28 32 Z
+```
 
 | Point | Role |
 |-------|------|
-| `(54, 42)` | tip |
-| `(30, 26)` | top outer |
-| `(30, 58)` | bottom outer |
-| `(30, 50)` | bottom inner |
-| `(40, 42)` | throat |
-| `(30, 34)` | top inner |
+| `(52, 40)` | tip |
+| `(28, 24)` / `(28, 56)` | outer arms |
+| `(28, 32)` / `(28, 48)` | inner arms (thickness 8) |
+| `(40, 40)` | throat |
 
-Path: `M30 26 L54 42 L30 58 V50 L40 42 L30 34 Z`
-
-Used as an **evenodd cutout** in the cell fill (A/B/C/E) or a **solid mark** on an outline cell (D).
-
-## Bold chevron — option F
-
-Thicker arms (12): `M28 24 L56 42 L28 60 V48 L38 42 L28 36 Z`
-
-## Options
+## Files
 
 | File | Idea |
 |------|------|
-| `option-a-solid-cutout.svg` | Axis-aligned solid cell, chevron cutout, brand green |
-| `option-b-mono-cutout.svg` | Same geometry, monochrome black |
-| `option-c-rotated.svg` | Same mark, rigid −12° + scale 0.9 (sketch energy) |
-| `option-d-outline.svg` | Outline cell + solid chevron + solid handle |
-| `option-e-gap-handle.svg` | Solid cutout with detached handle (4u gap) |
-| `option-f-bold-chevron.svg` | Solid cell + thicker chevron cutout |
-
-## Non-goals (this folder)
-
-Does not replace production `apps/shared/icon.svg` or favicons — options for review first.
+| `option-a-solid.svg` | Square solid, 6u handle gap |
+| `option-e-tight-gap.svg` | Square solid, 4u handle gap |
+| `option-c-external-gap.svg` | Cell + detached handle (sketch-like) |
+| `option-b-outline.svg` | Outline cell + solid chevron |
+| `option-d-rotated.svg` | A geometry, −12° rigid |

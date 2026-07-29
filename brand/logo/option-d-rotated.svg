@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo rotated">
+  <!--
+    D — option A, rigid −12°, scale 0.88 to keep mark inside the square viewBox
+  -->
+  <g transform="translate(48 48) rotate(-12) scale(0.88) translate(-48 -48)">
+    <path
+      fill="#0A0A0A"
+      fill-rule="evenodd"
+      d="M8 8H88V88H8ZM28 24L52 40L28 56V48L40 40L28 32ZM70 70H88V88H70Z"
+    />
+    <rect x="76" y="76" width="12" height="12" fill="#0A0A0A"/>
+  </g>
+</svg>

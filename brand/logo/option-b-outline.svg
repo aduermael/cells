@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo outline">
+  <!--
+    B — outline square + solid prompt chevron + handle with external gap
+    Outer content square (8,8)–(88,88)
+    Cell frame outer 8–72; gap 4; handle 12×12 at (76,76)
+  -->
+  <rect
+    x="12"
+    y="12"
+    width="56"
+    height="56"
+    stroke="#0A0A0A"
+    stroke-width="8"
+    fill="none"
+  />
+  <path
+    fill="#0A0A0A"
+    d="M28 24L52 40L28 56V48L40 40L28 32Z"
+  />
+  <rect x="76" y="76" width="12" height="12" fill="#0A0A0A"/>
+</svg>

@@ -1,32 +1,25 @@
 # Cells logo options
 
-Clean SVG marks derived from the sketch concept: **cell** + **CLI chevron (`>`)** + **bottom-right selection handle**.
+Black SVG marks: **cell** + **prompt chevron (`>`)** + **selection handle with gap**.
 
-These are review options only — they do **not** replace `apps/shared/icon.svg` or favicons yet.
+Square bounds throughout. Monochrome (`#0A0A0A`) — recolor per context.
 
-## Quick look
+## Options
 
-| | Option | File | Notes |
-|---|--------|------|-------|
-| **A** | Solid cutout | [`option-a-solid-cutout.svg`](option-a-solid-cutout.svg) | Hero mark — brand green `#058601` |
-| **B** | Mono cutout | [`option-b-mono-cutout.svg`](option-b-mono-cutout.svg) | Same geometry, black (print / mono) |
-| **C** | Rotated | [`option-c-rotated.svg`](option-c-rotated.svg) | Rigid −12° (sketch energy) |
-| **D** | Outline | [`option-d-outline.svg`](option-d-outline.svg) | Lighter frame + solid chevron |
-| **E** | Gap handle | [`option-e-gap-handle.svg`](option-e-gap-handle.svg) | Detached handle like the sketch |
-| **F** | Bold chevron | [`option-f-bold-chevron.svg`](option-f-bold-chevron.svg) | Thicker `>` for tiny sizes |
+| | File | Notes |
+|---|------|--------|
+| **A** | [`option-a-solid.svg`](option-a-solid.svg) | Solid square silhouette, **6u** gap around BR handle |
+| **E** | [`option-e-tight-gap.svg`](option-e-tight-gap.svg) | Same idea, **4u** gap (tighter, better at small sizes) |
+| **C** | [`option-c-external-gap.svg`](option-c-external-gap.svg) | Handle outside the cell (sketch-like) |
+| **B** | [`option-b-outline.svg`](option-b-outline.svg) | Outline cell + solid chevron |
+| **D** | [`option-d-rotated.svg`](option-d-rotated.svg) | A with rigid −12° |
 
-Raster previews: [`previews/`](previews/) (512px each + contact sheets).
-
-## Construction
-
-See [`CONSTRUCTION.md`](CONSTRUCTION.md) for the grid, proportions, and path math.
-
-All marks use integer coordinates on a `0 0 96 96` viewBox, pure `path`/`rect` primitives, no traced paths.
+Previews: [`previews/`](previews/). Geometry: [`CONSTRUCTION.md`](CONSTRUCTION.md).
 
 ## Suggested shortlist
 
-1. **A** — primary product mark  
-2. **D** — secondary / light UI  
-3. **C** or **E** — if you want sketch attitude or a detached handle  
+1. **E** — primary (square mark, clear gap, small-size friendly)  
+2. **A** — if you want more air around the handle  
+3. **B** or **C** — outline / detached variants  
 
-**B** is the mono twin of A; **F** is a bolder chevron for favicon-scale.
+Does not replace production `apps/shared/icon.svg` yet.
