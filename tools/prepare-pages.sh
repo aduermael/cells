@@ -72,8 +72,13 @@ if ! grep -q '<iframe' "$OUT_DIR/index.html"; then
   echo "error: assembled index.html is missing an <iframe>" >&2
   exit 1
 fi
-if ! grep -q "src=\"${APP_URL}\"" "$OUT_DIR/index.html"; then
-  echo "error: iframe src does not match APP_URL=${APP_URL}" >&2
+# Demo URL may appear as data-app-url / open-in-new-page href (src is set at runtime with theme).
+if ! grep -q "${APP_URL}" "$OUT_DIR/index.html"; then
+  echo "error: assembled index.html is missing APP_URL=${APP_URL}" >&2
+  exit 1
+fi
+if ! grep -q 'data-app-url=' "$OUT_DIR/index.html"; then
+  echo "error: iframe is missing data-app-url for themed demo loading" >&2
   exit 1
 fi
 if ! grep -q "$REPO_URL" "$OUT_DIR/index.html"; then
