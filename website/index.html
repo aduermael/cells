@@ -25,7 +25,14 @@
 <body>
   <header class="top">
     <a class="brand" href="{{REPO_URL}}">
-      <img class="logo" src="favicon.svg" width="28" height="28" alt="">
+      <!-- Inline SVG so logo follows light/dark brand green (same as app). -->
+      <svg class="logo" width="28" height="28" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g transform="translate(1 1)">
+          <path d="M16 16h56v56H16z" stroke="currentColor" stroke-width="8"/>
+          <path d="M33 28l24 16-24 16v-8l12-8-12-8z" fill="currentColor"/>
+          <path d="M60 60h22v22H60z" fill="currentColor"/>
+        </g>
+      </svg>
       <span>Cells</span>
     </a>
     <nav class="links">
@@ -57,7 +64,11 @@
         A lightweight and fully scriptable CLI primarily, with a web UI for
         humans to see and collaborate.
       </p>
-      <p class="cta">Try it right here 👇</p>
+      <p class="cta">
+        Try it right here 👇
+        You can drag&amp;drop <code>.csv</code> &amp; <code>.xlsx</code> files,
+        everything stays in your browser.
+      </p>
     </section>
 
     <section class="demo" id="demo" aria-label="Live demo">

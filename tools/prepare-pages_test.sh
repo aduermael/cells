@@ -57,7 +57,11 @@ assert_ok "no Open app nav" bash -c "! grep -q 'Open app' '$OUT/index.html'"
 assert_ok "Open in new page below demo" grep -q 'Open in new page' "$OUT/index.html"
 assert_ok "no dual-license footer" bash -c "! grep -qi 'dual-licensed' '$OUT/index.html'"
 assert_ok "theme toggle present" grep -q 'id="theme-toggle"' "$OUT/index.html"
-assert_ok "brand green link token" grep -q '#0a9208' "$OUT/styles.css"
+assert_ok "brand green token" grep -q '#0a9208' "$OUT/styles.css"
+assert_ok "logo uses currentColor (theme-aware)" \
+  grep -q 'stroke="currentColor"' "$OUT/index.html"
+assert_ok "logo color uses brand token" grep -q 'color: var(--brand)' "$OUT/styles.css"
+assert_ok "drag-drop privacy note" grep -q 'stays in your browser' "$OUT/index.html"
 assert_ok "data-theme dark tokens" grep -q 'data-theme="dark"' "$OUT/styles.css"
 assert_ok "demo uses theme-aware background" grep -q -- '--demo-bg' "$OUT/styles.css"
 assert_ok "no leftover {{tokens}}" \
