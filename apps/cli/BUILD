@@ -4,6 +4,17 @@ config_setting(
     constraint_values = ["@platforms//os:macos"],
 )
 
+# Sync argument parsing (shared by full CLI and converter-only)
+cc_library(
+    name = "sync_args",
+    srcs = ["sync_args.cc"],
+    hdrs = [
+        "cli_version.h",
+        "sync_args.h",
+        "sync_command.h",
+    ],
+)
+
 # Full CLI binary with sync support (requires OpenSSL/libdatachannel)
 cc_binary(
     name = "cells",
@@ -24,6 +35,7 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
+        ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
         "//core/cells:formula_eval",
@@ -54,6 +66,7 @@ cc_binary(
         "sync_command_stub.cc",
     ],
     deps = [
+        ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
         "//core/cells:formula_eval",
@@ -89,6 +102,15 @@ cc_test(
         "//core/cells:serializer",
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sync_args_test",
+    srcs = ["sync_args_test.cc"],
+    deps = [
+        ":sync_args",
         "@googletest//:gtest_main",
     ],
 )

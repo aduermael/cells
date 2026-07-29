@@ -28,6 +28,79 @@ Both share the same core engine, so formulas and files work identically across e
 - **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
 - **Git-friendly** - [Text-based file format](#collaboration--zcd-format-) that diffs cleanly
 
+## Install
+
+Install methods for the **CLI**, in order of preference:
+
+### 1. Agent skill (recommended)
+
+Best default for agentic workflows. Installs a skill that knows how to install
+and use the `cells` binary:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh
+```
+
+The skill lands in `.agents/skills/cells`, `.claude/skills/cells`, and
+`.grok/skills/cells`. When `cells` is missing from `PATH`, agents run the
+bundled `install.sh` (Homebrew first, then direct release install — no npm).
+
+### 2. Homebrew
+
+```bash
+brew install aduermael/tap/cells
+```
+
+Requires the [Homebrew tap](https://github.com/aduermael/homebrew-tap) to be
+published for a release. Formula assets are generated automatically on each
+`v*` tag when tap credentials are configured.
+
+### 3. Direct install (`curl | sh`)
+
+Downloads the platform binary from the latest GitHub Release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh
+```
+
+User-local install (no sudo):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh \
+  | env CELLS_INSTALL_DIR=$HOME/.local/bin sh
+```
+
+Pin a version: `CELLS_VERSION=v0.0.1`.
+
+### 4. Build from source
+
+```bash
+bazel run :cli          # → dist/cli/cells
+bazel run :cli-release  # optimized
+```
+
+### Optional: run the collaboration server
+
+Not required for CLI conversion/scripting. Use this only if you want to host
+the web UI + signaling yourself.
+
+| Method | Command |
+|--------|---------|
+| **Public demo** | [https://cells-app.fly.dev/](https://cells-app.fly.dev/) |
+| **Docker** | `docker build -t cells-server . && docker run -p 8080:8080 cells-server` |
+| **Local dev** | `bazel run :wasm-dist && bazel run :serve` → http://localhost:8081 |
+
+Point the CLI at any server URL for collab:
+
+```bash
+cells sync --server 'https://cells-app.fly.dev/?room=YOUR_ROOM'
+# or
+cells sync 'https://your-host/?room=YOUR_ROOM'
+```
+
+Tag a release (`git tag v0.0.1 && git push origin v0.0.1`) to build multi-platform
+CLI assets and publish a GitHub Release automatically.
+
 ## Quick Start
 
 ### Web UI
@@ -39,17 +112,12 @@ bazel run :serve
 # Open http://localhost:8081
 ```
 
-### CLI Tool 
+### CLI Tool
 
 ```bash
-# Build the CLI
-bazel run :cli
-
-# Convert Excel to Cells format
-./dist/cli/cells -i spreadsheet.xlsx output.zcd
-
-# Inspect a file
-./dist/cli/cells -I spreadsheet.zcd
+# After install, or: bazel run :cli → ./dist/cli/cells
+cells -i spreadsheet.xlsx output.zcd
+cells -I spreadsheet.zcd
 ```
 
 #### Format Conversion

@@ -1,0 +1,392 @@
+# Tag-triggered release: build multi-platform CLI binaries, package with
+# checksums, publish a GitHub Release. Optional Homebrew tap update when
+# secrets are configured. No npm distribution.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, for example v0.0.1"
+        required: true
+        type: string
+      update_homebrew:
+        description: "Update Homebrew tap when secrets are configured"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Create the GitHub release as a prerelease"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CELLS_REPO: aduermael/cells
+
+jobs:
+  validate:
+    name: Validate release input
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      update_homebrew: ${{ steps.release.outputs.update_homebrew }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version and branch
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
+          INPUT_UPDATE_HOMEBREW: ${{ github.event.inputs.update_homebrew }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$REF_NAME" != "main" ]]; then
+            echo "Releases must be run from main. Current ref: $REF_NAME" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$REF_TYPE" != "tag" ]]; then
+              echo "Release push events must come from tags. Current ref type: $REF_TYPE" >&2
+              exit 1
+            fi
+            release_tag="$REF_NAME"
+            update_homebrew="true"
+            prerelease="false"
+          else
+            release_tag="$INPUT_VERSION"
+            update_homebrew="$INPUT_UPDATE_HOMEBREW"
+            prerelease="$INPUT_PRERELEASE"
+          fi
+
+          chmod +x scripts/release/validate-tag.sh scripts/release/common.sh
+          # Prints tag= and version=; also appends to GITHUB_OUTPUT
+          scripts/release/validate-tag.sh "$release_tag"
+          echo "update_homebrew=$update_homebrew" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  build-assets:
+    name: Build ${{ matrix.name }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+            os: linux
+            arch: x86_64
+            asset: cells-linux-x86_64.tar.gz
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+            os: linux
+            arch: arm64
+            asset: cells-linux-arm64.tar.gz
+          - name: macos-x86_64
+            runner: macos-15-intel
+            os: macos
+            arch: x86_64
+            asset: cells-macos-x86_64.tar.gz
+          - name: macos-arm64
+            runner: macos-15
+            os: macos
+            arch: arm64
+            asset: cells-macos-arm64.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: release-${{ matrix.name }}
+          repository-cache: true
+
+      - name: Install Linux build dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build perl libssl-dev pkg-config
+
+      - name: Build CLI (optimized, version-stamped)
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Stamp CELLS_VERSION into the binary via compiler define
+          bazel build -c opt //apps/cli:cells \
+            --copt="-DCELLS_VERSION=\"${VERSION}\""
+          mkdir -p dist/cli
+          cp -f bazel-bin/apps/cli/cells dist/cli/cells
+          chmod +x dist/cli/cells
+          dist/cli/cells --version
+          dist/cli/cells --version | grep -Fq "cells $VERSION"
+
+      - name: Package asset
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          OS_NAME: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/release/*.sh
+          out="dist/${TAG}"
+          mkdir -p "$out"
+          scripts/release/package-cli.sh \
+            --binary dist/cli/cells \
+            --os "$OS_NAME" \
+            --arch "$ARCH" \
+            --out-dir "$out" \
+            --version "$VERSION"
+          test -s "$out/$ASSET"
+          test -s "$out/$ASSET.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            dist/${{ needs.validate.outputs.tag }}/${{ matrix.asset }}
+            dist/${{ needs.validate.outputs.tag }}/${{ matrix.asset }}.sha256
+          if-no-files-found: error
+
+  github-release:
+    name: Publish GitHub release
+    needs:
+      - validate
+      - build-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      url: ${{ steps.publish.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist/${{ needs.validate.outputs.tag }}
+
+      - name: Verify all release assets
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/release/common.sh
+          # shellcheck source=scripts/release/common.sh
+          . scripts/release/common.sh
+          expected=(
+            cells-linux-x86_64.tar.gz
+            cells-linux-arm64.tar.gz
+            cells-macos-x86_64.tar.gz
+            cells-macos-arm64.tar.gz
+          )
+          for asset in "${expected[@]}"; do
+            test -s "dist/$TAG/$asset"
+            test -s "dist/$TAG/$asset.sha256"
+            tar -tzf "dist/$TAG/$asset" | grep -Fx cells >/dev/null
+            grep -Eq '^[a-f0-9]{64}$' "dist/$TAG/$asset.sha256"
+          done
+
+      - name: Create or verify tag
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          head_sha="$(git rev-parse HEAD)"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            :
+          elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+          else
+            git tag -a "$TAG" -m "$TAG" "$head_sha"
+            git push origin "refs/tags/$TAG"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$TAG")"
+            if [[ "$tag_sha" != "$head_sha" ]]; then
+              echo "Tag $TAG already exists at $tag_sha, not current HEAD $head_sha" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Create or update GitHub release
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          files=(dist/"$TAG"/cells-*.tar.gz dist/"$TAG"/cells-*.tar.gz.sha256)
+
+          release_json="$(gh release view "$TAG" --repo "$CELLS_REPO" --json databaseId,isDraft,url 2>/dev/null || true)"
+          if [[ -n "$release_json" ]]; then
+            release_id="$(jq -r .databaseId <<<"$release_json")"
+            release_is_draft="$(jq -r .isDraft <<<"$release_json")"
+            release_url="$(jq -r .url <<<"$release_json")"
+
+            if [[ "$release_is_draft" == "true" || "$release_url" == *"/untagged-"* ]]; then
+              echo "Deleting stale release for $TAG at $release_url before recreating it."
+              gh api -X DELETE "repos/$CELLS_REPO/releases/$release_id"
+              release_json=""
+            fi
+          fi
+
+          if [[ -n "$release_json" ]]; then
+            gh release upload "$TAG" "${files[@]}" --repo "$CELLS_REPO" --clobber
+          else
+            prerelease_flag=()
+            if [[ "$PRERELEASE" == "true" ]]; then
+              prerelease_flag=(--prerelease)
+            fi
+            notes="Prebuilt cells CLI binaries for ${TAG}. Install: skill (install-skill.sh), brew install aduermael/tap/cells, or install.sh — see README."
+            gh release create "$TAG" "${files[@]}" \
+              --repo "$CELLS_REPO" \
+              --title "$TAG" \
+              --notes "$notes" \
+              --verify-tag \
+              "${prerelease_flag[@]}"
+          fi
+
+          release_url="$(gh release view "$TAG" --repo "$CELLS_REPO" --json url --jq .url)"
+          if [[ "$release_url" == *"/untagged-"* ]]; then
+            echo "Release URL is stale after publishing: $release_url" >&2
+            exit 1
+          fi
+          echo "url=$release_url" >> "$GITHUB_OUTPUT"
+
+  homebrew:
+    name: Update Homebrew tap
+    needs:
+      - validate
+      - github-release
+    if: needs.validate.outputs.update_homebrew == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check Homebrew secrets
+        id: secrets
+        shell: bash
+        env:
+          CLIENT_ID: ${{ secrets.HOMEBREW_RELEASE_APP_CLIENT_ID }}
+          PRIVATE_KEY: ${{ secrets.HOMEBREW_RELEASE_APP_PRIVATE_KEY }}
+          TAP_REPO: ${{ secrets.HOMEBREW_TAP_REPO }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLIENT_ID:-}" || -z "${PRIVATE_KEY:-}" ]]; then
+            echo "Homebrew tap secrets not configured; skipping formula push."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          # Default tap repo if not set
+          echo "tap_repo=${TAP_REPO:-aduermael/homebrew-tap}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/create-github-app-token@v1
+        if: steps.secrets.outputs.configured == 'true'
+        id: tap-token
+        with:
+          # GitHub App client id (or numeric app id) for the homebrew-tap updater
+          app-id: ${{ secrets.HOMEBREW_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HOMEBREW_RELEASE_APP_PRIVATE_KEY }}
+          owner: aduermael
+          repositories: homebrew-tap
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.configured == 'true'
+        with:
+          path: cells
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.configured == 'true'
+        with:
+          repository: ${{ steps.secrets.outputs.tap_repo }}
+          path: tap
+          token: ${{ steps.tap-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Write and push formula
+        if: steps.secrets.outputs.configured == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.tap-token.outputs.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          CELLS_REPO: aduermael/cells
+        run: |
+          set -euo pipefail
+          chmod +x cells/scripts/release/*.sh
+          checksums="$(mktemp -d)"
+          gh release download "$TAG" --repo "$CELLS_REPO" --pattern '*.sha256' --dir "$checksums" --clobber
+
+          cells/scripts/release/write-homebrew-formula.sh \
+            --version "$VERSION" \
+            --tag "$TAG" \
+            --checksum-dir "$checksums" \
+            --output tap/Formula/cells.rb
+
+          cd tap
+          app_slug="${{ steps.tap-token.outputs.app-slug }}"
+          if [[ -n "$app_slug" ]]; then
+            app_user_id="$(gh api "/users/${app_slug}[bot]" --jq .id 2>/dev/null || echo "41898282")"
+            git config user.name "${app_slug}[bot]"
+            git config user.email "${app_user_id}+${app_slug}[bot]@users.noreply.github.com"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          fi
+          gh auth setup-git
+          git add Formula/cells.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew formula already up to date."
+            exit 0
+          fi
+          git commit -m "cells $TAG"
+          git push
+
+      - name: Soft-skip notice
+        if: steps.secrets.outputs.configured != 'true'
+        run: |
+          echo "Skipped Homebrew tap update (HOMEBREW_RELEASE_APP_CLIENT_ID / PRIVATE_KEY not set)."
+          echo "Formula can still be generated with: scripts/release/write-homebrew-formula.sh"
