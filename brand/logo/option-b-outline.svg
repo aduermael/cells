@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Cells logo outline">
-  <!-- Same as option-d-outline -->
-  <rect x="8" y="8" width="80" height="8" fill="#0A0A0A"/>
-  <rect x="8" y="8" width="8" height="80" fill="#0A0A0A"/>
-  <rect x="80" y="8" width="8" height="60" fill="#0A0A0A"/>
-  <rect x="8" y="80" width="60" height="8" fill="#0A0A0A"/>
-  <path fill="#0A0A0A" d="M32 28L56 44L32 60V52L44 44L32 36Z"/>
-  <rect x="72" y="72" width="12" height="12" fill="#0A0A0A"/>
-</svg>

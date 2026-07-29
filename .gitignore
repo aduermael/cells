@@ -25,3 +25,9 @@ node_modules/
 compile_commands.json
 .claude/settings.local.json
 .build-output/linux/cells
+
+# Local agent / contributor scratch — never commit
+plans/
+*.log
+tmp/
+/tmp/
