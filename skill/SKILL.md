@@ -3,9 +3,9 @@ name: cells
 description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal.
 ---
 
-# Cells — Excel CLI equivalent
+# Cells spreadsheet CLI
 
-`cells` is a command-line tool for spreadsheet work with `.xlsx`, `.csv`, and `.zcd`.
+`cells` is a spreadsheet engine CLI for `.xlsx`, `.csv`, and `.zcd`.
 
 ## Check availability
 
