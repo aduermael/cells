@@ -9,8 +9,6 @@
   /* Brand green (logo / --color-primary) */
   --link: #0a9208;
   --link-hover: #087a06;
-  --btn-bg: #1a1a1a;
-  --btn-fg: #fafafa;
   --demo-bg: #ffffff;
   --frame-h: min(72vh, 720px);
   --max: 960px;
@@ -25,8 +23,6 @@
   --border: #2a2a2a;
   --link: #4ade80;
   --link-hover: #86efac;
-  --btn-bg: #f0f0f0;
-  --btn-fg: #111;
   --demo-bg: #1a1a1a;
 }
 
@@ -153,10 +149,9 @@ main {
 }
 
 .cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin: 0;
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 1.05rem;
 }
 
 .btn {
@@ -175,17 +170,6 @@ main {
   color: var(--fg);
   text-decoration: none;
   border-color: var(--muted);
-}
-
-.btn.primary {
-  background: var(--btn-bg);
-  border-color: var(--btn-bg);
-  color: var(--btn-fg);
-}
-
-.btn.primary:hover {
-  color: var(--btn-fg);
-  opacity: 0.92;
 }
 
 .demo {

@@ -46,6 +46,8 @@ assert_ok "data-app-url present" grep -q 'data-app-url="https://example.test/app
 assert_ok "GitHub link present" grep -q 'https://github.com/example/cells' "$OUT/index.html"
 assert_ok "title is agent-focused" grep -q 'A spreadsheet engine for agents' "$OUT/index.html"
 assert_ok "CTA is try it right here" grep -q 'Try it right here' "$OUT/index.html"
+assert_ok "CTA is plain text not a button" \
+  bash -c "! grep -E 'class=\"btn[^\"]*\"[^>]*>Try it right here' '$OUT/index.html'"
 assert_ok "Lua/Luau feature copy" grep -q 'Lua/Luau' "$OUT/index.html"
 assert_ok "headless CLI (no pipelines)" \
   bash -c "grep -q 'headless CLI' '$OUT/index.html' && ! grep -q 'pipelines' '$OUT/index.html'"
