@@ -244,7 +244,7 @@ cells/
 │       └── *_test.cc       # Tests (colocated)
 ├── testdata/               # Sample .zcd files
 ├── docs/                   # Architecture documentation
-├── plans/                  # Implementation plans
+├── brand/                  # Logo source + PNG exports
 ├── tools/                  # Build/lint scripts and utilities
 │   └── serve/              # Local WASM server
 ├── MODULE.bazel            # Bazel module definition

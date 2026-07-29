@@ -1,8 +1,8 @@
-<svg width="643" height="563" viewBox="0 0 643 563" fill="none" xmlns="http://www.w3.org/2000/svg">
-<mask id="mask0_2_304" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="643" height="563">
-<path d="M0.895996 0.302002H642.896V562.302H0.895996V0.302002Z" fill="white"/>
-</mask>
-<g mask="url(#mask0_2_304)">
-<path d="M293.771 277.677L290.865 281.885L290.854 281.875L293.771 277.677ZM0.895996 561.364H98.0418L216.417 389.781L167.781 319.697L0.895996 561.364ZM157.896 560.895H255.042L295.177 503.27L246.781 433.541L157.896 560.895ZM642.896 0.416138H546.479L400.021 210.416L370.323 167.395L485.906 0.884888H389.49L322.083 97.5307L255.042 0.416138H157.896L273.406 167.343L243.031 210.875L98.0418 0.884888H0.895996L194.615 280.833L243.167 351L388.729 561.375H485.146L290.865 281.875L290.854 281.864L293.771 277.677L321.813 237.281L545.75 560.895H642.156L447.844 281.395L642.896 0.416138Z" fill="#058601"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" fill="none" role="img" aria-label="Cells">
+  <!-- Production app icon — brand green (slightly lighter than legacy #058601) -->
+  <g transform="translate(1 1)">
+    <path d="M16 16h56v56H16z" stroke="#0a9208" stroke-width="8"/>
+    <path d="M33 28l24 16-24 16v-8l12-8-12-8z" fill="#0a9208"/>
+    <path d="M60 60h22v22H60z" fill="#0a9208"/>
+  </g>
 </svg>

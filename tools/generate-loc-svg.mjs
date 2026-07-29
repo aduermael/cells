@@ -22,7 +22,7 @@ const CHART_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const CHART_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 
 // Colors
-const PRODUCT_COLOR = '#058601';  // Green from project icon
+const PRODUCT_COLOR = '#0a9208';  // Green from project icon
 const TEST_COLOR = '#2196F3';     // Blue for tests
 const DOCS_COLOR = '#FF9800';     // Orange for documentation
 const COMMITS_COLOR = '#9C27B0';  // Purple for commits

@@ -2,11 +2,11 @@
 
 /* Design System Variables */
 :root {
-    /* Primary brand colors */
-    --color-primary: #058601;
-    --color-secondary: #50aa4d;
-    --color-primary-hover: #046e01;
-    --color-primary-active: #035d01;
+    /* Primary brand colors (aligned with apps/shared/icon.svg) */
+    --color-primary: #0a9208;
+    --color-secondary: #5cb85a;
+    --color-primary-hover: #087a06;
+    --color-primary-active: #066505;
 
     /* Neutral palette */
     --color-bg-primary: #ffffff;
@@ -212,7 +212,7 @@ body {
 
 #header-logo {
     height: 22px;
-    width: auto;
+    width: 22px;
     flex-shrink: 0;
     color: var(--color-primary);
 }
