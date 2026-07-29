@@ -21,7 +21,7 @@ bool parseDoubleFull(std::string_view s, double& value) {
         return false;
     }
     // from_chars rejects leading whitespace; match that for CSV detection.
-    if (std::isspace(static_cast<unsigned char>(s.front()))) {
+    if (std::isspace(static_cast<unsigned char>(s.front())) != 0) {
         return false;
     }
     // strtod needs a null-terminated C string.

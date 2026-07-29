@@ -69,7 +69,7 @@ static bool parseDouble(const std::string& str, double& value) {
         return false;
     }
     // Match from_chars: no leading whitespace, full-string consumption.
-    if (std::isspace(static_cast<unsigned char>(clean.front()))) {
+    if (std::isspace(static_cast<unsigned char>(clean.front())) != 0) {
         return false;
     }
     char* end = nullptr;
