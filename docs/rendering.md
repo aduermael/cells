@@ -207,7 +207,7 @@ const COLORS = {
     headerText: '#495057',    // Header text
     cellText: '#212529',      // Cell text
     cellBg: '#ffffff',        // Cell background
-    selectionBorder: '#058601', // Selection border (green)
+    selectionBorder: '#0a9208', // Selection border (brand green)
     selectionBg: 'rgba(5, 134, 1, 0.1)', // Selection fill
     cornerBg: '#e9ecef'       // Corner background
 } as const;

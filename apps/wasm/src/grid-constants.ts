@@ -98,7 +98,7 @@ export function getZoomedFontSize(baseFontSize: number): number {
 
 // Color palette
 // Primary brand colors (should match CSS variables)
-export const PRIMARY_COLOR = "#058601";
+export const PRIMARY_COLOR = "#0a9208";
 export const SECONDARY_COLOR = "#50AA4D";
 
 // Static color constants (used as fallback)
