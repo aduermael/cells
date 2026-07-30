@@ -32,11 +32,13 @@ Invoke the chosen binary for all work (convert, inspect, script, **session**, sy
 
 ```bash
 ./dist/cli/cells --help
-# Multi-step collab (preferred for agents):
+# Multi-step collab (preferred for agents; stdout is pure JSON / JSONL):
 ./dist/cli/cells session start 'http://localhost:8081/?room=ROOM_ID'
+# → {"ok":true,"id":"...","room":"ROOM_ID",...}
 ./dist/cli/cells session exec SESSION_ID -e 'setCell("A1", 1)'
-./dist/cli/cells session watch SESSION_ID --duration 10
-./dist/cli/cells session list
+# → {"ok":true,"id":"...","output":...}
+./dist/cli/cells session watch SESSION_ID --duration 10   # JSONL event stream
+./dist/cli/cells session list                            # [] or [{...}]
 ./dist/cli/cells session stop SESSION_ID
 # One-shot blocking listen (optional):
 ./dist/cli/cells sync 'http://localhost:8081/?room=ROOM_ID'

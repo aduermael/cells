@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -637,18 +638,42 @@ std::string resolve_root(const SessionCliOptions& opts) {
     return session_root_dir();
 }
 
+// ---------------------------------------------------------------------------
+// Pure-JSON stdout contract for all session client commands:
+// - one JSON value (object/array) per response, or JSONL for watch
+// - large payloads spill to /tmp with a small pointer object on stdout
+// - errors are JSON {"ok":false,"error":"..."} on stdout (exit 1); no prose
+// ---------------------------------------------------------------------------
+
+void emit_json_stdout(std::string_view json) {
+    SpillResult spill = maybe_spill_output(json);
+    std::cout << spill.stdout_text;
+    if (!spill.stdout_text.empty() && spill.stdout_text.back() != '\n') {
+        std::cout << "\n";
+    }
+}
+
+int emit_json_error(std::string_view error, std::string_view id = {}) {
+    std::ostringstream o;
+    o << "{\"ok\":false,\"error\":\"" << json_escape(error) << "\"";
+    if (!id.empty()) {
+        o << ",\"id\":\"" << json_escape(id) << "\"";
+    }
+    o << "}";
+    emit_json_stdout(o.str());
+    return 1;
+}
+
 int cmd_start(const SessionCliOptions& opts) {
     RoomTarget target = parse_room_target(opts.url);
     if (!target.ok) {
-        std::cerr << "Error: " << target.error << "\n";
-        return 1;
+        return emit_json_error(target.error);
     }
 
     std::string root = resolve_root(opts);
     std::string id = generate_session_id();
     if (!create_session_dir(root, id)) {
-        std::cerr << "Error: cannot create session directory under " << root << "\n";
-        return 1;
+        return emit_json_error("cannot create session directory under " + root);
     }
 
     SessionMeta meta;
@@ -660,9 +685,8 @@ int cmd_start(const SessionCliOptions& opts) {
     meta.started_at_ms = now_unix_ms();
     meta.pid = 0;
     if (!write_session_meta(root, meta)) {
-        std::cerr << "Error: cannot write session meta\n";
         remove_session_dir(root, id);
-        return 1;
+        return emit_json_error("cannot write session meta", id);
     }
 
     std::string sock = session_socket_path(root, id);
@@ -670,9 +694,8 @@ int cmd_start(const SessionCliOptions& opts) {
     // Fork daemon process
     pid_t pid = ::fork();
     if (pid < 0) {
-        std::cerr << "Error: fork failed\n";
         remove_session_dir(root, id);
-        return 1;
+        return emit_json_error("fork failed");
     }
     if (pid == 0) {
         // Child: become session leader and run daemon
@@ -706,9 +729,8 @@ int cmd_start(const SessionCliOptions& opts) {
     bool ready = false;
     while (waited < max_wait_ms) {
         if (!process_alive(meta.pid)) {
-            std::cerr << "Error: session daemon exited during startup\n";
             remove_session_dir(root, id);
-            return 1;
+            return emit_json_error("session daemon exited during startup", id);
         }
         int fd = connect_socket(sock, 200);
         if (fd >= 0) {
@@ -726,55 +748,45 @@ int cmd_start(const SessionCliOptions& opts) {
     }
 
     if (!ready) {
-        std::cerr << "Error: session daemon did not become ready\n";
         ::kill(pid, SIGTERM);
         remove_session_dir(root, id);
-        return 1;
+        return emit_json_error("session daemon did not become ready", id);
     }
 
-    // Machine-readable start result
     std::ostringstream o;
     o << "{"
+      << "\"ok\":true,"
       << "\"id\":\"" << json_escape(id) << "\","
       << "\"url\":\"" << json_escape(target.url) << "\","
       << "\"room\":\"" << json_escape(target.room_id) << "\","
       << "\"name\":\"" << json_escape(meta.name) << "\","
       << "\"idle_minutes\":" << meta.idle_minutes << ","
       << "\"pid\":" << meta.pid << "}";
-    std::cout << o.str() << "\n";
-    if (!opts.quiet) {
-        std::cerr << "Session " << id << " started (room " << target.room_id << ", idle "
-                  << meta.idle_minutes << " min)\n";
-    }
+    emit_json_stdout(o.str());
     return 0;
 }
 
 int cmd_list(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto sessions = list_sessions(root, true);
-    if (sessions.empty()) {
-        std::cout << "[]\n";
-        if (!opts.quiet) {
-            std::cerr << "No active sessions\n";
-        }
-        return 0;
-    }
-    std::cout << "[";
+    std::ostringstream o;
+    o << "[";
     for (std::size_t i = 0; i < sessions.size(); ++i) {
         const auto& e = sessions[i];
         if (i) {
-            std::cout << ",";
+            o << ",";
         }
-        std::cout << "{"
-                  << "\"id\":\"" << json_escape(e.meta.id) << "\","
-                  << "\"url\":\"" << json_escape(e.meta.url) << "\","
-                  << "\"room\":\"" << json_escape(e.meta.room) << "\","
-                  << "\"name\":\"" << json_escape(e.meta.name) << "\","
-                  << "\"idle_minutes\":" << e.meta.idle_minutes << ","
-                  << "\"pid\":" << e.meta.pid << ","
-                  << "\"alive\":" << (e.alive ? "true" : "false") << "}";
+        o << "{"
+          << "\"id\":\"" << json_escape(e.meta.id) << "\","
+          << "\"url\":\"" << json_escape(e.meta.url) << "\","
+          << "\"room\":\"" << json_escape(e.meta.room) << "\","
+          << "\"name\":\"" << json_escape(e.meta.name) << "\","
+          << "\"idle_minutes\":" << e.meta.idle_minutes << ","
+          << "\"pid\":" << e.meta.pid << ","
+          << "\"alive\":" << (e.alive ? "true" : "false") << "}";
     }
-    std::cout << "]\n";
+    o << "]";
+    emit_json_stdout(o.str());
     return 0;
 }
 
@@ -782,8 +794,7 @@ int cmd_stop(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto meta = read_session_meta(root, opts.session_id);
     if (!meta) {
-        std::cerr << "Error: session not found: " << opts.session_id << "\n";
-        return 1;
+        return emit_json_error("session not found", opts.session_id);
     }
     std::string sock = session_socket_path(root, opts.session_id);
     SessionResponse r = rpc(sock, "{\"op\":\"stop\"}");
@@ -795,22 +806,22 @@ int cmd_stop(const SessionCliOptions& opts) {
             ::kill(static_cast<pid_t>(meta->pid), SIGKILL);
         }
         remove_session_dir(root, opts.session_id);
-        std::cout << "{\"ok\":true,\"id\":\"" << json_escape(opts.session_id)
-                  << "\",\"stopped\":true}\n";
+        emit_json_stdout("{\"ok\":true,\"id\":\"" + json_escape(opts.session_id) +
+                         "\",\"stopped\":true}");
         return 0;
     }
     if (!r.ok) {
         remove_session_dir(root, opts.session_id);
-        std::cout << "{\"ok\":true,\"id\":\"" << json_escape(opts.session_id)
-                  << "\",\"stopped\":true,\"note\":\"cleaned stale\"}\n";
+        emit_json_stdout("{\"ok\":true,\"id\":\"" + json_escape(opts.session_id) +
+                         "\",\"stopped\":true,\"note\":\"cleaned stale\"}");
         return 0;
     }
     // Wait briefly for cleanup
     for (int i = 0; i < 50 && process_alive(meta->pid); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
-    std::cout << "{\"ok\":true,\"id\":\"" << json_escape(opts.session_id)
-              << "\",\"stopped\":true}\n";
+    emit_json_stdout("{\"ok\":true,\"id\":\"" + json_escape(opts.session_id) +
+                     "\",\"stopped\":true}");
     return 0;
 }
 
@@ -818,16 +829,14 @@ int cmd_status(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto meta = read_session_meta(root, opts.session_id);
     if (!meta) {
-        std::cerr << "Error: session not found: " << opts.session_id << "\n";
-        return 1;
+        return emit_json_error("session not found", opts.session_id);
     }
     std::string sock = session_socket_path(root, opts.session_id);
     SessionResponse r = rpc(sock, "{\"op\":\"status\"}");
     if (!r.ok) {
-        std::cerr << "Error: " << (r.error.empty() ? "status failed" : r.error) << "\n";
-        return 1;
+        return emit_json_error(r.error.empty() ? "status failed" : r.error, opts.session_id);
     }
-    std::cout << encode_session_response(r) << "\n";
+    emit_json_stdout(encode_session_response(r));
     return 0;
 }
 
@@ -835,8 +844,7 @@ int cmd_exec(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto meta = read_session_meta(root, opts.session_id);
     if (!meta) {
-        std::cerr << "Error: session not found: " << opts.session_id << "\n";
-        return 1;
+        return emit_json_error("session not found", opts.session_id);
     }
     std::string sock = session_socket_path(root, opts.session_id);
 
@@ -859,58 +867,42 @@ int cmd_exec(const SessionCliOptions& opts) {
     req << "}";
 
     SessionResponse r = rpc(sock, req.str());
+    // Always wrap as JSON (script print text lives in "output")
+    std::ostringstream o;
+    o << "{\"ok\":" << (r.ok ? "true" : "false") << ",\"id\":\"" << json_escape(opts.session_id)
+      << "\"";
     if (!r.ok) {
-        std::cerr << "Error: " << (r.error.empty() ? "exec failed" : r.error) << "\n";
-        if (!r.output.empty()) {
-            SpillResult spill = maybe_spill_output(r.output);
-            std::cout << spill.stdout_text;
-            if (!spill.stdout_text.empty() && spill.stdout_text.back() != '\n') {
-                std::cout << "\n";
-            }
-        }
-        return 1;
+        o << ",\"error\":\"" << json_escape(r.error.empty() ? "exec failed" : r.error) << "\"";
     }
     if (!r.output.empty()) {
-        SpillResult spill = maybe_spill_output(r.output);
-        std::cout << spill.stdout_text;
-        if (!spill.stdout_text.empty() && spill.stdout_text.back() != '\n') {
-            std::cout << "\n";
-        }
-    } else if (!opts.quiet) {
-        // Always emit something observable for agents
-        std::cout << "{\"ok\":true,\"id\":\"" << json_escape(opts.session_id)
-                  << "\",\"exec\":true}\n";
+        o << ",\"output\":\"" << json_escape(r.output) << "\"";
     }
-    return 0;
+    o << "}";
+    emit_json_stdout(o.str());
+    return r.ok ? 0 : 1;
 }
 
 int cmd_watch(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto meta = read_session_meta(root, opts.session_id);
     if (!meta) {
-        std::cerr << "Error: session not found: " << opts.session_id << "\n";
-        return 1;
+        return emit_json_error("session not found", opts.session_id);
     }
     std::string sock = session_socket_path(root, opts.session_id);
     int fd = connect_socket(sock);
     if (fd < 0) {
-        std::cerr << "Error: cannot connect to session\n";
-        return 1;
+        return emit_json_error("cannot connect to session", opts.session_id);
     }
     if (!write_all(fd, "{\"op\":\"watch\"}\n")) {
         ::close(fd);
-        std::cerr << "Error: failed to start watch\n";
-        return 1;
+        return emit_json_error("failed to start watch", opts.session_id);
     }
 
-    // Touch activity so watch counts as use
-    // (watch request itself already touches in daemon)
-
+    // JSONL stream: one JSON object per line until duration/watch_end/disconnect
     auto start = std::chrono::steady_clock::now();
     double max_sec = opts.watch_duration_sec;
     std::string buf;
     char tmp[4096];
-    bool got_line = false;
 
     while (true) {
         if (max_sec > 0) {
@@ -963,8 +955,8 @@ int cmd_watch(const SessionCliOptions& opts) {
             if (line.empty()) {
                 continue;
             }
-            got_line = true;
-            std::cout << line << "\n";
+            // JSONL: emit line as-is (already JSON). Large single events spill.
+            emit_json_stdout(line);
             // End if watch_end
             if (json_get_bool(line, "watch_end").value_or(false)) {
                 ::close(fd);
@@ -973,10 +965,6 @@ int cmd_watch(const SessionCliOptions& opts) {
         }
     }
     ::close(fd);
-    // Success if we started cleanly; duration exit is ok even with only watch_start
-    if (!got_line && !opts.quiet) {
-        std::cerr << "Watch ended with no events\n";
-    }
     return 0;
 }
 
@@ -984,8 +972,7 @@ int cmd_daemon(const SessionCliOptions& opts) {
     // Direct daemon entry (for testing / re-exec). Not the normal path (fork from start).
     RoomTarget target = parse_room_target(opts.url);
     if (!target.ok) {
-        std::cerr << "Error: " << target.error << "\n";
-        return 1;
+        return emit_json_error(target.error);
     }
     std::string root = resolve_root(opts);
     SessionMeta meta;
@@ -1007,7 +994,9 @@ int cmd_daemon(const SessionCliOptions& opts) {
 }  // namespace
 
 void print_session_help(const char* program_name) {
-    std::cerr << session_usage(program_name);
+    // Usage text is for humans via `cells --help`; session subcommands themselves
+    // never print prose on stdout/stderr — only JSON / JSONL.
+    (void)program_name;
 }
 
 int run_session_command(const SessionCliOptions& opts) {
@@ -1027,9 +1016,11 @@ int run_session_command(const SessionCliOptions& opts) {
         case SessionCommandKind::kDaemon:
             return cmd_daemon(opts);
         case SessionCommandKind::kNone:
-        default:
-            print_session_help("cells");
+        default: {
+            std::cout << "{\"ok\":false,\"error\":\"missing session subcommand "
+                         "(start|list|stop|exec|watch|status)\"}\n";
             return 1;
+        }
     }
 }
 

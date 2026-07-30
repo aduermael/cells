@@ -38,30 +38,37 @@ When a human (or peer) shares a Cells collab link that includes a **room id** (`
 
 ### Multi-step agent workflow (session daemon)
 
+**Stdout contract (all session commands):** pure **JSON** only — no human prose on stdout or stderr.
+- One JSON value per command (object or array)
+- Errors: `{"ok":false,"error":"..."}` on stdout, exit code 1
+- Large JSON: spilled to `/tmp` with a small pointer object `{"path","bytes","preview"}`
+- `session watch`: **JSONL** (one JSON object per line)
+
 ```bash
 # 1) Start a background peer (prints JSON with session id)
 cells session start 'https://example.com/?room=ROOM_ID' --idle-minutes 30 --name 'CLI Agent'
-# → {"id":"a1b2c3d4","url":"...","room":"ROOM_ID",...}
+# → {"ok":true,"id":"a1b2c3d4","url":"...","room":"ROOM_ID",...}
 
 # 2) Run scripts/actions against the live session (no reconnect each time)
 cells session exec a1b2c3d4 -e 'setCell("A1", 42); print(getCell("A1").value)'
+# → {"ok":true,"id":"a1b2c3d4","output":"42\n"}
 cells session exec a1b2c3d4 --script transform.luau
 
-# 3) Optional: stream room/session events (ops, peers, state)
+# 3) Optional: stream room/session events as JSONL
 cells session watch a1b2c3d4 --duration 30
 
 # 4) Inspect / list / stop
 cells session status a1b2c3d4
-cells session list
+cells session list          # → [] when empty (no prose)
 cells session stop a1b2c3d4
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `session start <url>` | Fork a daemon, join the room, print `{"id",...}` |
-| `session exec <id> -e` / `--script` | Run Luau on the live workbook and broadcast ops |
-| `session watch <id>` | Stream JSON events (`--duration SECS` to auto-exit) |
-| `session list` | Active sessions (JSON array) |
+| `session start <url>` | Fork a daemon, join the room, print `{"ok":true,"id",...}` |
+| `session exec <id> -e` / `--script` | Run Luau; result `{"ok",...","output":"..."}` + broadcast ops |
+| `session watch <id>` | Stream JSONL events (`--duration SECS` to auto-exit) |
+| `session list` | Active sessions as JSON array (`[]` if none) |
 | `session status <id>` | Connection state, peers, idle settings |
 | `session stop <id>` | Stop daemon and leave the room |
 
@@ -109,13 +116,13 @@ cells -i report.csv -e 'print(getCell("A1").value)'
 
 ### Large CLI output
 
-If a command prints a large payload (script output above a size threshold), the CLI writes the full body under `/tmp` and prints a small JSON pointer on stdout instead of dumping megabytes into the agent context:
+If a command’s JSON (or offline script print) is above a size threshold, the CLI writes the full body under `/tmp` and prints a small JSON pointer on stdout instead of dumping megabytes into the agent context:
 
 ```json
 {"path":"/tmp/cells-out-XXXXXX","bytes":123456,"preview":"..."}
 ```
 
-Open `path` to read the full output. Small payloads still print inline.
+Open `path` to read the full body. Small payloads stay inline. Session commands always wrap results as JSON (never raw script text alone).
 
 ### Formats
 

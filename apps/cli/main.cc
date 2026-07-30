@@ -6,6 +6,7 @@
 #include "cli_version.h"
 #include "converter.h"
 #include "options.h"
+#include "output_spill.h"
 #include "session_args.h"
 #include "session_command.h"
 #include "sync_args.h"
@@ -451,18 +452,18 @@ int show_file_info(const Options& opts) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    // Session subcommand (daemon peer for agents)
+    // Session subcommand (daemon peer for agents) — pure JSON on stdout
     cells::cli::SessionParseResult session_parse = cells::cli::parse_session_args(argc, argv);
     if (session_parse.is_session) {
         if (!session_parse.ok) {
-            std::cerr << "Error: " << session_parse.error << "\n";
-            cells::cli::print_session_help(argv[0]);
+            std::cout << "{\"ok\":false,\"error\":\""
+                      << cells::cli::json_escape(session_parse.error) << "\"}\n";
             return 1;
         }
         cells::cli::validate_session_options(session_parse);
         if (!session_parse.ok) {
-            std::cerr << "Error: " << session_parse.error << "\n";
-            cells::cli::print_session_help(argv[0]);
+            std::cout << "{\"ok\":false,\"error\":\""
+                      << cells::cli::json_escape(session_parse.error) << "\"}\n";
             return 1;
         }
         return cells::cli::run_session_command(session_parse.options);
