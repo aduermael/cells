@@ -13,11 +13,12 @@ namespace {
 // Uses std::random_device for seeding (cryptographically secure on most platforms)
 thread_local std::random_device rd;
 thread_local std::mt19937 rng(rd());
-thread_local std::uniform_int_distribution<uint8_t> byte_dist(0, 255);
+// MSVC rejects uniform_int_distribution over uint8_t (N4950 [rand.req.genl]/1.5).
+thread_local std::uniform_int_distribution<unsigned int> byte_dist(0, 255);
 
 // Get a random byte
 uint8_t random_byte() {
-    return byte_dist(rng);
+    return static_cast<uint8_t>(byte_dist(rng));
 }
 
 }  // namespace
