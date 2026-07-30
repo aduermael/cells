@@ -229,6 +229,7 @@ void SyncClient::stopSync() {
 
     room_id_.clear();
     peer_id_.clear();
+    expect_remote_peers_ = false;
     setState(SyncClientState::OFFLINE);
 }
 
@@ -501,6 +502,10 @@ void SyncClient::removePeer(const std::string& peer_id) {
     // (closing the connection triggers callbacks which might call removePeer again)
     auto peer = std::move(it->second);
     peers_.erase(it);
+    if (peers_.empty()) {
+        // Room may be empty now; allow ONLINE alone again
+        expect_remote_peers_ = false;
+    }
 
     // Clear data channel delegates to prevent callbacks on destroyed objects
     if (peer->operations_channel) {
@@ -799,9 +804,13 @@ void SyncClient::updateSyncState() {
     const size_t connecting = peers_.size();
 
     if (ready_count == 0) {
-        // No ready data channels. If we still have in-flight WebRTC peers,
-        // stay SYNCING. Only go ONLINE alone when nobody is connecting.
-        if (state_ == SyncClientState::SYNCING && connecting == 0) {
+        // No ready data channels. Stay SYNCING while:
+        //  - WebRTC peers are mid-handshake (connecting > 0), or
+        //  - we joined a room that already had peers (expect_remote_peers_)
+        //    and are still waiting for their offer (polite path).
+        // Going ONLINE alone here was minting a parallel Sheet1 on the CLI
+        // that never shared IDs with the browser document.
+        if (state_ == SyncClientState::SYNCING && connecting == 0 && !expect_remote_peers_) {
             setState(SyncClientState::ONLINE);
         }
         return;
@@ -826,6 +835,7 @@ void SyncClient::updateSyncState() {
 
     if (all_synced && state_ == SyncClientState::SYNCING) {
         LOG_INFO("[Sync] All %zu peer(s) CRDT-synced → ONLINE", ready_count);
+        expect_remote_peers_ = false;
         setState(SyncClientState::ONLINE);
     }
 }
@@ -888,6 +898,7 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
     if (existing_peers.empty()) {
         // We're the first/only peer - go online
         LOG_INFO("[Sync] Joined room alone → ONLINE");
+        expect_remote_peers_ = false;
         setState(SyncClientState::ONLINE);
         return;
     }
@@ -896,7 +907,12 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
     // only "existing peers initiate via peer-joined" — if the browser missed
     // that event, the joiner sat in SYNCING forever. Perfect negotiation:
     // higher peer id offers to each existing peer.
+    //
+    // expect_remote_peers_: polite joiners have peers_.empty() until the first
+    // offer arrives — without this flag updateSyncState would go ONLINE alone
+    // and callers (CLI session) would mint a second empty Sheet1.
     LOG_INFO("[Sync] Joined room with %zu existing peer(s) → SYNCING", existing_peers.size());
+    expect_remote_peers_ = true;
     setState(SyncClientState::SYNCING);
     for (const auto& other : existing_peers) {
         if (shouldInitiateTo(other)) {

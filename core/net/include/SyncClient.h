@@ -327,6 +327,12 @@ private:
     std::string room_id_;
     std::string peer_id_;
 
+    // When we join a room that already has peers, do not flip to ONLINE alone
+    // while waiting for their offers (polite joiner has peers_.empty() until
+    // the first offer). Minting a local Sheet1 in that window creates a second
+    // document that never merges with the browser's sheet.
+    bool expect_remote_peers_ = false;
+
     // Delegate
     SyncClientDelegate* delegate_ = nullptr;
 

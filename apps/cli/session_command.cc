@@ -351,10 +351,11 @@ public:
                     << " peer_id=" << client.getPeerId() << "\n";
             }
         }
-        if (state == net::SyncClientState::ONLINE) {
-            // Alone in room or fully synced — ensure a sheet exists for scripts
-            ensureDefaultSheetViaCrdt();
-        }
+        // Do NOT mint a Sheet1 on ONLINE here. If we joined a room that already
+        // had a browser peer, going ONLINE before CRDT sync used to create a
+        // second empty Sheet1; setCell then wrote A1 on the wrong sheet while
+        // getCell(B1) could still read the browser sheet after sync. Sheet is
+        // created only in exec when truly alone with zero sheets.
         SessionEvent e;
         e.type = "state";
         e.message = last_state_;
@@ -429,10 +430,14 @@ private:
 
     void touch() { last_activity_ms_ = now_mono_ms(); }
 
-    // Create default Sheet1 via CRDT only when the workbook has no sheets
-    // (empty room). Never invent axes/sheets before peer sync.
+    // Create default Sheet1 only when we are alone and still have no sheet
+    // after join (no peer document to pull). Never call this while expecting
+    // remote peers — that forks a parallel workbook.
     void ensureDefaultSheetViaCrdt() {
         if (!workbook_ || !workbook_->sheets.empty()) {
+            return;
+        }
+        if (sync_ && sync_->getPeerCount() > 0) {
             return;
         }
         const ID sheet_id = generate_id();
@@ -441,6 +446,27 @@ private:
         if (sync_) {
             sync_->broadcastOperations();
         }
+    }
+
+    // Prefer the sheet that already has document content (peer-synced), not a
+    // later empty Sheet1 mint.
+    Sheet* pickScriptSheet() {
+        if (!workbook_ || workbook_->sheets.empty()) {
+            return nullptr;
+        }
+        Sheet* best = workbook_->sheets[0].get();
+        size_t best_cells = best ? best->cellCount() : 0;
+        for (const auto& s : workbook_->sheets) {
+            if (!s) {
+                continue;
+            }
+            const size_t n = s->cellCount();
+            if (n > best_cells) {
+                best = s.get();
+                best_cells = n;
+            }
+        }
+        return best;
     }
 
     void pump_network() {
@@ -768,7 +794,7 @@ private:
             r.state = st;
             r.ready = session_state_is_ready(st);
         }
-        // If ONLINE but sheet still missing (race), create before scripting
+        // Only mint a sheet if still empty after peer sync (truly alone).
         ensureDefaultSheetViaCrdt();
         std::string script = req.code;
         if (script.empty() && !req.script_path.empty()) {
@@ -786,7 +812,14 @@ private:
         }
 
         LuauSandbox sandbox;
-        Sheet* sheet = workbook_->sheets.empty() ? nullptr : workbook_->sheets[0].get();
+        // Critical: do not default to sheets[0] if a later empty Sheet1 was
+        // minted — write to the sheet that holds peer content (e.g. B1).
+        Sheet* sheet = pickScriptSheet();
+        if (sheet == nullptr) {
+            r.ok = false;
+            r.error = "no sheet available (wait for peer sync or create alone)";
+            return r;
+        }
         sandbox.setContext(workbook_.get(), sheet);
         ScriptResult result = sandbox.execute(script);
         r.output = result.output;
