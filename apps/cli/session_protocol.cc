@@ -373,6 +373,11 @@ std::optional<SessionRequest> parse_session_request(std::string_view line) {
 }
 
 bool session_state_is_ready(std::string_view state) {
+    // Only ONLINE means initial peer sync finished (or alone in room).
+    return state == "ONLINE";
+}
+
+bool session_state_is_joined(std::string_view state) {
     return state == "ONLINE" || state == "SYNCING";
 }
 

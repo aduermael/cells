@@ -33,6 +33,7 @@
 #include <mach-o/dyld.h>
 #endif
 
+#include "core/cells/crdt.h"
 #include "core/cells/csv_writer.h"
 #include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
@@ -257,9 +258,11 @@ public:
     }
 
     int run() {
+        // Empty workbook with NO local sheet/axes. Creating a Sheet1 here would
+        // mint new CRDT IDs that collide with the browser's axes at the same
+        // positions. Structure comes from peer sync; if alone, we add a sheet
+        // via CRDT ops once ONLINE.
         workbook_ = std::make_unique<Workbook>();
-        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-        workbook_->addSheet(std::move(sheet));
 
         net::SyncClientConfig config;
         config.signaling_url = target_.signaling_ws;
@@ -324,6 +327,10 @@ public:
     void syncClientStateDidChange(net::SyncClient& /*client*/,
                                   net::SyncClientState state) override {
         last_state_ = net::syncClientStateToString(state);
+        if (state == net::SyncClientState::ONLINE) {
+            // Alone in room or fully synced — ensure a sheet exists for scripts
+            ensureDefaultSheetViaCrdt();
+        }
         SessionEvent e;
         e.type = "state";
         e.message = last_state_;
@@ -397,6 +404,20 @@ private:
     }
 
     void touch() { last_activity_ms_ = now_mono_ms(); }
+
+    // Create default Sheet1 via CRDT only when the workbook has no sheets
+    // (empty room). Never invent axes/sheets before peer sync.
+    void ensureDefaultSheetViaCrdt() {
+        if (!workbook_ || !workbook_->sheets.empty()) {
+            return;
+        }
+        const ID sheet_id = generate_id();
+        Operation op = makeSheetSetOp(*workbook_, sheet_id, R"({"name":"Sheet1"})");
+        applyOperation(*workbook_, op);
+        if (sync_) {
+            sync_->broadcastOperations();
+        }
+    }
 
     void pump_network() {
 #if defined(__APPLE__)
@@ -722,12 +743,9 @@ private:
             std::string st = net::syncClientStateToString(sync_->getState());
             r.state = st;
             r.ready = session_state_is_ready(st);
-            // Refuse silent local-only edits while never connected (unless force via code path)
-            // force is client-side; daemon allows exec always but tags ready.
-            if (!r.ready) {
-                // Still allow but mark warning in error-free ok with ready=false
-            }
         }
+        // If ONLINE but sheet still missing (race), create before scripting
+        ensureDefaultSheetViaCrdt();
         std::string script = req.code;
         if (script.empty() && !req.script_path.empty()) {
             script = read_file_contents(req.script_path);
@@ -998,9 +1016,11 @@ int cmd_start(const SessionCliOptions& opts) {
         }
         remove_session_dir(root, id);
         std::ostringstream err;
-        err << "session stuck " << (state.empty() ? "CONNECTING" : state)
-            << " after " << opts.wait_seconds << "s"
-            << (last_error.empty() ? "" : ("; last_error=" + last_error));
+        err << "session not ONLINE (state=" << (state.empty() ? "CONNECTING" : state)
+            << ") after " << opts.wait_seconds
+            << "s — WebRTC peer sync incomplete or no peers"
+            << (last_error.empty() ? "" : ("; last_error=" + last_error))
+            << ". Rebuild CLI if still stuck CONNECTING forever.";
         return emit_json_error(err.str(), id);
     }
 

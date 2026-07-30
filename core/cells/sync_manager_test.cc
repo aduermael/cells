@@ -102,18 +102,16 @@ TEST_F(SyncManagerTest, AddPeerTwiceNoDoubleHello) {
 }
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithSameOpCount) {
-    // Both have 0 operations
+    // Both have 0 operations — still bidirectional exchange (request + response)
     sync_a->addPeer(node_b);
     auto hello_messages = sync_a->getOutgoingMessages();
     EXPECT_EQ(hello_messages.size(), 1);
 
-    // B receives hello from A
     auto result = sync_b->handleMessage(node_a, hello_messages[0].json);
 
-    // B should not need to request sync (same op count)
-    // Should be empty or just acknowledgment
-    EXPECT_EQ(result.messages.size(), 0);
-    // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
     EXPECT_FALSE(result.dataModified);
 }
 
@@ -122,17 +120,18 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithMoreOps) {
     Operation op = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_b, op);
 
-    // A sends hello to B (A has 0 ops)
     sync_a->addPeer(node_b);
     auto hello_messages = sync_a->getOutgoingMessages();
 
-    // B receives hello from A and should send sync-response
+    // B receives hello from A → always sync-request + full sync-response
     auto result = sync_b->handleMessage(node_a, hello_messages[0].json);
 
-    EXPECT_EQ(result.messages.size(), 1);
-    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_NE(result.messages[0].json.find("\"operations\":"), std::string::npos);
-    EXPECT_FALSE(result.dataModified);  // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"operations\":"), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("CELL_SET"), std::string::npos);
+    EXPECT_FALSE(result.dataModified);
 }
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
@@ -140,16 +139,38 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
     Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_a, op);
 
-    // B sends hello to A
     sync_b->addPeer(node_a);
     auto hello_messages = sync_b->getOutgoingMessages();
 
-    // A receives hello from B and should send sync-response (since A has more ops)
+    // A receives hello from B → always sync-request + full sync-response (includes A's ops)
     auto result = sync_a->handleMessage(node_b, hello_messages[0].json);
 
-    EXPECT_EQ(result.messages.size(), 1);
-    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_FALSE(result.dataModified);  // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("CELL_SET"), std::string::npos);
+    EXPECT_FALSE(result.dataModified);
+}
+
+TEST_F(SyncManagerTest, ConcurrentLocalOpsExchangedOnHello) {
+    // Divergent histories with same length: A and B each have one different CELL_SET
+    Operation op_a = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"1"})");
+    applyOperation(*workbook_a, op_a);
+    Operation op_b = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"2"})");
+    applyOperation(*workbook_b, op_b);
+
+    sync_a->addPeer(node_b);
+    auto hello_a = sync_a->getOutgoingMessages();
+    ASSERT_EQ(hello_a.size(), 1);
+
+    // B handles A's hello → sends full log including op_b
+    auto from_b = sync_b->handleMessage(node_a, hello_a[0].json);
+    ASSERT_EQ(from_b.messages.size(), 2);
+    EXPECT_NE(from_b.messages[1].json.find("\"v\":\"2\""), std::string::npos);
+
+    // A applies B's sync-response
+    auto applied = sync_a->handleMessage(node_b, from_b.messages[1].json);
+    EXPECT_TRUE(applied.dataModified || !applied.receivedOperations.empty());
 }
 
 TEST_F(SyncManagerTest, HandleSyncRequest) {
@@ -348,26 +369,28 @@ TEST_F(SyncManagerTest, FullSyncFlow) {
     auto hello_from_a = sync_a->getOutgoingMessages();
     EXPECT_EQ(hello_from_a.size(), 1);
 
-    // B receives hello and responds with sync-request (since A has more ops)
+    // B receives hello → bidirectional sync-request + full sync-response
     sync_b->addPeer(node_a);
     auto result_from_b = sync_b->handleMessage(node_a, hello_from_a[0].json);
-    // B should send sync-request since A reported 2 ops and B has 0
-    EXPECT_EQ(result_from_b.messages.size(), 1);
+    ASSERT_EQ(result_from_b.messages.size(), 2);
     EXPECT_NE(result_from_b.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
-    EXPECT_FALSE(result_from_b.dataModified);  // Hello doesn't modify data
+    EXPECT_NE(result_from_b.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_FALSE(result_from_b.dataModified);
 
-    // A receives sync-request and responds with sync-response
+    // A receives B's full sync-response (empty ops) — no data change
+    auto apply_empty = sync_a->handleMessage(node_b, result_from_b.messages[1].json);
+    EXPECT_FALSE(apply_empty.dataModified);
+
+    // A receives B's sync-request and responds with full oplog
     auto result_from_a = sync_a->handleMessage(node_b, result_from_b.messages[0].json);
-    EXPECT_EQ(result_from_a.messages.size(), 1);
+    ASSERT_EQ(result_from_a.messages.size(), 1);
     EXPECT_NE(result_from_a.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_FALSE(result_from_a.dataModified);  // Sync-request doesn't modify data
+    EXPECT_FALSE(result_from_a.dataModified);
 
-    // B receives sync-response with operations
+    // B receives sync-response with A's operations
     auto final_result = sync_b->handleMessage(node_a, result_from_a.messages[0].json);
-    EXPECT_TRUE(final_result.dataModified);  // Sync-response DOES modify data
+    EXPECT_TRUE(final_result.dataModified);
 
-    // B applied all operations (oplog is pruned after sync because peer A is now synced)
-    // Verify the cell has the final value from op2
     EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "20");
 }
 

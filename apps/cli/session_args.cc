@@ -259,7 +259,7 @@ std::string session_usage(const char* program_name) {
       << "\n"
       << "  --idle-minutes N   Auto-stop after N minutes idle (default " << kDefaultIdleMinutes
       << "; fractions ok)\n"
-      << "  --wait-seconds N   start: wait for ONLINE/SYNCING before success (default "
+      << "  --wait-seconds N   start: wait for ONLINE (peer sync done) before success (default "
       << kDefaultWaitSeconds << "; 0=no wait)\n"
       << "  --name NAME        Presence display name (default \"CLI Agent\")\n"
       << "  --duration SECS    Watch for at most SECS seconds then exit\n"

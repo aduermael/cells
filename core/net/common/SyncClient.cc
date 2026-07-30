@@ -231,7 +231,11 @@ void SyncClient::broadcastOperations() {
         return;
     }
 
+    // Delta broadcast (ops newer than peer watermarks) plus a full oplog push
+    // so concurrent/local ops made before a peer joined are never stranded.
+    // Receivers dedupe by HLC.
     sync_manager_->queueOperationsBroadcast();
+    sync_manager_->queueFullSyncToAllPeers();
     processOutgoing();
 }
 
@@ -242,12 +246,20 @@ void SyncClient::processOutgoing() {
 
     auto messages = sync_manager_->getOutgoingMessages();
     for (const auto& msg : messages) {
+        if (msg.json.empty()) {
+            continue;
+        }
         if (msg.isBroadcast()) {
             broadcastToPeers(msg.json);
         } else {
             sendToPeer(msg.peerId.toString(), msg.json);
         }
         stats_.messages_sent++;
+        // Count operation batches as operations_sent for agent observability
+        if (msg.json.find("\"type\":\"operations\"") != std::string::npos ||
+            msg.json.find("\"type\":\"sync-response\"") != std::string::npos) {
+            stats_.operations_sent++;
+        }
     }
 }
 
@@ -703,10 +715,14 @@ void SyncClient::notifyPeerReady(const std::string& peer_id) {
         return;
     }
 
-    // Add peer to SyncManager (queues hello message)
+    // Add peer to SyncManager (queues hello message → bidirectional full sync)
     sync_manager_->addPeer(cells::ID(peer_id));
 
-    // Flush outgoing messages
+    // Flush hello / sync-request / sync-response immediately
+    processOutgoing();
+
+    // Also push any local ops that predate the channel (belt and suspenders)
+    sync_manager_->queueFullSyncToAllPeers();
     processOutgoing();
 
     // Notify delegate

@@ -284,6 +284,21 @@ void SyncManager::queueOperationsBroadcast() {
     }
 }
 
+void SyncManager::queueFullSyncToAllPeers() {
+    if (_peers.empty() || _workbook == nullptr) {
+        return;
+    }
+    const std::string msg = makeSyncResponseMessage(HLC{});
+    if (msg.empty()) {
+        return;
+    }
+    for (const auto& pair : _peers) {
+        queueToPeer(pair.first, msg);
+    }
+    LOG_DEBUG("[Sync] queueFullSyncToAllPeers: peers=%zu oplog_size=%zu", _peers.size(),
+              _workbook->getOpLog()->size());
+}
+
 void SyncManager::setDebugNoPrune(bool noPrune) {
     _debugNoPrune = noPrune;
     if (noPrune) {
@@ -367,35 +382,35 @@ HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string
         it = _peers.find(peerId);
     }
 
+    // lastSyncedHLC: what we believe they have — use their reported HLC so we
+    // only send ops they may be missing. isSynced is set true only after a full
+    // exchange (sync-response) or when both sides have empty oplogs.
     it->second.lastSyncedHLC = peerHLC;
     it->second.opCount = static_cast<size_t>(opCount);
     it->second.isSynced = false;
 
-    // Determine if we need to request operations from them
     const OpLog* oplog = _workbook->getOpLog();
     const size_t localOpCount = oplog->size();
+    const HLC localHLC = oplog->getCurrentHLC();
 
     LOG_DEBUG("[Sync] handleHello: peer=%s peer_hlc=%s peer_ops=%lld local_ops=%zu",
-              peerId.toString().c_str(), peerHLC.toString().c_str(), opCount, localOpCount);
+              peerId.toString().c_str(), peerHLC.toString().c_str(),
+              static_cast<long long>(opCount), localOpCount);
 
-    if (static_cast<size_t>(opCount) > localOpCount) {
-        // They have more operations - request sync
-        const HLC localHLC = oplog->getCurrentHLC();
-        LOG_DEBUG("[Sync] handleHello: peer has more ops, requesting sync from %s",
-                  localHLC.toString().c_str());
-        response.emplace_back(peerId, makeSyncRequestMessage(localHLC));
-    } else if (static_cast<size_t>(opCount) < localOpCount) {
-        // We have more operations - send sync response
-        LOG_DEBUG("[Sync] handleHello: we have more ops, sending sync response since %s",
-                  peerHLC.toString().c_str());
-        response.emplace_back(peerId, makeSyncResponseMessage(peerHLC));
-    } else {
-        // Same op count - mark as synced
-        LOG_DEBUG("[Sync] handleHello: same op count, marking peer %s as synced",
-                  peerId.toString().c_str());
+    // Always do a full bidirectional exchange. Op-count comparison is wrong for
+    // concurrent histories (CLI local CELL_SET + empty axes vs browser document
+    // of the same length). Empty HLC = entire oplog; receivers dedupe by HLC.
+    //
+    // 1) Request everything we might be missing
+    // 2) Send our full oplog so concurrent/local ops are not dropped
+    response.emplace_back(peerId, makeSyncRequestMessage(HLC{}));
+    response.emplace_back(peerId, makeSyncResponseMessage(HLC{}));
+
+    if (localOpCount == 0 && opCount == 0) {
         it->second.isSynced = true;
     }
 
+    (void)localHLC;  // available for logging / future since-HLC optimization
     // hello doesn't modify data, just peer state
     return HandleMessageResult(std::move(response), false);
 }
@@ -453,24 +468,30 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
         }
     }
 
-    // Update peer sync state
+    // Update peer sync state. lastSyncedHLC is what we believe *they* hold —
+    // never set it to our current HLC (that would hide concurrent local ops
+    // with lower HLCs from later broadcasts).
     auto it = _peers.find(peerId);
     if (it != _peers.end()) {
+        HLC maxFromPeer = it->second.lastSyncedHLC;
+        for (const auto& op : ops) {
+            if (op.hlc > maxFromPeer) {
+                maxFromPeer = op.hlc;
+            }
+        }
         const HLC oldHLC = it->second.lastSyncedHLC;
-        // Update their lastSyncedHLC to our current HLC
-        it->second.lastSyncedHLC = _workbook->getOpLog()->getCurrentHLC();
+        it->second.lastSyncedHLC = maxFromPeer;
         it->second.isSynced = true;
         LOG_DEBUG("[Sync] handleSyncResponse: peer %s marked synced, HLC %s -> %s",
                   peerId.toString().c_str(), oldHLC.toString().c_str(),
                   it->second.lastSyncedHLC.toString().c_str());
     }
 
-    // Note: Do NOT prune oplog here. When we receive a sync-response, we've just
-    // added operations to our oplog. Pruning immediately would remove them because
-    // lastSyncedHLC equals getCurrentHLC() (the max HLC of received ops).
-    // Pruning should only happen when all peers have confirmed receipt via ACK.
+    // Note: Do NOT prune oplog here — only after ACKs.
+    // Do NOT re-queue a full sync-response here (would loop with the peer).
+    // Initial full exchange is done in handleHello; later local edits use
+    // broadcastOperations() / queueFullSyncToAllPeers() from the editor path.
 
-    // Return operations for delegate notification
     return {{}, std::move(ops), dataModified};
 }
 

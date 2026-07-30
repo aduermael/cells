@@ -45,11 +45,12 @@ When a human (or peer) shares a Cells collab link that includes a **room id** (`
 - `session watch`: **JSONL** (one JSON object per line)
 
 ```bash
-# 1) Start a background peer — waits until ONLINE/SYNCING (default 15s)
+# 1) Start a background peer — waits until ONLINE (peer CRDT sync done; default 15s)
+# Prefer: browser already in the room, then session start (pulls browser document).
 cells session start 'https://example.com/?room=ROOM_ID' \
-  --wait-seconds 15 --idle-minutes 30 --name 'CLI Agent'
+  --wait-seconds 20 --idle-minutes 30 --name 'CLI Agent'
 # → {"ok":true,"id":"a1b2c3d4","state":"ONLINE","ready":true,...}
-# Fails (and stops daemon) if still CONNECTING after wait.
+# Fails if not ONLINE after wait (CONNECTING or stuck SYNCING).
 
 # 2) Run scripts against the live session (refuses if not ready unless --force)
 cells session exec a1b2c3d4 -e 'setCell("A1", 42); print(getCell("A1").value)'
@@ -80,7 +81,9 @@ cells session --help            # JSON {"ok":true,"usage":"..."}
 
 **Idle timeout:** auto-stop after N minutes idle (default **30**; `--idle-minutes`).
 
-**Readiness:** start uses `--wait-seconds` (default **15**). Status includes `ready`, `state`, `peers`, `ops_received`, `cells`, `last_error`.
+**Readiness:** start waits for **ONLINE** (`--wait-seconds`, default 15). `SYNCING` alone is not ready (still exchanging ops). Status includes `ready`, `state`, `peers`, `ops_sent`/`ops_received`, `cells`, `last_error`.
+
+**Document identity:** the session does **not** invent a local Sheet1 before peer sync (that caused dual row/col IDs). Structure comes from the room; only an empty room gets a CRDT Sheet1 after ONLINE.
 
 **Why sessions?** `cells sync <url>` is one-shot blocking. Prefer **session** for multi-step agent work.
 

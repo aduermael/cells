@@ -118,6 +118,11 @@ public:
     // Creates an "operations" message with ops newer than peers have seen
     void queueOperationsBroadcast();
 
+    // Queue a full oplog sync-response to every known peer (receivers dedupe).
+    // Use after local edits or when peers may have concurrent HLCs so that
+    // ops made before a peer joined are never stranded.
+    void queueFullSyncToAllPeers();
+
     // Prune old operations from the OpLog.
     // - Always keeps at least 500 operations for debugging visibility
     // - If no peers: prunes down to 500 ops

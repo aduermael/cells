@@ -131,11 +131,14 @@ TEST(SessionProtocolTest, GenerateSessionId) {
 
 TEST(SessionProtocolTest, SessionStateIsReady) {
     EXPECT_TRUE(session_state_is_ready("ONLINE"));
-    EXPECT_TRUE(session_state_is_ready("SYNCING"));
+    EXPECT_FALSE(session_state_is_ready("SYNCING"));  // still exchanging ops
     EXPECT_FALSE(session_state_is_ready("CONNECTING"));
     EXPECT_FALSE(session_state_is_ready("OFFLINE"));
     EXPECT_FALSE(session_state_is_ready("RECONNECTING"));
     EXPECT_FALSE(session_state_is_ready(""));
+    EXPECT_TRUE(session_state_is_joined("SYNCING"));
+    EXPECT_TRUE(session_state_is_joined("ONLINE"));
+    EXPECT_FALSE(session_state_is_joined("CONNECTING"));
 }
 
 TEST(SessionProtocolTest, ParseExportRequest) {

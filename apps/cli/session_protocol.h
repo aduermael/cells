@@ -108,9 +108,13 @@ struct SessionResponse {
     std::optional<SessionEvent> event;
 };
 
-// True when SyncClient has joined the room (ONLINE or SYNCING).
+// True when SyncClient has finished peer sync (ONLINE).
+// SYNCING means joined but still exchanging ops — not ready for safe edits.
 // CONNECTING / OFFLINE / RECONNECTING are not ready.
 bool session_state_is_ready(std::string_view state);
+
+// True when signaling has joined (ONLINE or SYNCING).
+bool session_state_is_joined(std::string_view state);
 
 // Default seconds to wait for ready after session start.
 inline constexpr double kDefaultWaitSeconds = 15.0;
