@@ -795,10 +795,36 @@ private:
             r.error = "Script error: " + result.error;
             return r;
         }
-        // Propagate local CRDT ops to peers
+        // Propagate local CRDT ops to peers (full + delta; see SyncClient::broadcastOperations)
         if (sync_) {
+            auto stats_before = sync_->getStats();
             sync_->broadcastOperations();
             sync_->processOutgoing();
+            auto stats_after = sync_->getStats();
+            r.ops_sent = stats_after.operations_sent;
+            r.ops_received = stats_after.operations_received;
+            r.peers = static_cast<int>(sync_->getPeerCount());
+            // Surface silent drop: had peers but sent nothing new
+            if (r.peers == 0) {
+                r.last_error = "no ready data-channel peers; local edit not broadcast";
+            } else if (stats_after.messages_sent == stats_before.messages_sent &&
+                       workbook_ && workbook_->getOpLog() &&
+                       workbook_->getOpLog()->size() > 0) {
+                // Still try one more full push after ensuring peer tracking
+                sync_->broadcastOperations();
+            }
+            {
+                std::ofstream out(session_dir(root_, meta_.id) + "/daemon.log", std::ios::app);
+                if (out) {
+                    out << now_unix_ms() << " exec broadcast peers=" << r.peers
+                        << " ops_sent=" << r.ops_sent
+                        << " msgs_sent_delta="
+                        << (stats_after.messages_sent - stats_before.messages_sent)
+                        << " oplog="
+                        << (workbook_ && workbook_->getOpLog() ? workbook_->getOpLog()->size() : 0)
+                        << "\n";
+                }
+            }
         }
         r.ok = true;
         if (sync_) {
@@ -806,6 +832,7 @@ private:
             r.ready = session_state_is_ready(r.state);
             r.peers = static_cast<int>(sync_->getPeerCount());
         }
+        r.cells = count_cells();
         return r;
     }
 

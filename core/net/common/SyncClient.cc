@@ -123,6 +123,12 @@ void ConnectedPeer::peerConnectionDidReceiveDataChannel(RTCPeerConnection& /*pc*
 
     if (label == OPERATIONS_CHANNEL) {
         operations_channel = std::move(channel);
+        // Channel may already be OPEN before we set the delegate (common as answerer).
+        // Without this, notifyPeerReady never runs → SyncManager has no peers →
+        // broadcastOperations is a silent no-op (inbound still works).
+        if (operations_channel && operations_channel->isOpen() && sync_client) {
+            sync_client->handlePeerDataChannelOpen(id, label);
+        }
     } else if (label == PRESENCE_CHANNEL) {
         presence_channel = std::move(channel);
     }
@@ -229,6 +235,18 @@ void SyncClient::stopSync() {
 void SyncClient::broadcastOperations() {
     if (!sync_manager_) {
         return;
+    }
+
+    // Ensure every RTC peer with an open operations channel is in SyncManager.
+    // Inbound ops can apply without addPeer; outbound broadcast requires peers.
+    for (const auto& pair : peers_) {
+        if (pair.second && pair.second->isReady()) {
+            // addPeer is a no-op if already tracked (no double hello)
+            if (!sync_manager_->hasPeer(cells::ID(pair.first))) {
+                LOG_INFO("[Sync] broadcastOperations: late-tracking peer %s", pair.first.c_str());
+                notifyPeerReady(pair.first);
+            }
+        }
     }
 
     // Delta broadcast (ops newer than peer watermarks) plus a full oplog push
@@ -526,6 +544,12 @@ void SyncClient::handleSyncMessage(const std::string& peer_id, const std::string
 
     stats_.messages_received++;
 
+    // Track peer for outbound broadcast even if we never got dataChannelDidOpen
+    // (answerer race) or never exchanged hello before the first ops batch.
+    if (!sync_manager_->hasPeer(cells::ID(peer_id))) {
+        sync_manager_->addPeer(cells::ID(peer_id));
+    }
+
     // Route message through SyncManager
     auto result = sync_manager_->handleMessage(cells::ID(peer_id), message);
 
@@ -538,6 +562,9 @@ void SyncClient::handleSyncMessage(const std::string& peer_id, const std::string
         }
         stats_.messages_sent++;
     }
+
+    // Flush anything handleMessage queued on _outgoing (not only result.messages)
+    processOutgoing();
 
     // Notify delegate about received operations
     if (!result.receivedOperations.empty() && delegate_) {
@@ -594,19 +621,36 @@ void SyncClient::sendPingToAll() {
 void SyncClient::sendToPeer(const std::string& peer_id, const std::string& message) {
     auto it = peers_.find(peer_id);
     if (it == peers_.end()) {
+        LOG_INFO("[Sync] sendToPeer: no RTC peer %s (drop %zu bytes)", peer_id.c_str(),
+                 message.size());
         return;
     }
 
     if (it->second->operations_channel && it->second->operations_channel->isOpen()) {
-        it->second->operations_channel->send(message);
+        if (!it->second->operations_channel->send(message)) {
+            LOG_INFO("[Sync] sendToPeer: send FAILED to %s (%zu bytes)", peer_id.c_str(),
+                     message.size());
+        }
+    } else {
+        LOG_INFO("[Sync] sendToPeer: channel not open for %s (drop %zu bytes)", peer_id.c_str(),
+                 message.size());
     }
 }
 
 void SyncClient::broadcastToPeers(const std::string& message) {
+    size_t sent = 0;
     for (auto& pair : peers_) {
         if (pair.second->operations_channel && pair.second->operations_channel->isOpen()) {
-            pair.second->operations_channel->send(message);
+            if (pair.second->operations_channel->send(message)) {
+                sent++;
+            } else {
+                LOG_INFO("[Sync] broadcastToPeers: send FAILED to %s", pair.first.c_str());
+            }
         }
+    }
+    if (sent == 0 && !peers_.empty()) {
+        LOG_INFO("[Sync] broadcastToPeers: 0/%zu peers accepted message (%zu bytes)", peers_.size(),
+                 message.size());
     }
 }
 
