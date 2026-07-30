@@ -114,3 +114,7 @@ jobs:
 
       - name: Build WinHTTP HTTP and WebSocket libraries
         run: bazel build //core/net:http_request_winhttp //core/net:ws_connection_winhttp
+
+      # Converter-only CLI (no sync/WebRTC stack).
+      - name: Build cells-converter CLI
+        run: bazel build //apps/cli:cells-converter
