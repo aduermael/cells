@@ -265,9 +265,10 @@ std::string session_usage(const char* program_name) {
       << "  --duration SECS    Watch for at most SECS seconds then exit\n"
       << "  --force            exec even if session is still CONNECTING\n"
       << "\n"
-      << "start fails if still CONNECTING after --wait-seconds (daemon stopped).\n"
+      << "start keeps the daemon running even if not ONLINE yet (ready:false + warning).\n"
       << "export writes the live workbook (zcd/xlsx/csv by extension).\n"
-      << "Prefer session over one-shot `cells sync` for multi-step agent work.\n";
+      << "Prefer session over one-shot `cells sync` for multi-step agent work.\n"
+      << "Debug: CELLS_SESSION_DEBUG=1 or session dir daemon.log for state transitions.\n";
     return o.str();
 }
 

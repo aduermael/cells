@@ -261,8 +261,15 @@ private:
     // Generate a random peer ID
     static std::string generatePeerId();
 
-    // Create peer connection to remote peer
+    // Perfect negotiation: higher peer id is the offerer (impolite).
+    // Ensures exactly one side creates the offer for a pair.
+    [[nodiscard]] bool shouldInitiateTo(const std::string& remote_peer_id) const;
+
+    // Create peer connection to remote peer. Returns nullptr on glare ignore.
     ConnectedPeer* createPeerConnection(const std::string& peer_id, bool we_initiate);
+
+    // Start WebRTC offer to peer (data channels + createOffer).
+    void initiateConnectionToPeer(const std::string& peer_id);
 
     // Remove peer
     void removePeer(const std::string& peer_id);

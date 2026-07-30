@@ -261,6 +261,10 @@ void SyncClient::processOutgoing() {
             stats_.operations_sent++;
         }
     }
+
+    // Re-evaluate ONLINE/SYNCING even when no messages (stuck SYNCING fix:
+    // previously updateSyncState only ran on peer messages/disconnect).
+    updateSyncState();
 }
 
 bool SyncClient::isConnected() const {
@@ -367,7 +371,34 @@ std::string SyncClient::generatePeerId() {
     return id;
 }
 
+bool SyncClient::shouldInitiateTo(const std::string& remote_peer_id) const {
+    // Perfect negotiation (impolite = higher id always offers). Same rule on
+    // every client so exactly one side creates the offer.
+    return peer_id_ > remote_peer_id;
+}
+
 ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool we_initiate) {
+    auto existing = peers_.find(peer_id);
+    if (existing != peers_.end()) {
+        if (we_initiate) {
+            LOG_INFO("[Sync] Peer %s already connecting (skip re-init)", peer_id.c_str());
+            return existing->second.get();
+        }
+        // Receiving an offer while we already initiated → glare
+        if (existing->second->we_initiated) {
+            if (shouldInitiateTo(peer_id)) {
+                // We are impolite: ignore their offer, keep ours
+                LOG_INFO("[Sync] Glare: ignoring offer from %s (we are impolite)", peer_id.c_str());
+                return nullptr;
+            }
+            // We are polite: roll back our offer and accept theirs
+            LOG_INFO("[Sync] Glare: rolling back our offer to %s (we are polite)", peer_id.c_str());
+            removePeer(peer_id);
+        } else {
+            return existing->second.get();
+        }
+    }
+
     LOG_INFO("[Sync] Connecting to peer: %s (initiator=%s)", peer_id.c_str(),
              we_initiate ? "true" : "false");
 
@@ -402,6 +433,41 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
     ConnectedPeer* ptr = peer.get();
     peers_[peer_id] = std::move(peer);
     return ptr;
+}
+
+void SyncClient::initiateConnectionToPeer(const std::string& peer_id) {
+    if (peer_id.empty() || peer_id == peer_id_) {
+        return;
+    }
+    ConnectedPeer* peer = createPeerConnection(peer_id, true);
+    if (!peer || !peer->connection) {
+        return;
+    }
+    if (!peer->we_initiated) {
+        return;  // polite rollback path may have switched roles
+    }
+
+    peer->connection->createOffer(
+        // NOLINTNEXTLINE(bugprone-exception-escape)
+        [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
+            if (!success) {
+                LOG_INFO("[Sync] createOffer failed for %s", peer_id.c_str());
+                return;
+            }
+            auto it = peers_.find(peer_id);
+            if (it == peers_.end() || !it->second->connection) {
+                return;
+            }
+            it->second->connection->setLocalDescription(
+                sdp,
+                // NOLINTNEXTLINE(bugprone-exception-escape)
+                [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
+                    if (set_success) {
+                        LOG_INFO("[Sync] Sending offer to %s", peer_id.c_str());
+                        signaling_client_->sendOffer(peer_id, sdp);
+                    }
+                });
+        });
 }
 
 void SyncClient::removePeer(const std::string& peer_id) {
@@ -684,20 +750,24 @@ void SyncClient::updateSyncState() {
         return;
     }
 
-    // Check if we have any ready peers
+    // Check if we have any ready peers (data channel open)
     const size_t ready_count = getPeerCount();
+    const size_t connecting = peers_.size();
 
     if (ready_count == 0) {
-        // No peers - we're online (alone in the room)
-        if (state_ == SyncClientState::SYNCING) {
+        // No ready data channels. If we still have in-flight WebRTC peers,
+        // stay SYNCING. Only go ONLINE alone when nobody is connecting.
+        if (state_ == SyncClientState::SYNCING && connecting == 0) {
             setState(SyncClientState::ONLINE);
         }
         return;
     }
 
-    // Check if all peers are synced
+    // Check if all ready peers are CRDT-synced
     bool all_synced = true;
+    size_t tracked = 0;
     for (const auto& peer_id : sync_manager_->getPeerIds()) {
+        tracked++;
         const auto* peer_state = sync_manager_->getPeerSyncState(peer_id);
         if (peer_state && !peer_state->isSynced) {
             all_synced = false;
@@ -705,7 +775,13 @@ void SyncClient::updateSyncState() {
         }
     }
 
+    // Also require every RTC-ready peer to be in SyncManager
+    if (tracked < ready_count) {
+        all_synced = false;
+    }
+
     if (all_synced && state_ == SyncClientState::SYNCING) {
+        LOG_INFO("[Sync] All %zu peer(s) CRDT-synced → ONLINE", ready_count);
         setState(SyncClientState::ONLINE);
     }
 }
@@ -767,45 +843,37 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
                                             const std::vector<std::string>& existing_peers) {
     if (existing_peers.empty()) {
         // We're the first/only peer - go online
+        LOG_INFO("[Sync] Joined room alone → ONLINE");
         setState(SyncClientState::ONLINE);
-    } else {
-        // Existing peers will initiate connections to us via peer-joined
-        setState(SyncClientState::SYNCING);
+        return;
+    }
+
+    // Join with existing peers: do NOT wait for them to notice us. Previously
+    // only "existing peers initiate via peer-joined" — if the browser missed
+    // that event, the joiner sat in SYNCING forever. Perfect negotiation:
+    // higher peer id offers to each existing peer.
+    LOG_INFO("[Sync] Joined room with %zu existing peer(s) → SYNCING", existing_peers.size());
+    setState(SyncClientState::SYNCING);
+    for (const auto& other : existing_peers) {
+        if (shouldInitiateTo(other)) {
+            LOG_INFO("[Sync] Joiner initiating to existing peer %s", other.c_str());
+            initiateConnectionToPeer(other);
+        } else {
+            LOG_INFO("[Sync] Waiting for offer from existing peer %s", other.c_str());
+        }
     }
 }
 
 void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
                                             const std::string& peer_id) {
-    // We initiate connection to new peer
-    ConnectedPeer* peer = createPeerConnection(peer_id, true);
-    if (!peer || !peer->connection) {
+    // Perfect negotiation: only the higher id creates the offer
+    if (!shouldInitiateTo(peer_id)) {
+        LOG_INFO("[Sync] peer-joined %s — waiting for their offer (we are polite)",
+                 peer_id.c_str());
         return;
     }
-
-    // Create offer
-    peer->connection->createOffer(
-        // NOLINTNEXTLINE(bugprone-exception-escape) - std::string copy is acceptable
-        [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
-            if (!success) {
-                return;
-            }
-
-            auto it = peers_.find(peer_id);
-            if (it == peers_.end()) {
-                return;
-            }
-
-            // Set local description
-            it->second->connection->setLocalDescription(
-                sdp,
-                // NOLINTNEXTLINE(bugprone-exception-escape)
-                [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
-                    if (set_success) {
-                        // Send offer to peer
-                        signaling_client_->sendOffer(peer_id, sdp);
-                    }
-                });
-        });
+    LOG_INFO("[Sync] peer-joined %s — initiating offer", peer_id.c_str());
+    initiateConnectionToPeer(peer_id);
 }
 
 void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
@@ -816,7 +884,8 @@ void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
 void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                                                 const std::string& from_peer,
                                                 const SessionDescription& sdp) {
-    // Accept peer connection
+    LOG_INFO("[Sync] Received offer from %s", from_peer.c_str());
+    // Accept peer connection (createPeerConnection handles glare)
     ConnectedPeer* peer = createPeerConnection(from_peer, false);
     if (!peer || !peer->connection) {
         return;

@@ -287,16 +287,32 @@ public:
         // Ignore SIGPIPE from closed clients
         std::signal(SIGPIPE, SIG_IGN);
 
+        // Optional debug log under session dir (always on if CELLS_SESSION_DEBUG,
+        // or write lightweight state transitions to session log).
+        const std::string log_path = session_dir(root_, meta_.id) + "/daemon.log";
+        auto dlog = [&](const std::string& line) {
+            std::ofstream out(log_path, std::ios::app);
+            if (out) {
+                out << now_unix_ms() << " " << line << "\n";
+            }
+            if (std::getenv("CELLS_SESSION_DEBUG") != nullptr) {
+                std::cerr << "[session " << meta_.id << "] " << line << "\n";
+            }
+        };
+        dlog("daemon start room=" + meta_.room + " signaling=" + target_.signaling_ws);
+
         while (!g_daemon_shutdown && !stop_requested_) {
             pump_network();
             accept_clients();
             service_clients();
             if (idle_expired(last_activity_ms_, now_mono_ms(), meta_.idle_minutes)) {
+                dlog("idle timeout");
                 push_event({"state", "idle timeout; stopping session", {}, {}, {}, {}});
                 break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
+        dlog("daemon exit");
 
         // Notify watchers
         SessionResponse end;
@@ -324,9 +340,17 @@ public:
     }
 
     // SyncClientDelegate
-    void syncClientStateDidChange(net::SyncClient& /*client*/,
+    void syncClientStateDidChange(net::SyncClient& client,
                                   net::SyncClientState state) override {
         last_state_ = net::syncClientStateToString(state);
+        {
+            std::ofstream out(session_dir(root_, meta_.id) + "/daemon.log", std::ios::app);
+            if (out) {
+                out << now_unix_ms() << " state=" << last_state_
+                    << " peers=" << client.getPeerCount()
+                    << " peer_id=" << client.getPeerId() << "\n";
+            }
+        }
         if (state == net::SyncClientState::ONLINE) {
             // Alone in room or fully synced — ensure a sheet exists for scripts
             ensureDefaultSheetViaCrdt();
@@ -965,63 +989,51 @@ int cmd_start(const SessionCliOptions& opts) {
         return emit_json_error("session daemon did not become ready (IPC)", id);
     }
 
-    // Wait for collab readiness (ONLINE/SYNCING), not just IPC.
+    // Wait for ONLINE (full peer CRDT sync). On timeout: **keep daemon alive**
+    // so agents can poll `session status` / wait for the browser peer.
     std::string state = "CONNECTING";
     std::string last_error;
     std::string peer_id;
     int peers = 0;
+    std::uint64_t ops_received = 0;
+    std::uint64_t cells = 0;
     bool collab_ready = false;
     const int wait_ms = static_cast<int>(opts.wait_seconds * 1000.0);
     waited = 0;
-    if (wait_ms <= 0) {
-        // Explicit no-wait: still query status once
+    auto pull_status = [&]() {
         SessionResponse st = rpc(sock, "{\"op\":\"status\"}");
-        state = st.state.empty() ? "CONNECTING" : st.state;
-        collab_ready = session_state_is_ready(state);
+        if (!st.ok) {
+            return;
+        }
+        state = st.state.empty() ? state : st.state;
         last_error = st.last_error;
         peer_id = st.peer_id;
         peers = st.peers;
+        ops_received = st.ops_received;
+        cells = st.cells;
+        // Document-ready: ONLINE and either alone (cells may be 0) or we have
+        // received peer ops / have cells after sync.
+        collab_ready = session_state_is_ready(state);
+    };
+
+    if (wait_ms <= 0) {
+        pull_status();
     } else {
         while (waited < wait_ms) {
             if (!process_alive(meta.pid)) {
                 remove_session_dir(root, id);
                 return emit_json_error("session daemon exited while waiting for ONLINE", id);
             }
-            SessionResponse st = rpc(sock, "{\"op\":\"status\"}");
-            if (st.ok) {
-                state = st.state.empty() ? state : st.state;
-                last_error = st.last_error;
-                peer_id = st.peer_id;
-                peers = st.peers;
-                if (session_state_is_ready(state)) {
-                    collab_ready = true;
-                    break;
-                }
+            pull_status();
+            if (collab_ready) {
+                break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             waited += 100;
         }
-    }
-
-    if (!collab_ready && wait_ms > 0) {
-        // Do not leave a zombie CONNECTING peer pretending success
-        SessionResponse stop = rpc(sock, "{\"op\":\"stop\"}");
-        (void)stop;
-        if (process_alive(meta.pid)) {
-            ::kill(pid, SIGTERM);
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            if (process_alive(meta.pid)) {
-                ::kill(pid, SIGKILL);
-            }
+        if (!collab_ready) {
+            pull_status();  // final sample
         }
-        remove_session_dir(root, id);
-        std::ostringstream err;
-        err << "session not ONLINE (state=" << (state.empty() ? "CONNECTING" : state)
-            << ") after " << opts.wait_seconds
-            << "s — WebRTC peer sync incomplete or no peers"
-            << (last_error.empty() ? "" : ("; last_error=" + last_error))
-            << ". Rebuild CLI if still stuck CONNECTING forever.";
-        return emit_json_error(err.str(), id);
     }
 
     std::ostringstream o;
@@ -1034,15 +1046,23 @@ int cmd_start(const SessionCliOptions& opts) {
       << "\"idle_minutes\":" << meta.idle_minutes << ","
       << "\"wait_seconds\":" << opts.wait_seconds << ","
       << "\"state\":\"" << json_escape(state) << "\","
-      << "\"ready\":" << (session_state_is_ready(state) ? "true" : "false") << ","
+      << "\"ready\":" << (collab_ready ? "true" : "false") << ","
       << "\"peers\":" << peers << ","
+      << "\"ops_received\":" << ops_received << ","
+      << "\"cells\":" << cells << ","
       << "\"peer_id\":\"" << json_escape(peer_id) << "\","
-      << "\"pid\":" << meta.pid;
+      << "\"pid\":" << meta.pid << ","
+      << "\"session_alive\":true";
     if (!last_error.empty()) {
         o << ",\"last_error\":\"" << json_escape(last_error) << "\"";
     }
+    if (!collab_ready && wait_ms > 0) {
+        o << ",\"warning\":\"not ONLINE after wait; daemon kept running — poll "
+             "session status or wait for browser peer\"";
+    }
     o << "}";
     emit_json_stdout(o.str());
+    // Exit 0 when session is running (even if not ready yet). Exit 1 only on hard errors.
     return 0;
 }
 

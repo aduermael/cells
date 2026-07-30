@@ -49,8 +49,8 @@ When a human (or peer) shares a Cells collab link that includes a **room id** (`
 # Prefer: browser already in the room, then session start (pulls browser document).
 cells session start 'https://example.com/?room=ROOM_ID' \
   --wait-seconds 20 --idle-minutes 30 --name 'CLI Agent'
-# → {"ok":true,"id":"a1b2c3d4","state":"ONLINE","ready":true,...}
-# Fails if not ONLINE after wait (CONNECTING or stuck SYNCING).
+# → {"ok":true,"id":"...","state":"ONLINE","ready":true,...}  or ready:false + warning
+# Daemon stays up even if not ONLINE yet — poll: cells session status <id>
 
 # 2) Run scripts against the live session (refuses if not ready unless --force)
 cells session exec a1b2c3d4 -e 'setCell("A1", 42); print(getCell("A1").value)'

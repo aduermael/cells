@@ -36,10 +36,12 @@ type SignalingMessage struct {
 }
 
 // WebSocket connection parameters
+// Generous timeouts: browser tabs can hitch during WASM/WebRTC work and miss a
+// single ping window; tearing them down mid-collab was a major reliability issue.
 const (
-	pingInterval = 30 * time.Second
-	pongTimeout  = 10 * time.Second
-	writeTimeout = 10 * time.Second
+	pingInterval = 25 * time.Second
+	pongTimeout  = 60 * time.Second
+	writeTimeout = 30 * time.Second
 )
 
 var upgrader = websocket.Upgrader{
@@ -161,6 +163,9 @@ func sendError(conn *websocket.Conn, code string, message string) {
 func pingRoutine(peer *Peer, done <-chan struct{}) {
 	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
+	// Tolerate a few failed pings before killing (transient main-thread stalls)
+	failures := 0
+	const maxFailures = 3
 
 	for {
 		select {
@@ -173,10 +178,15 @@ func pingRoutine(peer *Peer, done <-chan struct{}) {
 			peer.mu.Unlock()
 
 			if err != nil {
-				log.Printf("Ping failed for peer %s: %v", peer.ID, err)
-				peer.Conn.Close()
-				return
+				failures++
+				log.Printf("Ping failed for peer %s (%d/%d): %v", peer.ID, failures, maxFailures, err)
+				if failures >= maxFailures {
+					peer.Conn.Close()
+					return
+				}
+				continue
 			}
+			failures = 0
 		case <-done:
 			return
 		}
