@@ -45,36 +45,44 @@ When a human (or peer) shares a Cells collab link that includes a **room id** (`
 - `session watch`: **JSONL** (one JSON object per line)
 
 ```bash
-# 1) Start a background peer (prints JSON with session id)
-cells session start 'https://example.com/?room=ROOM_ID' --idle-minutes 30 --name 'CLI Agent'
-# → {"ok":true,"id":"a1b2c3d4","url":"...","room":"ROOM_ID",...}
+# 1) Start a background peer — waits until ONLINE/SYNCING (default 15s)
+cells session start 'https://example.com/?room=ROOM_ID' \
+  --wait-seconds 15 --idle-minutes 30 --name 'CLI Agent'
+# → {"ok":true,"id":"a1b2c3d4","state":"ONLINE","ready":true,...}
+# Fails (and stops daemon) if still CONNECTING after wait.
 
-# 2) Run scripts/actions against the live session (no reconnect each time)
+# 2) Run scripts against the live session (refuses if not ready unless --force)
 cells session exec a1b2c3d4 -e 'setCell("A1", 42); print(getCell("A1").value)'
-# → {"ok":true,"id":"a1b2c3d4","output":"42\n"}
-cells session exec a1b2c3d4 --script transform.luau
+# → {"ok":true,"id":"a1b2c3d4","output":"42\n","state":"ONLINE","ready":true}
 
-# 3) Optional: stream room/session events as JSONL
+# 3) Dump the live workbook (at least one of zcd/xlsx/csv)
+cells session export a1b2c3d4 /tmp/room.xlsx
+cells session export a1b2c3d4 /tmp/room.csv
+
+# 4) Optional: stream room/session events as JSONL
 cells session watch a1b2c3d4 --duration 30
 
-# 4) Inspect / list / stop
-cells session status a1b2c3d4
-cells session list          # → [] when empty (no prose)
+# 5) Inspect / list / stop
+cells session status a1b2c3d4   # state, ready, peers, peer_id, ops_*, cells, last_error
+cells session list              # → [] when empty
 cells session stop a1b2c3d4
+cells session --help            # JSON {"ok":true,"usage":"..."}
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `session start <url>` | Fork a daemon, join the room, print `{"ok":true,"id",...}` |
-| `session exec <id> -e` / `--script` | Run Luau; result `{"ok",...","output":"..."}` + broadcast ops |
-| `session watch <id>` | Stream JSONL events (`--duration SECS` to auto-exit) |
-| `session list` | Active sessions as JSON array (`[]` if none) |
-| `session status <id>` | Connection state, peers, idle settings |
-| `session stop <id>` | Stop daemon and leave the room |
+| `session start <url>` | Start daemon, **wait for ONLINE/SYNCING**, print JSON |
+| `session exec <id> -e` / `--script` | Run Luau + broadcast; refuses if CONNECTING (use `--force`) |
+| `session export <id> <path>` | Save live workbook as `.zcd` / `.xlsx` / `.csv` |
+| `session watch <id>` | Stream JSONL events (`--duration SECS`) |
+| `session list` / `status` / `stop` | Lifecycle |
+| `session --help` | JSON usage |
 
-**Idle timeout:** sessions auto-stop after N minutes with no action (default **30**). Override with `--idle-minutes N` (fractions allowed, e.g. `0.05` ≈ 3s for tests).
+**Idle timeout:** auto-stop after N minutes idle (default **30**; `--idle-minutes`).
 
-**Why sessions?** `cells sync <url>` is a one-shot **blocking** listener (Ctrl+C to exit). For multi-command agent work, **always prefer `session start` + `session exec`** so the peer remains connected between commands.
+**Readiness:** start uses `--wait-seconds` (default **15**). Status includes `ready`, `state`, `peers`, `ops_received`, `cells`, `last_error`.
+
+**Why sessions?** `cells sync <url>` is one-shot blocking. Prefer **session** for multi-step agent work.
 
 Give the agent the full URL from the web **Collaborate** menu (Copy Link).
 

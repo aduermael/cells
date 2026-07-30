@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <errno.h>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
+#include <limits.h>
 #include <memory>
 #include <poll.h>
 #include <signal.h>
@@ -26,12 +28,21 @@
 #include <unistd.h>
 #include <vector>
 
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#include <mach-o/dyld.h>
+#endif
+
+#include "core/cells/csv_writer.h"
 #include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
+#include "core/cells/serializer.h"
+#include "core/cells/xlsx_writer.h"
 #include "core/net/include/SyncClient.h"
 
+#include "options.h"
 #include "output_spill.h"
 #include "session_protocol.h"
 #include "session_store.h"
@@ -206,11 +217,25 @@ SessionResponse rpc(const std::string& socket_path, const std::string& request_l
     r.room = json_get_string(line, "room");
     r.state = json_get_string(line, "state");
     r.name = json_get_string(line, "name");
+    r.peer_id = json_get_string(line, "peer_id");
+    r.last_error = json_get_string(line, "last_error");
+    r.path = json_get_string(line, "path");
+    r.format = json_get_string(line, "format");
+    r.ready = json_get_bool(line, "ready").value_or(session_state_is_ready(r.state));
     if (auto p = json_get_number(line, "peers")) {
         r.peers = static_cast<int>(*p);
     }
     if (auto idle = json_get_number(line, "idle_minutes")) {
         r.idle_minutes = *idle;
+    }
+    if (auto c = json_get_number(line, "cells")) {
+        r.cells = static_cast<std::uint64_t>(*c);
+    }
+    if (auto os = json_get_number(line, "ops_sent")) {
+        r.ops_sent = static_cast<std::uint64_t>(*os);
+    }
+    if (auto orx = json_get_number(line, "ops_received")) {
+        r.ops_received = static_cast<std::uint64_t>(*orx);
     }
     r.pong = json_get_bool(line, "pong").value_or(false);
     r.stopped = json_get_bool(line, "stopped").value_or(false);
@@ -298,9 +323,10 @@ public:
     // SyncClientDelegate
     void syncClientStateDidChange(net::SyncClient& /*client*/,
                                   net::SyncClientState state) override {
+        last_state_ = net::syncClientStateToString(state);
         SessionEvent e;
         e.type = "state";
-        e.message = net::syncClientStateToString(state);
+        e.message = last_state_;
         push_event(std::move(e));
     }
 
@@ -332,6 +358,7 @@ public:
     }
 
     void syncClientDidError(net::SyncClient& /*client*/, const std::string& error) override {
+        last_error_ = error;
         SessionEvent e;
         e.type = "error";
         e.message = error;
@@ -372,11 +399,93 @@ private:
     void touch() { last_activity_ms_ = now_mono_ms(); }
 
     void pump_network() {
+#if defined(__APPLE__)
+        // Apple NSURLSession/WebRTC callbacks dispatch to the main queue.
+        // Without pumping CFRunLoop the daemon stays CONNECTING forever
+        // (one-shot `cells sync` pumps the loop; this must match).
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+#endif
         if (!sync_) {
             return;
         }
         sync_->processOutgoing();
         sync_->processPresenceUpdates();
+    }
+
+    std::uint64_t count_cells() const {
+        if (!workbook_) {
+            return 0;
+        }
+        std::uint64_t n = 0;
+        for (const auto& sheet : workbook_->sheets) {
+            if (sheet) {
+                n += sheet->cellCount();
+            }
+        }
+        return n;
+    }
+
+    bool export_workbook(const std::string& path, std::string format, std::string& error_out) {
+        if (!workbook_) {
+            error_out = "no workbook";
+            return false;
+        }
+        if (format.empty()) {
+            Format f = detect_format(path);
+            if (f == Format::kZcd) {
+                format = "zcd";
+            } else if (f == Format::kCsv) {
+                format = "csv";
+            } else if (f == Format::kXlsx) {
+                format = "xlsx";
+            } else {
+                error_out = "unknown export format (use .zcd, .xlsx, or .csv)";
+                return false;
+            }
+        }
+        for (char& c : format) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+
+        if (format == "zcd") {
+            std::string content = serialize(*workbook_);
+            std::ofstream out(path, std::ios::trunc);
+            if (!out) {
+                error_out = "cannot write " + path;
+                return false;
+            }
+            out << content;
+            return static_cast<bool>(out);
+        }
+        if (format == "csv") {
+            CSVWriteOptions csv_opts;
+            csv_opts.includeHeader = true;
+            CSVWriteResult result = writeCSV(*workbook_, csv_opts);
+            if (!result.ok() && result.error.has_value()) {
+                error_out = result.error->toString();
+                return false;
+            }
+            std::ofstream out(path, std::ios::trunc);
+            if (!out) {
+                error_out = "cannot write " + path;
+                return false;
+            }
+            out << result.output;
+            return static_cast<bool>(out);
+        }
+        if (format == "xlsx") {
+            XLSXWriteOptions xlsx_opts;
+            xlsx_opts.writeFormulas = true;
+            xlsx_opts.writeDimensions = true;
+            XLSXWriteResult result = writeXLSX(*workbook_, path, xlsx_opts);
+            if (!result.ok() && result.error.has_value()) {
+                error_out = result.error->toString();
+                return false;
+            }
+            return true;
+        }
+        error_out = "unsupported format: " + format + " (use zcd|xlsx|csv)";
+        return false;
     }
 
     void push_event(SessionEvent e) {
@@ -525,6 +634,12 @@ private:
                 write_all(c.fd, encode_session_response(resp) + "\n");
                 c.close_after_write = true;
                 break;
+            case SessionOp::kExport: {
+                resp = run_export(req);
+                write_all(c.fd, encode_session_response(resp) + "\n");
+                c.close_after_write = true;
+                break;
+            }
             case SessionOp::kWatch:
                 c.watching = true;
                 // send initial status event so client sees a line immediately
@@ -557,17 +672,62 @@ private:
         r.name = meta_.name;
         r.idle_minutes = meta_.idle_minutes;
         r.last_activity_ms = last_activity_ms_;
+        r.last_error = last_error_;
+        r.cells = count_cells();
         if (sync_) {
             r.state = net::syncClientStateToString(sync_->getState());
+            r.peer_id = sync_->getPeerId();
             r.peers = static_cast<int>(sync_->getPeerCount());
+            auto st = sync_->getStats();
+            r.ops_sent = st.operations_sent;
+            r.ops_received = st.operations_received;
         } else {
-            r.state = "OFFLINE";
+            r.state = last_state_.empty() ? "OFFLINE" : last_state_;
         }
+        r.ready = session_state_is_ready(r.state);
+        return r;
+    }
+
+    SessionResponse run_export(const SessionRequest& req) {
+        SessionResponse r;
+        r.id = meta_.id;
+        if (req.export_path.empty()) {
+            r.ok = false;
+            r.error = "export path required";
+            return r;
+        }
+        std::string err;
+        std::string fmt = req.format;
+        if (!export_workbook(req.export_path, fmt, err)) {
+            r.ok = false;
+            r.error = err;
+            return r;
+        }
+        r.ok = true;
+        r.path = req.export_path;
+        if (fmt.empty()) {
+            Format f = detect_format(req.export_path);
+            r.format = format_name(f);
+        } else {
+            r.format = fmt;
+        }
+        r.cells = count_cells();
         return r;
     }
 
     SessionResponse run_exec(const SessionRequest& req) {
         SessionResponse r;
+        r.id = meta_.id;
+        if (sync_) {
+            std::string st = net::syncClientStateToString(sync_->getState());
+            r.state = st;
+            r.ready = session_state_is_ready(st);
+            // Refuse silent local-only edits while never connected (unless force via code path)
+            // force is client-side; daemon allows exec always but tags ready.
+            if (!r.ready) {
+                // Still allow but mark warning in error-free ok with ready=false
+            }
+        }
         std::string script = req.code;
         if (script.empty() && !req.script_path.empty()) {
             script = read_file_contents(req.script_path);
@@ -599,6 +759,11 @@ private:
             sync_->processOutgoing();
         }
         r.ok = true;
+        if (sync_) {
+            r.state = net::syncClientStateToString(sync_->getState());
+            r.ready = session_state_is_ready(r.state);
+            r.peers = static_cast<int>(sync_->getPeerCount());
+        }
         return r;
     }
 
@@ -625,6 +790,8 @@ private:
     std::vector<Client> clients_;
     std::int64_t last_activity_ms_ = 0;
     bool stop_requested_ = false;
+    std::string last_error_;
+    std::string last_state_ = "OFFLINE";
 };
 
 // ---------------------------------------------------------------------------
@@ -664,10 +831,38 @@ int emit_json_error(std::string_view error, std::string_view id = {}) {
     return 1;
 }
 
+std::string resolve_self_executable() {
+#if defined(__APPLE__)
+    char buf[PATH_MAX];
+    uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) == 0) {
+        char real[PATH_MAX];
+        if (::realpath(buf, real) != nullptr) {
+            return std::string(real);
+        }
+        return std::string(buf);
+    }
+    return {};
+#else
+    char buf[PATH_MAX];
+    ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = '\0';
+        return std::string(buf);
+    }
+    return {};
+#endif
+}
+
 int cmd_start(const SessionCliOptions& opts) {
     RoomTarget target = parse_room_target(opts.url);
     if (!target.ok) {
         return emit_json_error(target.error);
+    }
+
+    std::string self = resolve_self_executable();
+    if (self.empty()) {
+        return emit_json_error("cannot resolve cells executable path for session daemon");
     }
 
     std::string root = resolve_root(opts);
@@ -690,22 +885,21 @@ int cmd_start(const SessionCliOptions& opts) {
     }
 
     std::string sock = session_socket_path(root, id);
+    std::string idle_str = std::to_string(opts.idle_minutes);
 
-    // Fork daemon process
+    // Fork + re-exec a clean process (avoids post-fork networking issues on macOS).
+    // The child runs: cells session _run <id> <url> --socket ... --root ... ...
     pid_t pid = ::fork();
     if (pid < 0) {
         remove_session_dir(root, id);
         return emit_json_error("fork failed");
     }
     if (pid == 0) {
-        // Child: become session leader and run daemon
         ::setsid();
-        // Redirect stdio to /dev/null (keep stderr for rare fatal logs? — silence for daemon)
         int devnull = ::open("/dev/null", O_RDWR);
         if (devnull >= 0) {
             ::dup2(devnull, STDIN_FILENO);
             ::dup2(devnull, STDOUT_FILENO);
-            // leave stderr for debugging if CELLS_SESSION_DEBUG
             if (std::getenv("CELLS_SESSION_DEBUG") == nullptr) {
                 ::dup2(devnull, STDERR_FILENO);
             }
@@ -713,33 +907,33 @@ int cmd_start(const SessionCliOptions& opts) {
                 ::close(devnull);
             }
         }
-        g_daemon_shutdown = false;
-        SessionDaemon daemon(meta, root, sock, target);
-        int code = daemon.run();
-        _exit(code);
+        // re-exec full binary
+        ::execl(self.c_str(), self.c_str(), "session", "_run", id.c_str(), target.url.c_str(),
+                "--socket", sock.c_str(), "--root", root.c_str(), "--idle-minutes", idle_str.c_str(),
+                "--name", meta.name.c_str(), static_cast<char*>(nullptr));
+        _exit(127);
     }
 
-    // Parent: wait until socket accepts connections
     meta.pid = static_cast<std::int64_t>(pid);
     write_session_meta(root, meta);
     write_session_pid(root, id, meta.pid);
 
-    const int max_wait_ms = 10000;
+    // Wait for IPC socket
+    const int ipc_wait_ms = 10000;
     int waited = 0;
-    bool ready = false;
-    while (waited < max_wait_ms) {
+    bool ipc_ready = false;
+    while (waited < ipc_wait_ms) {
         if (!process_alive(meta.pid)) {
             remove_session_dir(root, id);
             return emit_json_error("session daemon exited during startup", id);
         }
         int fd = connect_socket(sock, 200);
         if (fd >= 0) {
-            // ping
             write_all(fd, "{\"op\":\"ping\"}\n");
             std::string line = read_line(fd);
             ::close(fd);
             if (!line.empty() && json_get_bool(line, "ok").value_or(false)) {
-                ready = true;
+                ipc_ready = true;
                 break;
             }
         }
@@ -747,10 +941,67 @@ int cmd_start(const SessionCliOptions& opts) {
         waited += 50;
     }
 
-    if (!ready) {
+    if (!ipc_ready) {
         ::kill(pid, SIGTERM);
         remove_session_dir(root, id);
-        return emit_json_error("session daemon did not become ready", id);
+        return emit_json_error("session daemon did not become ready (IPC)", id);
+    }
+
+    // Wait for collab readiness (ONLINE/SYNCING), not just IPC.
+    std::string state = "CONNECTING";
+    std::string last_error;
+    std::string peer_id;
+    int peers = 0;
+    bool collab_ready = false;
+    const int wait_ms = static_cast<int>(opts.wait_seconds * 1000.0);
+    waited = 0;
+    if (wait_ms <= 0) {
+        // Explicit no-wait: still query status once
+        SessionResponse st = rpc(sock, "{\"op\":\"status\"}");
+        state = st.state.empty() ? "CONNECTING" : st.state;
+        collab_ready = session_state_is_ready(state);
+        last_error = st.last_error;
+        peer_id = st.peer_id;
+        peers = st.peers;
+    } else {
+        while (waited < wait_ms) {
+            if (!process_alive(meta.pid)) {
+                remove_session_dir(root, id);
+                return emit_json_error("session daemon exited while waiting for ONLINE", id);
+            }
+            SessionResponse st = rpc(sock, "{\"op\":\"status\"}");
+            if (st.ok) {
+                state = st.state.empty() ? state : st.state;
+                last_error = st.last_error;
+                peer_id = st.peer_id;
+                peers = st.peers;
+                if (session_state_is_ready(state)) {
+                    collab_ready = true;
+                    break;
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            waited += 100;
+        }
+    }
+
+    if (!collab_ready && wait_ms > 0) {
+        // Do not leave a zombie CONNECTING peer pretending success
+        SessionResponse stop = rpc(sock, "{\"op\":\"stop\"}");
+        (void)stop;
+        if (process_alive(meta.pid)) {
+            ::kill(pid, SIGTERM);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            if (process_alive(meta.pid)) {
+                ::kill(pid, SIGKILL);
+            }
+        }
+        remove_session_dir(root, id);
+        std::ostringstream err;
+        err << "session stuck " << (state.empty() ? "CONNECTING" : state)
+            << " after " << opts.wait_seconds << "s"
+            << (last_error.empty() ? "" : ("; last_error=" + last_error));
+        return emit_json_error(err.str(), id);
     }
 
     std::ostringstream o;
@@ -761,7 +1012,16 @@ int cmd_start(const SessionCliOptions& opts) {
       << "\"room\":\"" << json_escape(target.room_id) << "\","
       << "\"name\":\"" << json_escape(meta.name) << "\","
       << "\"idle_minutes\":" << meta.idle_minutes << ","
-      << "\"pid\":" << meta.pid << "}";
+      << "\"wait_seconds\":" << opts.wait_seconds << ","
+      << "\"state\":\"" << json_escape(state) << "\","
+      << "\"ready\":" << (session_state_is_ready(state) ? "true" : "false") << ","
+      << "\"peers\":" << peers << ","
+      << "\"peer_id\":\"" << json_escape(peer_id) << "\","
+      << "\"pid\":" << meta.pid;
+    if (!last_error.empty()) {
+        o << ",\"last_error\":\"" << json_escape(last_error) << "\"";
+    }
+    o << "}";
     emit_json_stdout(o.str());
     return 0;
 }
@@ -840,6 +1100,17 @@ int cmd_status(const SessionCliOptions& opts) {
     return 0;
 }
 
+std::string absolutize_path(const std::string& path) {
+    if (path.empty() || path[0] == '/') {
+        return path;
+    }
+    char cwd[4096];
+    if (::getcwd(cwd, sizeof(cwd))) {
+        return std::string(cwd) + "/" + path;
+    }
+    return path;
+}
+
 int cmd_exec(const SessionCliOptions& opts) {
     std::string root = resolve_root(opts);
     auto meta = read_session_meta(root, opts.session_id);
@@ -848,26 +1119,28 @@ int cmd_exec(const SessionCliOptions& opts) {
     }
     std::string sock = session_socket_path(root, opts.session_id);
 
+    // Refuse exec while stuck CONNECTING unless --force (avoids local-only false success)
+    if (!opts.force) {
+        SessionResponse st = rpc(sock, "{\"op\":\"status\"}");
+        if (st.ok && !session_state_is_ready(st.state)) {
+            return emit_json_error(
+                "session not ready (state=" + (st.state.empty() ? "unknown" : st.state) +
+                    "); wait for ONLINE/SYNCING or pass --force",
+                opts.session_id);
+        }
+    }
+
     std::ostringstream req;
     req << "{\"op\":\"exec\"";
     if (!opts.script_inline.empty()) {
         req << ",\"code\":\"" << json_escape(opts.script_inline) << "\"";
     }
     if (!opts.script_file.empty()) {
-        // Prefer absolute path so daemon can open it
-        std::string path = opts.script_file;
-        if (!path.empty() && path[0] != '/') {
-            char cwd[4096];
-            if (::getcwd(cwd, sizeof(cwd))) {
-                path = std::string(cwd) + "/" + path;
-            }
-        }
-        req << ",\"script\":\"" << json_escape(path) << "\"";
+        req << ",\"script\":\"" << json_escape(absolutize_path(opts.script_file)) << "\"";
     }
     req << "}";
 
     SessionResponse r = rpc(sock, req.str());
-    // Always wrap as JSON (script print text lives in "output")
     std::ostringstream o;
     o << "{\"ok\":" << (r.ok ? "true" : "false") << ",\"id\":\"" << json_escape(opts.session_id)
       << "\"";
@@ -877,9 +1150,49 @@ int cmd_exec(const SessionCliOptions& opts) {
     if (!r.output.empty()) {
         o << ",\"output\":\"" << json_escape(r.output) << "\"";
     }
+    if (!r.state.empty()) {
+        o << ",\"state\":\"" << json_escape(r.state) << "\"";
+        o << ",\"ready\":" << (r.ready ? "true" : "false");
+    }
     o << "}";
     emit_json_stdout(o.str());
     return r.ok ? 0 : 1;
+}
+
+int cmd_export(const SessionCliOptions& opts) {
+    std::string root = resolve_root(opts);
+    auto meta = read_session_meta(root, opts.session_id);
+    if (!meta) {
+        return emit_json_error("session not found", opts.session_id);
+    }
+    std::string sock = session_socket_path(root, opts.session_id);
+    std::string path = absolutize_path(opts.export_path);
+
+    std::ostringstream req;
+    req << "{\"op\":\"export\",\"path\":\"" << json_escape(path) << "\"";
+    if (!opts.export_format.empty()) {
+        req << ",\"format\":\"" << json_escape(opts.export_format) << "\"";
+    }
+    req << "}";
+
+    SessionResponse r = rpc(sock, req.str());
+    if (!r.ok) {
+        return emit_json_error(r.error.empty() ? "export failed" : r.error, opts.session_id);
+    }
+    std::ostringstream o;
+    o << "{\"ok\":true,\"id\":\"" << json_escape(opts.session_id) << "\","
+      << "\"path\":\"" << json_escape(r.path.empty() ? path : r.path) << "\","
+      << "\"format\":\"" << json_escape(r.format) << "\","
+      << "\"cells\":" << r.cells << "}";
+    emit_json_stdout(o.str());
+    return 0;
+}
+
+int cmd_help(const SessionCliOptions& /*opts*/) {
+    std::ostringstream o;
+    o << "{\"ok\":true,\"usage\":\"" << json_escape(session_usage("cells")) << "\"}";
+    emit_json_stdout(o.str());
+    return 0;
 }
 
 int cmd_watch(const SessionCliOptions& opts) {
@@ -1009,16 +1322,20 @@ int run_session_command(const SessionCliOptions& opts) {
             return cmd_stop(opts);
         case SessionCommandKind::kExec:
             return cmd_exec(opts);
+        case SessionCommandKind::kExport:
+            return cmd_export(opts);
         case SessionCommandKind::kWatch:
             return cmd_watch(opts);
         case SessionCommandKind::kStatus:
             return cmd_status(opts);
+        case SessionCommandKind::kHelp:
+            return cmd_help(opts);
         case SessionCommandKind::kDaemon:
             return cmd_daemon(opts);
         case SessionCommandKind::kNone:
         default: {
             std::cout << "{\"ok\":false,\"error\":\"missing session subcommand "
-                         "(start|list|stop|exec|watch|status)\"}\n";
+                         "(start|list|stop|exec|export|watch|status)\"}\n";
             return 1;
         }
     }

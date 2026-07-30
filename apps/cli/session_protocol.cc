@@ -359,10 +359,21 @@ std::optional<SessionRequest> parse_session_request(std::string_view line) {
         req.op = SessionOp::kWatch;
     } else if (op == "touch") {
         req.op = SessionOp::kTouch;
+    } else if (op == "export") {
+        req.op = SessionOp::kExport;
+        req.export_path = json_get_string(line, "path");
+        if (req.export_path.empty()) {
+            req.export_path = json_get_string(line, "file");
+        }
+        req.format = json_get_string(line, "format");
     } else {
         req.op = SessionOp::kUnknown;
     }
     return req;
+}
+
+bool session_state_is_ready(std::string_view state) {
+    return state == "ONLINE" || state == "SYNCING";
 }
 
 std::string encode_session_response(const SessionResponse& r) {
@@ -398,14 +409,35 @@ std::string encode_session_response(const SessionResponse& r) {
     if (!r.name.empty()) {
         o << ",\"name\":\"" << json_escape(r.name) << "\"";
     }
+    if (!r.peer_id.empty()) {
+        o << ",\"peer_id\":\"" << json_escape(r.peer_id) << "\"";
+    }
+    if (!r.last_error.empty()) {
+        o << ",\"last_error\":\"" << json_escape(r.last_error) << "\"";
+    }
+    if (!r.id.empty() || r.ready) {
+        o << ",\"ready\":" << (r.ready ? "true" : "false");
+    }
     if (r.peers != 0 || !r.id.empty()) {
         o << ",\"peers\":" << r.peers;
+    }
+    if (r.ops_sent != 0 || r.ops_received != 0 || !r.id.empty()) {
+        o << ",\"ops_sent\":" << r.ops_sent << ",\"ops_received\":" << r.ops_received;
+    }
+    if (r.cells != 0 || !r.id.empty()) {
+        o << ",\"cells\":" << r.cells;
     }
     if (r.idle_minutes > 0) {
         o << ",\"idle_minutes\":" << r.idle_minutes;
     }
     if (r.last_activity_ms > 0) {
         o << ",\"last_activity_ms\":" << r.last_activity_ms;
+    }
+    if (!r.path.empty()) {
+        o << ",\"path\":\"" << json_escape(r.path) << "\"";
+    }
+    if (!r.format.empty()) {
+        o << ",\"format\":\"" << json_escape(r.format) << "\"";
     }
     if (r.event.has_value()) {
         o << ",\"event\":" << encode_session_event(*r.event);

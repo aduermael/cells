@@ -124,7 +124,41 @@ TEST(SessionArgsTest, UsageMentionsIdleAndCommands) {
     EXPECT_NE(u.find("session stop"), std::string::npos);
     EXPECT_NE(u.find("session exec"), std::string::npos);
     EXPECT_NE(u.find("session watch"), std::string::npos);
+    EXPECT_NE(u.find("session export"), std::string::npos);
     EXPECT_NE(u.find("idle-minutes"), std::string::npos);
+    EXPECT_NE(u.find("wait-seconds"), std::string::npos);
+}
+
+TEST(SessionArgsTest, HelpFlag) {
+    Argv args({"cells", "session", "--help"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    EXPECT_EQ(r.options.kind, SessionCommandKind::kHelp);
+}
+
+TEST(SessionArgsTest, ExportArgs) {
+    Argv args({"cells", "session", "export", "sid1", "/tmp/out.xlsx"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    EXPECT_EQ(r.options.kind, SessionCommandKind::kExport);
+    EXPECT_EQ(r.options.session_id, "sid1");
+    EXPECT_EQ(r.options.export_path, "/tmp/out.xlsx");
+    validate_session_options(r);
+    EXPECT_TRUE(r.ok);
+}
+
+TEST(SessionArgsTest, StartWaitSeconds) {
+    Argv args({"cells", "session", "start", "http://x/?room=1", "--wait-seconds", "5"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    EXPECT_DOUBLE_EQ(r.options.wait_seconds, 5.0);
+}
+
+TEST(SessionArgsTest, ExecForce) {
+    Argv args({"cells", "session", "exec", "sid", "-e", "print(1)", "--force"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    EXPECT_TRUE(r.options.force);
 }
 
 }  // namespace

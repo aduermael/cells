@@ -3,10 +3,9 @@
 #ifndef APPS_CLI_SESSION_ARGS_H_
 #define APPS_CLI_SESSION_ARGS_H_
 
-#include <string>
-#include <vector>
-
 #include "session_protocol.h"
+
+#include <string>
 
 namespace cells::cli {
 
@@ -18,21 +17,28 @@ enum class SessionCommandKind {
     kExec,
     kWatch,
     kStatus,
+    kExport,
+    kHelp,
     kDaemon,  // internal: cells session _run ...
 };
 
 struct SessionCliOptions {
     SessionCommandKind kind = SessionCommandKind::kNone;
     std::string url;                 // start / daemon
-    std::string session_id;          // stop / exec / watch / status / daemon
+    std::string session_id;          // stop / exec / watch / status / export / daemon
     std::string script_file;         // exec --script
     std::string script_inline;       // exec -e
+    std::string export_path;         // export <path>
+    std::string export_format;       // optional override (csv|xlsx|zcd)
     std::string name = "CLI Agent";  // presence name
     double idle_minutes = kDefaultIdleMinutes;
+    // start: wait for ONLINE/SYNCING before returning success (0 = no wait)
+    double wait_seconds = kDefaultWaitSeconds;
     // watch: optional max duration in seconds (0 = until interrupted)
     double watch_duration_sec = 0;
     bool quiet = false;
     bool verbose = false;
+    bool force = false;  // exec even if not ready
     // daemon-only
     std::string socket_path;
     std::string root_dir;
@@ -52,7 +58,7 @@ SessionParseResult parse_session_args(int argc, char* argv[]);
 // Validate required fields for the parsed kind. Sets ok/error.
 void validate_session_options(SessionParseResult& result);
 
-// Usage text for session subcommands.
+// Usage text for session subcommands (also returned as JSON help).
 std::string session_usage(const char* program_name);
 
 }  // namespace cells::cli

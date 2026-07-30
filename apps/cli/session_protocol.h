@@ -58,12 +58,15 @@ enum class SessionOp {
     kExec,
     kWatch,
     kTouch,
+    kExport,
 };
 
 struct SessionRequest {
     SessionOp op = SessionOp::kUnknown;
     std::string code;         // exec: inline script
     std::string script_path;  // exec: path to script file
+    std::string export_path;  // export: destination file
+    std::string format;       // export: optional format override (zcd|csv|xlsx)
     std::string raw;          // original JSON line (debug)
 };
 
@@ -89,13 +92,28 @@ struct SessionResponse {
     std::string url;
     std::string room;
     std::string state;
+    std::string peer_id;
+    std::string last_error;
+    bool ready = false;  // signaling joined: ONLINE or SYNCING
     int peers = 0;
+    std::uint64_t ops_sent = 0;
+    std::uint64_t ops_received = 0;
+    std::uint64_t cells = 0;
     std::string name;
     double idle_minutes = 0;
     std::int64_t last_activity_ms = 0;
+    std::string path;    // export path written
+    std::string format;  // export format used
     // single event (watch stream line)
     std::optional<SessionEvent> event;
 };
+
+// True when SyncClient has joined the room (ONLINE or SYNCING).
+// CONNECTING / OFFLINE / RECONNECTING are not ready.
+bool session_state_is_ready(std::string_view state);
+
+// Default seconds to wait for ready after session start.
+inline constexpr double kDefaultWaitSeconds = 15.0;
 
 // Parse one JSON request line. Returns nullopt if not valid JSON object.
 std::optional<SessionRequest> parse_session_request(std::string_view line);

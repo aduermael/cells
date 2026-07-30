@@ -33,15 +33,16 @@ Invoke the chosen binary for all work (convert, inspect, script, **session**, sy
 ```bash
 ./dist/cli/cells --help
 # Multi-step collab (preferred for agents; stdout is pure JSON / JSONL):
-./dist/cli/cells session start 'http://localhost:8081/?room=ROOM_ID'
-# → {"ok":true,"id":"...","room":"ROOM_ID",...}
+./dist/cli/cells session start 'http://localhost:8081/?room=ROOM_ID' --wait-seconds 15
+# → {"ok":true,"id":"...","state":"ONLINE","ready":true,...}
 ./dist/cli/cells session exec SESSION_ID -e 'setCell("A1", 1)'
-# → {"ok":true,"id":"...","output":...}
-./dist/cli/cells session watch SESSION_ID --duration 10   # JSONL event stream
-./dist/cli/cells session list                            # [] or [{...}]
+./dist/cli/cells session export SESSION_ID /tmp/room.xlsx
+./dist/cli/cells session watch SESSION_ID --duration 10   # JSONL
+./dist/cli/cells session list
 ./dist/cli/cells session stop SESSION_ID
-# One-shot blocking listen (optional):
-./dist/cli/cells sync 'http://localhost:8081/?room=ROOM_ID'
+# One-shot blocking listen / apply-to-file (optional):
+./dist/cli/cells sync --server 'http://localhost:8081/?room=ROOM_ID' --apply /tmp/room.zcd
+# (--apply creates the file if missing, then saves on Ctrl+C)
 ```
 
 Release install (`install.sh` / Homebrew) is for end users without a checkout.
@@ -62,15 +63,17 @@ engine changes — once it has been built.
    # Use existing binary if present; build only if missing
    CELLS=./dist/cli/cells
    test -x "$CELLS" || bazel run :cli
-   # Start a long-running session so the CLI peer stays visible in the browser
-   "$CELLS" session start 'http://localhost:8081/?room=ROOM_ID' --name 'CLI Agent'
-   # Use the printed "id" for further commands:
-   "$CELLS" session exec SESSION_ID -e 'setCell("A1", "hello from agent")'
-   "$CELLS" session watch SESSION_ID --duration 60
-   # When done:
-   "$CELLS" session stop SESSION_ID
+   # Start a long-running session so the CLI peer stays visible in the browser.
+   # start waits until ONLINE/SYNCING (fails if stuck CONNECTING).
+   OUT=$("$CELLS" session start 'http://localhost:8081/?room=ROOM_ID' --name 'CLI Agent')
+   SID=$(echo "$OUT" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+   "$CELLS" session exec "$SID" -e 'setCell("A1", "hello from agent")'
+   "$CELLS" session export "$SID" /tmp/room.xlsx
+   "$CELLS" session watch "$SID" --duration 60
+   "$CELLS" session stop "$SID"
    ```
 
 The human edits in the web UI; the agent uses the CLI session against the same room.
-The session daemon keeps the peer connected between `exec`/`watch` calls (idle
-auto-stop defaults to 30 minutes; override with `--idle-minutes`).
+The session daemon keeps the peer connected between commands (idle auto-stop default
+30 minutes). If `start` returns `ready:false` / error about CONNECTING, rebuild the
+CLI (`bazel run :cli`) — older builds did not pump the macOS network run loop.

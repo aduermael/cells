@@ -7,8 +7,10 @@ namespace cells::cli {
 
 namespace {
 
-bool is_flag(std::string_view arg) {
-    return !arg.empty() && arg[0] == '-';
+bool is_flag(std::string_view arg) { return !arg.empty() && arg[0] == '-'; }
+
+bool is_help_flag(std::string_view arg) {
+    return arg == "--help" || arg == "-h" || arg == "help";
 }
 
 }  // namespace
@@ -21,12 +23,15 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
     result.is_session = true;
 
     if (argc < 3) {
-        result.ok = false;
-        result.error = "Missing session subcommand (start|list|stop|exec|watch|status)";
+        result.options.kind = SessionCommandKind::kHelp;
         return result;
     }
 
     std::string_view sub = argv[2];
+    if (is_help_flag(sub)) {
+        result.options.kind = SessionCommandKind::kHelp;
+        return result;
+    }
     if (sub == "start") {
         result.options.kind = SessionCommandKind::kStart;
     } else if (sub == "list") {
@@ -39,24 +44,36 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
         result.options.kind = SessionCommandKind::kWatch;
     } else if (sub == "status") {
         result.options.kind = SessionCommandKind::kStatus;
+    } else if (sub == "export") {
+        result.options.kind = SessionCommandKind::kExport;
+    } else if (sub == "help") {
+        result.options.kind = SessionCommandKind::kHelp;
     } else if (sub == "_run") {
-        // Internal daemon entry
         result.options.kind = SessionCommandKind::kDaemon;
     } else {
         result.ok = false;
-        result.error = "Unknown session subcommand: " + std::string(sub);
+        result.error = "Unknown session subcommand: " + std::string(sub) +
+                       " (try: cells session --help)";
         return result;
     }
 
     for (int i = 3; i < argc; ++i) {
         std::string_view arg = argv[i];
 
+        if (is_help_flag(arg)) {
+            result.options.kind = SessionCommandKind::kHelp;
+            return result;
+        }
         if (arg == "-q") {
             result.options.quiet = true;
             continue;
         }
         if (arg == "-v") {
             result.options.verbose = true;
+            continue;
+        }
+        if (arg == "--force") {
+            result.options.force = true;
             continue;
         }
         if ((arg == "--idle-minutes" || arg == "--idle") && i + 1 < argc) {
@@ -67,6 +84,16 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
                 return result;
             }
             result.options.idle_minutes = *m;
+            continue;
+        }
+        if ((arg == "--wait-seconds" || arg == "--wait") && i + 1 < argc) {
+            auto m = parse_idle_minutes(argv[++i]);
+            if (!m || *m < 0) {
+                result.ok = false;
+                result.error = "Invalid --wait-seconds value";
+                return result;
+            }
+            result.options.wait_seconds = *m;
             continue;
         }
         if (arg == "--name" && i + 1 < argc) {
@@ -89,8 +116,12 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
             result.options.script_inline = argv[++i];
             continue;
         }
+        if (arg == "--format" && i + 1 < argc) {
+            result.options.export_format = argv[++i];
+            continue;
+        }
         if ((arg == "--duration" || arg == "--timeout") && i + 1 < argc) {
-            auto m = parse_idle_minutes(argv[++i]);  // reuse double parse
+            auto m = parse_idle_minutes(argv[++i]);
             if (!m || *m < 0) {
                 result.ok = false;
                 result.error = "Invalid --duration value (seconds)";
@@ -109,18 +140,35 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
         }
         if (is_flag(arg)) {
             result.ok = false;
-            result.error = "Unknown option: " + std::string(arg);
+            result.error = "Unknown option: " + std::string(arg) + " (try: cells session --help)";
             return result;
         }
 
-        // Positional: for start → url; for stop/exec/watch/status → session id
-        if (result.options.kind == SessionCommandKind::kStart ||
-            result.options.kind == SessionCommandKind::kDaemon) {
+        // Positionals
+        if (result.options.kind == SessionCommandKind::kStart) {
             if (result.options.url.empty()) {
                 result.options.url = std::string(arg);
-            } else if (result.options.session_id.empty() &&
-                       result.options.kind == SessionCommandKind::kDaemon) {
+            } else {
+                result.ok = false;
+                result.error = "Unexpected argument: " + std::string(arg);
+                return result;
+            }
+        } else if (result.options.kind == SessionCommandKind::kDaemon) {
+            // Prefer flags; allow positional id then url for convenience
+            if (result.options.session_id.empty()) {
                 result.options.session_id = std::string(arg);
+            } else if (result.options.url.empty()) {
+                result.options.url = std::string(arg);
+            } else {
+                result.ok = false;
+                result.error = "Unexpected argument: " + std::string(arg);
+                return result;
+            }
+        } else if (result.options.kind == SessionCommandKind::kExport) {
+            if (result.options.session_id.empty()) {
+                result.options.session_id = std::string(arg);
+            } else if (result.options.export_path.empty()) {
+                result.options.export_path = std::string(arg);
             } else {
                 result.ok = false;
                 result.error = "Unexpected argument: " + std::string(arg);
@@ -137,7 +185,8 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
                 result.error = "Unexpected argument: " + std::string(arg);
                 return result;
             }
-        } else if (result.options.kind == SessionCommandKind::kList) {
+        } else if (result.options.kind == SessionCommandKind::kList ||
+                   result.options.kind == SessionCommandKind::kHelp) {
             result.ok = false;
             result.error = "Unexpected argument: " + std::string(arg);
             return result;
@@ -176,6 +225,12 @@ void validate_session_options(SessionParseResult& result) {
                 result.error = "Script required: -e '<code>' or --script <file>";
             }
             break;
+        case SessionCommandKind::kExport:
+            if (o.session_id.empty() || o.export_path.empty()) {
+                result.ok = false;
+                result.error = "Usage: cells session export <id> <path.(zcd|xlsx|csv)>";
+            }
+            break;
         case SessionCommandKind::kDaemon:
             if (o.session_id.empty() || o.url.empty() || o.socket_path.empty()) {
                 result.ok = false;
@@ -183,6 +238,7 @@ void validate_session_options(SessionParseResult& result) {
             }
             break;
         case SessionCommandKind::kList:
+        case SessionCommandKind::kHelp:
         case SessionCommandKind::kNone:
             break;
     }
@@ -190,20 +246,27 @@ void validate_session_options(SessionParseResult& result) {
 
 std::string session_usage(const char* program_name) {
     std::ostringstream o;
-    o << "Session commands (long-running collab peer for agents):\n"
-      << "  " << program_name << " session start <url> [--idle-minutes N] [--name NAME]\n"
+    o << "Session commands (long-running collab peer for agents; stdout is pure JSON/JSONL):\n"
+      << "  " << program_name
+      << " session start <url> [--idle-minutes N] [--wait-seconds N] [--name NAME]\n"
       << "  " << program_name << " session list\n"
       << "  " << program_name << " session status <id>\n"
       << "  " << program_name << " session stop <id>\n"
-      << "  " << program_name << " session exec <id> -e '<code>' | --script <file>\n"
+      << "  " << program_name << " session exec <id> -e '<code>' | --script <file> [--force]\n"
+      << "  " << program_name << " session export <id> <path.(zcd|xlsx|csv)> [--format FMT]\n"
       << "  " << program_name << " session watch <id> [--duration SECS]\n"
+      << "  " << program_name << " session --help\n"
       << "\n"
-      << "  --idle-minutes N   Auto-stop after N minutes with no action (default "
-      << kDefaultIdleMinutes << "; fractions allowed, e.g. 0.05)\n"
+      << "  --idle-minutes N   Auto-stop after N minutes idle (default " << kDefaultIdleMinutes
+      << "; fractions ok)\n"
+      << "  --wait-seconds N   start: wait for ONLINE/SYNCING before success (default "
+      << kDefaultWaitSeconds << "; 0=no wait)\n"
       << "  --name NAME        Presence display name (default \"CLI Agent\")\n"
       << "  --duration SECS    Watch for at most SECS seconds then exit\n"
+      << "  --force            exec even if session is still CONNECTING\n"
       << "\n"
-      << "Start prints JSON: {\"id\",\"url\",\"room\",...}. Pass id to exec/watch/stop.\n"
+      << "start fails if still CONNECTING after --wait-seconds (daemon stopped).\n"
+      << "export writes the live workbook (zcd/xlsx/csv by extension).\n"
       << "Prefer session over one-shot `cells sync` for multi-step agent work.\n";
     return o.str();
 }

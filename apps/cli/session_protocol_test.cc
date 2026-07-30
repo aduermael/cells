@@ -129,5 +129,39 @@ TEST(SessionProtocolTest, GenerateSessionId) {
     EXPECT_NE(a, b);
 }
 
+TEST(SessionProtocolTest, SessionStateIsReady) {
+    EXPECT_TRUE(session_state_is_ready("ONLINE"));
+    EXPECT_TRUE(session_state_is_ready("SYNCING"));
+    EXPECT_FALSE(session_state_is_ready("CONNECTING"));
+    EXPECT_FALSE(session_state_is_ready("OFFLINE"));
+    EXPECT_FALSE(session_state_is_ready("RECONNECTING"));
+    EXPECT_FALSE(session_state_is_ready(""));
+}
+
+TEST(SessionProtocolTest, ParseExportRequest) {
+    auto exp = parse_session_request(R"json({"op":"export","path":"/tmp/a.xlsx","format":"xlsx"})json");
+    ASSERT_TRUE(exp.has_value());
+    EXPECT_EQ(exp->op, SessionOp::kExport);
+    EXPECT_EQ(exp->export_path, "/tmp/a.xlsx");
+    EXPECT_EQ(exp->format, "xlsx");
+}
+
+TEST(SessionProtocolTest, EncodeStatusReadyFields) {
+    SessionResponse r;
+    r.ok = true;
+    r.id = "abc";
+    r.state = "ONLINE";
+    r.ready = true;
+    r.peer_id = "p1";
+    r.ops_received = 3;
+    r.cells = 10;
+    r.last_error = "";
+    std::string json = encode_session_response(r);
+    EXPECT_EQ(json_get_string(json, "state"), "ONLINE");
+    EXPECT_EQ(json_get_string(json, "peer_id"), "p1");
+    EXPECT_TRUE(json_get_bool(json, "ready").value_or(false));
+    EXPECT_EQ(json_get_number(json, "cells").value_or(0), 10);
+}
+
 }  // namespace
 }  // namespace cells::cli

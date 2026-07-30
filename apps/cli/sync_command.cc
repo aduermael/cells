@@ -204,22 +204,34 @@ int run_sync_command(const SyncOptions& opts) {
     std::unique_ptr<Workbook> workbook;
 
     if (!opts.workbook_file.empty()) {
-        // Load workbook from file
         std::string content = read_file(opts.workbook_file);
         if (content.empty()) {
-            std::cerr << "Error: Could not read file: " << opts.workbook_file << "\n";
-            return 1;
-        }
+            // --apply: create empty workbook if file is missing so agents can
+            // "join, sync, save on exit" without a prior create step.
+            // --send still requires an existing file to broadcast.
+            if (opts.apply && !opts.send) {
+                workbook = std::make_unique<Workbook>();
+                auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+                workbook->addSheet(std::move(sheet));
+                if (!opts.quiet) {
+                    std::cerr << "Created empty workbook for --apply: " << opts.workbook_file
+                              << "\n";
+                }
+            } else {
+                std::cerr << "Error: Could not read file: " << opts.workbook_file << "\n";
+                return 1;
+            }
+        } else {
+            ParseResult result = parse(content);
+            if (!result.ok()) {
+                std::cerr << "Error: " << result.error->toString() << "\n";
+                return 1;
+            }
+            workbook = std::move(result.workbook);
 
-        ParseResult result = parse(content);
-        if (!result.ok()) {
-            std::cerr << "Error: " << result.error->toString() << "\n";
-            return 1;
-        }
-        workbook = std::move(result.workbook);
-
-        if (!opts.quiet) {
-            std::cerr << "Loaded workbook: " << opts.workbook_file << "\n";
+            if (!opts.quiet) {
+                std::cerr << "Loaded workbook: " << opts.workbook_file << "\n";
+            }
         }
     } else {
         // Create empty workbook
