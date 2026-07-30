@@ -6,6 +6,8 @@
 #   common/   - Shared implementation (all platforms)
 #   web/      - Emscripten/WASM implementations
 #   apple/    - iOS/macOS implementations (Objective-C++)
+#   windows/  - Windows implementations (WinHTTP OS stack)
+#   native/   - Linux (libcurl HTTP, libdatachannel WS/RTC)
 #
 # Apple implementations use objc_library for Objective-C++ support.
 # On macOS/iOS, we select the objc_library targets; on other platforms
@@ -25,6 +27,11 @@ config_setting(
 config_setting(
     name = "is_linux",
     constraint_values = ["@platforms//os:linux"],
+)
+
+config_setting(
+    name = "is_windows",
+    constraint_values = ["@platforms//os:windows"],
 )
 
 # =============================================================================
@@ -111,6 +118,22 @@ cc_library(
     ],
 )
 
+# HTTP request using WinHTTP (Windows OS stack)
+cc_library(
+    name = "http_request_winhttp",
+    srcs = ["windows/HttpRequest_winhttp.cc"],
+    hdrs = ["include/HttpRequest.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    linkopts = ["winhttp.lib"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        ":http_request_common",
+        ":http_response",
+        ":url",
+    ],
+)
+
 # WebSocket connection using libdatachannel (Linux/native platforms)
 cc_library(
     name = "ws_connection_libdc",
@@ -128,6 +151,24 @@ cc_library(
         "@libdatachannel",
         "@openssl//:ssl",
         "@openssl//:crypto",
+    ],
+)
+
+# WebSocket connection using WinHTTP (Windows OS stack, Windows 8+)
+cc_library(
+    name = "ws_connection_winhttp",
+    srcs = ["windows/WSConnection_winhttp.cc"],
+    hdrs = ["include/WSConnection.h"],
+    alwayslink = True,
+    copts = ["-std=c++17"],
+    includes = ["."],
+    linkopts = ["winhttp.lib"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        ":connection",
+        ":url",
+        ":ws_connection_common",
+        ":ws_worker_state",
     ],
 )
 
@@ -206,6 +247,7 @@ cc_library(
         ":is_macos": [":http_request_apple"],
         ":is_ios": [":http_request_apple"],
         ":is_linux": [":http_request_curl"],
+        ":is_windows": [":http_request_winhttp"],
         "//conditions:default": [":http_request_default"],
     }),
 )
@@ -272,6 +314,7 @@ cc_library(
         ":is_macos": [":ws_connection_apple"],
         ":is_ios": [":ws_connection_apple"],
         ":is_linux": [":ws_connection_libdc"],
+        ":is_windows": [":ws_connection_winhttp"],
         "//conditions:default": [":ws_connection_default"],
     }),
 )
@@ -311,6 +354,37 @@ cc_test(
         ":url",
         "@googletest//:gtest_main",
     ],
+)
+
+# Structural checks for Windows WinHTTP sources/selects (runs on all hosts)
+cc_test(
+    name = "windows_backend_test",
+    srcs = ["windows_backend_test.cc"],
+    data = [
+        "BUILD",
+        "windows/HttpRequest_winhttp.cc",
+        "windows/WSConnection_winhttp.cc",
+    ],
+    deps = [
+        "@googletest//:gtest_main",
+    ],
+)
+
+# Lifecycle rules used by WinHTTP WebSocket (pure C++, all hosts)
+cc_test(
+    name = "ws_worker_state_test",
+    srcs = ["ws_worker_state_test.cc"],
+    deps = [
+        ":ws_worker_state",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ws_worker_state",
+    hdrs = ["windows/ws_worker_state.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
 )
 
 cc_test(

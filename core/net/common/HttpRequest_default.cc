@@ -1,8 +1,7 @@
-// Default HTTP request implementation (stub for non-web, non-Apple platforms)
-// This is a placeholder that always fails - real implementation needed for
-// Linux/Windows
+// Default HTTP request implementation (stub for platforms without a real backend)
+// Windows uses WinHTTP; Linux uses libcurl; Apple uses NSURLSession.
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
 
 #include "core/net/include/HttpRequest.h"
 
@@ -39,4 +38,4 @@ std::unique_ptr<HttpRequest> HttpRequest::make(HttpMethod method, const std::str
 
 }  // namespace cells::net
 
-#endif  // !__EMSCRIPTEN__ && !__APPLE__
+#endif  // !__EMSCRIPTEN__ && !__APPLE__ && !_WIN32

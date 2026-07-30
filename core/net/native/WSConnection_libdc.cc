@@ -2,7 +2,7 @@
 // Uses rtc::WebSocket from libdatachannel which is already a dependency for WebRTC
 // Reference: https://github.com/paullouisageneau/libdatachannel
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
 
 #include <cstring>
 
@@ -131,4 +131,4 @@ std::unique_ptr<WSConnection> WSConnection::make(const std::string& scheme, cons
 
 }  // namespace cells::net
 
-#endif  // !__EMSCRIPTEN__ && !__APPLE__
+#endif  // !__EMSCRIPTEN__ && !__APPLE__ && !_WIN32

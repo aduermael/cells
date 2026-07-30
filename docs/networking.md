@@ -20,8 +20,9 @@
 | Platform | Status | Source Files |
 |----------|--------|--------------|
 | Web (Emscripten) | ✅ Implemented | `core/net/web/` (HttpRequest, WebSocket, WebRTC bindings) |
-| Apple (iOS/macOS) | ✅ Implemented | `core/net/apple/` (HttpRequest, WebSocket, WebRTC via stasel/WebRTC) |
-| Native (libdatachannel) | ✅ Implemented | `core/net/native/` (RTC via libdatachannel) |
+| Apple (iOS/macOS) | ✅ Implemented | `core/net/apple/` (HttpRequest, WebSocket; WebRTC sources exist, build uses libdatachannel) |
+| Linux | ✅ Implemented | `core/net/native/` (HTTP via libcurl; WS/RTC via libdatachannel) |
+| Windows | ✅ HTTP/WS | `core/net/windows/` (HTTP + WebSocket via WinHTTP OS stack; WebRTC not yet) |
 
 ### TypeScript Layer (`apps/wasm/src/`)
 
@@ -286,7 +287,9 @@ auto peersOnSheet = presence->getPeersOnSheet("sheet123");
 
 | Platform | Library | Notes |
 |----------|---------|-------|
-| iOS/macOS | [stasel/WebRTC](https://github.com/stasel/WebRTC) | BSD-3 license, prebuilt XCFramework |
-| Web | Native RTCPeerConnection | Via Emscripten bindings (`core/net/web/`) |
-| Native | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | C++ WebRTC implementation (`core/net/native/`) |
+| iOS/macOS HTTP/WS | Foundation (NSURLSession) | OS stack in `core/net/apple/` |
+| Windows HTTP/WS | WinHTTP | OS stack in `core/net/windows/` (Windows 8+ for WebSocket) |
+| Web | Browser APIs | Via Emscripten bindings (`core/net/web/`) |
+| Linux HTTP | libcurl | `core/net/native/HttpRequest_curl.cc` |
+| Native WebRTC / Linux WS | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | `core/net/native/` (Windows WebRTC still TODO) |
 | All | `core/net/` | Cross-platform C++ abstraction layer |
