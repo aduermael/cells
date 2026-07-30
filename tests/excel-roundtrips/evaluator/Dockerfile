@@ -6,7 +6,7 @@ COPY ExcelExtractor.csproj .
 RUN dotnet restore
 
 # Copy source and build
-COPY *.cs .
+COPY *.cs ./
 RUN dotnet publish -c Release -o /app --no-restore
 
 # Runtime image

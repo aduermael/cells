@@ -4,8 +4,7 @@
 # GitHub Environment: production
 #   Secrets:
 #     FLY_API_TOKEN — flyctl deploy token (required)
-# Fly app secrets (set via `fly secrets set`, not GitHub):
-#   ANTHROPIC_API_KEY — optional; enables the AI agent endpoint
+# Agents use the CLI externally; the Fly app only needs collab (no in-product AI).
 
 name: Deploy server (Fly.io)
 

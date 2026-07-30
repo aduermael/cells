@@ -21,6 +21,8 @@ If `cells` is missing and this skill folder contains `install.sh`, install the C
 sh ./install.sh
 ```
 
+If this skill directory also contains `REPO_LOCAL.md` (present when working from the cells git checkout via skill symlinks), read that file for how to build and use the in-repo CLI instead of downloading a release.
+
 ### Install environment overrides
 
 | Variable | Purpose |
