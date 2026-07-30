@@ -88,14 +88,15 @@ class SyncManager {
 public:
     explicit SyncManager(Workbook* workbook);
 
-    // Peer management
+    // Peer management (live connections). removePeer drops the live entry but
+    // durable frontier knowledge remains on the Workbook for rejoin/ZCD export.
     void addPeer(const ID& peerId);
     void removePeer(const ID& peerId);
     [[nodiscard]] std::vector<ID> getPeerIds() const;
     [[nodiscard]] bool hasPeer(const ID& peerId) const;
     [[nodiscard]] size_t peerCount() const;
 
-    // Get sync state for a specific peer (returns nullptr if peer not found)
+    // Get sync state for a specific peer (returns nullptr if peer not currently live)
     [[nodiscard]] const PeerSyncState* getPeerSyncState(const ID& peerId) const;
 
     // Handle incoming message from a peer.
@@ -153,10 +154,19 @@ private:
     // Create operations message
     [[nodiscard]] std::string makeOperationsMessage(const HLC& sinceHLC) const;
 
+    // Create ack message
+    [[nodiscard]] static std::string makeAckMessage(const HLC& hlc);
+
+    // Record that a peer knows through hlc (live state + durable workbook knowledge)
+    void recordPeerFrontier(const ID& peerId, const HLC& hlc);
+
+    // Min frontier across durable known peers (for prune); zero if none known
+    [[nodiscard]] HLC minKnownPeerFrontier() const;
+
     // Back-reference to workbook (not owned)
     Workbook* _workbook;
 
-    // Connected peers and their sync state
+    // Currently connected peers and their live sync state
     std::map<ID, PeerSyncState> _peers;
 
     // Outgoing message queue

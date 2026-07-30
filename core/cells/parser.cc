@@ -160,6 +160,9 @@ bool Parser::parseLine(std::string_view line) {
         case 'O':  // OpLog entry
             return parseOperation(line.substr(firstNonSpace));
 
+        case 'P':  // Peer knowledge (frontier)
+            return parsePeerKnowledge(line.substr(firstNonSpace));
+
         default:
             // Unknown line type - ignore gracefully
             return true;
@@ -1467,6 +1470,43 @@ bool Parser::parseOperation(std::string_view line) {
     OpLog* oplog = workbook_->getOpLog();
     if (oplog != nullptr) {
         oplog->addOperation(op);
+    }
+
+    return true;
+}
+
+bool Parser::parsePeerKnowledge(std::string_view line) {
+    // Format: P <peer_id> <hlc>
+    // Example: P AbCdEf12 1705312200000.0.N3f8hJ2w
+    if (line.size() < 2 || line[0] != 'P' || line[1] != ' ') {
+        return setError("Invalid peer knowledge line");
+    }
+
+    line = line.substr(2);  // Skip "P "
+
+    // Parse peer ID
+    const size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing peer frontier HLC");
+    }
+
+    const std::string peerStr(line.substr(0, spacePos));
+    const ID peerId(peerStr);
+    if (peerId.isNull()) {
+        return setError("Invalid peer ID");
+    }
+
+    const std::string hlcStr(line.substr(spacePos + 1));
+    // Trim trailing whitespace
+    size_t end = hlcStr.size();
+    while (end > 0 && (hlcStr[end - 1] == ' ' || hlcStr[end - 1] == '\t' ||
+                       hlcStr[end - 1] == '\r' || hlcStr[end - 1] == '\n')) {
+        --end;
+    }
+    const HLC hlc = HLC::fromString(hlcStr.substr(0, end));
+
+    if (workbook_ != nullptr) {
+        workbook_->setPeerFrontier(peerId, hlc);
     }
 
     return true;

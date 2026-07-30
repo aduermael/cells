@@ -867,6 +867,28 @@ struct Workbook {
     [[nodiscard]] HLC getCurrentHLC() const;
 
     // ========================================================================
+    // Durable peer knowledge (survives disconnect; persisted in ZCD)
+    // ========================================================================
+    // Maps peer_id -> highest HLC we know that peer has applied/received.
+    // Enables offline work + clean rejoin reconciliation (CRDT purpose).
+
+    // Set absolute frontier for a peer (hello claim, ZCD load). Zero HLC is stored.
+    void setPeerFrontier(const ID& peerId, const HLC& hlc);
+
+    // Monotonically advance frontier (ACK / received ops). No-op if hlc is not greater.
+    void advancePeerFrontier(const ID& peerId, const HLC& hlc);
+
+    // Returns zero HLC if peer is unknown.
+    [[nodiscard]] HLC getPeerFrontier(const ID& peerId) const;
+
+    [[nodiscard]] bool hasPeerKnowledge(const ID& peerId) const;
+
+    // All known peers and their frontiers (deterministic map order for serialize).
+    [[nodiscard]] const std::map<ID, HLC>& getPeerKnowledge() const;
+
+    void clearPeerKnowledge();
+
+    // ========================================================================
     // Collaboration mode
     // ========================================================================
 
@@ -1193,6 +1215,9 @@ private:
 
     // Last HLC used for generating operations
     mutable HLC _lastHLC;
+
+    // Durable knowledge of peer frontiers (peer_id -> last known HLC)
+    std::map<ID, HLC> _peerKnowledge;
 
     // Collaboration mode (default: OFFLINE)
     CollabMode _collabMode{CollabMode::OFFLINE};

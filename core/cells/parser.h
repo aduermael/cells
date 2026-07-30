@@ -101,18 +101,19 @@ private:
     bool parseLine(std::string_view line);
 
     // Line type parsers
-    bool parseDocument(std::string_view line);    // D <id> "<name>"
-    bool parseFormat(std::string_view line);      // F <id> "<format-code>"
-    bool parseStyle(std::string_view line);       // Y <id> <json-props>
-    bool parseNamedRange(std::string_view line);  // N "<name>" <scope> <target>
-    bool parseSheet(std::string_view line);       // S <id> "<name>"
-    bool parseTheme(std::string_view line);       // T "<name>" colors:... fonts:...
-    bool parseSheetView(std::string_view line);   // V <properties...>
-    bool parseColumn(std::string_view line);      // C <id> <pos> [props]
-    bool parseRow(std::string_view line);         // R <id> <pos> [props]
-    bool parseCell(std::string_view line);        // X <id> <col> <row> <type> <value>
-    bool parseRange(std::string_view line);       // RG <id> <corners> <flags> [sty:<base64>]
-    bool parseOperation(std::string_view line);   // O <hlc> <op-type> <target-id> <payload>
+    bool parseDocument(std::string_view line);       // D <id> "<name>"
+    bool parseFormat(std::string_view line);         // F <id> "<format-code>"
+    bool parseStyle(std::string_view line);          // Y <id> <json-props>
+    bool parseNamedRange(std::string_view line);     // N "<name>" <scope> <target>
+    bool parseSheet(std::string_view line);          // S <id> "<name>"
+    bool parseTheme(std::string_view line);          // T "<name>" colors:... fonts:...
+    bool parseSheetView(std::string_view line);      // V <properties...>
+    bool parseColumn(std::string_view line);         // C <id> <pos> [props]
+    bool parseRow(std::string_view line);            // R <id> <pos> [props]
+    bool parseCell(std::string_view line);           // X <id> <col> <row> <type> <value>
+    bool parseRange(std::string_view line);          // RG <id> <corners> <flags> [sty:<base64>]
+    bool parseOperation(std::string_view line);      // O <hlc> <op-type> <target-id> <payload>
+    bool parsePeerKnowledge(std::string_view line);  // P <peer_id> <hlc>
 
     // Helper parsers
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);

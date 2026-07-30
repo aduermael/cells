@@ -2655,5 +2655,72 @@ TEST(SerializerTest, AxisDefaultStyleRoundTrip) {
     EXPECT_TRUE(rowStyle.italic);
 }
 
+TEST(SerializerTest, PeerKnowledgeRoundTrip) {
+    Workbook wb(ID("aB3cD4eF"), "PeerKnowledge");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
+    wb.addSheet(std::move(sheet));
+
+    const ID peer1("PeerOne1");
+    const ID peer2("PeerTwo2");
+    const HLC hlc1(1705312200000LL, 0, ID("NodeAAAA"));
+    const HLC hlc2(1705312200999LL, 3, ID("NodeBBBB"));
+
+    wb.setPeerFrontier(peer1, hlc1);
+    wb.setPeerFrontier(peer2, hlc2);
+
+    const std::string output = serialize(wb);
+    EXPECT_NE(output.find("#peers"), std::string::npos);
+    EXPECT_NE(output.find("P PeerOne1 "), std::string::npos);
+    EXPECT_NE(output.find("P PeerTwo2 "), std::string::npos);
+    EXPECT_NE(output.find(hlc1.toString()), std::string::npos);
+    EXPECT_NE(output.find(hlc2.toString()), std::string::npos);
+
+    ParseResult result = parse(output);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+    ASSERT_NE(result.workbook, nullptr);
+
+    EXPECT_TRUE(result.workbook->hasPeerKnowledge(peer1));
+    EXPECT_TRUE(result.workbook->hasPeerKnowledge(peer2));
+    EXPECT_EQ(result.workbook->getPeerFrontier(peer1), hlc1);
+    EXPECT_EQ(result.workbook->getPeerFrontier(peer2), hlc2);
+    EXPECT_EQ(result.workbook->getPeerKnowledge().size(), 2u);
+}
+
+TEST(SerializerTest, PeerKnowledgeAbsentInLegacyFiles) {
+    // Minimal document without any P lines
+    const std::string legacy = R"(#zcd v1
+D aB3cD4eF "Legacy"
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 1
+)";
+    ParseResult result = parse(legacy);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+    EXPECT_TRUE(result.workbook->getPeerKnowledge().empty());
+
+    // Re-serialize should not invent peer knowledge
+    const std::string output = serialize(*result.workbook);
+    EXPECT_EQ(output.find("#peers"), std::string::npos);
+    EXPECT_EQ(output.find("\nP "), std::string::npos);
+}
+
+TEST(SerializerTest, PeerKnowledgeParseOnlyLines) {
+    const std::string content = R"(#zcd v1
+D aB3cD4eF "WithPeers"
+S sH3eE4tB "Sheet1"
+#peers
+P AbCdEf12 1000.0.NodeId01
+P GhIjKl34 2000.1.NodeId02
+)";
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    EXPECT_EQ(result.workbook->getPeerKnowledge().size(), 2u);
+    EXPECT_EQ(result.workbook->getPeerFrontier(ID("AbCdEf12")).toString(), "1000.0.NodeId01");
+    EXPECT_EQ(result.workbook->getPeerFrontier(ID("GhIjKl34")).toString(), "2000.1.NodeId02");
+}
+
 }  // namespace
 }  // namespace cells

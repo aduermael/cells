@@ -525,6 +525,43 @@ const ID& Workbook::getNodeId() const {
     return _nodeId;
 }
 
+void Workbook::setPeerFrontier(const ID& peerId, const HLC& hlc) {
+    if (peerId.isNull()) {
+        return;
+    }
+    _peerKnowledge[peerId] = hlc;
+}
+
+void Workbook::advancePeerFrontier(const ID& peerId, const HLC& hlc) {
+    if (peerId.isNull() || hlc.isZero()) {
+        return;
+    }
+    auto it = _peerKnowledge.find(peerId);
+    if (it == _peerKnowledge.end() || hlc > it->second) {
+        _peerKnowledge[peerId] = hlc;
+    }
+}
+
+HLC Workbook::getPeerFrontier(const ID& peerId) const {
+    auto it = _peerKnowledge.find(peerId);
+    if (it == _peerKnowledge.end()) {
+        return {};
+    }
+    return it->second;
+}
+
+bool Workbook::hasPeerKnowledge(const ID& peerId) const {
+    return _peerKnowledge.find(peerId) != _peerKnowledge.end();
+}
+
+const std::map<ID, HLC>& Workbook::getPeerKnowledge() const {
+    return _peerKnowledge;
+}
+
+void Workbook::clearPeerKnowledge() {
+    _peerKnowledge.clear();
+}
+
 HLC Workbook::getCurrentHLC() const {
     // If no node ID set, return zero HLC
     if (_nodeId.isNull()) {

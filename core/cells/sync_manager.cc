@@ -170,9 +170,13 @@ void SyncManager::addPeer(const ID& peerId) {
         return;
     }
 
-    // Add peer if not already tracked
+    // Add peer if not already live; seed frontier from durable workbook knowledge
     if (_peers.find(peerId) == _peers.end()) {
-        _peers[peerId] = PeerSyncState();
+        PeerSyncState state;
+        if (_workbook != nullptr && _workbook->hasPeerKnowledge(peerId)) {
+            state.lastSyncedHLC = _workbook->getPeerFrontier(peerId);
+        }
+        _peers[peerId] = state;
 
         // Queue hello message for this peer
         queueToPeer(peerId, makeHelloMessage());
@@ -180,7 +184,55 @@ void SyncManager::addPeer(const ID& peerId) {
 }
 
 void SyncManager::removePeer(const ID& peerId) {
-    _peers.erase(peerId);
+    // Drop live connection only — durable frontier stays on the Workbook so
+    // offline peers can rejoin and we still prune safely against known knowledge.
+    auto it = _peers.find(peerId);
+    if (it == _peers.end()) {
+        return;
+    }
+    if (_workbook != nullptr && !it->second.lastSyncedHLC.isZero()) {
+        _workbook->advancePeerFrontier(peerId, it->second.lastSyncedHLC);
+    }
+    _peers.erase(it);
+}
+
+void SyncManager::recordPeerFrontier(const ID& peerId, const HLC& hlc) {
+    if (peerId.isNull() || hlc.isZero()) {
+        return;
+    }
+    auto it = _peers.find(peerId);
+    if (it != _peers.end() && hlc > it->second.lastSyncedHLC) {
+        it->second.lastSyncedHLC = hlc;
+    }
+    if (_workbook != nullptr) {
+        _workbook->advancePeerFrontier(peerId, hlc);
+    }
+}
+
+HLC SyncManager::minKnownPeerFrontier() const {
+    HLC minHLC;
+    bool first = true;
+
+    // Prefer durable knowledge (includes offline peers) so we never prune past
+    // a known peer's frontier just because they disconnected.
+    if (_workbook != nullptr) {
+        for (const auto& pair : _workbook->getPeerKnowledge()) {
+            if (first || pair.second < minHLC) {
+                minHLC = pair.second;
+                first = false;
+            }
+        }
+    }
+
+    // Also consider live peers that may not yet be in durable knowledge
+    for (const auto& pair : _peers) {
+        if (first || pair.second.lastSyncedHLC < minHLC) {
+            minHLC = pair.second.lastSyncedHLC;
+            first = false;
+        }
+    }
+
+    return minHLC;
 }
 
 std::vector<ID> SyncManager::getPeerIds() const {
@@ -328,8 +380,13 @@ size_t SyncManager::pruneOpLog() {
         return 0;
     }
 
-    if (_peers.empty()) {
-        // No peers - prune but keep minimum for debugging
+    // Use durable + live peer frontiers so offline peers still protect their ops
+    const HLC minHLC = minKnownPeerFrontier();
+    const bool anyKnown =
+        (_workbook != nullptr && !_workbook->getPeerKnowledge().empty()) || !_peers.empty();
+
+    if (!anyKnown) {
+        // No known peers - prune but keep minimum for debugging
         const size_t pruned = oplog->pruneKeeping(kMinOpLogRetention);
         if (pruned > 0) {
             LOG_DEBUG("[Sync] pruneOpLog: no peers, pruned %zu ops (was %zu, kept %zu)", pruned,
@@ -338,18 +395,8 @@ size_t SyncManager::pruneOpLog() {
         return pruned;
     }
 
-    // Find the minimum HLC that all peers have synced
-    HLC minHLC;
-    bool first = true;
-    for (const auto& pair : _peers) {
-        if (first || pair.second.lastSyncedHLC < minHLC) {
-            minHLC = pair.second.lastSyncedHLC;
-            first = false;
-        }
-    }
-
-    // If minHLC is zero (no synced operations), don't prune anything
-    if (minHLC.wall_time == 0 && minHLC.logical == 0) {
+    // If minHLC is zero (some peer not caught up), don't prune anything
+    if (minHLC.isZero()) {
         LOG_DEBUG("[Sync] pruneOpLog: min_hlc is zero, not pruning (oplog_size=%zu)", sizeBefore);
         return 0;
     }
@@ -377,32 +424,34 @@ HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string
     // Update peer state
     auto it = _peers.find(peerId);
     if (it == _peers.end()) {
-        // Auto-add peer if not tracked
+        // Auto-add peer if not live
         _peers[peerId] = PeerSyncState();
         it = _peers.find(peerId);
     }
 
-    // lastSyncedHLC: what we believe they have — use their reported HLC so we
-    // only send ops they may be missing. isSynced is set true only after a full
-    // exchange (sync-response) or when both sides have empty oplogs.
+    // Trust their claim of what they have (authoritative for this connection).
+    // May lower a previous durable frontier if they rejoin with less state.
     it->second.lastSyncedHLC = peerHLC;
     it->second.opCount = static_cast<size_t>(opCount);
     it->second.isSynced = false;
+    if (_workbook != nullptr) {
+        _workbook->setPeerFrontier(peerId, peerHLC);
+    }
 
     const OpLog* oplog = _workbook->getOpLog();
     const size_t localOpCount = oplog->size();
-    const HLC localHLC = oplog->getCurrentHLC();
 
     LOG_DEBUG("[Sync] handleHello: peer=%s peer_hlc=%s peer_ops=%lld local_ops=%zu",
               peerId.toString().c_str(), peerHLC.toString().c_str(),
               static_cast<long long>(opCount), localOpCount);
 
-    // Always do a full bidirectional exchange. Op-count comparison is wrong for
-    // concurrent histories (CLI local CELL_SET + empty axes vs browser document
-    // of the same length). Empty HLC = entire oplog; receivers dedupe by HLC.
+    // Joiner pulls current state: we send our full oplog (receivers dedupe by HLC)
+    // and request anything they may have (concurrent offline edits). Full exchange
+    // is required because a single HLC frontier is not a vector clock.
     //
     // 1) Request everything we might be missing
     // 2) Send our full oplog so concurrent/local ops are not dropped
+    // Joiner will ACK after applying our sync-response so we record their frontier.
     response.emplace_back(peerId, makeSyncRequestMessage(HLC{}));
     response.emplace_back(peerId, makeSyncResponseMessage(HLC{}));
 
@@ -410,7 +459,6 @@ HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string
         it->second.isSynced = true;
     }
 
-    (void)localHLC;  // available for logging / future since-HLC optimization
     // hello doesn't modify data, just peer state
     return HandleMessageResult(std::move(response), false);
 }
@@ -438,6 +486,16 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
     std::vector<Operation> ops = extractJSONOperations(json, "operations");
 
     bool dataModified = false;
+    std::vector<OutgoingMessage> response;
+
+    // Track max HLC from the batch (what the sender clearly holds, and what we
+    // will ACK so the provider records that we are caught up through this frontier).
+    HLC maxFromPeer;
+    for (const auto& op : ops) {
+        if (op.hlc > maxFromPeer) {
+            maxFromPeer = op.hlc;
+        }
+    }
 
     // Apply operations to workbook
     if (!ops.empty()) {
@@ -466,33 +524,36 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
             LOG_DEBUG("[Sync] handleSyncResponse: from=%s received=%zu new=%zu applied=%zu",
                       peerId.toString().c_str(), ops.size(), newOps.size(), applied);
         }
+
+        // ACK so the provider records that we have all ops up to this HLC.
+        // Without this, join leaves the provider's frontier for us at hello HLC
+        // (often zero) and later broadcast/prune decisions stay wrong.
+        response.emplace_back(peerId, makeAckMessage(maxFromPeer));
+        LOG_DEBUG("[Sync] handleSyncResponse: sending ACK to %s for HLC %s",
+                  peerId.toString().c_str(), maxFromPeer.toString().c_str());
     }
 
-    // Update peer sync state. lastSyncedHLC is what we believe *they* hold —
-    // never set it to our current HLC (that would hide concurrent local ops
-    // with lower HLCs from later broadcasts).
+    // Ops they sent us imply they hold them — advance our knowledge of them.
+    // Never set lastSyncedHLC to *our* current HLC (would hide concurrent local ops).
     auto it = _peers.find(peerId);
     if (it != _peers.end()) {
-        HLC maxFromPeer = it->second.lastSyncedHLC;
-        for (const auto& op : ops) {
-            if (op.hlc > maxFromPeer) {
-                maxFromPeer = op.hlc;
-            }
-        }
         const HLC oldHLC = it->second.lastSyncedHLC;
-        it->second.lastSyncedHLC = maxFromPeer;
+        if (!maxFromPeer.isZero() && maxFromPeer > it->second.lastSyncedHLC) {
+            it->second.lastSyncedHLC = maxFromPeer;
+        }
         it->second.isSynced = true;
+        if (_workbook != nullptr && !maxFromPeer.isZero()) {
+            _workbook->advancePeerFrontier(peerId, maxFromPeer);
+        }
         LOG_DEBUG("[Sync] handleSyncResponse: peer %s marked synced, HLC %s -> %s",
                   peerId.toString().c_str(), oldHLC.toString().c_str(),
                   it->second.lastSyncedHLC.toString().c_str());
     }
 
-    // Note: Do NOT prune oplog here — only after ACKs.
+    // Note: Do NOT prune oplog here — only after ACKs from the other side.
     // Do NOT re-queue a full sync-response here (would loop with the peer).
-    // Initial full exchange is done in handleHello; later local edits use
-    // broadcastOperations() / queueFullSyncToAllPeers() from the editor path.
 
-    return {{}, std::move(ops), dataModified};
+    return {std::move(response), std::move(ops), dataModified};
 }
 
 // Handle operations batch from peer
@@ -545,11 +606,12 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
             }
         }
 
+        // Ops they sent us imply they hold them
+        recordPeerFrontier(peerId, maxHLC);
+
         // Send ACK with the max HLC we received
         // This tells the sender we have all ops up to this HLC
-        std::ostringstream ack;
-        ack << "{\"type\":\"ack\",\"hlc\":\"" << maxHLC.toString() << "\"}";
-        response.emplace_back(peerId, ack.str());
+        response.emplace_back(peerId, makeAckMessage(maxHLC));
         LOG_DEBUG("[Sync] handleOperations: sending ACK to %s for HLC %s",
                   peerId.toString().c_str(), maxHLC.toString().c_str());
     }
@@ -565,21 +627,33 @@ HandleMessageResult SyncManager::handleAck(const ID& peerId, const std::string& 
     const std::string hlcStr = extractJSONString(json, "hlc");
     const HLC ackedHLC = HLC::fromString(hlcStr);
 
-    // Update peer's lastSyncedHLC - they've confirmed receipt up to this HLC
+    // Update live + durable frontier — they've confirmed receipt up to this HLC
     auto it = _peers.find(peerId);
     if (it != _peers.end()) {
         if (ackedHLC > it->second.lastSyncedHLC) {
             LOG_DEBUG("[Sync] handleAck: peer %s ACKed HLC %s (was %s)", peerId.toString().c_str(),
                       ackedHLC.toString().c_str(), it->second.lastSyncedHLC.toString().c_str());
             it->second.lastSyncedHLC = ackedHLC;
-
-            // Now that peer has confirmed receipt, try to prune old operations
-            pruneOpLog();
+            it->second.isSynced = true;
         }
+    }
+    if (_workbook != nullptr && !ackedHLC.isZero()) {
+        _workbook->advancePeerFrontier(peerId, ackedHLC);
+    }
+
+    // Now that peer has confirmed receipt, try to prune old operations
+    if (!ackedHLC.isZero()) {
+        pruneOpLog();
     }
 
     // ACK doesn't modify data
     return {};
+}
+
+std::string SyncManager::makeAckMessage(const HLC& hlc) {
+    std::ostringstream oss;
+    oss << "{\"type\":\"ack\",\"hlc\":\"" << hlc.toString() << "\"}";
+    return oss.str();
 }
 
 std::string SyncManager::makeHelloMessage() const {
