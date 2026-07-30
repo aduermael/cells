@@ -18,4 +18,4 @@ go version | awk '{print $3}' | sed 's/go//' | awk -F. '{if ($1 < 1 || ($1 == 1 
 }}'
 
 echo "Serving dist/wasm/ at http://localhost:8081/"
-cd tools/serve && go run . -port 8081 -dir "$REPO_ROOT/dist/wasm" -enable-collab -enable-agent
+cd tools/serve && go run . -port 8081 -dir "$REPO_ROOT/dist/wasm" -enable-collab

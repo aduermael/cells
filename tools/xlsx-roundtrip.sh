@@ -26,7 +26,16 @@ cd "$REPO_ROOT"
 
 # Build CLI
 echo "Building CLI..."
-bazel build //apps/cli:cells
+extra_toolchains=()
+if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
+  extra_toolchains=(
+    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain
+    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain
+    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain
+    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain
+  )
+fi
+bazel build //apps/cli:cells "${extra_toolchains[@]}"
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells dist/cli/cells
 

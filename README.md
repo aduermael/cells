@@ -234,9 +234,15 @@ For detailed architecture documentation, see [docs/](./docs/).
 
 ## AI Agents 🤖
 
-A basic agent integration is available—provide an Anthropic API key and the agent can generate and execute Luau code to manipulate the spreadsheet.
+Cells does **not** host an in-product AI agent. Humans use the web client; agents use the **CLI** (and the agent skill) like any other tool—Codex, Claude Code, Grok, or anything else.
 
-> ⚠️ The current implementation is a prototype. The planned architecture will have agents run in their own app instances, communicating via CRDT operations—just like human collaborators. This ensures consistent conflict-free collaboration whether edits come from humans or AI.
+**Collaborate with an agent:** open the Collaborate menu in the web UI, copy the room link, and give it to an agent. The agent joins via:
+
+```bash
+cells sync '<room-url>'
+```
+
+Install the skill (CLI + docs) with `./install-skill.sh` or see [skill/SKILL.md](./skill/SKILL.md). In this repository, skills are also symlinked for local agent discovery under `.agents/skills/cells`, `.claude/skills/cells`, and `.grok/skills/cells`.
 
 ## Requirements 📋
 
@@ -291,7 +297,7 @@ Set with `fly secrets set` on the `cells-app` app:
 
 | Secret | Required | Purpose |
 |--------|----------|---------|
-| `ANTHROPIC_API_KEY` | No | Enables the AI agent (`-enable-agent`) |
+| *(none required for agent features)* | — | Agents use the CLI; the server only needs collab for multi-peer rooms |
 
 ### One-time GitHub Pages setting
 

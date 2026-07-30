@@ -90,8 +90,7 @@ static std::string computeEditValueForCore(double num, const std::string& displa
 CellsEngine::CellsEngine()
     : _workbook(nullptr),
       _activeSheetIndex(0),
-      _listener(val::null()),
-      _agentListener(val::null()) {}
+      _listener(val::null()) {}
 
 CellsEngine::~CellsEngine() {
     disableSync();

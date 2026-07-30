@@ -15,6 +15,22 @@ cc_library(
     ],
 )
 
+# Large stdout spill helper (agent-friendly CLI output)
+cc_library(
+    name = "output_spill",
+    srcs = ["output_spill.cc"],
+    hdrs = ["output_spill.h"],
+)
+
+cc_test(
+    name = "output_spill_test",
+    srcs = ["output_spill_test.cc"],
+    deps = [
+        ":output_spill",
+        "@googletest//:gtest_main",
+    ],
+)
+
 # Full CLI binary with sync support (requires OpenSSL/libdatachannel)
 cc_binary(
     name = "cells",
@@ -35,6 +51,7 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
+        ":output_spill",
         ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
@@ -66,6 +83,7 @@ cc_binary(
         "sync_command_stub.cc",
     ],
     deps = [
+        ":output_spill",
         ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
@@ -91,6 +109,7 @@ cc_test(
     ],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
+        ":output_spill",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
         "//core/cells:formula_eval",

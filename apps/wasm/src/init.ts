@@ -18,7 +18,7 @@
 // Component wiring (delegated to init-components.ts):
 // - CellsClient → WasmDataSource → App → GridRenderer
 // - App → CellEditor, ColumnHeaderEditor, FormulaBarEditor, SheetTabsManager
-// - App → FileLoader, ClipboardManager, ScriptPanel, AgentPanel
+// - App → FileLoader, ClipboardManager, ScriptPanel
 // - App → CppSyncAdapter → CollabUI, PresenceBroadcaster
 //
 // =============================================================================
@@ -39,7 +39,6 @@ import type { AppEventManager } from "./app-events";
 import type { FileLoader } from "./file-loader";
 import type { AstDebugPanel } from "./ast-debug";
 import type { ScriptPanel } from "./script-panel";
-import type { AgentPanel } from "./agent-panel";
 import type { WorkbookTitleEditor } from "./workbook-title-editor";
 import type { ClipboardManager } from "./clipboard";
 import type { FormatControls } from "./format-controls";
@@ -61,7 +60,6 @@ export interface AppContext {
   eventManager: AppEventManager;
   astDebugPanel: AstDebugPanel;
   scriptPanel: ScriptPanel;
-  agentPanel: AgentPanel;
   workbookTitleEditor: WorkbookTitleEditor;
   clipboardManager: ClipboardManager;
   formatControls: FormatControls;
@@ -234,7 +232,6 @@ export function initApp(): AppContext {
     eventManager: components.eventManager,
     astDebugPanel: components.astDebugPanel,
     scriptPanel: components.scriptPanel,
-    agentPanel: components.agentPanel,
     workbookTitleEditor: components.workbookTitleEditor,
     clipboardManager: components.clipboardManager,
     formatControls: components.formatControls,

@@ -99,7 +99,7 @@ export class KeyboardEventHandlers {
         const hasTextSelection = selection && selection.toString().length > 0;
         const selectionInCanvas = selection?.anchorNode?.parentElement?.closest("canvas");
 
-        // Check if focus is on an input/textarea (e.g., agent panel)
+        // Check if focus is on an input/textarea (e.g., text input)
         const activeEl = document.activeElement;
         const isInputFocused =
             activeEl &&

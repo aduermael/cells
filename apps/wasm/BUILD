@@ -68,7 +68,6 @@ cc_binary(
         "-s FETCH=1",  # HTTP fetch support for networking
     ],
     deps = [
-        "//core/cells:agent_client",
         "//core/cells:builtin_themes",
         "//core/cells:cell_style_presets",
         "//core/cells:crdt",

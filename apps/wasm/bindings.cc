@@ -14,7 +14,7 @@
 // - bindings_format.cc: Number formatting, input parsing
 // - bindings_formula.cc: Formula parsing, evaluation, display
 // - bindings_crdt.cc: CRDT operations, sync management
-// - bindings_luau.cc: Luau scripting, autocomplete, AI agent
+// - bindings_luau.cc: Luau scripting, autocomplete
 //
 // =============================================================================
 
@@ -267,24 +267,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Scripting (Luau)
         .function("executeScript", &cells::wasm::CellsEngine::executeScript)
         .function("tokenizeLuau", &cells::wasm::CellsEngine::tokenizeLuau)
-        .function("getAutocomplete", &cells::wasm::CellsEngine::getAutocomplete)
-        // AI Agent
-        .function("setAgentListener", &cells::wasm::CellsEngine::setAgentListener)
-        .function("removeAgentListener", &cells::wasm::CellsEngine::removeAgentListener)
-        .function("initAgent", &cells::wasm::CellsEngine::initAgent)
-        .function("isAgentInitialized", &cells::wasm::CellsEngine::isAgentInitialized)
-        .function("sendAgentMessage", &cells::wasm::CellsEngine::sendAgentMessage)
-        .function("getAgentConversationId", &cells::wasm::CellsEngine::getAgentConversationId)
-        .function("clearAgentConversation", &cells::wasm::CellsEngine::clearAgentConversation)
-        .function("cancelAgent", &cells::wasm::CellsEngine::cancelAgent)
-        .function("isAgentProcessing", &cells::wasm::CellsEngine::isAgentProcessing)
-        // AI Agent - JS-based streaming
-        .function("getAgentServerUrl", &cells::wasm::CellsEngine::getAgentServerUrl)
-        .function("feedAgentStreamData", &cells::wasm::CellsEngine::feedAgentStreamData)
-        .function("endAgentStream", &cells::wasm::CellsEngine::endAgentStream)
-        .function("errorAgentStream", &cells::wasm::CellsEngine::errorAgentStream)
-        .function("isAgentStreaming", &cells::wasm::CellsEngine::isAgentStreaming)
-        .function("setAgentStreaming", &cells::wasm::CellsEngine::setAgentStreaming);
+        .function("getAutocomplete", &cells::wasm::CellsEngine::getAutocomplete);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")

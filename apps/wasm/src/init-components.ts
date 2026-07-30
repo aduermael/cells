@@ -22,7 +22,6 @@ import type { FormulaHighlight } from "./grid-constants";
 import { PresenceBroadcaster } from "./presence-broadcast";
 import { AstDebugPanel } from "./ast-debug";
 import { ScriptPanel } from "./script-panel";
-import { AgentPanel } from "./agent-panel";
 import { WorkbookTitleEditor } from "./workbook-title-editor";
 import { FocusManager } from "./focus-manager";
 import { CellEditor } from "./cell-editor";
@@ -86,7 +85,6 @@ export interface Components {
   presenceBroadcaster: PresenceBroadcaster;
   astDebugPanel: AstDebugPanel;
   scriptPanel: ScriptPanel;
-  agentPanel: AgentPanel;
   workbookTitleEditor: WorkbookTitleEditor;
   focusManager: FocusManager;
   cellEditor: CellEditor;
@@ -580,35 +578,6 @@ export function createComponents(config: ComponentsConfig): Components {
     getAutocomplete: async (source: string, line: number, column: number) => {
       if (!app.dataSource) return { context: "unknown" as const, suggestions: [] };
       return app.dataSource.getAutocomplete(source, line, column);
-    },
-  });
-
-  const AGENT_SERVER_URL =
-    (typeof window !== "undefined" &&
-      (window as Window & { AGENT_SERVER_URL?: string }).AGENT_SERVER_URL) || "";
-
-  const agentPanel = new AgentPanel({
-    panel: elements.chatPanel,
-    header: elements.chatHeader,
-    title: elements.chatTitle,
-    clearBtn: elements.chatClearBtn,
-    minimizeBtn: elements.chatMinimizeBtn,
-    messages: elements.chatMessages,
-    inputArea: elements.chatInputArea,
-    input: elements.chatInput,
-    sendBtn: elements.chatSendBtn,
-    openBtn: elements.chatOpenBtn,
-    getClient: () => app.dataSource?.client ?? null,
-    getServerUrl: () => AGENT_SERVER_URL,
-    onViewportRefresh: async () => {
-      fetchViewportNow();
-      if (app.dataSource) {
-        const name = await app.dataSource.client.getWorkbookName();
-        if (name) {
-          app.dataSource.setWorkbookName(name);
-          workbookTitleEditor.setTitle(name);
-        }
-      }
     },
   });
 
@@ -1204,7 +1173,6 @@ export function createComponents(config: ComponentsConfig): Components {
     presenceBroadcaster,
     astDebugPanel,
     scriptPanel,
-    agentPanel,
     workbookTitleEditor,
     focusManager,
     cellEditor,

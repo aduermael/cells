@@ -20,7 +20,7 @@
 // - luau_types.cc: Type wrappers (Cell/Sheet objects, metamethods)
 //
 // Dependencies: Luau VM (external), model.h
-// Used by: bindings.cc (script execution), agent_client.h (AI tool execution)
+// Used by: bindings.cc (script execution)
 //
 // =============================================================================
 

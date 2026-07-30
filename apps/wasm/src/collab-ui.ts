@@ -218,7 +218,9 @@ export class CollabUI {
         this._detailsPanel.innerHTML = `
             <div class="collab-status-details-header">Collaborate</div>
             <div class="collab-status-share-section">
-                <p class="collab-share-description">Share this link to collaborate in real-time:</p>
+                <p class="collab-share-description">Share this link to collaborate in real-time — with people or with an agent (Codex, Claude Code, Grok, etc.). Agents join via the CLI:</p>
+                <code class="collab-agent-hint">cells sync '&lt;room-url&gt;'</code>
+                <p class="collab-share-description collab-agent-docs">Install skill/CLI: <a href="https://github.com/aduermael/cells#ai-agents-" target="_blank" rel="noopener">docs</a> · <a href="https://github.com/aduermael/cells/blob/main/skill/SKILL.md" target="_blank" rel="noopener">skill</a> · <a href="https://github.com/aduermael/cells/blob/main/install-skill.sh" target="_blank" rel="noopener">install-skill.sh</a></p>
                 <button class="btn btn-primary btn-block btn-lg" id="collab-copy-link-btn">Copy Link</button>
             </div>
             <div class="collab-status-details-divider"></div>

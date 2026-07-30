@@ -30,5 +30,5 @@ COPY dist/wasm/ dist/
 # Expose the port
 EXPOSE 8080
 
-# Run the server with collaboration and AI agent enabled
-CMD ["./server", "-port", "8080", "-dir", "dist", "-enable-collab", "-enable-agent"]
+# Run the server with collaboration enabled
+CMD ["./server", "-port", "8080", "-dir", "dist", "-enable-collab"]

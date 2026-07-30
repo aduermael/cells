@@ -238,23 +238,6 @@ export interface CellsEngine {
     tokenizeLuau(source: string): string;
     getAutocomplete(source: string, line: number, column: number): string;
 
-    // AI Agent
-    setAgentListener(callback: (type: string, data: string) => void): void;
-    removeAgentListener(): void;
-    initAgent(serverUrl: string): void;
-    isAgentInitialized(): boolean;
-    sendAgentMessage(prompt: string, conversationId: string): void;
-    getAgentConversationId(): string;
-    clearAgentConversation(): void;
-    cancelAgent(): void;
-    isAgentProcessing(): boolean;
-    // JS-based streaming
-    getAgentServerUrl(): string;
-    feedAgentStreamData(data: string): void;
-    endAgentStream(): void;
-    errorAgentStream(error: string): void;
-    isAgentStreaming(): boolean;
-    setAgentStreaming(streaming: boolean): void;
 
     // Viewport pixel queries (Phase 5)
     getColumnPixelOffset(position: number): number;

@@ -13,7 +13,6 @@
 // - Provide async/await API for all spreadsheet operations
 // - Handle request/response correlation with unique IDs
 // - Manage real-time collaboration via RTCProxy
-// - Bridge agent events from C++ to TypeScript callbacks
 //
 // Architecture:
 // - Main thread creates CellsClient, which spawns a Web Worker
@@ -70,8 +69,6 @@ import type {
   ScriptResult,
   LuauToken,
   AutocompleteResult,
-  AgentEventType,
-  AgentEventCallback,
 } from "./client-types";
 
 // Re-export types for external consumers
@@ -114,7 +111,6 @@ export class CellsClient {
   private _onDataChanged: ((changeType: "cell" | "structure" | "sheet" | "loaded") => void) | null;
   private _onLoadProgress: ((cellsLoaded: number, totalEstimate: number) => void) | null;
   private _rtcProxy: RTCProxy | null;
-  private _onAgentEvent: AgentEventCallback | null;
 
   constructor(workerPath: string = "./worker.js") {
     this._worker = new Worker(workerPath);
@@ -125,7 +121,6 @@ export class CellsClient {
     this._onDataChanged = null;
     this._onLoadProgress = null;
     this._rtcProxy = null;
-    this._onAgentEvent = null;
 
     this._initRTCProxy();
 
@@ -185,12 +180,6 @@ export class CellsClient {
       return;
     }
 
-    if (msg.type === "agentEvent") {
-      if (this._onAgentEvent) {
-        this._onAgentEvent(msg.eventType as AgentEventType, msg.data as string);
-      }
-      return;
-    }
 
     if (msg.type && (msg.type.startsWith("rtc_") || msg.type.startsWith("dc_"))) {
       if (!this._rtcProxy) {
@@ -1319,53 +1308,5 @@ export class CellsClient {
     return JSON.parse(response.result as string);
   }
 
-  // ========== AI Agent API ==========
-
-  /** Set callback for agent events (text, tool_use, done, error) */
-  setOnAgentEvent(callback: AgentEventCallback): void {
-    this._onAgentEvent = callback;
-  }
-
-  /** Remove agent event callback */
-  removeOnAgentEvent(): void {
-    this._onAgentEvent = null;
-  }
-
-  /** Initialize the agent with a server URL */
-  async initAgent(serverUrl: string): Promise<void> {
-    await this._send("initAgent", { serverUrl });
-  }
-
-  /** Check if agent is initialized */
-  async isAgentInitialized(): Promise<boolean> {
-    const response = await this._send("isAgentInitialized");
-    return response.initialized as boolean;
-  }
-
-  /** Send a message to the agent */
-  async sendAgentMessage(prompt: string, conversationId: string = ""): Promise<void> {
-    await this._send("sendAgentMessage", { prompt, conversationId });
-  }
-
-  /** Get current conversation ID */
-  async getAgentConversationId(): Promise<string> {
-    const response = await this._send("getAgentConversationId");
-    return response.conversationId as string;
-  }
-
-  /** Clear the current conversation */
-  async clearAgentConversation(): Promise<void> {
-    await this._send("clearAgentConversation");
-  }
-
-  /** Cancel any in-progress agent request */
-  async cancelAgent(): Promise<void> {
-    await this._send("cancelAgent");
-  }
-
-  /** Check if agent is currently processing a request */
-  async isAgentProcessing(): Promise<boolean> {
-    const response = await this._send("isAgentProcessing");
-    return response.processing as boolean;
-  }
 }
+

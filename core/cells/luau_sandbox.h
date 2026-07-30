@@ -26,7 +26,7 @@
 // - print(...): Captured to script output
 //
 // Dependencies: Luau VM (external), model.h
-// Used by: bindings.cc (script execution), agent_client.h (AI tool execution)
+// Used by: bindings.cc (script execution)
 //
 // =============================================================================
 

@@ -21,6 +21,7 @@ cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/wasm/
 cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm.map dist/wasm/ 2>/dev/null || true
 
 echo "Building TypeScript..."
+export BAZEL_RUN=1
 cd apps/wasm && npm run build
 cd "$REPO_ROOT"
 

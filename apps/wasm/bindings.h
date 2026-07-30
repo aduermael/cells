@@ -14,7 +14,7 @@
 // - bindings_format.cc: Number formatting, input parsing
 // - bindings_formula.cc: Formula parsing, evaluation, display
 // - bindings_crdt.cc: CRDT operations, sync management
-// - bindings_luau.cc: Luau scripting, autocomplete, AI agent
+// - bindings_luau.cc: Luau scripting, autocomplete
 //
 // =============================================================================
 
@@ -26,8 +26,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
-#include "core/cells/agent_client.h"
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
@@ -35,7 +36,6 @@
 #include "core/cells/ref_converter.h"
 #include "core/cells/sync_manager.h"
 #include "core/cells/viewport_index.h"
-#include "core/net/include/SSEParser.h"
 #include "core/net/include/SyncClient.h"
 
 namespace cells::wasm {
@@ -69,7 +69,7 @@ std::string extractPayloadField(const std::string& payload, const std::string& k
 // CellsEngine - main wrapper class exposing the spreadsheet engine to JS
 // ============================================================================
 
-class CellsEngine : public cells::net::SyncClientDelegate, public cells::AgentClientDelegate {
+class CellsEngine : public cells::net::SyncClientDelegate {
 public:
     CellsEngine();
     ~CellsEngine() override;
@@ -367,37 +367,6 @@ public:
     void syncClientPresenceDidRemove(cells::net::SyncClient& client,
                                      const std::string& peerId) override;
 
-    // ========================================================================
-    // AgentClientDelegate implementation (bindings_luau.cc)
-    // ========================================================================
-
-    void onAgentText(const std::string& text) override;
-    void onAgentToolUse(const std::string& toolId, const std::string& name,
-                        const std::string& input) override;
-    void onAgentToolResultNeeded(const std::string& toolUseId) override;
-    void onAgentComplete(const std::string& stopReason,
-                         const std::string& conversationId) override;
-    void onAgentError(const std::string& message) override;
-
-    // ========================================================================
-    // Agent API methods (bindings_luau.cc)
-    // ========================================================================
-
-    void setAgentListener(val callback);
-    void removeAgentListener();
-    void initAgent(const std::string& serverUrl);
-    std::string getAgentServerUrl() const;
-    void feedAgentStreamData(const std::string& data);
-    void endAgentStream();
-    void errorAgentStream(const std::string& error);
-    bool isAgentStreaming() const;
-    void setAgentStreaming(bool streaming);
-    bool isAgentInitialized() const;
-    void sendAgentMessage(const std::string& prompt, const std::string& conversationId);
-    std::string getAgentConversationId() const;
-    void clearAgentConversation();
-    void cancelAgent();
-    bool isAgentProcessing() const;
 
     // ========================================================================
     // Formula API methods (bindings_formula.cc)
@@ -459,7 +428,6 @@ public:
     LuauAutocomplete& luauAutocomplete() { return _luauAutocomplete; }
     NumberFormatRegistry& formatRegistry() { return _formatRegistry; }
     val& listener() { return _listener; }
-    val& agentListener() { return _agentListener; }
 
     // For setting workbook (used by file loaders)
     void setWorkbook(std::unique_ptr<Workbook> wb) { _workbook = std::move(wb); }
@@ -481,20 +449,6 @@ private:
 
     static inline const std::unordered_map<ID, std::string, IDHash> _emptyCustomFormats{};
 
-    val _agentListener;
-    std::unique_ptr<AgentClient> _agentClient;
-    std::string _agentServerUrl;
-    std::unique_ptr<net::SSEParser> _agentSseParser;
-    bool _agentIsStreaming{false};
-    std::string _agentConversationId;
-    std::string _pendingToolId;
-    std::string _pendingToolName;
-    std::string _pendingToolInput;
-    bool _needsToolExecution{false};
-
-    // Internal helpers for agent SSE parsing
-    void handleAgentSSEEvent(const std::string& eventType, const std::string& data);
-    void executeAgentTool();
 
     // Broadcast pending operations to peers (queue + send)
     void broadcastPendingOperations();

@@ -17,7 +17,6 @@
 // - Viewport queries
 // - Formula operations (validate, dependencies, references)
 // - Scripting (Luau execute, tokenize, autocomplete)
-// - AI Agent (init, message, cancel)
 //
 // =============================================================================
 
@@ -1637,61 +1636,3 @@ export function handleGetSpillRangeAt(
     respond({ type: "spillRange", result });
 }
 
-// ============================================================================
-// AI Agent
-// ============================================================================
-
-export function handleInitAgent(
-    engine: CellsEngine,
-    params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    const { serverUrl } = params as { serverUrl: string };
-    engine.initAgent(serverUrl);
-    respond({ type: "agentInitialized", success: true });
-}
-
-export function handleIsAgentInitialized(
-    engine: CellsEngine,
-    _params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    const initialized = engine.isAgentInitialized();
-    respond({ type: "agentStatus", initialized });
-}
-
-export function handleGetAgentConversationId(
-    engine: CellsEngine,
-    _params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    const conversationId = engine.getAgentConversationId();
-    respond({ type: "agentConversationId", conversationId });
-}
-
-export function handleClearAgentConversation(
-    engine: CellsEngine,
-    _params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    engine.clearAgentConversation();
-    respond({ type: "agentConversationCleared", success: true });
-}
-
-export function handleCancelAgent(
-    engine: CellsEngine,
-    _params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    engine.cancelAgent();
-    respond({ type: "agentCancelled", success: true });
-}
-
-export function handleIsAgentProcessing(
-    engine: CellsEngine,
-    _params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    const processing = engine.isAgentProcessing();
-    respond({ type: "agentProcessing", processing });
-}

@@ -18,8 +18,9 @@ if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
 fi
 
 # --test_output=errors prints logs for failures only (keeps CI actionable).
-# Include //apps/cli:sync_args_test (release arg parsing). Do not use
-# //apps/cli/... yet — converter_test still has pre-existing data-path failures.
-bazel test //core/... //apps/cli:sync_args_test \
+# Include //apps/cli:sync_args_test (release arg parsing) and output_spill_test
+# (agent-friendly large stdout). Do not use //apps/cli/... yet — converter_test
+# still has pre-existing data-path failures.
+bazel test //core/... //apps/cli:sync_args_test //apps/cli:output_spill_test \
   --test_output=errors \
   "${extra_toolchains[@]}"

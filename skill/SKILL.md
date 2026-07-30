@@ -1,11 +1,13 @@
 ---
 name: cells
-description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal.
+description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal. Also used to join collab rooms via cells sync.
 ---
 
 # Cells spreadsheet CLI
 
 `cells` is a spreadsheet engine CLI for `.xlsx`, `.csv`, and `.zcd`.
+
+Humans often use the web client; agents should use this CLI (and this skill). The product does not host agent intelligence — use Codex, Claude Code, Grok, or any other agent with the CLI.
 
 ## Check availability
 
@@ -27,6 +29,20 @@ sh ./install.sh
 | `CELLS_INSTALL_DIR` | Install directory (default `/usr/local/bin`) |
 | `CELLS_REPO` | GitHub `owner/repo` for release assets |
 | `CELLS_FORCE_INSTALL` | Set `1` to reinstall even if `cells` is on PATH |
+
+## Collaborate via room URL
+
+When a human (or peer) shares a Cells collab link that includes a **room id** (`?room=...` or path `/{room-id}`), join with the CLI:
+
+```bash
+cells sync 'https://example.com/?room=ROOM_ID'
+# or
+cells sync --server 'https://example.com/?room=ROOM_ID'
+```
+
+That starts CRDT sync so the agent and human edit the same workbook. Prefer `cells --help` for full sync flags (`--apply`, `--send`, `--ops-only`).
+
+Give the agent the full URL from the web **Collaborate** menu (Copy Link).
 
 ## How to use
 
@@ -53,6 +69,16 @@ cells -i data.xlsx output.csv --script transform.luau
 cells -i data.csv out.xlsx -e 'setCell("A1", 100)'
 cells -i report.csv -e 'print(getCell("A1").value)'
 ```
+
+### Large CLI output
+
+If a command prints a large payload (script output above a size threshold), the CLI writes the full body under `/tmp` and prints a small JSON pointer on stdout instead of dumping megabytes into the agent context:
+
+```json
+{"path":"/tmp/cells-out-XXXXXX","bytes":123456,"preview":"..."}
+```
+
+Open `path` to read the full output. Small payloads still print inline.
 
 ### Formats
 
