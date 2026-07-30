@@ -537,6 +537,12 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
 
             LOG_DEBUG("[Sync] handleOperations: from=%s received=%zu new=%zu applied=%zu",
                       peerId.toString().c_str(), ops.size(), newOps.size(), applied);
+            if (applied < newOps.size()) {
+                LOG_DEBUG(
+                    "[Sync] handleOperations: %zu op(s) failed to apply (INVALID_TARGET often "
+                    "means col/row missing — axes must be CRDT ops, not local-only)",
+                    newOps.size() - applied);
+            }
         }
 
         // Send ACK with the max HLC we received

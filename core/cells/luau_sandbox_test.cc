@@ -2,8 +2,10 @@
 
 #include <gtest/gtest.h>
 
+#include "core/cells/crdt.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/operation.h"
 
 namespace cells {
 namespace {
@@ -1899,6 +1901,93 @@ TEST(LuauSandboxTest, StyleMerging) {
     EXPECT_TRUE(r2.success) << r2.error;
     // Bold should be preserved from previous style, italic should be new
     EXPECT_EQ(r2.output, "true,true");
+}
+
+// Sparse sheet (only B1) then setCell A1 must emit COL_SET/ROW_SET so a peer
+// can apply the CELL_SET (INVALID_TARGET if axes were local-only).
+TEST(LuauSandboxTest, SetCellCreatesAxesViaCrdtForPeers) {
+    // Peer B: only column B and row 1, cell B1=53 (like browser with B1 filled)
+    auto wb_b = std::make_unique<Workbook>(generate_id(), "B");
+    wb_b->startCollaboration();
+    wb_b->setNodeId(generate_id());
+    auto sheet_b = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet_b->setWorkbook(wb_b.get());
+    Sheet* sb = sheet_b.get();
+    {
+        auto col = std::make_unique<Axis>(generate_id(), sb->id, true);
+        col->position = 1;  // B
+        sb->addColumn(std::move(col));
+        auto row = std::make_unique<Axis>(generate_id(), sb->id, false);
+        row->position = 0;  // 1
+        sb->addRow(std::move(row));
+        auto cell = std::make_unique<Cell>(generate_id(), sb->getColumnByPosition(1)->id,
+                                           sb->getRowByPosition(0)->id);
+        cell->value = CellValue(53.0);
+        sb->addCell(std::move(cell));
+    }
+    wb_b->addSheet(std::move(sheet_b));
+
+    // Peer A: empty sheet, will receive B's structure then setCell A1
+    auto wb_a = std::make_unique<Workbook>(generate_id(), "A");
+    wb_a->startCollaboration();
+    wb_a->setNodeId(generate_id());
+    auto sheet_a = std::make_unique<Sheet>(sb->id, "Sheet1");  // same sheet id
+    sheet_a->setWorkbook(wb_a.get());
+    // Replay B's axes/cells onto A via oplog if any — simpler: clone structure with ops
+    // Copy axes from B by applying COL/ROW/CELL ops built from B
+    for (const auto& colId : sb->getColumnIds()) {
+        Axis* col = sb->getColumn(colId);
+        std::string payload = "{\"pos\":" + std::to_string(col->position) + "}";
+        applyOperation(*wb_a, makeColSetOp(*wb_a, col->id, sb->id, payload));
+    }
+    for (const auto& rowId : sb->getRowIds()) {
+        Axis* row = sb->getRow(rowId);
+        std::string payload = "{\"pos\":" + std::to_string(row->position) + "}";
+        applyOperation(*wb_a, makeRowSetOp(*wb_a, row->id, sb->id, payload));
+    }
+    wb_a->addSheet(std::move(sheet_a));
+    Sheet* sa = wb_a->getSheetByIndex(0);
+
+    // Clear A's oplog of bootstrap — use only setCell-generated ops for peer B
+    // Actually keep workbook B as peer applying ops from A after setCell
+    const size_t ops_before = wb_a->getOpLog()->size();
+
+    LuauSandbox sandbox;
+    sandbox.setContext(wb_a.get(), sa);
+    auto r = sandbox.execute("setCell('A1', 1)");
+    ASSERT_TRUE(r.success) << r.error;
+
+    // New ops on A must include COL_SET for pos 0 (column A did not exist)
+    const auto& all = wb_a->getOpLog()->getAllOperations();
+    bool saw_col = false;
+    bool saw_cell = false;
+    std::vector<Operation> new_ops;
+    for (size_t i = ops_before; i < all.size(); ++i) {
+        new_ops.push_back(all[i]);
+        if (all[i].type == OpType::COL_SET) {
+            saw_col = true;
+        }
+        if (all[i].type == OpType::CELL_SET) {
+            saw_cell = true;
+        }
+    }
+    EXPECT_TRUE(saw_col) << "setCell A1 should emit COL_SET for missing column A";
+    EXPECT_TRUE(saw_cell);
+
+    // B applies A's new ops — must succeed (previously INVALID_TARGET)
+    const size_t applied = applyOperations(*wb_b, new_ops);
+    EXPECT_EQ(applied, new_ops.size()) << "peer must apply all setCell-related ops";
+
+    // A1 on B should now hold 1
+    Sheet* sb2 = wb_b->getSheetByIndex(0);
+    ASSERT_NE(sb2, nullptr);
+    Axis* colA = sb2->getColumnByPosition(0);
+    Axis* row1 = sb2->getRowByPosition(0);
+    ASSERT_NE(colA, nullptr);
+    ASSERT_NE(row1, nullptr);
+    Cell* a1 = sb2->getCellAt(colA->id, row1->id);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.raw, "1");
 }
 
 }  // namespace

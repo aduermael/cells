@@ -49,6 +49,35 @@ namespace cells {
 // Helper functions (shared between API implementations)
 // ============================================================================
 
+// Ensure column/row exist at a grid position via CRDT ops (not local-only
+// getOrCreate). Local-only axis minting makes CELL_SET unapplyable on peers
+// (INVALID_TARGET: unknown col/row ids) — the CLI-writes-invisible-in-browser bug.
+inline Axis* ensureColumnViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position) {
+    Axis* existing = sheet.getColumnByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+    const ID colId = generate_id();
+    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
+    const Operation op = makeColSetOp(workbook, colId, sheet.id, payload);
+    applyOperation(workbook, op);
+    return sheet.getColumn(colId);
+}
+
+inline Axis* ensureRowViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position) {
+    Axis* existing = sheet.getRowByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+    const ID rowId = generate_id();
+    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
+    const Operation op = makeRowSetOp(workbook, rowId, sheet.id, payload);
+    applyOperation(workbook, op);
+    return sheet.getRow(rowId);
+}
+
+
+
 // Helper: Escape a string for JSON
 static std::string jsonEscape(const std::string& str) {
     std::string result;
@@ -325,11 +354,15 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: invalid reference '%s'", ref);
     }
 
-    // Get or create the column and row
-    const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colIdx));
-    const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(rowIdx));
+    // Create missing axes via CRDT so peers can apply the CELL_SET (payload col/row
+    // must exist on every replica). Never use getOrCreate* for collab-safe edits.
+    Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
+    Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
+    if (col == nullptr || row == nullptr) {
+        luaL_error(L, "setCell: failed to ensure column/row for '%s'", ref);
+    }
 
-    // Get or create the cell
+    // Get or create the cell (cell id is then used in makeCellSetOp)
     const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
     // Build payload based on value type

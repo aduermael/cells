@@ -47,6 +47,9 @@ std::string CellsEngine::executeScript(const std::string& script) {
     json << "}";
 
     if (result.success) {
+        // Same as grid edits / CLI session exec: push CRDT ops to collab peers.
+        // Without this, setCell in the script panel only mutates the local workbook.
+        broadcastPendingOperations();
         rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
     }
