@@ -305,7 +305,7 @@ Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and f
 | Real-time collaboration | 🔵 | CRDT + P2P (not Excel) |
 | Presence cursors | 🔵 | |
 | Luau scripting | 🔵 | CLI + web panel |
-| Agent collab via CLI | ✅ | External agents join rooms with `cells sync <url>` |
+| Agent collab via CLI | ✅ | External agents join rooms with `cells session start <url>` (or one-shot `cells sync`) |
 | `.zcd` native format | 🔵 | Git-friendly text CRDT log |
 
 ### Not implemented (Excel has these)

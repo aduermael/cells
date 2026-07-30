@@ -90,11 +90,12 @@ the web UI + signaling yourself.
 | **Docker** | `docker build -t cells-server . && docker run -p 8080:8080 cells-server` |
 | **Local dev** | `bazel run :wasm-dist && bazel run :serve` → http://localhost:8081 |
 
-Point the CLI at any server URL for collab:
+Point the CLI at any server URL for collab (prefer **session** for multi-step agent work):
 
 ```bash
-cells sync --server 'https://cells-app.fly.dev/?room=YOUR_ROOM'
-# or
+cells session start 'https://cells-app.fly.dev/?room=YOUR_ROOM'
+cells session exec SESSION_ID -e 'setCell("A1", 1)'
+# one-shot blocking listen (optional):
 cells sync 'https://your-host/?room=YOUR_ROOM'
 ```
 
@@ -236,11 +237,16 @@ For detailed architecture documentation, see [docs/](./docs/).
 
 Cells does **not** host an in-product AI agent. Humans use the web client; agents use the **CLI** (and the agent skill) like any other tool—Codex, Claude Code, Grok, or anything else.
 
-**Collaborate with an agent:** open the Collaborate menu in the web UI, copy the room link, and give it to an agent. The agent joins via:
+**Collaborate with an agent:** open the Collaborate menu in the web UI, copy the room link, and give it to an agent. The agent starts a long-running **session** so the CLI peer stays connected while it runs multiple scripts:
 
 ```bash
-cells sync '<room-url>'
+cells session start '<room-url>' --name 'CLI Agent'
+cells session exec SESSION_ID -e 'setCell("A1", 42)'
+cells session watch SESSION_ID --duration 30
+cells session stop SESSION_ID
 ```
+
+Sessions auto-stop after idle minutes (default 30; `--idle-minutes N`). For a one-shot blocking listener, `cells sync '<room-url>'` still works.
 
 Install the skill (CLI + docs) with `./install-skill.sh` or see [skill/SKILL.md](./skill/SKILL.md). In this repository, skills are also symlinked for local agent discovery under `.agents/skills/cells`, `.claude/skills/cells`, and `.grok/skills/cells`.
 

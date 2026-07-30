@@ -28,10 +28,17 @@ From the repository root, resolve the CLI in this order and **stop at the first 
 - there is no usable binary, or
 - the user asks to rebuild / refresh the CLI after engine changes.
 
-Invoke the chosen binary for all work (convert, inspect, script, sync):
+Invoke the chosen binary for all work (convert, inspect, script, **session**, sync):
 
 ```bash
 ./dist/cli/cells --help
+# Multi-step collab (preferred for agents):
+./dist/cli/cells session start 'http://localhost:8081/?room=ROOM_ID'
+./dist/cli/cells session exec SESSION_ID -e 'setCell("A1", 1)'
+./dist/cli/cells session watch SESSION_ID --duration 10
+./dist/cli/cells session list
+./dist/cli/cells session stop SESSION_ID
+# One-shot blocking listen (optional):
 ./dist/cli/cells sync 'http://localhost:8081/?room=ROOM_ID'
 ```
 
@@ -53,7 +60,15 @@ engine changes — once it has been built.
    # Use existing binary if present; build only if missing
    CELLS=./dist/cli/cells
    test -x "$CELLS" || bazel run :cli
-   "$CELLS" sync 'http://localhost:8081/?room=ROOM_ID'
+   # Start a long-running session so the CLI peer stays visible in the browser
+   "$CELLS" session start 'http://localhost:8081/?room=ROOM_ID' --name 'CLI Agent'
+   # Use the printed "id" for further commands:
+   "$CELLS" session exec SESSION_ID -e 'setCell("A1", "hello from agent")'
+   "$CELLS" session watch SESSION_ID --duration 60
+   # When done:
+   "$CELLS" session stop SESSION_ID
    ```
 
-The human edits in the web UI; the agent uses the CLI against the same room.
+The human edits in the web UI; the agent uses the CLI session against the same room.
+The session daemon keeps the peer connected between `exec`/`watch` calls (idle
+auto-stop defaults to 30 minutes; override with `--idle-minutes`).

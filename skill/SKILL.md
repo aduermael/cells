@@ -1,6 +1,6 @@
 ---
 name: cells
-description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal. Also used to join collab rooms via cells sync.
+description: Cells is a CLI for spreadsheet work (.xlsx/.csv/.zcd) — an Excel CLI equivalent for converting, inspecting, creating, and transforming workbooks from the terminal. Also used to join collab rooms via long-running sessions (or one-shot cells sync).
 ---
 
 # Cells spreadsheet CLI
@@ -32,9 +32,46 @@ If this skill directory also contains `REPO_LOCAL.md` (present when working from
 | `CELLS_REPO` | GitHub `owner/repo` for release assets |
 | `CELLS_FORCE_INSTALL` | Set `1` to reinstall even if `cells` is on PATH |
 
-## Collaborate via room URL
+## Collaborate via room URL (preferred: sessions)
 
-When a human (or peer) shares a Cells collab link that includes a **room id** (`?room=...` or path `/{room-id}`), join with the CLI:
+When a human (or peer) shares a Cells collab link that includes a **room id** (`?room=...` or path `/{room-id}`), agents should join with a **long-running session**. The CLI peer stays connected so the human sees it in the browser Collaborate UI while you run multiple scripts/actions.
+
+### Multi-step agent workflow (session daemon)
+
+```bash
+# 1) Start a background peer (prints JSON with session id)
+cells session start 'https://example.com/?room=ROOM_ID' --idle-minutes 30 --name 'CLI Agent'
+# → {"id":"a1b2c3d4","url":"...","room":"ROOM_ID",...}
+
+# 2) Run scripts/actions against the live session (no reconnect each time)
+cells session exec a1b2c3d4 -e 'setCell("A1", 42); print(getCell("A1").value)'
+cells session exec a1b2c3d4 --script transform.luau
+
+# 3) Optional: stream room/session events (ops, peers, state)
+cells session watch a1b2c3d4 --duration 30
+
+# 4) Inspect / list / stop
+cells session status a1b2c3d4
+cells session list
+cells session stop a1b2c3d4
+```
+
+| Command | Purpose |
+|---------|---------|
+| `session start <url>` | Fork a daemon, join the room, print `{"id",...}` |
+| `session exec <id> -e` / `--script` | Run Luau on the live workbook and broadcast ops |
+| `session watch <id>` | Stream JSON events (`--duration SECS` to auto-exit) |
+| `session list` | Active sessions (JSON array) |
+| `session status <id>` | Connection state, peers, idle settings |
+| `session stop <id>` | Stop daemon and leave the room |
+
+**Idle timeout:** sessions auto-stop after N minutes with no action (default **30**). Override with `--idle-minutes N` (fractions allowed, e.g. `0.05` ≈ 3s for tests).
+
+**Why sessions?** `cells sync <url>` is a one-shot **blocking** listener (Ctrl+C to exit). For multi-command agent work, **always prefer `session start` + `session exec`** so the peer remains connected between commands.
+
+Give the agent the full URL from the web **Collaborate** menu (Copy Link).
+
+### One-shot sync (optional)
 
 ```bash
 cells sync 'https://example.com/?room=ROOM_ID'
@@ -42,9 +79,7 @@ cells sync 'https://example.com/?room=ROOM_ID'
 cells sync --server 'https://example.com/?room=ROOM_ID'
 ```
 
-That starts CRDT sync so the agent and human edit the same workbook. Prefer `cells --help` for full sync flags (`--apply`, `--send`, `--ops-only`).
-
-Give the agent the full URL from the web **Collaborate** menu (Copy Link).
+Use only when you intentionally want a single blocking process that logs ops until exit. Prefer `cells --help` for full sync flags (`--apply`, `--send`, `--ops-only`).
 
 ## How to use
 
@@ -92,7 +127,7 @@ Open `path` to read the full output. Small payloads still print inline.
 
 ## Scripting
 
-Scripts run with `--script <file>` or `-e '<code>'`. They use the Cells scripting API (`getCell`, `setCell`, sheets, ranges, and more).
+Scripts run with `--script <file>` or `-e '<code>'` (offline convert path), or with `session exec <id> -e` / `--script` (live collab session). They use the Cells scripting API (`getCell`, `setCell`, sheets, ranges, and more).
 
 - **API reference:** [SCRIPTING.md](SCRIPTING.md) — load this before inventing API names
 - **Sample scripts:** [samples/](samples/)
@@ -100,4 +135,6 @@ Scripts run with `--script <file>` or `-e '<code>'`. They use the Cells scriptin
 ```bash
 cells -i data.xlsx out.xlsx --script samples/set-values.luau
 cells -i data.csv -e 'local c = getCell("A1"); print(c and c.value)'
+# Live session (peer stays connected):
+cells session exec SESSION_ID -e 'setCell("A1", 100)'
 ```

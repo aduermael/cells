@@ -31,7 +31,61 @@ cc_test(
     ],
 )
 
-# Full CLI binary with sync support (requires OpenSSL/libdatachannel)
+# Session protocol (pure JSON IPC + room URL + idle timeout)
+cc_library(
+    name = "session_protocol",
+    srcs = ["session_protocol.cc"],
+    hdrs = ["session_protocol.h"],
+    deps = [":output_spill"],
+)
+
+# Session on-disk registry
+cc_library(
+    name = "session_store",
+    srcs = ["session_store.cc"],
+    hdrs = ["session_store.h"],
+    deps = [
+        ":output_spill",
+        ":session_protocol",
+    ],
+)
+
+# Session CLI arg parsing
+cc_library(
+    name = "session_args",
+    srcs = ["session_args.cc"],
+    hdrs = ["session_args.h"],
+    deps = [":session_protocol"],
+)
+
+cc_test(
+    name = "session_protocol_test",
+    srcs = ["session_protocol_test.cc"],
+    deps = [
+        ":session_protocol",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "session_args_test",
+    srcs = ["session_args_test.cc"],
+    deps = [
+        ":session_args",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "session_store_test",
+    srcs = ["session_store_test.cc"],
+    deps = [
+        ":session_store",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# Full CLI binary with sync + session support (requires OpenSSL/libdatachannel)
 cc_binary(
     name = "cells",
     srcs = [
@@ -39,6 +93,8 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
+        "session_command.cc",
+        "session_command.h",
         "sync_command.cc",
         "sync_command.h",
     ],
@@ -52,6 +108,9 @@ cc_binary(
     }),
     deps = [
         ":output_spill",
+        ":session_args",
+        ":session_protocol",
+        ":session_store",
         ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
@@ -79,11 +138,16 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
+        "session_command.h",
+        "session_command_stub.cc",
         "sync_command.h",
         "sync_command_stub.cc",
     ],
     deps = [
         ":output_spill",
+        ":session_args",
+        ":session_protocol",
+        ":session_store",
         ":sync_args",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
