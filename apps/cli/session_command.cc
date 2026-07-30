@@ -431,42 +431,27 @@ private:
     void touch() { last_activity_ms_ = now_mono_ms(); }
 
     // Create default Sheet1 only when we are alone and still have no sheet
-    // after join (no peer document to pull). Never call this while expecting
-    // remote peers — that forks a parallel workbook.
+    // after join (no peer document to pull). Shared helper with WASM.
+    // Never call while peers are connected — that forks a parallel workbook.
     void ensureDefaultSheetViaCrdt() {
-        if (!workbook_ || !workbook_->sheets.empty()) {
+        if (!workbook_) {
             return;
         }
         if (sync_ && sync_->getPeerCount() > 0) {
             return;
         }
-        const ID sheet_id = generate_id();
-        Operation op = makeSheetSetOp(*workbook_, sheet_id, R"({"name":"Sheet1"})");
-        applyOperation(*workbook_, op);
-        if (sync_) {
+        if (::cells::ensureDefaultSheetViaCrdt(*workbook_) && sync_) {
             sync_->broadcastOperations();
         }
     }
 
-    // Prefer the sheet that already has document content (peer-synced), not a
-    // later empty Sheet1 mint.
+    // Prefer the sheet that already has document content (peer-synced).
+    // Shared index helper with WASM active-sheet selection.
     Sheet* pickScriptSheet() {
         if (!workbook_ || workbook_->sheets.empty()) {
             return nullptr;
         }
-        Sheet* best = workbook_->sheets[0].get();
-        size_t best_cells = best ? best->cellCount() : 0;
-        for (const auto& s : workbook_->sheets) {
-            if (!s) {
-                continue;
-            }
-            const size_t n = s->cellCount();
-            if (n > best_cells) {
-                best = s.get();
-                best_cells = n;
-            }
-        }
-        return best;
+        return workbook_->getSheetByIndex(preferredActiveSheetIndex(*workbook_));
     }
 
     void pump_network() {

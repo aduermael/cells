@@ -210,9 +210,10 @@ int run_sync_command(const SyncOptions& opts) {
             // "join, sync, save on exit" without a prior create step.
             // --send still requires an existing file to broadcast.
             if (opts.apply && !opts.send) {
+                // Empty workbook, no Sheet1 — prepareWorkbookForSync (via
+                // startSync) publishes nothing; remote state is pulled, or a
+                // default sheet is minted only if truly alone later.
                 workbook = std::make_unique<Workbook>();
-                auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-                workbook->addSheet(std::move(sheet));
                 if (!opts.quiet) {
                     std::cerr << "Created empty workbook for --apply: " << opts.workbook_file
                               << "\n";
@@ -234,10 +235,8 @@ int run_sync_command(const SyncOptions& opts) {
             }
         }
     } else {
-        // Create empty workbook
+        // Empty workbook for join: no local Sheet1 (shared join policy).
         workbook = std::make_unique<Workbook>();
-        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-        workbook->addSheet(std::move(sheet));
     }
 
     // Create sync client

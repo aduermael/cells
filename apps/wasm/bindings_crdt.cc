@@ -20,7 +20,6 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/hlc.h"
-#include "core/cells/id.h"
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/log/include/Logger.h"
@@ -458,26 +457,14 @@ std::string CellsEngine::startCollaboration() {
         return "{\"error\":\"No workbook\"}";
     }
 
-    if (_workbook->isCollaborating()) {
-        return "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":0}";
-    }
-
-    size_t opCount = 0;
-    // Empty UI shell only: do not publish a competing Sheet1. Content is pulled
-    // from peers (or minted when alone ONLINE). Hosts that already edited have
-    // columns/rows and take the bootstrap path.
-    if (isWorkbookContentEmpty(*_workbook)) {
-        discardEmptyPlaceholderSheets(*_workbook);
-        _workbook->startCollaboration();
-        _activeSheetIndex = 0;
-    } else {
-        _workbook->startCollaboration();
-        opCount = bootstrapOpLog(*_workbook);
-        _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
-    }
+    // Shared policy with CLI (prepareWorkbookForSync): empty → no publish;
+    // content → bootstrap; already collab → no-op.
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*_workbook);
+    _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
 
     std::ostringstream json;
-    json << "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":" << opCount << "}";
+    json << "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":" << prep.bootstrappedOps
+         << "}";
     return json.str();
 }
 
@@ -512,23 +499,6 @@ std::string CellsEngine::enableSync(const std::string& url, const std::string& r
         _syncClient.reset();
     }
 
-    size_t bootstrappedOps = 0;
-    if (!_workbook->isCollaborating()) {
-        // Late joiners start from createEmptyWorkbook()'s empty Sheet1. If we
-        // bootstrap that shell, every peer ends up with two Sheet1s and the
-        // joiner UI stays on the empty one while content lives on the host's.
-        if (isWorkbookContentEmpty(*_workbook)) {
-            discardEmptyPlaceholderSheets(*_workbook);
-            _workbook->startCollaboration();
-            bootstrappedOps = 0;
-            _activeSheetIndex = 0;
-        } else {
-            _workbook->startCollaboration();
-            bootstrappedOps = bootstrapOpLog(*_workbook);
-            _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
-        }
-    }
-
     cells::net::SyncClientConfig config;
     config.signaling_url = url;
 
@@ -536,11 +506,14 @@ std::string CellsEngine::enableSync(const std::string& url, const std::string& r
     _syncClient->setDelegate(this);
 
     // Empty peerId: SyncClient generates one. Non-empty: reuse (e.g. rejoin).
+    // startSync runs prepareWorkbookForSync (shared with CLI): empty join
+    // publishes nothing; local content is bootstrapped; rejoin leaves state.
     _syncClient->startSync(roomId, peerId);
+    _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
 
     std::ostringstream json;
     json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId()
-         << "\",\"bootstrapped\":" << bootstrappedOps << "}";
+         << "\",\"bootstrapped\":" << _syncClient->lastBootstrappedOpCount() << "}";
     return json.str();
 }
 
@@ -743,22 +716,20 @@ std::string CellsEngine::getRemotePresences() {
 // SyncClientDelegate implementation
 // ============================================================================
 
-void CellsEngine::syncClientStateDidChange(cells::net::SyncClient& /*client*/,
+void CellsEngine::syncClientStateDidChange(cells::net::SyncClient& client,
                                             cells::net::SyncClientState newState) {
-    // Alone in a room with no document sheet yet (we stripped the empty UI
-    // placeholder on join): mint default Sheet1 via CRDT so the grid works.
+    // Alone ONLINE with no sheets (empty join and no peers): mint default sheet.
+    // Shared helper; never mint while still expecting remote peers (SyncClient
+    // stays SYNCING until offers arrive / peers leave).
     if (newState == cells::net::SyncClientState::ONLINE && _workbook &&
-        _workbook->sheetCount() == 0) {
-        const ID sheetId = generate_id();
-        const Operation op = makeSheetSetOp(*_workbook, sheetId, R"({"name":"Sheet1"})");
-        applyOperation(*_workbook, op);
-        if (_syncClient) {
-            _syncClient->broadcastOperations();
+        _workbook->sheetCount() == 0 && client.getPeerCount() == 0) {
+        if (ensureDefaultSheetViaCrdt(*_workbook)) {
+            client.broadcastOperations();
+            _activeSheetIndex = 0;
+            rebuildViewportIndex();
+            notifyListeners(ChangeType::SHEET_CHANGED);
+            LOG_INFO("[Sync] Minted default Sheet1 (alone ONLINE, no sheets)");
         }
-        _activeSheetIndex = 0;
-        rebuildViewportIndex();
-        notifyListeners(ChangeType::SHEET_CHANGED);
-        LOG_INFO("[Sync] Minted default Sheet1 (alone ONLINE, no sheets)");
     }
     notifyListeners(ChangeType::SYNC_STATE_CHANGED);
 }

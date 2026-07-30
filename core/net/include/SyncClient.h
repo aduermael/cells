@@ -189,6 +189,9 @@ public:
     [[nodiscard]] const std::string& getPeerId() const { return peer_id_; }
     [[nodiscard]] bool isConnected() const;
 
+    // Ops bootstrapped by the last startSync prepare (0 if empty join / already collab).
+    [[nodiscard]] size_t lastBootstrappedOpCount() const { return last_bootstrapped_ops_; }
+
     // Peer information
     [[nodiscard]] size_t getPeerCount() const;
     [[nodiscard]] std::vector<PeerInfo> getPeers() const;
@@ -332,6 +335,9 @@ private:
     // the first offer). Minting a local Sheet1 in that window creates a second
     // document that never merges with the browser's sheet.
     bool expect_remote_peers_ = false;
+
+    // Result of prepareWorkbookForSync in the last startSync call
+    size_t last_bootstrapped_ops_{0};
 
     // Delegate
     SyncClientDelegate* delegate_ = nullptr;

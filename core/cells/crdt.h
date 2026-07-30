@@ -189,19 +189,42 @@ Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const Form
 // Returns the number of operations created.
 size_t bootstrapOpLog(Workbook& workbook);
 
+// ---------------------------------------------------------------------------
+// Entering collaboration / join (shared by CLI SyncClient and WASM)
+// ---------------------------------------------------------------------------
+// Design:
+//  1) First join with empty local shell: publish NOTHING. Discard UI
+//     placeholders (empty Sheet1) and pull remote state via hello/sync.
+//  2) Local content already exists (edited offline, loaded file): bootstrap
+//     material state into the oplog so peers receive it.
+//  3) Already collaborating: leave state alone — ops are source of truth;
+//     reconnect only reconciles missing ops (compatible existing state).
+
+// Result of prepareWorkbookForSync.
+struct PrepareForSyncResult {
+    size_t bootstrappedOps{0};     // ops written by bootstrap (0 if pull-only)
+    size_t discardedSheets{0};     // empty placeholder sheets removed
+    bool alreadyCollaborating{false};
+};
+
+// Single entry point before P2P sync (called from SyncClient::startSync).
+// See design notes above. Safe to call when already collaborating (no-op).
+PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook);
+
 // True when every sheet has zero columns and zero rows (default empty UI shell).
-// Used to decide whether a peer should publish local state or only pull remote.
 [[nodiscard]] bool isWorkbookContentEmpty(const Workbook& workbook);
 
 // Remove sheets that have no columns and no rows (createEmptyWorkbook placeholders).
-// Call before joining collaboration so a late joiner does not publish a second
-// empty Sheet1 that shadows the host document. Returns number of sheets removed.
+// Prefer prepareWorkbookForSync(); this is exposed for tests.
 size_t discardEmptyPlaceholderSheets(Workbook& workbook);
 
 // Index of the first sheet with columns/cells, or 0 if none / empty workbook.
-// Prefer this as the active sheet after a join so the UI is not stuck on an
-// empty local placeholder while content lives on another sheet.
 [[nodiscard]] size_t preferredActiveSheetIndex(const Workbook& workbook);
+
+// Create default Sheet1 via CRDT when workbook has no sheets (alone in room).
+// Does not check peer connectivity — caller must ensure we are not mid-join
+// waiting for remote state. Returns true if a sheet was created.
+bool ensureDefaultSheetViaCrdt(Workbook& workbook);
 
 // =============================================================================
 // Collab-safe ensure + grid helpers (shared by CLI Luau API and WASM engine)

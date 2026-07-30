@@ -1687,16 +1687,17 @@ TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
                                  "{\"t\":\"s\",\"v\":\"foo\",\"col\":\"" + colId.toString() +
                                      "\",\"row\":\"" + rowId.toString() + "\"}"));
 
-    // Joiner: empty UI shell (createEmptyWorkbook) — strip + no bootstrap
+    // Joiner: empty UI shell — prepareWorkbookForSync (shared CLI/WASM path)
     auto joiner = std::make_unique<Workbook>(generate_id(), "Untitled");
     joiner->setNodeId(generate_id());
     joiner->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
     ASSERT_TRUE(isWorkbookContentEmpty(*joiner));
-    discardEmptyPlaceholderSheets(*joiner);
-    joiner->startCollaboration();
-    // Do NOT bootstrap — matches enableSync empty-shell path
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*joiner);
+    EXPECT_EQ(prep.bootstrappedOps, 0u);
+    EXPECT_GE(prep.discardedSheets, 1u);
     EXPECT_EQ(joiner->sheetCount(), 0u);
     EXPECT_EQ(joiner->getOpLog()->size(), 0u);
+    EXPECT_TRUE(joiner->isCollaborating());
 
     // Apply host ops (full join pull)
     const size_t applied = applyOperations(*joiner, host->getOpLog()->getAllOperations());
@@ -1705,6 +1706,43 @@ TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
     EXPECT_EQ(joiner->sheets[0]->id, hostSheet);
     EXPECT_EQ(preferredActiveSheetIndex(*joiner), 0u);
     EXPECT_EQ(joiner->getSheet(hostSheet)->getCell(cellId)->value.raw, "foo");
+}
+
+TEST(CrdtJoinEmptyShell, PrepareBootstrapsLocalContent) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    const ID sheetId = generate_id();
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(wb.get());
+    wb->addSheet(std::move(sheet));
+    applyOperation(*wb, makeColSetOp(*wb, generate_id(), sheetId, R"({"pos":0})"));
+
+    // Offline edits put ops in oplog; prepare bootstraps material state
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*wb);
+    EXPECT_FALSE(prep.alreadyCollaborating);
+    EXPECT_GE(prep.bootstrappedOps, 1u);
+    EXPECT_TRUE(wb->isCollaborating());
+    EXPECT_FALSE(wb->getOpLog()->empty());
+}
+
+TEST(CrdtJoinEmptyShell, PrepareAlreadyCollaboratingIsNoOp) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+    const size_t before = wb->getOpLog()->size();
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*wb);
+    EXPECT_TRUE(prep.alreadyCollaborating);
+    EXPECT_EQ(prep.bootstrappedOps, 0u);
+    EXPECT_EQ(wb->getOpLog()->size(), before);
+}
+
+TEST(CrdtJoinEmptyShell, EnsureDefaultSheetOnlyWhenEmpty) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+    EXPECT_TRUE(ensureDefaultSheetViaCrdt(*wb));
+    EXPECT_EQ(wb->sheetCount(), 1u);
+    EXPECT_FALSE(ensureDefaultSheetViaCrdt(*wb));  // already has a sheet
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include <random>
 #include <sstream>
 
+#include "core/cells/crdt.h"
 #include "core/cells/hlc.h"
 #include "core/cells/model.h"
 #include "core/cells/sync_manager.h"
@@ -193,11 +194,15 @@ void SyncClient::startSync(const std::string& room_id, const std::string& peer_i
 
     LOG_INFO("[Sync] Starting sync: room=%s peer=%s", room_id_.c_str(), peer_id_.c_str());
 
-    // Set node ID on workbook for HLC generation
+    // Set node ID on workbook for HLC generation before any bootstrap ops
     workbook_->setNodeId(cells::ID(peer_id_));
 
-    // Start collaboration mode
-    workbook_->startCollaboration();
+    // Shared join policy (CLI + WASM): empty shell → publish nothing and pull;
+    // local content → bootstrap; already collab → leave state alone.
+    {
+        const cells::PrepareForSyncResult prep = cells::prepareWorkbookForSync(*workbook_);
+        last_bootstrapped_ops_ = prep.bootstrappedOps;
+    }
 
     // Create SyncManager if not already created
     if (!sync_manager_) {

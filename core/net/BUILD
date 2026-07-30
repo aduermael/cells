@@ -507,6 +507,7 @@ cc_library(
         ":rtc_data_channel",
         ":rtc_peer_connection",
         ":signaling_client",
+        "//core/cells:crdt",
         "//core/cells:hlc",
         "//core/cells:model",
         "//core/cells:sync_manager",

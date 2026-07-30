@@ -934,6 +934,45 @@ size_t preferredActiveSheetIndex(const Workbook& workbook) {
     return 0;
 }
 
+PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook) {
+    PrepareForSyncResult result;
+
+    // Already in collab: existing ops/material state are authoritative.
+    // Rejoin only reconciles missing ops — do not strip or re-bootstrap.
+    if (workbook.isCollaborating()) {
+        result.alreadyCollaborating = true;
+        return result;
+    }
+
+    if (isWorkbookContentEmpty(workbook)) {
+        // First join with empty shell: publish nothing; pull remote (or mint
+        // later if truly alone — see ensureDefaultSheetViaCrdt).
+        result.discardedSheets = discardEmptyPlaceholderSheets(workbook);
+        workbook.startCollaboration();
+        LOG_INFO("[Sync] prepareWorkbookForSync: empty join (discarded %zu placeholder sheet(s), "
+                 "no bootstrap)",
+                 result.discardedSheets);
+        return result;
+    }
+
+    // Local content exists — bootstrap so peers receive the document.
+    workbook.startCollaboration();
+    result.bootstrappedOps = bootstrapOpLog(workbook);
+    LOG_INFO("[Sync] prepareWorkbookForSync: bootstrapped %zu op(s) from local content",
+             result.bootstrappedOps);
+    return result;
+}
+
+bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
+    if (!workbook.sheets.empty()) {
+        return false;
+    }
+    const ID sheetId = generate_id();
+    const Operation op = makeSheetSetOp(workbook, sheetId, R"({"name":"Sheet1"})");
+    applyOperation(workbook, op);
+    return true;
+}
+
 size_t bootstrapOpLog(Workbook& workbook) {
     size_t count = 0;
     OpLog* oplog = workbook.getOpLog();
