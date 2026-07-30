@@ -33,6 +33,6 @@ if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     exit 1
 fi
 
-# Set up standard paths for use by scripts
-REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
-SCRIPT_DIR="$REPO_ROOT/tools"
+# Set up standard paths for use by scripts (export so child helpers inherit them)
+export REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
+export SCRIPT_DIR="$REPO_ROOT/tools"
