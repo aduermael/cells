@@ -1551,10 +1551,9 @@ TEST(CrdtSheetMaterialize, ColRowCellApplyWithoutSheetSet) {
     // Simulate peer_ops=3 without SHEET_SET (historical browser bug)
     Operation colOp = makeColSetOp(*peer, colId, sheetId, R"({"pos":1})");
     Operation rowOp = makeRowSetOp(*peer, rowId, sheetId, R"({"pos":0})");
-    Operation cellOp =
-        makeCellSetOp(*peer, cellId, sheetId,
-                      "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() + "\",\"row\":\"" +
-                          rowId.toString() + "\"}");
+    Operation cellOp = makeCellSetOp(*peer, cellId, sheetId,
+                                     "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() +
+                                         "\",\"row\":\"" + rowId.toString() + "\"}");
 
     // mint HLCs on a temp workbook so ops have valid HLCs
     auto src = std::make_unique<Workbook>(generate_id(), "Src");
@@ -1562,10 +1561,9 @@ TEST(CrdtSheetMaterialize, ColRowCellApplyWithoutSheetSet) {
     src->setNodeId(generate_id());
     colOp = makeColSetOp(*src, colId, sheetId, R"({"pos":1})");
     rowOp = makeRowSetOp(*src, rowId, sheetId, R"({"pos":0})");
-    cellOp = makeCellSetOp(
-        *src, cellId, sheetId,
-        "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() + "\",\"row\":\"" +
-            rowId.toString() + "\"}");
+    cellOp = makeCellSetOp(*src, cellId, sheetId,
+                           "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() +
+                               "\",\"row\":\"" + rowId.toString() + "\"}");
 
     std::vector<Operation> ops = {colOp, rowOp, cellOp};
     const size_t applied = applyOperations(*peer, ops);

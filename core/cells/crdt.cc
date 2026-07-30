@@ -903,8 +903,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
         // COL/ROW/CELL ops that reference sheetId (createEmptyWorkbook does not
         // go through CRDT, so without this bootstrap peer_ops=3 with no sheet).
         {
-            std::string sheetPayload =
-                "{\"name\":\"" + internal::jsonEscape(sheet->name) + "\"}";
+            std::string sheetPayload = "{\"name\":\"" + internal::jsonEscape(sheet->name) + "\"}";
             const Operation sheetOp = makeSheetSetOp(workbook, sheet->id, sheetPayload);
             oplog->addOperation(sheetOp);
             count++;

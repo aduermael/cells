@@ -20,6 +20,7 @@
 #include "core/cells/dependency_graph.h"
 #include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/number_format.h"
 #include "core/cells/style_buffer.h"
 
@@ -114,69 +115,90 @@ ApplyResult applyCellSet(Workbook& workbook, const Operation& op) {
     // Apply value if type is provided
     if (!type_str.empty()) {
         const CellValueType type = charToValueType(type_str[0]);
-        cell->value.type = type;
-        cell->value.error = CellError::NONE;
 
         if (type == CellValueType::FORMULA) {
-            // Clear old formula dependencies before setting new formula
-            DependencyGraph* depGraph = workbook.getDependencyGraph();
-            if (depGraph != nullptr) {
-                depGraph->removeFormula(cell->id);
+            // Style/format helpers re-emit full-state CELL_SET payloads that include
+            // the formula AST for resurrection. If the formula is unchanged, preserve
+            // the computed value and dirty flag — otherwise every setStyle/setFormat
+            // wipes results to empty (value reads as nil until a full recalc).
+            bool sameFormula = false;
+            if (cell->isFormula()) {
+                const Formula* existing = cell->getFormula();
+                if (existing != nullptr && existing->ast != nullptr) {
+                    const std::string existingSerialized =
+                        FormulaSerializer::serialize(existing->ast);
+                    sameFormula = (existingSerialized == value_str);
+                }
             }
 
-            // Parse the UUID formula text to create the AST
-            FormulaParser parser(value_str);
-            std::unique_ptr<ASTNode> ast = parser.parse();
+            if (!sameFormula) {
+                cell->value.type = type;
+                cell->value.error = CellError::NONE;
 
-            // Create the formula object with AST
-            auto* formula = new Formula();
-            formula->ast = ast.release();
-            formula->dirty = true;
-
-            // Add to dependency graph for recalculation tracking if we have valid AST
-            if (formula->ast != nullptr && targetSheet != nullptr) {
+                // Clear old formula dependencies before setting new formula
                 DependencyGraph* depGraph = workbook.getDependencyGraph();
                 if (depGraph != nullptr) {
-                    depGraph->addFormula(cell->id, formula->ast,
-                                         makeWorkbookPositionResolver(&workbook));
+                    depGraph->removeFormula(cell->id);
+                }
 
-                    if (formula->hasVolatile()) {
-                        depGraph->markVolatile(cell->id);
+                // Parse the UUID formula text to create the AST
+                FormulaParser parser(value_str);
+                std::unique_ptr<ASTNode> ast = parser.parse();
+
+                // Create the formula object with AST
+                auto* formula = new Formula();
+                formula->ast = ast.release();
+                formula->dirty = true;
+
+                // Add to dependency graph for recalculation tracking if we have valid AST
+                if (formula->ast != nullptr && targetSheet != nullptr) {
+                    DependencyGraph* graph = workbook.getDependencyGraph();
+                    if (graph != nullptr) {
+                        graph->addFormula(cell->id, formula->ast,
+                                          makeWorkbookPositionResolver(&workbook));
+
+                        if (formula->hasVolatile()) {
+                            graph->markVolatile(cell->id);
+                        }
+                    }
+                }
+
+                cell->setFormula(formula);
+                cell->value.raw = "";
+
+                // Format inheritance for formulas
+                const bool hasFormat = workbook.hasEntityFormat(cell->id);
+                if (!hasFormat && formula->ast != nullptr && format_str.empty()) {
+                    const FormatLookup formatLookup =
+                        [&workbook](const std::string& cellIdStr) -> std::string {
+                        const ID cellId(cellIdStr);
+                        const Cell* refCell = workbook.getCell(cellId);
+                        if (refCell == nullptr) {
+                            return "";
+                        }
+                        const FormatBuffer* fmt = workbook.getEntityFormat(refCell->id);
+                        if (fmt == nullptr || fmt->isEmpty()) {
+                            return "";
+                        }
+                        return fmt->toFormatCode();
+                    };
+
+                    const std::string inheritedFormatCode =
+                        inferFormatFromFormula(formula->ast, formatLookup);
+                    if (!inheritedFormatCode.empty()) {
+                        auto maybeFormat = FormatBuffer::fromFormatCode(inheritedFormatCode);
+                        if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
+                            workbook.setEntityFormat(cell->id, *maybeFormat);
+                            cell->markHasFormat();
+                        }
                     }
                 }
             }
-
-            cell->setFormula(formula);
-            cell->value.raw = "";
-
-            // Format inheritance for formulas
-            const bool hasFormat = workbook.hasEntityFormat(cell->id);
-            if (!hasFormat && formula->ast != nullptr && format_str.empty()) {
-                const FormatLookup formatLookup =
-                    [&workbook](const std::string& cellIdStr) -> std::string {
-                    const ID cellId(cellIdStr);
-                    const Cell* refCell = workbook.getCell(cellId);
-                    if (refCell == nullptr) {
-                        return "";
-                    }
-                    const FormatBuffer* fmt = workbook.getEntityFormat(refCell->id);
-                    if (fmt == nullptr || fmt->isEmpty()) {
-                        return "";
-                    }
-                    return fmt->toFormatCode();
-                };
-
-                const std::string inheritedFormatCode =
-                    inferFormatFromFormula(formula->ast, formatLookup);
-                if (!inheritedFormatCode.empty()) {
-                    auto maybeFormat = FormatBuffer::fromFormatCode(inheritedFormatCode);
-                    if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
-                        workbook.setEntityFormat(cell->id, *maybeFormat);
-                        cell->markHasFormat();
-                    }
-                }
-            }
+            // sameFormula: leave value/formula/deps untouched; style/format apply below
         } else {
+            cell->value.type = type;
+            cell->value.error = CellError::NONE;
+
             // Clear formula if it was a formula cell
             if (cell->formula != nullptr) {
                 DependencyGraph* depGraph = workbook.getDependencyGraph();

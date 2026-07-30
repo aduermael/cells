@@ -34,6 +34,7 @@
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/format_buffer.h"
+#include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
@@ -151,7 +152,8 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
     }
 
     const ID cellId(uuidStr);
-    const Cell* cell = sheet->getCell(cellId);
+    // Non-const: .value may need to evaluate a dirty formula in place
+    Cell* cell = sheet->getCell(cellId);
     if (cell == nullptr) {
         luaL_error(L, "%s: cell not found", key);
     }
@@ -171,6 +173,13 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
 
     // Handle .value property - always fetch from model
     if (strcmp(key, "value") == 0) {
+        // Evaluate dirty formulas on read so agents see computed values even if
+        // a prior style/format full-state op (or remote apply) left the formula dirty.
+        Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->dirty && formula->ast != nullptr) {
+            evaluateCell(sheet, cell);
+        }
+
         const CellValue& value = cell->value;
         switch (value.type) {
             case CellValueType::NUMBER:

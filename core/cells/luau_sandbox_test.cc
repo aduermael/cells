@@ -1927,14 +1927,15 @@ TEST(LuauSandboxTest, SetCellCreatesAxesViaCrdtForPeers) {
     }
     wb_b->addSheet(std::move(sheet_b));
 
-    // Peer A: empty sheet, will receive B's structure then setCell A1
+    // Peer A: same sheet id as B; register sheet before replaying axes so COL/ROW
+    // ops attach to this Sheet* (not a second sheet materialized by ensureSheetForOp).
     auto wb_a = std::make_unique<Workbook>(generate_id(), "A");
     wb_a->startCollaboration();
     wb_a->setNodeId(generate_id());
     auto sheet_a = std::make_unique<Sheet>(sb->id, "Sheet1");  // same sheet id
     sheet_a->setWorkbook(wb_a.get());
-    // Replay B's axes/cells onto A via oplog if any — simpler: clone structure with ops
-    // Copy axes from B by applying COL/ROW/CELL ops built from B
+    wb_a->addSheet(std::move(sheet_a));
+    Sheet* sa = wb_a->getSheetByIndex(0);
     for (const auto& colId : sb->getColumnIds()) {
         Axis* col = sb->getColumn(colId);
         std::string payload = "{\"pos\":" + std::to_string(col->position) + "}";
@@ -1945,8 +1946,6 @@ TEST(LuauSandboxTest, SetCellCreatesAxesViaCrdtForPeers) {
         std::string payload = "{\"pos\":" + std::to_string(row->position) + "}";
         applyOperation(*wb_a, makeRowSetOp(*wb_a, row->id, sb->id, payload));
     }
-    wb_a->addSheet(std::move(sheet_a));
-    Sheet* sa = wb_a->getSheetByIndex(0);
 
     // Clear A's oplog of bootstrap — use only setCell-generated ops for peer B
     // Actually keep workbook B as peer applying ops from A after setCell
@@ -1988,6 +1987,184 @@ TEST(LuauSandboxTest, SetCellCreatesAxesViaCrdtForPeers) {
     Cell* a1 = sb2->getCellAt(colA->id, row1->id);
     ASSERT_NE(a1, nullptr);
     EXPECT_EQ(a1->value.raw, "1");
+}
+
+// Spacer rows: setRowHeight must create the row via CRDT (no "row not found")
+TEST(LuauSandboxTest, SetRowHeightCreatesMissingRow) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    // createTestWorkbook only has rows 1-3; row 10 must be created
+    ASSERT_EQ(sheet->getRowByPosition(9), nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto r = sandbox.execute("setRowHeight(10, {height=48})");
+    EXPECT_TRUE(r.success) << r.error;
+
+    const Axis* row = sheet->getRowByPosition(9);
+    ASSERT_NE(row, nullptr);
+    EXPECT_EQ(row->size, 48u);
+}
+
+// setColumnWidth must create missing columns via CRDT
+TEST(LuauSandboxTest, SetColumnWidthCreatesMissingColumn) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    // Only A,B,C exist; column Z must be created
+    ASSERT_EQ(sheet->getColumnByPosition(25), nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto r = sandbox.execute("setColumnWidth('Z', {width=120})");
+    EXPECT_TRUE(r.success) << r.error;
+
+    const Axis* col = sheet->getColumnByPosition(25);
+    ASSERT_NE(col, nullptr);
+    EXPECT_EQ(col->size, 120u);
+}
+
+// Style/format on formula cells must not wipe computed values (agent collab bug)
+TEST(LuauSandboxTest, StyleDoesNotWipeFormulaValue) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto setup = sandbox.execute(R"(
+        setCell('D5', 10)
+        setCell('D6', 20)
+        setCell('D7', 30)
+        setCell('D14', '=SUM(D5:D7)')
+        return getCell('D14').value
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+    EXPECT_EQ(setup.output, "60");
+
+    auto style = sandbox.execute(R"(
+        setStyle('D5:D14', {bold=true, bgColor="#EEF2FF"})
+        setFormat('D5:D14', 'FMT_N002')
+        return getCell('D14').value
+    )");
+    EXPECT_TRUE(style.success) << style.error;
+    EXPECT_EQ(style.output, "60") << "SUM value must survive style/format ops";
+
+    auto formula = sandbox.execute("return getCell('D14').formula");
+    EXPECT_TRUE(formula.success) << formula.error;
+    EXPECT_EQ(formula.output, "=SUM(D5:D7)");
+}
+
+// SUM over formula cells (chained) must recompute after styles
+TEST(LuauSandboxTest, SumOfFormulaCellsAfterStyle) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto r = sandbox.execute(R"(
+        setCell('E5', 0.25)
+        setCell('E6', 0.25)
+        setCell('E7', 0.50)
+        setCell('F5', '=E5')
+        setCell('F6', '=E6')
+        setCell('F7', '=E7')
+        setCell('E14', '=SUM(F5:F7)')
+        setStyle('E5:F14', {bold=true})
+        setFormat('E5:F14', 'FMT_P002')
+        return tostring(getCell('E14').value) .. ',' .. tostring(getCell('F5').value)
+    )");
+    EXPECT_TRUE(r.success) << r.error;
+    EXPECT_EQ(r.output, "1,0.25")
+        << "SUM of formula cells and individuals must stay valid after style";
+}
+
+// Blank cells in SUM ranges are treated as 0 (Excel-compatible)
+TEST(LuauSandboxTest, SumWithBlankCellsInRange) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto r = sandbox.execute(R"(
+        setCell('G5', 100)
+        -- G6 left blank
+        setCell('G7', 50)
+        setCell('G12', '=SUM(G5:G7)')
+        return getCell('G12').value
+    )");
+    EXPECT_TRUE(r.success) << r.error;
+    EXPECT_EQ(r.output, "150") << "blanks in SUM range must not break aggregate";
+}
+
+// Heavy style flood after formulas (agent demo order-of-ops) must leave values intact
+TEST(LuauSandboxTest, HeavyStyleAfterFormulasKeepsValues) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto r = sandbox.execute(R"(
+        setCell('D5', 1000)
+        setCell('D6', 2000)
+        setCell('D7', 3000)
+        setCell('D8', 4000)
+        setCell('E5', '=D5/10000')
+        setCell('E6', '=D6/10000')
+        setCell('E7', '=D7/10000')
+        setCell('E8', '=D8/10000')
+        setCell('D14', '=SUM(D5:D8)')
+        setCell('E14', '=SUM(E5:E8)')
+        setCell('D15', '=D5/D14')
+        -- spacer row height on never-created row
+        setRowHeight(3, {height=12})
+        setColumnWidth('D', {width=140})
+        setColumnWidth('E', {width=100})
+        setStyle('D5:E15', {fontSize=11})
+        setFormat('D5:D14', 'FMT_C002')
+        setFormat('E5:E14', 'FMT_P002')
+        setStyle('D14:E15', {bold=true})
+        return table.concat({
+            tostring(getCell('D14').value),
+            tostring(getCell('E14').value),
+            tostring(getCell('D15').value),
+            tostring(getCell('E5').value),
+        }, ',')
+    )");
+    EXPECT_TRUE(r.success) << r.error;
+    EXPECT_EQ(r.output, "10000,1,0.1,0.1");
+}
+
+// setRowHeight on missing row emits ROW_SET so peers can apply it
+TEST(LuauSandboxTest, SetRowHeightEmitsCrdtForPeers) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    const size_t opsBefore = workbook->getOpLog()->size();
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    auto r = sandbox.execute("setRowHeight(20, {height=36})");
+    ASSERT_TRUE(r.success) << r.error;
+
+    const auto& all = workbook->getOpLog()->getAllOperations();
+    bool sawRow = false;
+    for (size_t i = opsBefore; i < all.size(); ++i) {
+        if (all[i].type == OpType::ROW_SET) {
+            sawRow = true;
+        }
+    }
+    EXPECT_TRUE(sawRow) << "setRowHeight on missing row must emit ROW_SET";
 }
 
 }  // namespace
