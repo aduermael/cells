@@ -18,6 +18,11 @@
 #include <windows.h>
 #include <winhttp.h>
 
+// winnt.h defines DELETE as an access mask; avoid polluting later includes.
+#ifdef DELETE
+#undef DELETE
+#endif
+
 #include "core/net/include/WSConnection.h"
 #include "core/net/windows/ws_worker_state.h"
 

@@ -19,6 +19,11 @@
 #include <windows.h>
 #include <winhttp.h>
 
+// winnt.h defines DELETE as an access mask; collides with HttpMethod::DELETE.
+#ifdef DELETE
+#undef DELETE
+#endif
+
 #include "core/net/include/HttpRequest.h"
 
 #pragma comment(lib, "winhttp.lib")
