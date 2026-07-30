@@ -48,8 +48,8 @@ platform_id() {
   esac
 }
 
-# True if path is a native binary (not a #! script / Node shim).
-is_native_binary() {
+# True if path is a native binary for this machine (not a #! script / wrong-arch).
+is_usable_esbuild() {
   local p="$1"
   [ -f "$p" ] && [ -x "$p" ] || return 1
   # JS/shell wrappers start with a shebang; the real Go binary does not.
@@ -58,22 +58,26 @@ is_native_binary() {
   if [ "$magic" = "#!" ]; then
     return 1
   fi
+  # Reject wrong-arch / broken binaries ("cannot execute binary file").
+  if ! "$p" --version >/dev/null 2>&1; then
+    return 1
+  fi
   return 0
 }
 
 find_esbuild() {
   if [ -n "${ESBUILD:-}" ]; then
-    if is_native_binary "$ESBUILD"; then
+    if is_usable_esbuild "$ESBUILD"; then
       printf '%s\n' "$ESBUILD"
       return 0
     fi
-    echo "Warning: ESBUILD=$ESBUILD is not a native binary; ignoring." >&2
+    echo "Warning: ESBUILD=$ESBUILD is not a usable native esbuild; ignoring." >&2
   fi
 
   if command -v esbuild >/dev/null 2>&1; then
     local on_path
     on_path="$(command -v esbuild)"
-    if is_native_binary "$on_path"; then
+    if is_usable_esbuild "$on_path"; then
       printf '%s\n' "$on_path"
       return 0
     fi
@@ -81,15 +85,22 @@ find_esbuild() {
 
   local plat nm_bin
   plat="$(platform_id)" || return 1
-  # Real binary lives in the optional platform package, not esbuild/bin/esbuild.
+  # Prefer the platform package (always the real Go binary when present).
   nm_bin="$wasm_dir/node_modules/@esbuild/$plat/bin/esbuild"
-  if is_native_binary "$nm_bin"; then
+  if is_usable_esbuild "$nm_bin"; then
+    printf '%s\n' "$nm_bin"
+    return 0
+  fi
+  # Some npm installs also place a native copy under esbuild/bin/ — accept only
+  # if it actually runs (skip JS shims and wrong-arch leftovers).
+  nm_bin="$wasm_dir/node_modules/esbuild/bin/esbuild"
+  if is_usable_esbuild "$nm_bin"; then
     printf '%s\n' "$nm_bin"
     return 0
   fi
 
   local cache_bin="$REPO_ROOT/tmp/esbuild/${esbuild_version}/esbuild"
-  if is_native_binary "$cache_bin"; then
+  if is_usable_esbuild "$cache_bin"; then
     printf '%s\n' "$cache_bin"
     return 0
   fi
@@ -121,8 +132,8 @@ download_esbuild() {
   tar -xzf "$tmp/esbuild.tgz" -C "$tmp" package/bin/esbuild
   mv "$tmp/package/bin/esbuild" "$cache_bin"
   chmod +x "$cache_bin"
-  if ! is_native_binary "$cache_bin"; then
-    echo "Error: downloaded esbuild does not look like a native binary: $cache_bin" >&2
+  if ! is_usable_esbuild "$cache_bin"; then
+    echo "Error: downloaded esbuild is not runnable on this machine: $cache_bin" >&2
     exit 1
   fi
   echo "Cached esbuild at $cache_bin" >&2
