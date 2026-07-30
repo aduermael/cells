@@ -353,6 +353,25 @@ size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops) {
         if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
             result == ApplyResult::RESURRECTED) {
             applied++;
+        } else {
+            // INVALID_TARGET usually means col/row missing (peer never got COL_SET/ROW_SET)
+            const char* why = "OTHER";
+            switch (result) {
+                case ApplyResult::ALREADY_APPLIED:
+                    why = "ALREADY_APPLIED";
+                    break;
+                case ApplyResult::INVALID_TARGET:
+                    why = "INVALID_TARGET";
+                    break;
+                case ApplyResult::INVALID_PAYLOAD:
+                    why = "INVALID_PAYLOAD";
+                    break;
+                default:
+                    break;
+            }
+            LOG_DEBUG("[CRDT] apply failed %s op=%s target=%s sheet=%s payload=%.80s", why,
+                      opTypeToString(op.type), op.target_id.toString().c_str(),
+                      op.sheetId.toString().c_str(), op.payload.c_str());
         }
     }
 

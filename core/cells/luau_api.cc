@@ -354,16 +354,18 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: invalid reference '%s'", ref);
     }
 
-    // Create missing axes via CRDT so peers can apply the CELL_SET (payload col/row
-    // must exist on every replica). Never use getOrCreate* for collab-safe edits.
+    // Same as WASM CellsEngine::createCell: missing axes must be CRDT ops.
+    // getOrCreateColumnByPosition only mutates local state — peers then reject
+    // CELL_SET with INVALID_TARGET (empty A1 fails; updating existing B1 works).
     Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
     Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
     if (col == nullptr || row == nullptr) {
         luaL_error(L, "setCell: failed to ensure column/row for '%s'", ref);
     }
 
-    // Get or create the cell (cell id is then used in makeCellSetOp)
-    const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+    // Prefer existing cell id; otherwise mint id (cell is created by applyOperation)
+    Cell* existingCell = sheet->getCellAt(col->id, row->id);
+    const ID cellId = existingCell != nullptr ? existingCell->id : generate_id();
 
     // Build payload based on value type
     std::string payload;
@@ -371,15 +373,18 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     const std::string rowIdStr = row->id.toString();
 
     // Helper to append existing style/format for full-state resurrection correctness
-    auto appendStyleFormat = [&payload, &workbook, &cell]() {
-        if (cell->hasStyle()) {
-            const StyleBuffer* sty = workbook->getEntityStyle(cell->id);
+    auto appendStyleFormat = [&payload, &workbook, &cellId, existingCell]() {
+        if (existingCell == nullptr) {
+            return;
+        }
+        if (existingCell->hasStyle()) {
+            const StyleBuffer* sty = workbook->getEntityStyle(cellId);
             if (sty) {
                 payload += R"(,"sty":")" + sty->toBase64() + R"(")";
             }
         }
-        if (cell->hasFormat()) {
-            const FormatBuffer* fmt = workbook->getEntityFormat(cell->id);
+        if (existingCell->hasFormat()) {
+            const FormatBuffer* fmt = workbook->getEntityFormat(cellId);
             if (fmt) {
                 payload += R"(,"fmt":")" + fmt->toBase64() + R"(")";
             }
@@ -467,10 +472,10 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                     DependencyGraph* depGraph = sheet->getDependencyGraph();
                     if (depGraph != nullptr) {
                         // First remove any existing dependencies for this cell
-                        depGraph->removeFormula(cell->id);
+                        depGraph->removeFormula(cellId);
 
                         // Add new dependencies with position resolver
-                        depGraph->addFormula(cell->id, ast.get(), [sheet](const ID& cellIdArg) {
+                        depGraph->addFormula(cellId, ast.get(), [sheet](const ID& cellIdArg) {
                             const Cell* depCell = sheet->getCell(cellIdArg);
                             if (depCell == nullptr) {
                                 return std::make_pair(static_cast<int32_t>(-1),
@@ -488,9 +493,9 @@ int LuauSandbox::luaCellSet(lua_State* L) {
 
                         // Mark as volatile if needed
                         if (FormulaResolver::containsVolatileFunction(ast.get())) {
-                            depGraph->markVolatile(cell->id);
+                            depGraph->markVolatile(cellId);
                         } else {
-                            depGraph->unmarkVolatile(cell->id);
+                            depGraph->unmarkVolatile(cellId);
                         }
                     }
                 }
@@ -510,18 +515,21 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         payload += "}";
     } else if (lua_isnil(L, 2) != 0) {
         // Clear the cell - remove from dependency graph first
+        if (existingCell == nullptr) {
+            return 0;  // nothing to clear
+        }
         DependencyGraph* depGraph = sheet->getDependencyGraph();
         if (depGraph != nullptr) {
-            depGraph->removeFormula(cell->id);
-            depGraph->unmarkVolatile(cell->id);
+            depGraph->removeFormula(cellId);
+            depGraph->unmarkVolatile(cellId);
         }
 
-        const Operation op = makeCellDeleteOp(*workbook, cell->id);
+        const Operation op = makeCellDeleteOp(*workbook, cellId);
         applyOperation(*workbook, op);
 
         // Trigger recalculation for dependents
-        markDirty(sheet, cell->id);
-        const std::vector<ID> changed = {cell->id};
+        markDirty(sheet, cellId);
+        const std::vector<ID> changed = {cellId};
         cells::recalculate(workbook, changed);
         cells::recalculateVolatile(sheet);
         return 0;
@@ -529,14 +537,15 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: unsupported value type");
     }
 
-    // Apply the operation via CRDT
-    const Operation op = makeCellSetOp(*workbook, cell->id, payload);
+    // Apply via CRDT with sheet id (matches WASM createCell) so peers apply on the
+    // correct sheet and create the cell if missing.
+    const Operation op = makeCellSetOp(*workbook, cellId, sheet->id, payload);
     applyOperation(*workbook, op);
 
     // Trigger recalculation: mark dependents dirty and recalculate
     // This ensures formulas that depend on this cell get updated
-    markDirty(sheet, cell->id);
-    const std::vector<ID> changed = {cell->id};
+    markDirty(sheet, cellId);
+    const std::vector<ID> changed = {cellId};
     cells::recalculate(workbook, changed);
     cells::recalculateVolatile(sheet);
 
