@@ -31,6 +31,14 @@ bazel_dep(name = "pugixml", version = "1.14")
 # Apple platform rules (for Objective-C++ support on macOS/iOS)
 bazel_dep(name = "rules_apple", version = "4.3.3")
 
+# rules_apple pulls rules_swift@2.4.0, whose Windows autoconfig hard-fails when
+# swiftc.exe is absent. 2.9.0+ treats that as optional (needed for Windows CI
+# of pure C++/WinHTTP targets that never use Swift).
+single_version_override(
+    module_name = "rules_swift",
+    version = "2.9.0",
+)
+
 # Hedron's Compile Commands Extractor
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(

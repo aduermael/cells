@@ -123,7 +123,8 @@ cc_library(
     name = "http_request_winhttp",
     srcs = ["windows/HttpRequest_winhttp.cc"],
     hdrs = ["include/HttpRequest.h"],
-    copts = ["-std=c++17"],
+    # MSVC only (target is Windows-compatible); GCC-style -std= is rejected by cl.exe
+    copts = ["/std:c++17"],
     includes = ["."],
     linkopts = ["winhttp.lib"],
     target_compatible_with = ["@platforms//os:windows"],
@@ -160,7 +161,8 @@ cc_library(
     srcs = ["windows/WSConnection_winhttp.cc"],
     hdrs = ["include/WSConnection.h"],
     alwayslink = True,
-    copts = ["-std=c++17"],
+    # MSVC only (target is Windows-compatible); GCC-style -std= is rejected by cl.exe
+    copts = ["/std:c++17"],
     includes = ["."],
     linkopts = ["winhttp.lib"],
     target_compatible_with = ["@platforms//os:windows"],

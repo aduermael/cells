@@ -9,6 +9,9 @@ build:macos --cxxopt=-std=c++17
 # Linux-specific settings
 build:linux --cxxopt=-std=c++17
 
+# Windows-specific settings (MSVC)
+build:windows --cxxopt=/std:c++17
+
 # WebAssembly (Emscripten) build configuration
 build:wasm --incompatible_enable_cc_toolchain_resolution
 build:wasm --cxxopt=-fexceptions
