@@ -11,9 +11,13 @@
 namespace cells {
 namespace {
 
+// Portable pi (MSVC does not define M_PI without _USE_MATH_DEFINES).
+constexpr double kPi = 3.14159265358979323846;
+constexpr double kPiOver2 = kPi / 2.0;
+
 // Pre-computed conversion constants (matches Excel's computation order)
-constexpr double kDegreesToRadians = M_PI / 180.0;
-constexpr double kRadiansToDegrees = 180.0 / M_PI;
+constexpr double kDegreesToRadians = kPi / 180.0;
+constexpr double kRadiansToDegrees = 180.0 / kPi;
 
 // Round half away from zero to nearest integer (Excel ROUND(..., 0)).
 double roundHalfAwayFromZero(double value) {
@@ -677,7 +681,7 @@ EvalResult fn_SQRTPI(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (val < 0.0) {
         return EvalResult::Error(CellError::NUM);
     }
-    return EvalResult::Number(excelNormalize(std::sqrt(val * M_PI)));
+    return EvalResult::Number(excelNormalize(std::sqrt(val * kPi)));
 }
 
 EvalResult fn_CEILING_MATH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -1146,7 +1150,7 @@ EvalResult fn_PI(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) 
     if (!args.empty()) {
         return EvalResult::Error(CellError::VALUE);
     }
-    return EvalResult::Number(M_PI);
+    return EvalResult::Number(kPi);
 }
 
 EvalResult fn_SIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -1440,7 +1444,7 @@ EvalResult fn_ACOT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     }
 
     // Excel ACOT range is (0, π]: π/2 - atan(x).
-    return EvalResult::Number(excelNormalize(M_PI_2 - std::atan(num.getNumber())));
+    return EvalResult::Number(excelNormalize(kPiOver2 - std::atan(num.getNumber())));
 }
 
 EvalResult fn_ACOTH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
