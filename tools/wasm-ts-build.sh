@@ -3,10 +3,13 @@
 #
 # Node/npm are NOT required. esbuild is a native binary (Go); we call it
 # directly. Resolution order:
-#   1. ESBUILD env override
-#   2. esbuild on PATH
-#   3. apps/wasm/node_modules/@esbuild/<platform>/bin/esbuild (if present)
+#   1. ESBUILD env override (must be a real native binary)
+#   2. esbuild on PATH (native only — not the npm JS shim)
+#   3. apps/wasm/node_modules/@esbuild/<platform>/bin/esbuild
 #   4. Cached binary under $REPO_ROOT/tmp/esbuild/ (auto-downloaded once)
+#
+# Note: apps/wasm/node_modules/esbuild/bin/esbuild is a Node JS shim and is
+# never used (it fails with "cannot execute binary file" without Node).
 #
 # Version is pinned to apps/wasm/package.json "esbuild" dep (single source of truth).
 #
@@ -45,34 +48,49 @@ platform_id() {
   esac
 }
 
+# True if path is a native binary (not a #! script / Node shim).
+is_native_binary() {
+  local p="$1"
+  [ -f "$p" ] && [ -x "$p" ] || return 1
+  # JS/shell wrappers start with a shebang; the real Go binary does not.
+  local magic
+  magic="$(head -c 2 "$p" 2>/dev/null || true)"
+  if [ "$magic" = "#!" ]; then
+    return 1
+  fi
+  return 0
+}
+
 find_esbuild() {
-  if [ -n "${ESBUILD:-}" ] && [ -x "$ESBUILD" ]; then
-    echo "$ESBUILD"
-    return 0
+  if [ -n "${ESBUILD:-}" ]; then
+    if is_native_binary "$ESBUILD"; then
+      printf '%s\n' "$ESBUILD"
+      return 0
+    fi
+    echo "Warning: ESBUILD=$ESBUILD is not a native binary; ignoring." >&2
   fi
+
   if command -v esbuild >/dev/null 2>&1; then
-    command -v esbuild
-    return 0
-  fi
-  local plat
-  plat="$(platform_id)" || return 1
-  local nm_bin="$wasm_dir/node_modules/@esbuild/$plat/bin/esbuild"
-  if [ -x "$nm_bin" ]; then
-    echo "$nm_bin"
-    return 0
-  fi
-  # Legacy layout some npm installs use
-  local nm_legacy="$wasm_dir/node_modules/esbuild/bin/esbuild"
-  if [ -x "$nm_legacy" ]; then
-    # This is often a JS shim; only use if it is a real binary
-    if file "$nm_legacy" 2>/dev/null | grep -qiE 'ELF|Mach-O|executable'; then
-      echo "$nm_legacy"
+    local on_path
+    on_path="$(command -v esbuild)"
+    if is_native_binary "$on_path"; then
+      printf '%s\n' "$on_path"
       return 0
     fi
   fi
+
+  local plat nm_bin
+  plat="$(platform_id)" || return 1
+  # Real binary lives in the optional platform package, not esbuild/bin/esbuild.
+  nm_bin="$wasm_dir/node_modules/@esbuild/$plat/bin/esbuild"
+  if is_native_binary "$nm_bin"; then
+    printf '%s\n' "$nm_bin"
+    return 0
+  fi
+
   local cache_bin="$REPO_ROOT/tmp/esbuild/${esbuild_version}/esbuild"
-  if [ -x "$cache_bin" ]; then
-    echo "$cache_bin"
+  if is_native_binary "$cache_bin"; then
+    printf '%s\n' "$cache_bin"
     return 0
   fi
   return 1
@@ -86,7 +104,7 @@ download_esbuild() {
   tgz_url="https://registry.npmjs.org/@esbuild/${plat}/-/${plat}-${esbuild_version}.tgz"
 
   if ! command -v curl >/dev/null 2>&1; then
-    echo "Error: curl is required to download esbuild (or install esbuild another way)." >&2
+    echo "Error: curl is required to download esbuild (or set ESBUILD to a native binary)." >&2
     exit 1
   fi
   if ! command -v tar >/dev/null 2>&1; then
@@ -103,6 +121,10 @@ download_esbuild() {
   tar -xzf "$tmp/esbuild.tgz" -C "$tmp" package/bin/esbuild
   mv "$tmp/package/bin/esbuild" "$cache_bin"
   chmod +x "$cache_bin"
+  if ! is_native_binary "$cache_bin"; then
+    echo "Error: downloaded esbuild does not look like a native binary: $cache_bin" >&2
+    exit 1
+  fi
   echo "Cached esbuild at $cache_bin" >&2
   # Only the path goes to stdout (callers capture it).
   printf '%s\n' "$cache_bin"
@@ -110,7 +132,7 @@ download_esbuild() {
 
 resolve_esbuild() {
   if bin="$(find_esbuild)"; then
-    echo "$bin"
+    printf '%s\n' "$bin"
     return 0
   fi
   download_esbuild
