@@ -96,3 +96,21 @@ jobs:
 
       - name: Run vet
         run: ./tools/vet.sh
+
+  # Compile/link Windows WinHTTP HTTP + WebSocket backends (not exercised on Linux).
+  windows-net:
+    name: Windows net backends
+    runs-on: windows-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-windows
+          repository-cache: true
+
+      - name: Build WinHTTP HTTP and WebSocket libraries
+        run: bazel build //core/net:http_request_winhttp //core/net:ws_connection_winhttp
