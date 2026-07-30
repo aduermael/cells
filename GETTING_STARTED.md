@@ -8,7 +8,7 @@ This guide covers how to build, test, and develop the Cells spreadsheet engine.
 - **Clang** - C++17 compiler
 - **clang-format** - code formatting
 - **clang-tidy** - static analysis (optional)
-- **Node.js** (optional) - only for the web UI (`bazel run :wasm`). Bundles TypeScript with esbuild. The **npm CLI is not required at build time**; a one-time `(cd apps/wasm && npm ci)` installs esbuild. CLI builds need neither Node nor npm.
+- **Node.js / npm** — **not required** for CLI or web builds. The web UI TypeScript step uses the **esbuild native binary** (auto-downloaded once into `tmp/esbuild/` if missing; only needs `curl`).
 
 ### macOS
 

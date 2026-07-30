@@ -1,11 +1,16 @@
 #!/bin/bash
 # Bundle apps/wasm TypeScript into dist/wasm/{main,worker}.js via esbuild.
 #
-# Requires: Node.js on PATH, and apps/wasm/node_modules (esbuild).
-# Does NOT require the npm CLI at build time — only `node` runs the bundler.
-# One-time dependency install still uses npm/pnpm/yarn (see message below).
+# Node/npm are NOT required. esbuild is a native binary (Go); we call it
+# directly. Resolution order:
+#   1. ESBUILD env override
+#   2. esbuild on PATH
+#   3. apps/wasm/node_modules/@esbuild/<platform>/bin/esbuild (if present)
+#   4. Cached binary under $REPO_ROOT/tmp/esbuild/ (auto-downloaded once)
 #
-# Usage: sourced or executed after REPO_ROOT is set (via tools/guard.sh).
+# Version is pinned to apps/wasm/package.json "esbuild" dep (single source of truth).
+#
+# Usage: executed after REPO_ROOT is set (via tools/guard.sh).
 set -euo pipefail
 
 if [ -z "${REPO_ROOT:-}" ]; then
@@ -14,44 +19,122 @@ if [ -z "${REPO_ROOT:-}" ]; then
 fi
 
 wasm_dir="$REPO_ROOT/apps/wasm"
-build_script="$wasm_dir/scripts/build.mjs"
+out_dir="$REPO_ROOT/dist/wasm"
+pkg_json="$wasm_dir/package.json"
 
-if ! command -v node >/dev/null 2>&1; then
-  cat >&2 <<'EOF'
-Error: Node.js is required to bundle the web UI TypeScript (esbuild).
-
-npm is NOT required for the build itself. Install Node, then install
-esbuild once into apps/wasm:
-
-  # macOS (Homebrew installs node + npm together)
-  brew install node
-  (cd apps/wasm && npm ci)
-
-  # or any Node 18+ distribution, then:
-  (cd apps/wasm && npm ci)
-
-Then re-run: bazel run :wasm
-EOF
+# Pin to package.json so npm-based and binary-only paths stay aligned.
+esbuild_version="$(
+  sed -n 's/.*"esbuild"[[:space:]]*:[[:space:]]*"[\^~]*\([0-9][^"]*\)".*/\1/p' "$pkg_json" | head -1
+)"
+if [ -z "$esbuild_version" ]; then
+  echo "Error: could not read esbuild version from $pkg_json" >&2
   exit 1
 fi
 
-if [ ! -d "$wasm_dir/node_modules/esbuild" ]; then
-  cat >&2 <<'EOF'
-Error: apps/wasm/node_modules/esbuild is missing.
+platform_id() {
+  # Map uname to @esbuild npm package suffix (same as esbuild install script).
+  case "$(uname -ms)" in
+    'Darwin arm64') echo 'darwin-arm64' ;;
+    'Darwin x86_64') echo 'darwin-x64' ;;
+    'Linux arm64' | 'Linux aarch64') echo 'linux-arm64' ;;
+    'Linux x86_64') echo 'linux-x64' ;;
+    *)
+      echo "error: unsupported platform for esbuild binary: $(uname -ms)" >&2
+      return 1
+      ;;
+  esac
+}
 
-The web UI bundle step needs esbuild (listed in apps/wasm/package.json).
-This is a one-time install of JS build tools — not an npm dependency of
-the runtime product. From the repo root:
+find_esbuild() {
+  if [ -n "${ESBUILD:-}" ] && [ -x "$ESBUILD" ]; then
+    echo "$ESBUILD"
+    return 0
+  fi
+  if command -v esbuild >/dev/null 2>&1; then
+    command -v esbuild
+    return 0
+  fi
+  local plat
+  plat="$(platform_id)" || return 1
+  local nm_bin="$wasm_dir/node_modules/@esbuild/$plat/bin/esbuild"
+  if [ -x "$nm_bin" ]; then
+    echo "$nm_bin"
+    return 0
+  fi
+  # Legacy layout some npm installs use
+  local nm_legacy="$wasm_dir/node_modules/esbuild/bin/esbuild"
+  if [ -x "$nm_legacy" ]; then
+    # This is often a JS shim; only use if it is a real binary
+    if file "$nm_legacy" 2>/dev/null | grep -qiE 'ELF|Mach-O|executable'; then
+      echo "$nm_legacy"
+      return 0
+    fi
+  fi
+  local cache_bin="$REPO_ROOT/tmp/esbuild/${esbuild_version}/esbuild"
+  if [ -x "$cache_bin" ]; then
+    echo "$cache_bin"
+    return 0
+  fi
+  return 1
+}
 
-  (cd apps/wasm && npm ci)
+download_esbuild() {
+  local plat tgz_url cache_dir cache_bin tmp
+  plat="$(platform_id)"
+  cache_dir="$REPO_ROOT/tmp/esbuild/${esbuild_version}"
+  cache_bin="$cache_dir/esbuild"
+  tgz_url="https://registry.npmjs.org/@esbuild/${plat}/-/${plat}-${esbuild_version}.tgz"
 
-If you do not have npm, install Node (which includes npm), e.g.:
-  brew install node
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "Error: curl is required to download esbuild (or install esbuild another way)." >&2
+    exit 1
+  fi
+  if ! command -v tar >/dev/null 2>&1; then
+    echo "Error: tar is required to extract the esbuild binary." >&2
+    exit 1
+  fi
 
-Then re-run: bazel run :wasm
-EOF
-  exit 1
-fi
+  echo "Downloading esbuild ${esbuild_version} (${plat}) — no Node/npm needed..." >&2
+  mkdir -p "$cache_dir"
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmp'" RETURN
+  curl -fsSL -o "$tmp/esbuild.tgz" "$tgz_url"
+  tar -xzf "$tmp/esbuild.tgz" -C "$tmp" package/bin/esbuild
+  mv "$tmp/package/bin/esbuild" "$cache_bin"
+  chmod +x "$cache_bin"
+  echo "Cached esbuild at $cache_bin" >&2
+  # Only the path goes to stdout (callers capture it).
+  printf '%s\n' "$cache_bin"
+}
 
-export BAZEL_RUN=1
-(cd "$wasm_dir" && node scripts/build.mjs)
+resolve_esbuild() {
+  if bin="$(find_esbuild)"; then
+    echo "$bin"
+    return 0
+  fi
+  download_esbuild
+}
+
+esbuild_bin="$(resolve_esbuild)"
+
+mkdir -p "$out_dir"
+
+# Same options as apps/wasm/scripts/build.mjs (single source of flags here for no-node path).
+# Keep in sync if you change the node-based script.
+common_flags=(
+  --bundle
+  --format=esm
+  --target=es2020
+  --sourcemap
+  --minify
+  --log-level=info
+)
+
+echo "Bundling TypeScript with esbuild ${esbuild_version} ($esbuild_bin)..."
+(
+  cd "$wasm_dir"
+  "$esbuild_bin" src/main.ts "${common_flags[@]}" --outfile=../../dist/wasm/main.js
+  "$esbuild_bin" src/worker.ts "${common_flags[@]}" --outfile=../../dist/wasm/worker.js
+)
+echo "Build complete!"
