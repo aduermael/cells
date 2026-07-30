@@ -8,16 +8,8 @@ cd "$REPO_ROOT"
 echo "Building CLI..."
 # Prefer preinstalled cmake/ninja when available (avoids foreign_cc prebuilt
 # ninja requiring a newer glibc than some hosts provide).
-extra_toolchains=()
-if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
-  extra_toolchains=(
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain
-  )
-fi
-bazel build //apps/cli:cells "${extra_toolchains[@]}"
+# shellcheck disable=SC2046
+bazel build //apps/cli:cells $(foreign_cc_toolchain_args)
 
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells dist/cli/cells

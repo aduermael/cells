@@ -12,16 +12,10 @@ if [ -n "${CELLS_VERSION:-}" ]; then
 fi
 
 echo "Building CLI (optimized)${CELLS_VERSION:+ version=$CELLS_VERSION}..."
-extra_toolchains=()
-if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
-  extra_toolchains=(
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain
-    --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain
-  )
-fi
-bazel build -c opt //apps/cli:cells "${extra_copt[@]}" "${extra_toolchains[@]}"
+# shellcheck disable=SC2046,SC2086
+bazel build -c opt //apps/cli:cells \
+  ${extra_copt[@]+"${extra_copt[@]}"} \
+  $(foreign_cc_toolchain_args)
 
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells dist/cli/cells
