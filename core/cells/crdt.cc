@@ -949,9 +949,10 @@ PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook) {
         // later if truly alone — see ensureDefaultSheetViaCrdt).
         result.discardedSheets = discardEmptyPlaceholderSheets(workbook);
         workbook.startCollaboration();
-        LOG_INFO("[Sync] prepareWorkbookForSync: empty join (discarded %zu placeholder sheet(s), "
-                 "no bootstrap)",
-                 result.discardedSheets);
+        LOG_INFO(
+            "[Sync] prepareWorkbookForSync: empty join (discarded %zu placeholder sheet(s), "
+            "no bootstrap)",
+            result.discardedSheets);
         return result;
     }
 
@@ -986,7 +987,8 @@ size_t bootstrapOpLog(Workbook& workbook) {
         // COL/ROW/CELL ops that reference sheetId (createEmptyWorkbook does not
         // go through CRDT, so without this bootstrap peer_ops=3 with no sheet).
         {
-            std::string sheetPayload = "{\"name\":\"" + internal::jsonEscape(sheet->name) + "\"}";
+            const std::string sheetPayload =
+                "{\"name\":\"" + internal::jsonEscape(sheet->name) + "\"}";
             const Operation sheetOp = makeSheetSetOp(workbook, sheet->id, sheetPayload);
             oplog->addOperation(sheetOp);
             count++;

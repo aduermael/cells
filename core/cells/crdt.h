@@ -202,8 +202,8 @@ size_t bootstrapOpLog(Workbook& workbook);
 
 // Result of prepareWorkbookForSync.
 struct PrepareForSyncResult {
-    size_t bootstrappedOps{0};     // ops written by bootstrap (0 if pull-only)
-    size_t discardedSheets{0};     // empty placeholder sheets removed
+    size_t bootstrappedOps{0};  // ops written by bootstrap (0 if pull-only)
+    size_t discardedSheets{0};  // empty placeholder sheets removed
     bool alreadyCollaborating{false};
 };
 

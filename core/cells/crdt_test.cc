@@ -1682,10 +1682,9 @@ TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
     applyOperation(*host, makeSheetSetOp(*host, hostSheet, R"({"name":"Sheet1"})"));
     applyOperation(*host, makeColSetOp(*host, colId, hostSheet, R"({"pos":0})"));
     applyOperation(*host, makeRowSetOp(*host, rowId, hostSheet, R"({"pos":0})"));
-    applyOperation(*host,
-                   makeCellSetOp(*host, cellId, hostSheet,
-                                 "{\"t\":\"s\",\"v\":\"foo\",\"col\":\"" + colId.toString() +
-                                     "\",\"row\":\"" + rowId.toString() + "\"}"));
+    applyOperation(*host, makeCellSetOp(*host, cellId, hostSheet,
+                                        "{\"t\":\"s\",\"v\":\"foo\",\"col\":\"" + colId.toString() +
+                                            "\",\"row\":\"" + rowId.toString() + "\"}"));
 
     // Joiner: empty UI shell — prepareWorkbookForSync (shared CLI/WASM path)
     auto joiner = std::make_unique<Workbook>(generate_id(), "Untitled");
