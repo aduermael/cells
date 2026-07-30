@@ -49,6 +49,11 @@ bool extractJSONBool(const std::string& json, const std::string& key, bool defau
 double extractJSONDouble(const std::string& json, const std::string& key,
                          double defaultValue = 0.0);
 
+// Resolve sheet for COL/ROW/CELL ops. If op.sheetId is set but the sheet is
+// missing (common when peers never received a SHEET_SET because the sheet was
+// created outside the CRDT), materialize it so dependent ops can apply.
+Sheet* ensureSheetForOp(Workbook& workbook, const Operation& op);
+
 // =============================================================================
 // Cell operations (crdt_cell.cc)
 // =============================================================================

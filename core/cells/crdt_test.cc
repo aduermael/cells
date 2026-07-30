@@ -1535,5 +1535,68 @@ TEST_F(FullStateOperationTest, SparseSetLosesPropertiesOnResurrection) {
     EXPECT_FALSE(cell->hasFormat()) << "Sparse SET does NOT include format";
 }
 
+// Browser createEmptyWorkbook adds a sheet outside the oplog; live COL/ROW/CELL
+// ops carry sheetId. Peers must materialize the sheet so those ops apply.
+TEST(CrdtSheetMaterialize, ColRowCellApplyWithoutSheetSet) {
+    auto peer = std::make_unique<Workbook>(generate_id(), "Peer");
+    peer->startCollaboration();
+    peer->setNodeId(generate_id());
+    // Empty peer — no sheets
+
+    const ID sheetId = generate_id();
+    const ID colId = generate_id();
+    const ID rowId = generate_id();
+    const ID cellId = generate_id();
+
+    // Simulate peer_ops=3 without SHEET_SET (historical browser bug)
+    Operation colOp = makeColSetOp(*peer, colId, sheetId, R"({"pos":1})");
+    Operation rowOp = makeRowSetOp(*peer, rowId, sheetId, R"({"pos":0})");
+    Operation cellOp =
+        makeCellSetOp(*peer, cellId, sheetId,
+                      "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() + "\",\"row\":\"" +
+                          rowId.toString() + "\"}");
+
+    // mint HLCs on a temp workbook so ops have valid HLCs
+    auto src = std::make_unique<Workbook>(generate_id(), "Src");
+    src->startCollaboration();
+    src->setNodeId(generate_id());
+    colOp = makeColSetOp(*src, colId, sheetId, R"({"pos":1})");
+    rowOp = makeRowSetOp(*src, rowId, sheetId, R"({"pos":0})");
+    cellOp = makeCellSetOp(
+        *src, cellId, sheetId,
+        "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() + "\",\"row\":\"" +
+            rowId.toString() + "\"}");
+
+    std::vector<Operation> ops = {colOp, rowOp, cellOp};
+    const size_t applied = applyOperations(*peer, ops);
+    EXPECT_EQ(applied, 3u) << "COL/ROW/CELL must apply by materializing missing sheet";
+    ASSERT_EQ(peer->sheets.size(), 1u);
+    EXPECT_EQ(peer->sheets[0]->id, sheetId);
+    Sheet* sh = peer->getSheet(sheetId);
+    ASSERT_NE(sh, nullptr);
+    Cell* c = sh->getCell(cellId);
+    ASSERT_NE(c, nullptr);
+    EXPECT_EQ(c->value.raw, "123");
+}
+
+TEST(CrdtSheetMaterialize, BootstrapEmitsSheetSet) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "W");
+    wb->startCollaboration();
+    wb->setNodeId(generate_id());
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    const ID sid = sheet->id;
+    wb->addSheet(std::move(sheet));
+
+    const size_t n = bootstrapOpLog(*wb);
+    EXPECT_GE(n, 1u);
+    bool found_sheet = false;
+    for (const auto& op : wb->getOpLog()->getAllOperations()) {
+        if (op.type == OpType::SHEET_SET && op.target_id == sid) {
+            found_sheet = true;
+        }
+    }
+    EXPECT_TRUE(found_sheet) << "bootstrapOpLog must emit SHEET_SET for empty sheets";
+}
+
 }  // namespace
 }  // namespace cells

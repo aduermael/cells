@@ -745,6 +745,7 @@ private:
         r.last_activity_ms = last_activity_ms_;
         r.last_error = last_error_;
         r.cells = count_cells();
+        const size_t sheet_count = workbook_ ? workbook_->sheets.size() : 0;
         if (sync_) {
             r.state = net::syncClientStateToString(sync_->getState());
             r.peer_id = sync_->getPeerId();
@@ -755,7 +756,11 @@ private:
         } else {
             r.state = last_state_.empty() ? "OFFLINE" : last_state_;
         }
-        r.ready = session_state_is_ready(r.state);
+        // Signaling ONLINE is not enough: need a sheet to script against.
+        r.ready = session_state_is_ready(r.state) && sheet_count > 0;
+        if (session_state_is_ready(r.state) && sheet_count == 0) {
+            r.last_error = "ONLINE but no sheets (peer document incomplete or ops failed to apply)";
+        }
         return r;
     }
 
@@ -1071,9 +1076,8 @@ int cmd_start(const SessionCliOptions& opts) {
         peers = st.peers;
         ops_received = st.ops_received;
         cells = st.cells;
-        // Document-ready: ONLINE and either alone (cells may be 0) or we have
-        // received peer ops / have cells after sync.
-        collab_ready = session_state_is_ready(state);
+        // Use daemon's ready (ONLINE + at least one sheet) — not signaling alone.
+        collab_ready = st.ready;
     };
 
     if (wait_ms <= 0) {

@@ -37,14 +37,7 @@ namespace internal {
 // fields optional except pos is required when creating
 
 ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
-    // Use sheetId from operation if available, otherwise fall back to first sheet
-    Sheet* sheet = nullptr;
-    if (!op.sheetId.isNull()) {
-        sheet = workbook.getSheet(op.sheetId);
-    }
-    if (sheet == nullptr && !workbook.sheets.empty()) {
-        sheet = workbook.sheets[0].get();
-    }
+    Sheet* sheet = ensureSheetForOp(workbook, op);
     if (sheet == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
@@ -223,14 +216,7 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
 // All fields optional except pos is required when creating
 
 ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
-    // Use sheetId from operation if available, otherwise fall back to first sheet
-    Sheet* sheet = nullptr;
-    if (!op.sheetId.isNull()) {
-        sheet = workbook.getSheet(op.sheetId);
-    }
-    if (sheet == nullptr && !workbook.sheets.empty()) {
-        sheet = workbook.sheets[0].get();
-    }
+    Sheet* sheet = ensureSheetForOp(workbook, op);
     if (sheet == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }

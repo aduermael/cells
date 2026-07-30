@@ -92,16 +92,9 @@ ApplyResult applyCellSet(Workbook& workbook, const Operation& op) {
             return ApplyResult::INVALID_PAYLOAD;  // Missing required col/row for cell creation
         }
 
-        if (workbook.sheets.empty()) {
-            return ApplyResult::INVALID_TARGET;
-        }
-
-        // Use sheetId from operation if available, otherwise fall back to first sheet
-        if (!op.sheetId.isNull()) {
-            targetSheet = workbook.getSheet(op.sheetId);
-        }
+        targetSheet = ensureSheetForOp(workbook, op);
         if (targetSheet == nullptr) {
-            targetSheet = workbook.sheets[0].get();
+            return ApplyResult::INVALID_TARGET;
         }
 
         const ID colId(col_id_str);

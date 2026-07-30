@@ -173,6 +173,24 @@ std::string extractJSONString(const std::string& json, const std::string& key) {
     return jsonUnescape(json.substr(pos, end - pos));
 }
 
+Sheet* ensureSheetForOp(Workbook& workbook, const Operation& op) {
+    Sheet* sheet = nullptr;
+    if (!op.sheetId.isNull()) {
+        sheet = workbook.getSheet(op.sheetId);
+        if (sheet == nullptr) {
+            // Peer history often lacks SHEET_SET when the sheet was created by
+            // createEmptyWorkbook() outside the oplog. Materialize so COL/ROW/CELL apply.
+            auto newSheet = std::make_unique<Sheet>(op.sheetId, "Sheet1");
+            workbook.addSheet(std::move(newSheet));
+            sheet = workbook.getSheet(op.sheetId);
+        }
+    }
+    if (sheet == nullptr && !workbook.sheets.empty()) {
+        sheet = workbook.sheets[0].get();
+    }
+    return sheet;
+}
+
 int extractJSONInt(const std::string& json, const std::string& key, int defaultValue) {
     const std::string searchKey = "\"" + key + "\":";
     size_t pos = json.find(searchKey);
@@ -881,6 +899,17 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
     // Iterate through all sheets
     for (const auto& sheet : workbook.sheets) {
+        // Always emit SHEET_SET first so peers can materialize the sheet before
+        // COL/ROW/CELL ops that reference sheetId (createEmptyWorkbook does not
+        // go through CRDT, so without this bootstrap peer_ops=3 with no sheet).
+        {
+            std::string sheetPayload =
+                "{\"name\":\"" + internal::jsonEscape(sheet->name) + "\"}";
+            const Operation sheetOp = makeSheetSetOp(workbook, sheet->id, sheetPayload);
+            oplog->addOperation(sheetOp);
+            count++;
+        }
+
         // Collect and sort columns by position
         std::vector<std::pair<uint32_t, const Axis*>> columns;
         for (const ID& colId : sheet->getColumnIds()) {
@@ -924,7 +953,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
                 payload += ",\"hidden\":true";
             }
             payload += "}";
-            const Operation op = makeColSetOp(workbook, axis->id, payload);
+            const Operation op = makeColSetOp(workbook, axis->id, sheet->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -969,7 +998,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
                 payload += ",\"hidden\":true";
             }
             payload += "}";
-            const Operation op = makeRowSetOp(workbook, axis->id, payload);
+            const Operation op = makeRowSetOp(workbook, axis->id, sheet->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -1020,7 +1049,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
             }
 
             payload += "}";
-            const Operation op = makeCellSetOp(workbook, cell->id, payload);
+            const Operation op = makeCellSetOp(workbook, cell->id, sheet->id, payload);
             oplog->addOperation(op);
             count++;
         }
