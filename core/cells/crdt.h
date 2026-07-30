@@ -189,6 +189,35 @@ Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const Form
 // Returns the number of operations created.
 size_t bootstrapOpLog(Workbook& workbook);
 
+// =============================================================================
+// Collab-safe ensure + grid helpers (shared by CLI Luau API and WASM engine)
+// =============================================================================
+// Local-only getOrCreate* mints IDs that peers never receive, so later CELL_SET
+// ops fail with INVALID_TARGET. Always use these for mutations that must sync.
+
+// Create column/row at grid position via COL_SET/ROW_SET if missing.
+// If outCreated is non-null, set to true when a new axis was created.
+Axis* ensureColumnViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position,
+                          bool* outCreated = nullptr);
+Axis* ensureRowViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position,
+                       bool* outCreated = nullptr);
+
+// Create empty cell at (colId, rowId) via CELL_SET if missing.
+Cell* ensureCellViaCrdt(Workbook& workbook, Sheet& sheet, const ID& colId, const ID& rowId,
+                        bool* outCreated = nullptr);
+
+// Ensure column + row + empty cell at a grid position (0-based).
+Cell* ensureCellAtPositionViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t colPos,
+                                  uint32_t rowPos, bool* outColCreated = nullptr,
+                                  bool* outRowCreated = nullptr, bool* outCellCreated = nullptr);
+
+// Resize column/row by position; creates the axis via CRDT if it does not exist.
+// Returns the axis (nullptr on failure). outCreated set when newly minted.
+Axis* setColumnWidthByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t width,
+                               bool* outCreated = nullptr);
+Axis* setRowHeightByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t height,
+                             bool* outCreated = nullptr);
+
 }  // namespace cells
 
 #endif  // CELLS_CRDT_H_

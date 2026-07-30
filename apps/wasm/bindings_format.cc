@@ -14,8 +14,6 @@
 //
 // =============================================================================
 
-#include "apps/wasm/bindings.h"
-
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -24,9 +22,6 @@
 #include "core/cells/cell_style_presets.h"
 #include "core/cells/crdt.h"
 #include "core/cells/format_buffer.h"
-#include "core/cells/range.h"
-#include "core/log/include/Logger.h"
-#include "core/cells/range_index.h"
 #include "core/cells/format_code_formatter.h"
 #include "core/cells/format_code_parser.h"
 #include "core/cells/formula_functions.h"
@@ -34,7 +29,12 @@
 #include "core/cells/input_parser.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
+#include "core/cells/range.h"
+#include "core/cells/range_index.h"
 #include "core/cells/style_buffer.h"
+#include "core/log/include/Logger.h"
+
+#include "apps/wasm/bindings.h"
 
 namespace cells::wasm {
 
@@ -46,25 +46,37 @@ namespace {
 
 // Helper to convert string to NumberFormatCategory
 NumberFormatCategory stringToCategoryInternal(const std::string& str) {
-    if (str == "GENERAL" || str == "general") return NumberFormatCategory::GENERAL;
-    if (str == "NUMBER" || str == "number") return NumberFormatCategory::NUMBER;
-    if (str == "CURRENCY" || str == "currency") return NumberFormatCategory::CURRENCY;
-    if (str == "ACCOUNTING" || str == "accounting") return NumberFormatCategory::ACCOUNTING;
-    if (str == "PERCENTAGE" || str == "percentage") return NumberFormatCategory::PERCENTAGE;
-    if (str == "DATE" || str == "date") return NumberFormatCategory::DATE;
-    if (str == "TIME" || str == "time") return NumberFormatCategory::TIME;
-    if (str == "DATE_TIME" || str == "dateTime" || str == "date_time") return NumberFormatCategory::DATE_TIME;
-    if (str == "SCIENTIFIC" || str == "scientific") return NumberFormatCategory::SCIENTIFIC;
-    if (str == "FRACTION" || str == "fraction") return NumberFormatCategory::FRACTION;
-    if (str == "TEXT" || str == "text") return NumberFormatCategory::TEXT;
-    if (str == "CUSTOM" || str == "custom") return NumberFormatCategory::CUSTOM;
+    if (str == "GENERAL" || str == "general")
+        return NumberFormatCategory::GENERAL;
+    if (str == "NUMBER" || str == "number")
+        return NumberFormatCategory::NUMBER;
+    if (str == "CURRENCY" || str == "currency")
+        return NumberFormatCategory::CURRENCY;
+    if (str == "ACCOUNTING" || str == "accounting")
+        return NumberFormatCategory::ACCOUNTING;
+    if (str == "PERCENTAGE" || str == "percentage")
+        return NumberFormatCategory::PERCENTAGE;
+    if (str == "DATE" || str == "date")
+        return NumberFormatCategory::DATE;
+    if (str == "TIME" || str == "time")
+        return NumberFormatCategory::TIME;
+    if (str == "DATE_TIME" || str == "dateTime" || str == "date_time")
+        return NumberFormatCategory::DATE_TIME;
+    if (str == "SCIENTIFIC" || str == "scientific")
+        return NumberFormatCategory::SCIENTIFIC;
+    if (str == "FRACTION" || str == "fraction")
+        return NumberFormatCategory::FRACTION;
+    if (str == "TEXT" || str == "text")
+        return NumberFormatCategory::TEXT;
+    if (str == "CUSTOM" || str == "custom")
+        return NumberFormatCategory::CUSTOM;
     return NumberFormatCategory::GENERAL;
 }
 
 // Parse format JSON into FormatBuffer
-// Accepts: {"category":"NUMBER","decimals":2,"separator":true,"currency":"$","formatCode":"#,##0.00"}
-// Also accepts: {"base64":"..."} to parse from existing base64 format
-// All fields are optional.
+// Accepts:
+// {"category":"NUMBER","decimals":2,"separator":true,"currency":"$","formatCode":"#,##0.00"} Also
+// accepts: {"base64":"..."} to parse from existing base64 format All fields are optional.
 FormatBuffer parseFormatJson(const std::string& json) {
     FormatBuffer format;
 
@@ -91,8 +103,9 @@ FormatBuffer parseFormatJson(const std::string& json) {
         // Extract integer value
         size_t pos = json.find("\"decimals\":");
         if (pos != std::string::npos) {
-            pos += 11; // length of "\"decimals\":"
-            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+            pos += 11;  // length of "\"decimals\":"
+            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
+                pos++;
             int value = 0;
             while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
                 value = value * 10 + (json[pos] - '0');
@@ -106,8 +119,9 @@ FormatBuffer parseFormatJson(const std::string& json) {
     if (json.find("\"separator\":") != std::string::npos) {
         size_t pos = json.find("\"separator\":");
         if (pos != std::string::npos) {
-            pos += 12; // length of "\"separator\":"
-            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+            pos += 12;  // length of "\"separator\":"
+            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
+                pos++;
             bool value = (json.substr(pos, 4) == "true");
             format.setThousandsSeparator(value);
         }
@@ -142,34 +156,39 @@ std::string formatBufferToJson(const FormatBuffer& format) {
 
     // Decimals
     if (format.hasDecimals()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"decimals\":" << static_cast<int>(format.getDecimals());
         first = false;
     }
 
     // Thousands separator
     if (format.hasThousandsSeparator()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"separator\":" << (format.getThousandsSeparator() ? "true" : "false");
         first = false;
     }
 
     // Currency symbol
     if (format.hasCurrencySymbol()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"currency\":\"" << jsonEscape(format.getCurrencySymbol()) << "\"";
         first = false;
     }
 
     // Custom format code
     if (format.hasCustomFormatCode()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"formatCode\":\"" << jsonEscape(format.getCustomFormatCode()) << "\"";
         first = false;
     }
 
     // Always include the generated format code for display/formatting
-    if (!first) ss << ",";
+    if (!first)
+        ss << ",";
     ss << "\"effectiveFormatCode\":\"" << jsonEscape(format.toFormatCode()) << "\"";
 
     // Include base64 encoding for reference
@@ -182,7 +201,7 @@ std::string formatBufferToJson(const FormatBuffer& format) {
 }  // namespace
 
 std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
-                                        const std::string& formatJson) {
+                                       const std::string& formatJson) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -221,7 +240,7 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
 }
 
 std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
-                                          const std::string& formatJson) {
+                                         const std::string& formatJson) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -234,53 +253,18 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     // Parse format properties from JSON
     FormatBuffer format = parseFormatJson(formatJson);
 
-    // Find or create column at position
-    ID colId;
+    // Shared core ensure path (same as Luau setFormat)
     bool colCreated = false;
-    Axis* colAxis = sheet->getColumnByPosition(col);
-    if (colAxis != nullptr) {
-        colId = colAxis->id;
-    }
-    if (colId.isNull()) {
-        colId = generate_id();
-        colCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
-        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
-        applyOperation(*_workbook, colOp);
-    }
-
-    // Find or create row at position
-    ID rowId;
     bool rowCreated = false;
-    Axis* rowAxis = sheet->getRowByPosition(row);
-    if (rowAxis != nullptr) {
-        rowId = rowAxis->id;
-    }
-    if (rowId.isNull()) {
-        rowId = generate_id();
-        rowCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
-        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
-    }
-
-    // Find or create cell at this position
-    ID cellId;
     bool cellCreated = false;
-    Cell* existingCell = sheet->getCellAt(colId, rowId);
-    if (existingCell) {
-        cellId = existingCell->id;
+    Cell* cell = ensureCellAtPositionViaCrdt(*_workbook, *sheet, col, row, &colCreated, &rowCreated,
+                                             &cellCreated);
+    if (cell == nullptr) {
+        return "{\"error\":\"Failed to ensure cell\"}";
     }
-    if (cellId.isNull()) {
-        cellId = generate_id();
-        cellCreated = true;
-        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
-                                  colId.toString() + "\",\"row\":\"" + rowId.toString() + "\"}";
-        Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
-        applyOperation(*_workbook, cellOp);
-    }
+    const ID cellId = cell->id;
+    const ID colId = cell->colId;
+    const ID rowId = cell->rowId;
 
     // Apply format or clear if empty
     if (!format.isEmpty()) {
@@ -300,10 +284,7 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
     }
     if (cellCreated) {
-        Cell* newCell = sheet->getCell(cellId);
-        if (newCell) {
-            _viewportIndex.onCellAdded(newCell);
-        }
+        _viewportIndex.onCellAdded(cell);
     }
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -319,7 +300,8 @@ std::string CellsEngine::getAvailableFormats() {
     // Helper lambda to add a format entry
     auto addFormat = [&ss](bool& first, const char* category, int decimals, bool separator,
                            const char* currency, const char* formatCode, const char* name) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         first = false;
         ss << "{";
         ss << "\"category\":\"" << category << "\"";
@@ -591,7 +573,7 @@ std::string CellsEngine::getFormatDetails(const std::string& formatInput) {
 }
 
 std::string CellsEngine::makeFormatId(const std::string& category, int decimals, bool separator,
-                                       const std::string& currency) {
+                                      const std::string& currency) {
     // Create a FormatBuffer with the given properties and return its JSON
     FormatBuffer format;
 
@@ -621,45 +603,74 @@ namespace {
 // Helper to convert BorderStyle enum to string
 std::string borderStyleToString(BorderStyle style) {
     switch (style) {
-        case BorderStyle::THIN: return "thin";
-        case BorderStyle::MEDIUM: return "medium";
-        case BorderStyle::THICK: return "thick";
-        case BorderStyle::DASHED: return "dashed";
-        case BorderStyle::DOTTED: return "dotted";
-        case BorderStyle::DOUBLE: return "double";
-        case BorderStyle::HAIR: return "hair";
-        case BorderStyle::MEDIUM_DASHED: return "mediumDashed";
-        case BorderStyle::DASH_DOT: return "dashDot";
-        case BorderStyle::MEDIUM_DASH_DOT: return "mediumDashDot";
-        case BorderStyle::DASH_DOT_DOT: return "dashDotDot";
-        case BorderStyle::MEDIUM_DASH_DOT_DOT: return "mediumDashDotDot";
-        case BorderStyle::SLANT_DASH_DOT: return "slantDashDot";
-        default: return "none";
+        case BorderStyle::THIN:
+            return "thin";
+        case BorderStyle::MEDIUM:
+            return "medium";
+        case BorderStyle::THICK:
+            return "thick";
+        case BorderStyle::DASHED:
+            return "dashed";
+        case BorderStyle::DOTTED:
+            return "dotted";
+        case BorderStyle::DOUBLE:
+            return "double";
+        case BorderStyle::HAIR:
+            return "hair";
+        case BorderStyle::MEDIUM_DASHED:
+            return "mediumDashed";
+        case BorderStyle::DASH_DOT:
+            return "dashDot";
+        case BorderStyle::MEDIUM_DASH_DOT:
+            return "mediumDashDot";
+        case BorderStyle::DASH_DOT_DOT:
+            return "dashDotDot";
+        case BorderStyle::MEDIUM_DASH_DOT_DOT:
+            return "mediumDashDotDot";
+        case BorderStyle::SLANT_DASH_DOT:
+            return "slantDashDot";
+        default:
+            return "none";
     }
 }
 
 // Helper to convert string to BorderStyle enum
 BorderStyle stringToBorderStyle(const std::string& str) {
-    if (str == "thin") return BorderStyle::THIN;
-    if (str == "medium") return BorderStyle::MEDIUM;
-    if (str == "thick") return BorderStyle::THICK;
-    if (str == "dashed") return BorderStyle::DASHED;
-    if (str == "dotted") return BorderStyle::DOTTED;
-    if (str == "double") return BorderStyle::DOUBLE;
-    if (str == "hair") return BorderStyle::HAIR;
-    if (str == "mediumDashed") return BorderStyle::MEDIUM_DASHED;
-    if (str == "dashDot") return BorderStyle::DASH_DOT;
-    if (str == "mediumDashDot") return BorderStyle::MEDIUM_DASH_DOT;
-    if (str == "dashDotDot") return BorderStyle::DASH_DOT_DOT;
-    if (str == "mediumDashDotDot") return BorderStyle::MEDIUM_DASH_DOT_DOT;
-    if (str == "slantDashDot") return BorderStyle::SLANT_DASH_DOT;
+    if (str == "thin")
+        return BorderStyle::THIN;
+    if (str == "medium")
+        return BorderStyle::MEDIUM;
+    if (str == "thick")
+        return BorderStyle::THICK;
+    if (str == "dashed")
+        return BorderStyle::DASHED;
+    if (str == "dotted")
+        return BorderStyle::DOTTED;
+    if (str == "double")
+        return BorderStyle::DOUBLE;
+    if (str == "hair")
+        return BorderStyle::HAIR;
+    if (str == "mediumDashed")
+        return BorderStyle::MEDIUM_DASHED;
+    if (str == "dashDot")
+        return BorderStyle::DASH_DOT;
+    if (str == "mediumDashDot")
+        return BorderStyle::MEDIUM_DASH_DOT;
+    if (str == "dashDotDot")
+        return BorderStyle::DASH_DOT_DOT;
+    if (str == "mediumDashDotDot")
+        return BorderStyle::MEDIUM_DASH_DOT_DOT;
+    if (str == "slantDashDot")
+        return BorderStyle::SLANT_DASH_DOT;
     return BorderStyle::NONE;
 }
 
 // Helper to serialize a border edge to JSON
-void serializeBorderEdge(std::ostringstream& ss, const std::string& name, const BorderEdge& edge, bool& first) {
+void serializeBorderEdge(std::ostringstream& ss, const std::string& name, const BorderEdge& edge,
+                         bool& first) {
     if (edge.hasValue()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"" << name << "\":{";
         ss << "\"style\":\"" << borderStyleToString(edge.style) << "\"";
         if (!edge.color.empty()) {
@@ -679,32 +690,38 @@ std::string styleToJson(const CellStyle& style) {
     // Serialize properties based on defined flags (source of truth)
     // This allows explicitly set default values (e.g., bold=false) to be preserved
     if (style.isDefined(DEFINED_BOLD)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"bold\":" << (style.bold ? "true" : "false");
         first = false;
     }
     if (style.isDefined(DEFINED_ITALIC)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"italic\":" << (style.italic ? "true" : "false");
         first = false;
     }
     if (style.isDefined(DEFINED_UNDERLINE)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"underline\":" << (style.underline ? "true" : "false");
         first = false;
     }
     if (style.isDefined(DEFINED_WRAPTEXT)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"wrapText\":" << (style.wrapText ? "true" : "false");
         first = false;
     }
     if (style.isDefined(DEFINED_BGCOLOR)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
         first = false;
     }
     if (style.hasBgThemeColor()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"bgThemeIndex\":" << static_cast<int>(style.bgThemeIndex);
         first = false;
         if (style.bgThemeTint != 0.0) {
@@ -712,12 +729,14 @@ std::string styleToJson(const CellStyle& style) {
         }
     }
     if (style.isDefined(DEFINED_TEXTCOLOR)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
         first = false;
     }
     if (style.hasTextThemeColor()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"textThemeIndex\":" << static_cast<int>(style.textThemeIndex);
         first = false;
         if (style.textThemeTint != 0.0) {
@@ -725,17 +744,20 @@ std::string styleToJson(const CellStyle& style) {
         }
     }
     if (style.isDefined(DEFINED_FONTFAMILY)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"fontFamily\":\"" << jsonEscape(style.fontFamily) << "\"";
         first = false;
     }
     if (style.isDefined(DEFINED_FONTSIZE)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"fontSize\":" << static_cast<int>(style.fontSize);
         first = false;
     }
     if (style.isDefined(DEFINED_HALIGN)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"hAlign\":\"";
         switch (style.hAlign) {
             case TextAlign::LEFT:
@@ -758,7 +780,8 @@ std::string styleToJson(const CellStyle& style) {
         first = false;
     }
     if (style.isDefined(DEFINED_VALIGN)) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"vAlign\":\"";
         switch (style.vAlign) {
             case VerticalAlign::TOP:
@@ -778,7 +801,8 @@ std::string styleToJson(const CellStyle& style) {
     bool hasBorder = style.isDefined(DEFINED_BORDER_TOP) || style.isDefined(DEFINED_BORDER_RIGHT) ||
                      style.isDefined(DEFINED_BORDER_BOTTOM) || style.isDefined(DEFINED_BORDER_LEFT);
     if (hasBorder) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"border\":{";
         bool borderFirst = true;
         if (style.isDefined(DEFINED_BORDER_TOP)) {
@@ -870,13 +894,17 @@ double extractDoubleField(const std::string& json, const std::string& key, doubl
     }
     // Extract the number portion as a substring and convert
     size_t start = pos;
-    if (json[pos] == '-') pos++;
-    while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9')) pos++;
+    if (json[pos] == '-')
+        pos++;
+    while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9'))
+        pos++;
     if (pos < json.size() && json[pos] == '.') {
         pos++;
-        while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9')) pos++;
+        while (pos < json.size() && (json[pos] >= '0' && json[pos] <= '9'))
+            pos++;
     }
-    if (pos == start) return defaultValue;
+    if (pos == start)
+        return defaultValue;
     return std::stod(json.substr(start, pos - start));
 }
 
@@ -902,8 +930,10 @@ BorderEdge extractBorderEdge(const std::string& json, const std::string& edgeNam
     int braceCount = 1;
     size_t braceEnd = braceStart + 1;
     while (braceEnd < json.size() && braceCount > 0) {
-        if (json[braceEnd] == '{') braceCount++;
-        else if (json[braceEnd] == '}') braceCount--;
+        if (json[braceEnd] == '{')
+            braceCount++;
+        else if (json[braceEnd] == '}')
+            braceCount--;
         braceEnd++;
     }
 
@@ -925,8 +955,10 @@ BorderEdge extractBorderEdge(const std::string& json, const std::string& edgeNam
     int edgeBraceCount = 1;
     size_t edgeBraceEnd = edgeBraceStart + 1;
     while (edgeBraceEnd < borderJson.size() && edgeBraceCount > 0) {
-        if (borderJson[edgeBraceEnd] == '{') edgeBraceCount++;
-        else if (borderJson[edgeBraceEnd] == '}') edgeBraceCount--;
+        if (borderJson[edgeBraceEnd] == '{')
+            edgeBraceCount++;
+        else if (borderJson[edgeBraceEnd] == '}')
+            edgeBraceCount--;
         edgeBraceEnd++;
     }
 
@@ -1034,8 +1066,10 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
                 int braceCount = 1;
                 size_t braceEnd = braceStart + 1;
                 while (braceEnd < json.size() && braceCount > 0) {
-                    if (json[braceEnd] == '{') braceCount++;
-                    else if (json[braceEnd] == '}') braceCount--;
+                    if (json[braceEnd] == '{')
+                        braceCount++;
+                    else if (json[braceEnd] == '}')
+                        braceCount--;
                     braceEnd++;
                 }
                 std::string borderJson = json.substr(braceStart, braceEnd - braceStart);
@@ -1121,10 +1155,14 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
     if (hasJsonField(newStyleJson, "border")) {
         result.border = newStyle.border;
         // Copy border defined flags from newStyle
-        if (newStyle.isDefined(DEFINED_BORDER_TOP)) result.setDefined(DEFINED_BORDER_TOP);
-        if (newStyle.isDefined(DEFINED_BORDER_RIGHT)) result.setDefined(DEFINED_BORDER_RIGHT);
-        if (newStyle.isDefined(DEFINED_BORDER_BOTTOM)) result.setDefined(DEFINED_BORDER_BOTTOM);
-        if (newStyle.isDefined(DEFINED_BORDER_LEFT)) result.setDefined(DEFINED_BORDER_LEFT);
+        if (newStyle.isDefined(DEFINED_BORDER_TOP))
+            result.setDefined(DEFINED_BORDER_TOP);
+        if (newStyle.isDefined(DEFINED_BORDER_RIGHT))
+            result.setDefined(DEFINED_BORDER_RIGHT);
+        if (newStyle.isDefined(DEFINED_BORDER_BOTTOM))
+            result.setDefined(DEFINED_BORDER_BOTTOM);
+        if (newStyle.isDefined(DEFINED_BORDER_LEFT))
+            result.setDefined(DEFINED_BORDER_LEFT);
     }
 
     return result;
@@ -1135,7 +1173,7 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
 // Returns the stripped style and a bool indicating if the style is now empty.
 // Clears the defined flag for each stripped property.
 std::pair<CellStyle, bool> stripConflictingProperties(const CellStyle& existingStyle,
-                                                       const std::string& newStyleJson) {
+                                                      const std::string& newStyleJson) {
     CellStyle result = existingStyle;
 
     // Strip properties that are set in the new style JSON
@@ -1240,47 +1278,56 @@ std::string getStylePropertiesJson(const CellStyle& style) {
     ss << "{";
     bool first = true;
     if (style.bold) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"bold\":true";
         first = false;
     }
     if (style.italic) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"italic\":true";
         first = false;
     }
     if (style.underline) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"underline\":true";
         first = false;
     }
     if (style.wrapText) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"wrapText\":true";
         first = false;
     }
     if (!style.bgColor.empty()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"bgColor\":\"" << style.bgColor << "\"";
         first = false;
     }
     if (!style.textColor.empty()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"textColor\":\"" << style.textColor << "\"";
         first = false;
     }
     if (!style.fontFamily.empty()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"fontFamily\":\"" << style.fontFamily << "\"";
         first = false;
     }
     if (style.fontSize != 0) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"fontSize\":" << static_cast<int>(style.fontSize);
         first = false;
     }
     if (style.hAlign != TextAlign::GENERAL) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"hAlign\":\"";
         switch (style.hAlign) {
             case TextAlign::LEFT:
@@ -1302,7 +1349,8 @@ std::string getStylePropertiesJson(const CellStyle& style) {
         first = false;
     }
     if (style.vAlign != VerticalAlign::BOTTOM) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"vAlign\":\"";
         switch (style.vAlign) {
             case VerticalAlign::TOP:
@@ -1318,7 +1366,8 @@ std::string getStylePropertiesJson(const CellStyle& style) {
         first = false;
     }
     if (style.border.hasValue()) {
-        if (!first) ss << ",";
+        if (!first)
+            ss << ",";
         ss << "\"border\":true";
         first = false;
     }
@@ -1330,8 +1379,9 @@ std::string getStylePropertiesJson(const CellStyle& style) {
 // When a range style sets a property, that property is cleared from cells within the range
 // to avoid redundancy (the range will provide the style, cell-level overrides are removed).
 // Returns the modified cell style with covered properties reset to defaults.
-CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellStyle& /* rangeStyle */,
-                                        const std::string& styleJson) {
+CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle,
+                                       const CellStyle& /* rangeStyle */,
+                                       const std::string& styleJson) {
     CellStyle result = cellStyle;
 
     // Clear properties that the range style is setting (specified in styleJson)
@@ -1441,77 +1491,28 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    // First, try to find existing cell to get its current style
+    // Shared core ensure path (same as Luau setStyle)
+    bool colCreated = false;
+    bool rowCreated = false;
+    bool cellCreated = false;
+    Cell* cell = ensureCellAtPositionViaCrdt(*_workbook, *sheet, col, row, &colCreated, &rowCreated,
+                                             &cellCreated);
+    if (cell == nullptr) {
+        return "{\"error\":\"Failed to ensure cell\"}";
+    }
+    const ID cellId = cell->id;
+    const ID colId = cell->colId;
+    const ID rowId = cell->rowId;
+
+    // Start from existing style (merge semantics)
     CellStyle style;
-    ID existingColId, existingRowId;
-    Cell* existingCell = nullptr;
-
-    // Find existing column at position
-    Axis* existingColAxis = sheet->getColumnByPosition(col);
-    if (existingColAxis != nullptr) {
-        existingColId = existingColAxis->id;
-    }
-
-    // Find existing row at position
-    Axis* existingRowAxis = sheet->getRowByPosition(row);
-    if (existingRowAxis != nullptr) {
-        existingRowId = existingRowAxis->id;
-    }
-
-    // If both column and row exist, try to find the cell
-    if (!existingColId.isNull() && !existingRowId.isNull()) {
-        existingCell = sheet->getCellAt(existingColId, existingRowId);
-    }
-
-    // Get existing style if cell has one
-    if (existingCell && existingCell->hasStyle()) {
-        const StyleBuffer* existingStyle = _workbook->getEntityStyle(existingCell->id);
+    if (cell->hasStyle()) {
+        const StyleBuffer* existingStyle = _workbook->getEntityStyle(cell->id);
         if (existingStyle != nullptr) {
             style = existingStyle->toCellStyle();
         }
     }
-
-    // Merge incoming JSON with existing style
     mergeStyleJson(style, styleJson);
-
-    // Find or create column at position
-    ID colId = existingColId;
-    bool colCreated = false;
-    if (colId.isNull()) {
-        colId = generate_id();
-        colCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
-        Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
-        applyOperation(*_workbook, colOp);
-    }
-
-    // Find or create row at position
-    ID rowId = existingRowId;
-    bool rowCreated = false;
-    if (rowId.isNull()) {
-        rowId = generate_id();
-        rowCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
-        Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
-    }
-
-    // Find or create cell at this position
-    ID cellId;
-    bool cellCreated = false;
-    if (existingCell) {
-        cellId = existingCell->id;
-    }
-    if (cellId.isNull()) {
-        cellId = generate_id();
-        cellCreated = true;
-        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
-                                  "\",\"row\":\"" + rowId.toString() + "\"}";
-        Operation cellOp = makeCellSetOp(*_workbook, cellId, cellPayload);
-        applyOperation(*_workbook, cellOp);
-    }
 
     // Convert to content-addressed StyleBuffer and emit operation
     // Note: CellStyle.isEmpty() checks if any properties are defined, but
@@ -1543,10 +1544,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
     }
     if (cellCreated) {
-        Cell* newCell = sheet->getCell(cellId);
-        if (newCell) {
-            _viewportIndex.onCellAdded(newCell);
-        }
+        _viewportIndex.onCellAdded(cell);
     }
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -1682,8 +1680,9 @@ std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     return "{\"success\":true}";
 }
 
-std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
-                                               uint32_t endCol, uint32_t endRow, const std::string& styleJson) {
+std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t startCol,
+                                              uint32_t startRow, uint32_t endCol, uint32_t endRow,
+                                              const std::string& styleJson) {
     if (!_workbook || sheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"Invalid sheet index\"}";
     }
@@ -1774,7 +1773,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     std::vector<Range*> overlappingRanges;
     const RangeIndex* rangeIndex = sheet->getRangeIndex();
     if (rangeIndex) {
-        overlappingRanges = rangeIndex->queryRange(minCol, minRow, maxCol, maxRow, RangeFlags::STYLE);
+        overlappingRanges =
+            rangeIndex->queryRange(minCol, minRow, maxCol, maxRow, RangeFlags::STYLE);
     }
 
     // The new range's rectangle
@@ -1796,11 +1796,10 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             continue;
         }
 
-        PositionRect existingRect{
-            std::min(existingStartCol->position, existingEndCol->position),
-            std::min(existingStartRow->position, existingEndRow->position),
-            std::max(existingStartCol->position, existingEndCol->position),
-            std::max(existingStartRow->position, existingEndRow->position)};
+        PositionRect existingRect{std::min(existingStartCol->position, existingEndCol->position),
+                                  std::min(existingStartRow->position, existingEndRow->position),
+                                  std::max(existingStartCol->position, existingEndCol->position),
+                                  std::max(existingStartRow->position, existingEndRow->position)};
 
         // Case 1: EXACT MATCH - merge styles into existing range
         if (existingRect == newRect) {
@@ -1818,7 +1817,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             if (mergedStyle.isEmpty()) {
                 std::ostringstream removePayload;
                 removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-                Operation removeOp = makeRangeDeleteOp(*_workbook, existingRange->id, removePayload.str());
+                Operation removeOp =
+                    makeRangeDeleteOp(*_workbook, existingRange->id, removePayload.str());
                 applyOperation(*_workbook, removeOp);
 
                 broadcastPendingOperations();
@@ -1903,11 +1903,10 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             continue;
         }
 
-        PositionRect existingRect{
-            std::min(existingStartCol->position, existingEndCol->position),
-            std::min(existingStartRow->position, existingEndRow->position),
-            std::max(existingStartCol->position, existingEndCol->position),
-            std::max(existingStartRow->position, existingEndRow->position)};
+        PositionRect existingRect{std::min(existingStartCol->position, existingEndCol->position),
+                                  std::min(existingStartRow->position, existingEndRow->position),
+                                  std::max(existingStartCol->position, existingEndCol->position),
+                                  std::max(existingStartRow->position, existingEndRow->position)};
 
         // Check if they actually overlap
         if (!existingRect.overlaps(newRect)) {
@@ -1917,7 +1916,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Case 2: CONTAINED - existing range is fully inside new range
         // Strip conflicting properties from the existing range's style
         if (newRect.contains(existingRect)) {
-            auto [strippedCellStyle, isEmpty] = stripConflictingProperties(existingStyle, styleJson);
+            auto [strippedCellStyle, isEmpty] =
+                stripConflictingProperties(existingStyle, styleJson);
             ContainedOperation op;
             op.rangeId = existingRange->id;
             op.strippedStyle = StyleBuffer::fromCellStyle(strippedCellStyle);
@@ -1942,11 +1942,13 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // Style is now empty, delete the range
             std::ostringstream removePayload;
             removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-            Operation removeOp = makeRangeDeleteOp(*_workbook, containedOp.rangeId, removePayload.str());
+            Operation removeOp =
+                makeRangeDeleteOp(*_workbook, containedOp.rangeId, removePayload.str());
             applyOperation(*_workbook, removeOp);
         } else {
             // Update the range with the stripped style
-            Operation updateOp = makeRangeSetStyleOp(*_workbook, containedOp.rangeId, containedOp.strippedStyle);
+            Operation updateOp =
+                makeRangeSetStyleOp(*_workbook, containedOp.rangeId, containedOp.strippedStyle);
             applyOperation(*_workbook, updateOp);
         }
     }
@@ -2029,7 +2031,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             applyOperation(*_workbook, newRangeOp);
 
             // Apply the preserved style to the new split range
-            Operation newSetStyleOp = makeRangeSetStyleOp(*_workbook, newRangeId, splitOp.styleToPreserve);
+            Operation newSetStyleOp =
+                makeRangeSetStyleOp(*_workbook, newRangeId, splitOp.styleToPreserve);
             applyOperation(*_workbook, newSetStyleOp);
         }
     }
@@ -2051,7 +2054,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     applyOperation(*_workbook, setStyleOp);
 
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
-    // When applying a range style, remove matching properties from individual cells to avoid redundancy
+    // When applying a range style, remove matching properties from individual cells to avoid
+    // redundancy
     for (const auto& cellId : sheet->getCellIds()) {
         // Read style from entity (content-addressed)
         const StyleBuffer* cellStyleBuf = _workbook->getEntityStyle(cellId);
@@ -2060,7 +2064,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         }
 
         Cell* cell = _workbook->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
 
         // Check if cell is within the range bounds
         const Axis* cellCol = sheet->getColumn(cell->colId);
@@ -2071,7 +2076,8 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
         const uint32_t cellColPos = cellCol->position;
         const uint32_t cellRowPos = cellRow->position;
-        if (cellColPos < minCol || cellColPos > maxCol || cellRowPos < minRow || cellRowPos > maxRow) {
+        if (cellColPos < minCol || cellColPos > maxCol || cellRowPos < minRow ||
+            cellRowPos > maxRow) {
             continue;  // Cell is outside the range
         }
 
@@ -2203,9 +2209,8 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
 // This cascading allows users to set column-wide defaults that can be overridden
 // by specific ranges or individual cells. Column styles take precedence over row
 // styles at intersections, following common spreadsheet UX patterns.
-CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
-                                   uint32_t colPos, uint32_t rowPos,
-                                   ID colId, ID rowId) {
+CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook, uint32_t colPos,
+                                  uint32_t rowPos, ID colId, ID rowId) {
     CellStyle result;
 
     // Find cell at this position (may be null)
@@ -2314,7 +2319,8 @@ std::string CellsEngine::getEffectiveCellStyle(uint32_t col, uint32_t row) {
     return styleToJson(effectiveStyle);
 }
 
-std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
+std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2,
+                                                   uint32_t row2) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"style\":{},\"mixed\":{}}";
     }
@@ -2348,7 +2354,8 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     // Get style of first cell (anchor)
     ID firstColId = colIdByPos.count(minCol) > 0 ? colIdByPos[minCol] : ID();
     ID firstRowId = rowIdByPos.count(minRow) > 0 ? rowIdByPos[minRow] : ID();
-    CellStyle firstStyle = computeEffectiveStyleAt(*sheet, *_workbook, minCol, minRow, firstColId, firstRowId);
+    CellStyle firstStyle =
+        computeEffectiveStyleAt(*sheet, *_workbook, minCol, minRow, firstColId, firstRowId);
 
     // Track which properties differ across the range
     bool mixedBold = false;
@@ -2365,23 +2372,34 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     // Check all cells in range
     for (uint32_t c = minCol; c <= maxCol; ++c) {
         for (uint32_t r = minRow; r <= maxRow; ++r) {
-            if (c == minCol && r == minRow) continue;  // Skip anchor
+            if (c == minCol && r == minRow)
+                continue;  // Skip anchor
 
             ID colId = colIdByPos.count(c) > 0 ? colIdByPos[c] : ID();
             ID rowId = rowIdByPos.count(r) > 0 ? rowIdByPos[r] : ID();
             CellStyle cellStyle = computeEffectiveStyleAt(*sheet, *_workbook, c, r, colId, rowId);
 
             // Compare each property
-            if (cellStyle.bold != firstStyle.bold) mixedBold = true;
-            if (cellStyle.italic != firstStyle.italic) mixedItalic = true;
-            if (cellStyle.underline != firstStyle.underline) mixedUnderline = true;
-            if (cellStyle.wrapText != firstStyle.wrapText) mixedWrapText = true;
-            if (cellStyle.bgColor != firstStyle.bgColor) mixedBgColor = true;
-            if (cellStyle.textColor != firstStyle.textColor) mixedTextColor = true;
-            if (cellStyle.fontFamily != firstStyle.fontFamily) mixedFontFamily = true;
-            if (cellStyle.fontSize != firstStyle.fontSize) mixedFontSize = true;
-            if (cellStyle.hAlign != firstStyle.hAlign) mixedHAlign = true;
-            if (cellStyle.vAlign != firstStyle.vAlign) mixedVAlign = true;
+            if (cellStyle.bold != firstStyle.bold)
+                mixedBold = true;
+            if (cellStyle.italic != firstStyle.italic)
+                mixedItalic = true;
+            if (cellStyle.underline != firstStyle.underline)
+                mixedUnderline = true;
+            if (cellStyle.wrapText != firstStyle.wrapText)
+                mixedWrapText = true;
+            if (cellStyle.bgColor != firstStyle.bgColor)
+                mixedBgColor = true;
+            if (cellStyle.textColor != firstStyle.textColor)
+                mixedTextColor = true;
+            if (cellStyle.fontFamily != firstStyle.fontFamily)
+                mixedFontFamily = true;
+            if (cellStyle.fontSize != firstStyle.fontSize)
+                mixedFontSize = true;
+            if (cellStyle.hAlign != firstStyle.hAlign)
+                mixedHAlign = true;
+            if (cellStyle.vAlign != firstStyle.vAlign)
+                mixedVAlign = true;
         }
     }
 
@@ -2389,16 +2407,64 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     std::ostringstream ss;
     ss << "{\"style\":" << styleToJson(firstStyle) << ",\"mixed\":{";
     bool first = true;
-    if (mixedBold) { ss << "\"bold\":true"; first = false; }
-    if (mixedItalic) { if (!first) ss << ","; ss << "\"italic\":true"; first = false; }
-    if (mixedUnderline) { if (!first) ss << ","; ss << "\"underline\":true"; first = false; }
-    if (mixedWrapText) { if (!first) ss << ","; ss << "\"wrapText\":true"; first = false; }
-    if (mixedBgColor) { if (!first) ss << ","; ss << "\"bgColor\":true"; first = false; }
-    if (mixedTextColor) { if (!first) ss << ","; ss << "\"textColor\":true"; first = false; }
-    if (mixedFontFamily) { if (!first) ss << ","; ss << "\"fontFamily\":true"; first = false; }
-    if (mixedFontSize) { if (!first) ss << ","; ss << "\"fontSize\":true"; first = false; }
-    if (mixedHAlign) { if (!first) ss << ","; ss << "\"hAlign\":true"; first = false; }
-    if (mixedVAlign) { if (!first) ss << ","; ss << "\"vAlign\":true"; first = false; }
+    if (mixedBold) {
+        ss << "\"bold\":true";
+        first = false;
+    }
+    if (mixedItalic) {
+        if (!first)
+            ss << ",";
+        ss << "\"italic\":true";
+        first = false;
+    }
+    if (mixedUnderline) {
+        if (!first)
+            ss << ",";
+        ss << "\"underline\":true";
+        first = false;
+    }
+    if (mixedWrapText) {
+        if (!first)
+            ss << ",";
+        ss << "\"wrapText\":true";
+        first = false;
+    }
+    if (mixedBgColor) {
+        if (!first)
+            ss << ",";
+        ss << "\"bgColor\":true";
+        first = false;
+    }
+    if (mixedTextColor) {
+        if (!first)
+            ss << ",";
+        ss << "\"textColor\":true";
+        first = false;
+    }
+    if (mixedFontFamily) {
+        if (!first)
+            ss << ",";
+        ss << "\"fontFamily\":true";
+        first = false;
+    }
+    if (mixedFontSize) {
+        if (!first)
+            ss << ",";
+        ss << "\"fontSize\":true";
+        first = false;
+    }
+    if (mixedHAlign) {
+        if (!first)
+            ss << ",";
+        ss << "\"hAlign\":true";
+        first = false;
+    }
+    if (mixedVAlign) {
+        if (!first)
+            ss << ",";
+        ss << "\"vAlign\":true";
+        first = false;
+    }
     ss << "}}";
 
     return ss.str();
@@ -2625,9 +2691,12 @@ std::string CellsEngine::getColumnFormat(uint32_t colPosition) {
             std::string code = format->getCustomFormatCode();
             std::string escaped;
             for (char c : code) {
-                if (c == '"') escaped += "\\\"";
-                else if (c == '\\') escaped += "\\\\";
-                else escaped += c;
+                if (c == '"')
+                    escaped += "\\\"";
+                else if (c == '\\')
+                    escaped += "\\\\";
+                else
+                    escaped += c;
             }
             json << ",\"formatCode\":\"" << escaped << "\"";
         }
@@ -2674,9 +2743,12 @@ std::string CellsEngine::getRowFormat(uint32_t rowPosition) {
             std::string code = format->getCustomFormatCode();
             std::string escaped;
             for (char c : code) {
-                if (c == '"') escaped += "\\\"";
-                else if (c == '\\') escaped += "\\\\";
-                else escaped += c;
+                if (c == '"')
+                    escaped += "\\\"";
+                else if (c == '\\')
+                    escaped += "\\\\";
+                else
+                    escaped += c;
             }
             json << ",\"formatCode\":\"" << escaped << "\"";
         }
@@ -2848,8 +2920,8 @@ std::string CellsEngine::setRangeFormat(uint32_t startCol, uint32_t startRow, ui
     return setRangeFormatOnSheet(_activeSheetIndex, startCol, startRow, endCol, endRow, formatJson);
 }
 
-std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
-                                               uint32_t endCol, uint32_t endRow,
+std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t startCol,
+                                               uint32_t startRow, uint32_t endCol, uint32_t endRow,
                                                const std::string& formatJson) {
     if (!_workbook || sheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"Invalid sheet index\"}";

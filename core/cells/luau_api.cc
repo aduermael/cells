@@ -48,48 +48,8 @@ namespace cells {
 // ============================================================================
 // Helper functions (shared between API implementations)
 // ============================================================================
-
-// Ensure column/row exist at a grid position via CRDT ops (not local-only
-// getOrCreate). Local-only axis minting makes CELL_SET unapplyable on peers
-// (INVALID_TARGET: unknown col/row ids) — the CLI-writes-invisible-in-browser bug.
-inline Axis* ensureColumnViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position) {
-    Axis* existing = sheet.getColumnByPosition(position);
-    if (existing != nullptr) {
-        return existing;
-    }
-    const ID colId = generate_id();
-    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
-    const Operation op = makeColSetOp(workbook, colId, sheet.id, payload);
-    applyOperation(workbook, op);
-    return sheet.getColumn(colId);
-}
-
-inline Axis* ensureRowViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position) {
-    Axis* existing = sheet.getRowByPosition(position);
-    if (existing != nullptr) {
-        return existing;
-    }
-    const ID rowId = generate_id();
-    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
-    const Operation op = makeRowSetOp(workbook, rowId, sheet.id, payload);
-    applyOperation(workbook, op);
-    return sheet.getRow(rowId);
-}
-
-// Ensure a cell exists at (colId, rowId) via CRDT CELL_SET (not local-only getOrCreate).
-// Empty string value — used by style/format range ops that need a cell id.
-inline Cell* ensureCellViaCrdt(Workbook& workbook, Sheet& sheet, const ID& colId, const ID& rowId) {
-    Cell* existing = sheet.getCellAt(colId, rowId);
-    if (existing != nullptr) {
-        return existing;
-    }
-    const ID cellId = generate_id();
-    const std::string payload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
-                                "\",\"row\":\"" + rowId.toString() + "\"}";
-    const Operation op = makeCellSetOp(workbook, cellId, sheet.id, payload);
-    applyOperation(workbook, op);
-    return sheet.getCell(cellId);
-}
+// Collab-safe ensureColumnViaCrdt / ensureRowViaCrdt / ensureCellViaCrdt and
+// setColumnWidthByPosition / setRowHeightByPosition live in crdt.h (shared with WASM).
 
 // Helper: Escape a string for JSON
 static std::string jsonEscape(const std::string& str) {
@@ -599,7 +559,7 @@ int LuauSandbox::luaDocumentGetTitle(lua_State* L) {
 // ============================================================================
 // Cells API: setColumnWidth(col, options)
 // options.width: number (pixels)
-// Creates the column via CRDT if it does not exist (same as WASM resizeColumnByPos).
+// Uses shared setColumnWidthByPosition (same core path as WASM resizeColumnByPos).
 // ============================================================================
 int LuauSandbox::luaColumnSetWidth(lua_State* L) {
     const char* colRef = luaL_checkstring(L, 1);
@@ -624,28 +584,17 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
         luaL_error(L, "setColumnWidth: invalid column '%s'", colRef);
     }
 
-    Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
-    if (col == nullptr) {
-        // Create column with size in one CRDT op (matches WASM resizeColumnByPos)
-        const ID colId = generate_id();
-        const std::string createPayload =
-            "{\"pos\":" + std::to_string(colIdx) + ",\"size\":" + std::to_string(width) + "}";
-        const Operation createOp = makeColSetOp(*workbook, colId, sheet->id, createPayload);
-        applyOperation(*workbook, createOp);
-        return 0;
+    if (setColumnWidthByPosition(*workbook, *sheet, static_cast<uint32_t>(colIdx),
+                                 static_cast<uint32_t>(width)) == nullptr) {
+        luaL_error(L, "setColumnWidth: failed for column '%s'", colRef);
     }
-
-    const std::string payload = R"({"size":)" + std::to_string(width) + "}";
-    const Operation op = makeColSetOp(*workbook, col->id, sheet->id, payload);
-    applyOperation(*workbook, op);
-
     return 0;
 }
 
 // ============================================================================
 // Cells API: setRowHeight(row, options)
 // options.height: number (pixels)
-// Creates the row via CRDT if it does not exist (same as WASM resizeRowByPos).
+// Uses shared setRowHeightByPosition (same core path as WASM resizeRowByPos).
 // ============================================================================
 int LuauSandbox::luaRowSetHeight(lua_State* L) {
     const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
@@ -669,21 +618,10 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
         luaL_error(L, "setRowHeight: invalid row number %d", rowNum);
     }
 
-    Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
-    if (row == nullptr) {
-        // Create row with size in one CRDT op (matches WASM resizeRowByPos)
-        const ID rowId = generate_id();
-        const std::string createPayload =
-            "{\"pos\":" + std::to_string(rowIdx) + ",\"size\":" + std::to_string(height) + "}";
-        const Operation createOp = makeRowSetOp(*workbook, rowId, sheet->id, createPayload);
-        applyOperation(*workbook, createOp);
-        return 0;
+    if (setRowHeightByPosition(*workbook, *sheet, static_cast<uint32_t>(rowIdx),
+                               static_cast<uint32_t>(height)) == nullptr) {
+        luaL_error(L, "setRowHeight: failed for row %d", rowNum);
     }
-
-    const std::string payload = R"({"size":)" + std::to_string(height) + "}";
-    const Operation op = makeRowSetOp(*workbook, row->id, sheet->id, payload);
-    applyOperation(*workbook, op);
-
     return 0;
 }
 
@@ -1503,17 +1441,13 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
         std::swap(fromRow, toRow);
     }
 
-    // Apply format to all cells in range (axes/cells via CRDT — same as WASM setCellFormatAt)
+    // Apply format to all cells in range (shared ensureCellAtPositionViaCrdt)
     auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
 
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
-            Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c));
-            Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(r));
-            if (col == nullptr || row == nullptr) {
-                continue;
-            }
-            Cell* cell = ensureCellViaCrdt(*workbook, *sheet, col->id, row->id);
+            Cell* cell = ensureCellAtPositionViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c),
+                                                     static_cast<uint32_t>(r));
             if (cell == nullptr) {
                 continue;
             }
@@ -1567,12 +1501,8 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     if (lua_isnil(L, 2) != 0) {
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
-                Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c));
-                Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(r));
-                if (col == nullptr || row == nullptr) {
-                    continue;
-                }
-                Cell* cell = ensureCellViaCrdt(*workbook, *sheet, col->id, row->id);
+                Cell* cell = ensureCellAtPositionViaCrdt(
+                    *workbook, *sheet, static_cast<uint32_t>(c), static_cast<uint32_t>(r));
                 if (cell == nullptr) {
                     continue;
                 }
@@ -1682,12 +1612,8 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     if (style.isEmpty()) {
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
-                Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c));
-                Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(r));
-                if (col == nullptr || row == nullptr) {
-                    continue;
-                }
-                Cell* cell = ensureCellViaCrdt(*workbook, *sheet, col->id, row->id);
+                Cell* cell = ensureCellAtPositionViaCrdt(
+                    *workbook, *sheet, static_cast<uint32_t>(c), static_cast<uint32_t>(r));
                 if (cell == nullptr) {
                     continue;
                 }
@@ -1702,15 +1628,11 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     // Convert CellStyle to content-addressed StyleBuffer
     const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
 
-    // Apply style to all cells in range (axes/cells via CRDT — same as WASM)
+    // Apply style to all cells in range (shared ensureCellAtPositionViaCrdt)
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
-            Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c));
-            Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(r));
-            if (col == nullptr || row == nullptr) {
-                continue;
-            }
-            Cell* cell = ensureCellViaCrdt(*workbook, *sheet, col->id, row->id);
+            Cell* cell = ensureCellAtPositionViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c),
+                                                     static_cast<uint32_t>(r));
             if (cell == nullptr) {
                 continue;
             }

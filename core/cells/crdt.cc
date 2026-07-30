@@ -30,6 +30,7 @@
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
+#include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
 #include "core/log/include/Logger.h"
@@ -1132,6 +1133,162 @@ size_t bootstrapOpLog(Workbook& workbook) {
     }
 
     return count;
+}
+
+// =============================================================================
+// Collab-safe ensure + grid helpers
+// =============================================================================
+
+Axis* ensureColumnViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position, bool* outCreated) {
+    if (outCreated != nullptr) {
+        *outCreated = false;
+    }
+    Axis* existing = sheet.getColumnByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+    const ID colId = generate_id();
+    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
+    const Operation op = makeColSetOp(workbook, colId, sheet.id, payload);
+    applyOperation(workbook, op);
+    if (outCreated != nullptr) {
+        *outCreated = true;
+    }
+    return sheet.getColumn(colId);
+}
+
+Axis* ensureRowViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position, bool* outCreated) {
+    if (outCreated != nullptr) {
+        *outCreated = false;
+    }
+    Axis* existing = sheet.getRowByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+    const ID rowId = generate_id();
+    const std::string payload = "{\"pos\":" + std::to_string(position) + "}";
+    const Operation op = makeRowSetOp(workbook, rowId, sheet.id, payload);
+    applyOperation(workbook, op);
+    if (outCreated != nullptr) {
+        *outCreated = true;
+    }
+    return sheet.getRow(rowId);
+}
+
+Cell* ensureCellViaCrdt(Workbook& workbook, Sheet& sheet, const ID& colId, const ID& rowId,
+                        bool* outCreated) {
+    if (outCreated != nullptr) {
+        *outCreated = false;
+    }
+    Cell* existing = sheet.getCellAt(colId, rowId);
+    if (existing != nullptr) {
+        return existing;
+    }
+    const ID cellId = generate_id();
+    const std::string payload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
+                                "\",\"row\":\"" + rowId.toString() + "\"}";
+    const Operation op = makeCellSetOp(workbook, cellId, sheet.id, payload);
+    applyOperation(workbook, op);
+    if (outCreated != nullptr) {
+        *outCreated = true;
+    }
+    return sheet.getCell(cellId);
+}
+
+Cell* ensureCellAtPositionViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t colPos,
+                                  uint32_t rowPos, bool* outColCreated, bool* outRowCreated,
+                                  bool* outCellCreated) {
+    Axis* col = ensureColumnViaCrdt(workbook, sheet, colPos, outColCreated);
+    Axis* row = ensureRowViaCrdt(workbook, sheet, rowPos, outRowCreated);
+    if (col == nullptr || row == nullptr) {
+        if (outCellCreated != nullptr) {
+            *outCellCreated = false;
+        }
+        return nullptr;
+    }
+    return ensureCellViaCrdt(workbook, sheet, col->id, row->id, outCellCreated);
+}
+
+Axis* setColumnWidthByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t width,
+                               bool* outCreated) {
+    if (outCreated != nullptr) {
+        *outCreated = false;
+    }
+    Axis* column = sheet.getColumnByPosition(pos);
+    if (column == nullptr) {
+        const ID colId = generate_id();
+        const std::string payload =
+            "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(width) + "}";
+        applyOperation(workbook, makeColSetOp(workbook, colId, sheet.id, payload));
+        if (outCreated != nullptr) {
+            *outCreated = true;
+        }
+        return sheet.getColumn(colId);
+    }
+
+    // Full-state payload for resurrection correctness (matches prior WASM path)
+    std::string payload = "{\"pos\":" + std::to_string(column->position);
+    payload += ",\"size\":" + std::to_string(width);
+    if (!column->name.empty()) {
+        payload += ",\"name\":\"" + internal::jsonEscape(column->name) + "\"";
+    }
+    if (column->hasStyle()) {
+        const StyleBuffer* sty = workbook.getEntityStyle(column->id);
+        if (sty != nullptr) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+    if (column->hasFormat()) {
+        const FormatBuffer* fmt = workbook.getEntityFormat(column->id);
+        if (fmt != nullptr) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+    if (column->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+    payload += "}";
+    applyOperation(workbook, makeColSetOp(workbook, column->id, sheet.id, payload));
+    return sheet.getColumn(column->id);
+}
+
+Axis* setRowHeightByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t height,
+                             bool* outCreated) {
+    if (outCreated != nullptr) {
+        *outCreated = false;
+    }
+    Axis* row = sheet.getRowByPosition(pos);
+    if (row == nullptr) {
+        const ID rowId = generate_id();
+        const std::string payload =
+            "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(height) + "}";
+        applyOperation(workbook, makeRowSetOp(workbook, rowId, sheet.id, payload));
+        if (outCreated != nullptr) {
+            *outCreated = true;
+        }
+        return sheet.getRow(rowId);
+    }
+
+    std::string payload = "{\"pos\":" + std::to_string(row->position);
+    payload += ",\"size\":" + std::to_string(height);
+    if (row->hasStyle()) {
+        const StyleBuffer* sty = workbook.getEntityStyle(row->id);
+        if (sty != nullptr) {
+            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+        }
+    }
+    if (row->hasFormat()) {
+        const FormatBuffer* fmt = workbook.getEntityFormat(row->id);
+        if (fmt != nullptr) {
+            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+        }
+    }
+    if (row->hidden()) {
+        payload += ",\"hidden\":true";
+    }
+    payload += "}";
+    applyOperation(workbook, makeRowSetOp(workbook, row->id, sheet.id, payload));
+    return sheet.getRow(row->id);
 }
 
 }  // namespace cells
