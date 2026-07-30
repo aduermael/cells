@@ -11,13 +11,12 @@
 #define NOMINMAX
 #endif
 
-#include <windows.h>
-#include <winhttp.h>
-
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
+#include <windows.h>
+#include <winhttp.h>
 
 #include "core/net/include/WSConnection.h"
 #include "core/net/windows/ws_worker_state.h"
@@ -174,7 +173,8 @@ private:
             return;
         }
         notified = true;
-        if (WsWorkerState::abandonNotify(state_.isClosing()) == WsWorkerState::AbandonNotify::Close) {
+        if (WsWorkerState::abandonNotify(state_.isClosing()) ==
+            WsWorkerState::AbandonNotify::Close) {
             onClose(1000, "");
         } else {
             onError(error_if_not_closing);
@@ -247,8 +247,8 @@ private:
             return;
         }
 
-        if (!WinHttpSendRequest(req, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0,
-                                0)) {
+        if (!WinHttpSendRequest(req, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0,
+                                0, 0)) {
             const DWORD err = GetLastError();
             closeHandles();
             notifyAbandoned(notified, lastErrorString(err));
@@ -315,9 +315,8 @@ private:
 
             DWORD bytes_read = 0;
             WINHTTP_WEB_SOCKET_BUFFER_TYPE buffer_type;
-            const DWORD hr = WinHttpWebSocketReceive(ws, buffer.data(),
-                                                     static_cast<DWORD>(buffer.size()), &bytes_read,
-                                                     &buffer_type);
+            const DWORD hr = WinHttpWebSocketReceive(
+                ws, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes_read, &buffer_type);
 
             if (hr != ERROR_SUCCESS) {
                 if (state_.isClosing()) {

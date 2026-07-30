@@ -10,15 +10,14 @@
 #define NOMINMAX
 #endif
 
-#include <windows.h>
-#include <winhttp.h>
-
 #include <atomic>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
+#include <windows.h>
+#include <winhttp.h>
 
 #include "core/net/include/HttpRequest.h"
 
@@ -65,7 +64,8 @@ std::string lastErrorString(DWORD err) {
 
 class WinHttpRequest : public HttpRequest {
 public:
-    WinHttpRequest(HttpMethod method, std::string host, uint16_t port, std::string path, bool secure)
+    WinHttpRequest(HttpMethod method, std::string host, uint16_t port, std::string path,
+                   bool secure)
         : HttpRequest(method, std::move(host), port, std::move(path), secure) {}
 
     ~WinHttpRequest() override {
@@ -252,8 +252,9 @@ private:
                             WINHTTP_NO_OUTPUT_BUFFER, &header_bytes, WINHTTP_NO_HEADER_INDEX);
         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER && header_bytes > 0) {
             std::vector<wchar_t> header_buf(header_bytes / sizeof(wchar_t) + 1, L'\0');
-            if (WinHttpQueryHeaders(req, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX,
-                                    header_buf.data(), &header_bytes, WINHTTP_NO_HEADER_INDEX)) {
+            if (WinHttpQueryHeaders(req, WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                                    WINHTTP_HEADER_NAME_BY_INDEX, header_buf.data(), &header_bytes,
+                                    WINHTTP_NO_HEADER_INDEX)) {
                 parseRawHeaders(header_buf.data(), header_bytes / sizeof(wchar_t));
             }
         }

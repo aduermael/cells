@@ -2,12 +2,12 @@
 // Proves the shipped sources and Bazel selects exist with the expected OS stack.
 
 #include <cstdlib>
+
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-
-#include <gtest/gtest.h>
 
 namespace {
 

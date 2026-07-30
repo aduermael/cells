@@ -4,8 +4,9 @@
 #ifndef CELLS_NET_WINDOWS_WS_WORKER_STATE_H_
 #define CELLS_NET_WINDOWS_WS_WORKER_STATE_H_
 
-#include <atomic>
 #include <cstdint>
+
+#include <atomic>
 
 namespace cells::net {
 
