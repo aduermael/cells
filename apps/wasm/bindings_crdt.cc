@@ -20,6 +20,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/hlc.h"
+#include "core/cells/id.h"
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/log/include/Logger.h"
@@ -361,8 +362,15 @@ std::string CellsEngine::handlePeerMessage(const std::string& peerIdStr,
     HandleMessageResult result = _syncManager->handleMessage(peerId, messageJson);
 
     if (result.dataModified) {
+        if (_workbook && _workbook->sheetCount() > 0) {
+            const size_t preferred = preferredActiveSheetIndex(*_workbook);
+            if (preferred != _activeSheetIndex) {
+                _activeSheetIndex = preferred;
+            }
+        }
         rebuildViewportIndex();
-        notifyListeners(ChangeType::CELL_CHANGED);
+        // Sheet tabs need SHEET_CHANGED after join (new sheets / active switch)
+        notifyListeners(ChangeType::SHEET_CHANGED);
     }
 
     std::ostringstream json;
@@ -454,8 +462,19 @@ std::string CellsEngine::startCollaboration() {
         return "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":0}";
     }
 
-    _workbook->startCollaboration();
-    size_t opCount = bootstrapOpLog(*_workbook);
+    size_t opCount = 0;
+    // Empty UI shell only: do not publish a competing Sheet1. Content is pulled
+    // from peers (or minted when alone ONLINE). Hosts that already edited have
+    // columns/rows and take the bootstrap path.
+    if (isWorkbookContentEmpty(*_workbook)) {
+        discardEmptyPlaceholderSheets(*_workbook);
+        _workbook->startCollaboration();
+        _activeSheetIndex = 0;
+    } else {
+        _workbook->startCollaboration();
+        opCount = bootstrapOpLog(*_workbook);
+        _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
+    }
 
     std::ostringstream json;
     json << "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":" << opCount << "}";
@@ -495,8 +514,19 @@ std::string CellsEngine::enableSync(const std::string& url, const std::string& r
 
     size_t bootstrappedOps = 0;
     if (!_workbook->isCollaborating()) {
-        _workbook->startCollaboration();
-        bootstrappedOps = bootstrapOpLog(*_workbook);
+        // Late joiners start from createEmptyWorkbook()'s empty Sheet1. If we
+        // bootstrap that shell, every peer ends up with two Sheet1s and the
+        // joiner UI stays on the empty one while content lives on the host's.
+        if (isWorkbookContentEmpty(*_workbook)) {
+            discardEmptyPlaceholderSheets(*_workbook);
+            _workbook->startCollaboration();
+            bootstrappedOps = 0;
+            _activeSheetIndex = 0;
+        } else {
+            _workbook->startCollaboration();
+            bootstrappedOps = bootstrapOpLog(*_workbook);
+            _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
+        }
     }
 
     cells::net::SyncClientConfig config;
@@ -714,7 +744,22 @@ std::string CellsEngine::getRemotePresences() {
 // ============================================================================
 
 void CellsEngine::syncClientStateDidChange(cells::net::SyncClient& /*client*/,
-                                            cells::net::SyncClientState /*newState*/) {
+                                            cells::net::SyncClientState newState) {
+    // Alone in a room with no document sheet yet (we stripped the empty UI
+    // placeholder on join): mint default Sheet1 via CRDT so the grid works.
+    if (newState == cells::net::SyncClientState::ONLINE && _workbook &&
+        _workbook->sheetCount() == 0) {
+        const ID sheetId = generate_id();
+        const Operation op = makeSheetSetOp(*_workbook, sheetId, R"({"name":"Sheet1"})");
+        applyOperation(*_workbook, op);
+        if (_syncClient) {
+            _syncClient->broadcastOperations();
+        }
+        _activeSheetIndex = 0;
+        rebuildViewportIndex();
+        notifyListeners(ChangeType::SHEET_CHANGED);
+        LOG_INFO("[Sync] Minted default Sheet1 (alone ONLINE, no sheets)");
+    }
     notifyListeners(ChangeType::SYNC_STATE_CHANGED);
 }
 
@@ -729,8 +774,24 @@ void CellsEngine::syncClientPeerDidDisconnect(cells::net::SyncClient& /*client*/
 }
 
 void CellsEngine::syncClientDataDidChange(cells::net::SyncClient& /*client*/) {
+    // After join, content often lands on a sheet that is not index 0 (or the
+    // active sheet was empty). Prefer a sheet that actually has grid content
+    // so the canvas shows the synced document instead of a blank Sheet1.
+    bool sheetChanged = false;
+    if (_workbook && _workbook->sheetCount() > 0) {
+        const size_t preferred = preferredActiveSheetIndex(*_workbook);
+        if (preferred != _activeSheetIndex) {
+            _activeSheetIndex = preferred;
+            sheetChanged = true;
+            LOG_INFO("[Sync] Switched active sheet to index %zu (content sheet)", preferred);
+        }
+        // New sheets from peers always need tab refresh even if index unchanged
+        sheetChanged = true;
+    }
     rebuildViewportIndex();
-    notifyListeners(ChangeType::CELL_CHANGED);
+    // SHEET_CHANGED refreshes sheet tabs + viewport; CELL_CHANGED alone does not
+    // re-fetch sheets, so dual-sheet joins looked empty even when data was present.
+    notifyListeners(sheetChanged ? ChangeType::SHEET_CHANGED : ChangeType::CELL_CHANGED);
 }
 
 void CellsEngine::syncClientDidError(cells::net::SyncClient& /*client*/,

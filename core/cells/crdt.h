@@ -189,6 +189,20 @@ Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const Form
 // Returns the number of operations created.
 size_t bootstrapOpLog(Workbook& workbook);
 
+// True when every sheet has zero columns and zero rows (default empty UI shell).
+// Used to decide whether a peer should publish local state or only pull remote.
+[[nodiscard]] bool isWorkbookContentEmpty(const Workbook& workbook);
+
+// Remove sheets that have no columns and no rows (createEmptyWorkbook placeholders).
+// Call before joining collaboration so a late joiner does not publish a second
+// empty Sheet1 that shadows the host document. Returns number of sheets removed.
+size_t discardEmptyPlaceholderSheets(Workbook& workbook);
+
+// Index of the first sheet with columns/cells, or 0 if none / empty workbook.
+// Prefer this as the active sheet after a join so the UI is not stuck on an
+// empty local placeholder while content lives on another sheet.
+[[nodiscard]] size_t preferredActiveSheetIndex(const Workbook& workbook);
+
 // =============================================================================
 // Collab-safe ensure + grid helpers (shared by CLI Luau API and WASM engine)
 // =============================================================================

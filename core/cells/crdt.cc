@@ -891,6 +891,49 @@ Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const Form
 // Bootstrap OpLog
 // =============================================================================
 
+bool isWorkbookContentEmpty(const Workbook& workbook) {
+    for (const auto& sheet : workbook.sheets) {
+        if (sheet == nullptr) {
+            continue;
+        }
+        if (sheet->columnCount() > 0 || sheet->rowCount() > 0 || sheet->cellCount() > 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+size_t discardEmptyPlaceholderSheets(Workbook& workbook) {
+    std::vector<ID> emptyIds;
+    emptyIds.reserve(workbook.sheets.size());
+    for (const auto& sheet : workbook.sheets) {
+        if (sheet == nullptr) {
+            continue;
+        }
+        if (sheet->columnCount() == 0 && sheet->rowCount() == 0) {
+            emptyIds.push_back(sheet->id);
+        }
+    }
+    for (const ID& id : emptyIds) {
+        workbook.removeSheet(id);
+    }
+    return emptyIds.size();
+}
+
+size_t preferredActiveSheetIndex(const Workbook& workbook) {
+    if (workbook.sheets.empty()) {
+        return 0;
+    }
+    for (size_t i = 0; i < workbook.sheets.size(); ++i) {
+        const Sheet* sheet = workbook.sheets[i].get();
+        if (sheet != nullptr &&
+            (sheet->columnCount() > 0 || sheet->cellCount() > 0 || sheet->rowCount() > 0)) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 size_t bootstrapOpLog(Workbook& workbook) {
     size_t count = 0;
     OpLog* oplog = workbook.getOpLog();
