@@ -321,7 +321,9 @@ public:
     // C++ SyncClient methods (bindings_crdt.cc)
     // ========================================================================
 
-    std::string enableSync(const std::string& serverUrl, const std::string& roomId);
+    // peerId may be empty: SyncClient generates one. Non-empty reuses an existing peer id.
+    std::string enableSync(const std::string& serverUrl, const std::string& roomId,
+                           const std::string& peerId = "");
     void disableSync();
     std::string getSyncState();
     bool isSyncEnabled();

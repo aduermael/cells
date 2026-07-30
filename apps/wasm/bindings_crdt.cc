@@ -482,7 +482,8 @@ std::string CellsEngine::setCollabMode(const std::string& mode) {
 // C++ SyncClient methods
 // ============================================================================
 
-std::string CellsEngine::enableSync(const std::string& url, const std::string& roomId) {
+std::string CellsEngine::enableSync(const std::string& url, const std::string& roomId,
+                                    const std::string& peerId) {
     if (!_workbook) {
         return "{\"error\":\"No workbook\"}";
     }
@@ -504,7 +505,8 @@ std::string CellsEngine::enableSync(const std::string& url, const std::string& r
     _syncClient = std::make_unique<cells::net::SyncClient>(_workbook.get(), config);
     _syncClient->setDelegate(this);
 
-    _syncClient->startSync(roomId, "");
+    // Empty peerId: SyncClient generates one. Non-empty: reuse (e.g. rejoin).
+    _syncClient->startSync(roomId, peerId);
 
     std::ostringstream json;
     json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId()
