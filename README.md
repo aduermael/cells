@@ -153,7 +153,9 @@ cells output.xlsx
 cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 ```
 
-## Architecture 🏛️
+## Architecture
+
+Same engine, two shapes: **WebAssembly** in the browser, **native** for the CLI. The web UI stays intentionally thin (canvas + events in TypeScript). Spreadsheet logic (model, formulas, CRDT ops) lives in C++17 and is shared.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -174,28 +176,29 @@ cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 └─────────────────────────────────────────────────────┘
 ```
 
-The engine compiles to WebAssembly for the browser and native code for the CLI. All mutations go through CRDT operations, making collaboration a first-class feature rather than an afterthought.
+### Collaboration & `.zcd`
 
-### Collaboration & ZCD Format 📄
+Realtime sync is **WebRTC peer-to-peer**. A small signaling server only helps clients find each other (offers, answers, ICE). Once a DataChannel is up, document ops and presence travel between peers, not through a central document store. Concurrent edits merge automatically with CRDTs.
 
-Cells uses peer-to-peer sync via WebRTC. Document data travels directly between clients with no relay servers. Concurrent edits merge automatically using CRDTs.
+The native format is **`.zcd`** (Zero Conflict Document). It is plain text on purpose, built around collab and clean git diffs:
 
-The native `.zcd` format (Zero Conflict Document) is designed for this:
+- **One entity per line:** edit a cell, column, or row → exactly one line changes
+- **Content-addressed styles/formats:** same style encodes to the same base64 blob (auto-deduped; the content *is* the identity)
+- **CRDT operation log:** full edit history for sync and conflict resolution
 
-- **One entity per line** - Editing a cell changes exactly one line, minimal diffs
-- **Content-addressed styles** - Styles/formats stored as base64 hashes, auto-deduplicated
-- **CRDT operation log** - Full edit history for sync and conflict resolution
+A tiny workbook (value `42` in one cell, formula `=A1*10` next to it) looks roughly like this:
 
 ```
 D yRUosCbW "Untitled"
 S FD3KLIgo "Sheet1"
-C C4Jr2s32 1
-C pYYl3eZ1 2
-R Zv6vRn4q 1
+C C4Jr2s32 0
+C pYYl3eZ1 1
+R Zv6vRn4q 0
 X XO5lD1Nh C4Jr2s32 Zv6vRn4q n 42 fmt:DwICAQEk
 X 1MvyBXyr pYYl3eZ1 Zv6vRn4q f "=~~XO5lD1Nh*10" fmt:DwICAQEk sty:BAAB
 ```
-<sub>
+
+Formulas store stable cell IDs (`~~XO5lD1Nh`), not A1 coordinates, so inserts and renames do not break references. Below the snapshot, the op log records how the doc got there:
 
 ```
 #oplog
@@ -203,28 +206,7 @@ O 1769998913268.0.atyBEwwf CELL_SET XO5lD1Nh {"t":"n","v":"42","col":"C4Jr2s32",
 O 1769998921630.0.atyBEwwf CELL_SET 1MvyBXyr {"t":"f","v":"=~~XO5lD1Nh*10","col":"pYYl3eZ1","row":"Zv6vRn4q"}
 ```
 
-</sub>
-
-See [docs/persistence.md](./docs/persistence.md) for the full specification.
-
-For detailed architecture documentation, see [docs/](./docs/).
-
-## AI Agents 🤖
-
-Cells does **not** host an in-product AI agent. Humans use the web client; agents use the **CLI** (and the agent skill) like any other tool—Codex, Claude Code, Grok, or anything else.
-
-**Collaborate with an agent:** open the Collaborate menu in the web UI, copy the room link, and give it to an agent. The agent starts a long-running **session** so the CLI peer stays connected while it runs multiple scripts:
-
-```bash
-cells session start '<room-url>' --name 'CLI Agent'
-cells session exec SESSION_ID -e 'setCell("A1", 42)'
-cells session watch SESSION_ID --duration 30
-cells session stop SESSION_ID
-```
-
-Sessions auto-stop after idle minutes (default 30; `--idle-minutes N`). For a one-shot blocking listener, `cells sync '<room-url>'` still works.
-
-Install the skill (CLI + docs) with `./install-skill.sh` or see [skill/SKILL.md](./skill/SKILL.md). In this repository, skills are also symlinked for local agent discovery under `.agents/skills/cells`, `.claude/skills/cells`, and `.grok/skills/cells`.
+Full format spec: [docs/persistence.md](./docs/persistence.md). Deeper architecture notes live under [docs/](./docs/).
 
 ## Requirements 📋
 
@@ -255,41 +237,6 @@ bazel run :check            # All checks (test + lint + types)
 
 # Landing site (GitHub Pages artifact)
 ./tools/prepare-pages.sh    # → dist/pages/
-```
-
-## Deploy 🚀
-
-Production deploys are **manual** GitHub Actions workflows (no auto-deploy on push):
-
-| Workflow | What it deploys |
-|----------|-----------------|
-| **Deploy server (Fly.io)** | Collaboration server + WASM app → [cells-app.fly.dev](https://cells-app.fly.dev/) |
-| **Deploy website (GitHub Pages)** | Minimal landing page (iframe demo + links) → GitHub Pages |
-| **Deploy all** | Both of the above (reuses the same workflows) |
-
-### GitHub `production` environment secrets
-
-| Secret | Where | Required | Purpose |
-|--------|-------|----------|---------|
-| `FLY_API_TOKEN` | GitHub Environment **production** | Yes (server) | `flyctl deploy` |
-
-### Fly app secrets (not GitHub)
-
-Set with `fly secrets set` on the `cells-app` app:
-
-| Secret | Required | Purpose |
-|--------|----------|---------|
-| *(none required for agent features)* | — | Agents use the CLI; the server only needs collab for multi-peer rooms |
-
-### One-time GitHub Pages setting
-
-**Settings → Pages → Build and deployment → Source: GitHub Actions**
-
-Local preview of the landing page:
-
-```bash
-./tools/prepare-pages.sh
-# open dist/pages/index.html (iframe still loads the live Fly app)
 ```
 
 ## Documentation 📚
