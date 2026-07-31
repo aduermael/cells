@@ -332,9 +332,4 @@ Local preview of the landing page:
 
 ## License
 
-Cells is dual-licensed:
-
-1. **Open source (GPL-3.0)** — Free to use, modify, and distribute in open-source projects. If you distribute Cells (or a work based on it), you must also release the corresponding source under the GPL-3.0. See [LICENSE-GPL-3.0](./LICENSE-GPL-3.0).
-2. **Commercial** — For proprietary or closed-source use, a commercial license is available. Reach out to discuss terms. See [LICENSE-COMMERCIAL](./LICENSE-COMMERCIAL).
-
-Full dual-license notice: [LICENSE](./LICENSE).
+Cells is licensed under the [MIT License](./LICENSE).
