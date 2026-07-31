@@ -2,17 +2,17 @@
 
 Cells is a modern spreadsheet engine, built with agentic use primarily in mind. 
 
-It’s lightweight (~XMB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and Typescript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
+It’s lightweight (~XMB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
 
 Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for your agents. 
 
 You can test it on the [presentation web page](https://aduermael.github.io/cells/). 
 
-*NOTE: it’s early and not yet a drop-in replacement for Excel. (about 120 formula supported over almost 500 in Excel, charts not yet supported also)*
+*NOTE: it’s early and not yet a drop-in replacement for Excel. (about 120 formulas supported over almost 500 in Excel, charts not yet supported also)*
 
 ## Made for AI agents to work with, not an agent itself
 
-Cells defines no harness, no system prompts. The CLI is designed for agents through, delivering context-window-conscious structured outputs and using code as the main request interface. 
+Cells defines no harness, no system prompts. The CLI is designed for agents though, delivering context-window-conscious structured outputs and using code as the main request interface. 
 
 Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build and Codex agents (using the CLI):
 
@@ -20,8 +20,8 @@ Here’s a quick demo where you can see humans (web clients) collaborating with 
 
 ## Scriptable
 
-Cells is built from the start as fully scriptable Lua/Luau runtime. 
-(Python, VBA and Typescript not yet supported but planned, they will under the hood be transpired *into Luau)*
+Cells is built from the start as a fully scriptable Lua/Luau runtime. 
+(Python, VBA and TypeScript not yet supported but planned, they will under the hood be transpiled *into Luau*)
 
 <img style="max-width:400px" src="./docs/img/scripting.png">
 
@@ -50,7 +50,7 @@ and use `cells`:
 curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh
 ```
 
-The skill gets installed for Claude Code, Codex and Grok Build in your working directory. After this, just prompt for spreadsheet work like `“Open file.xlsx and fix formulas”`.
+The skill gets installed for Claude Code, Codex and Grok Build in your working directory. After this, just prompt for spreadsheet work like `"Open file.xlsx and fix formulas"`.
 
 ### 2. Homebrew
 
