@@ -21,7 +21,7 @@ Here’s a quick demo where you can see humans (web clients) collaborating with 
 ## Scriptable
 
 Cells is built from the start as a fully scriptable Lua/Luau runtime. 
-(Python, VBA and TypeScript not yet supported but planned, they will under the hood be transpiled *into Luau*)
+(Python, VBA and TypeScript not yet supported but planned; they will under the hood be transpiled *into Luau*)
 
 <img style="max-width:400px" src="./docs/img/scripting.png">
 
