@@ -65,7 +65,7 @@ class Cells < Formula
   desc "Lightweight spreadsheet engine CLI for conversion, scripting, and collaboration"
   homepage "$homepage"
   version "$version"
-  license "GPL-3.0-or-later"
+  license "MIT"
 
   on_macos do
     on_arm do
