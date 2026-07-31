@@ -1,32 +1,41 @@
 # Cells
 
-A modern spreadsheet engine! 
+Cells is a modern spreadsheet engine, built with agentic use primarily in mind. 
 
-Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
+It’s lightweight (~XMB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and Typescript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
 
-**[Demo](https://cells-app.fly.dev/)** | [GitHub Pages](https://aduermael.github.io/cells/) | [Documentation](./docs/)
+Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for your agents. 
 
-## What is Cells?
+You can test it on the [presentation web page](https://aduermael.github.io/cells/). 
 
-Cells is a spreadsheet engine that works two ways:
+*NOTE: it’s early and not yet a drop-in replacement for Excel. (about 120 formula supported over almost 500 in Excel, charts not yet supported also)*
 
-1. **Web App:** A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
+## Made for AI agents to work with, not an agent itself
 
-   <img style="max-width:500px" src="./docs/img/demo.gif">
+Cells defines no harness, no system prompts. The CLI is designed for agents through, delivering context-window-conscious structured outputs and using code as the main request interface. 
 
-2. **Headless CLI:** Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
+Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build and Codex agents (using the CLI):
 
-	<img style="max-width:500px" src="./docs/img/cli.png">
+<img style="max-width:500px" src="./docs/img/demo.gif">
 
-Both share the same core engine, so formulas and files work identically across environments.
+## Scriptable
 
-**Key features:**
+Cells is built from the start as fully scriptable Lua/Luau runtime. 
+(Python, VBA and Typescript not yet supported but planned, they will under the hood be transpired *into Luau)*
 
-- **Lightweight & Fast**
-- **Real-time collaboration** - Edit together with P2P sync
-- **Excel compatible** - Import and export .xlsx files seamlessly
-- **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
-- **Git-friendly** - [Text-based file format](#collaboration--zcd-format-) that diffs cleanly
+<img style="max-width:400px" src="./docs/img/scripting.png">
+
+```bash
+# Run inline script
+cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
+
+# Run a script file
+cells -i data.xlsx output.csv --script transform.luau
+
+# Script-only mode (no output file)
+cells -i report.xlsx --script analyze.luau
+cells -i data.csv -e 'print(getCell("A1"))'
+```
 
 ## Install
 
@@ -35,25 +44,19 @@ Install methods for the **CLI**, in order of preference:
 ### 1. Agent skill (recommended)
 
 Best default for agentic workflows. Installs a skill that knows how to install
-and use the `cells` binary:
+and use `cells`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh
 ```
 
-The skill lands in `.agents/skills/cells`, `.claude/skills/cells`, and
-`.grok/skills/cells`. When `cells` is missing from `PATH`, agents run the
-bundled `install.sh` (Homebrew first, then direct release install — no npm).
+The skill gets installed for Claude Code, Codex and Grok Build in your working directory. After this, just prompt for spreadsheet work like `“Open file.xlsx and fix formulas”`.
 
 ### 2. Homebrew
 
 ```bash
 brew install aduermael/tap/cells
 ```
-
-Requires the [Homebrew tap](https://github.com/aduermael/homebrew-tap) to be
-published for a release. Formula assets are generated automatically on each
-`v*` tag when tap credentials are configured.
 
 ### 3. Direct install (`curl | sh`)
 
@@ -62,15 +65,6 @@ Downloads the platform binary from the latest GitHub Release:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh
 ```
-
-User-local install (no sudo):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh \
-  | env CELLS_INSTALL_DIR=$HOME/.local/bin sh
-```
-
-Pin a version: `CELLS_VERSION=v0.0.1`.
 
 ### 4. Build from source
 
@@ -82,11 +76,10 @@ bazel run :cli-release  # optimized
 ### Optional: run the collaboration server
 
 Not required for CLI conversion/scripting. Use this only if you want to host
-the web UI + signaling yourself.
+the web UI + signaling server yourself.
 
 | Method | Command |
 |--------|---------|
-| **Public demo** | [https://cells-app.fly.dev/](https://cells-app.fly.dev/) |
 | **Docker** | `docker build -t cells-server . && docker run -p 8080:8080 cells-server` |
 | **Local dev** | `bazel run :wasm-dist && bazel run :serve` → http://localhost:8081 |
 
@@ -99,12 +92,13 @@ cells session exec SESSION_ID -e 'setCell("A1", 1)'
 cells sync 'https://your-host/?room=YOUR_ROOM'
 ```
 
-Tag a release (`git tag v0.0.1 && git push origin v0.0.1`) to build multi-platform
-CLI assets and publish a GitHub Release automatically.
-
 ## Quick Start
 
 ### Web UI
+
+The simplest is to test the most recent release here: https://cells-app.fly.dev
+
+To build and run locally: 
 
 ```bash
 # Build and serve locally
@@ -144,24 +138,6 @@ cells -i budget.xlsx budget.csv --eval
 
 # Useful when XLSX cached values are stale or missing
 cells -i calculations.xlsx results.csv --eval
-```
-
-#### Scripting
-
-<img style="max-width:400px" src="./docs/img/scripting.png">
-
-Run [Luau](https://luau.org) scripts to transform data, automate workflows, or analyze spreadsheets:
-
-```bash
-# Run a script file
-cells -i data.xlsx output.csv --script transform.luau
-
-# Run inline script
-cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
-
-# Script-only mode (no output file)
-cells -i report.xlsx --script analyze.luau
-cells -i data.csv -e 'print(getCell("A1"))'
 ```
 
 #### Empty Workbook Creation
