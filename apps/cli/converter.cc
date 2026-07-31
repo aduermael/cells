@@ -1,6 +1,7 @@
 // Converter implementation for cells CLI
 
 #include "converter.h"
+#include "output_spill.h"
 
 #include <filesystem>
 #include <fstream>
@@ -530,11 +531,12 @@ bool Converter::executeScript(Workbook& workbook, std::string& error_out) {
     // Execute script
     ScriptResult result = sandbox.execute(script);
 
-    // Print script output if any (unless quiet mode)
+    // Print script output if any (unless quiet mode). Large payloads spill to
+    // /tmp with a JSON pointer so agents do not ingest multi-megabyte stdout.
     if (!options_.output.quiet && !result.output.empty()) {
-        std::cout << result.output;
-        // Add newline if output doesn't end with one
-        if (!result.output.empty() && result.output.back() != '\n') {
+        SpillResult spill = maybe_spill_output(result.output);
+        std::cout << spill.stdout_text;
+        if (!spill.stdout_text.empty() && spill.stdout_text.back() != '\n') {
             std::cout << "\n";
         }
     }

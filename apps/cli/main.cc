@@ -1,11 +1,14 @@
-// Cells CLI - spreadsheet format converter and sync client
+// Cells CLI - spreadsheet format converter, sync client, and agent sessions
 // Usage: cells -i <input> <output>
 //        cells sync <url>
-//        cells sync --server <url>
+//        cells session start <url>
 
 #include "cli_version.h"
 #include "converter.h"
 #include "options.h"
+#include "output_spill.h"
+#include "session_args.h"
+#include "session_command.h"
 #include "sync_args.h"
 #include "sync_command.h"
 
@@ -40,6 +43,7 @@ void print_usage(const char* program_name) {
         << "  Info:     " << program_name << " -I <file>\n"
         << "  Script:   " << program_name << " -i <input> [--script <file> | -e '<code>'] [output]\n"
         << "  Sync:     " << program_name << " sync <url> | sync --server <url>\n"
+        << "  Session:  " << program_name << " session start|list|stop|exec|watch|status\n"
         << "\n"
         << "Formats (auto-detected from extension; override with -f / -t):\n"
         << "  .zcd      Native format (full fidelity)\n"
@@ -81,12 +85,21 @@ void print_usage(const char* program_name) {
         << "  Full API reference: skill SCRIPTING.md (agent skill package) or project docs.\n"
         << "  Examples: setCell(\"A1\", 100)  |  getCell(\"A1\").value  |  setCell(\"B1\", \"=A1*2\")\n"
         << "\n"
-        << "Sync:\n"
+        << "Sync (one-shot blocking listen):\n"
         << "  cells sync <url>                      Join room and log operations\n"
         << "  cells sync --server <url>             Same with explicit flag\n"
         << "  cells sync --server <url> --apply <f> Apply remote ops to workbook\n"
         << "  cells sync --server <url> --send <f>  Broadcast workbook as ops\n"
         << "  cells sync <url> --ops-only           Show only operations\n"
+        << "\n"
+        << "Session (long-running peer for agents; preferred multi-step path; pure JSON):\n"
+        << "  cells session start <url> [--wait-seconds N] [--idle-minutes N] [--name NAME]\n"
+        << "  cells session list | status <id> | stop <id>\n"
+        << "  cells session exec <id> -e '<code>' | --script <file> [--force]\n"
+        << "  cells session export <id> <path.(zcd|xlsx|csv)>\n"
+        << "  cells session watch <id> [--duration SECS]\n"
+        << "  cells session --help\n"
+        << "  start waits for ONLINE/SYNCING (default 15s); fails if stuck CONNECTING.\n"
         << "\n"
         << "Examples:\n"
         << "  cells -i data.csv output.zcd\n"
@@ -100,11 +113,17 @@ void print_usage(const char* program_name) {
         << "  cells -i data.xlsx output.csv --script transform.luau\n"
         << "  cells -i report.csv -e 'print(getCell(\"A1\").value)'\n"
         << "  cells -i input.xlsx output.csv -q -y\n"
+        << "  cells session start 'https://cells.example.com/?room=abc123'\n"
+        << "  cells session exec SID -e 'setCell(\"A1\", 42)'\n"
+        << "  cells session export SID /tmp/room.xlsx\n"
+        << "  cells session watch SID --duration 5\n"
+        << "  cells session stop SID\n"
         << "  cells sync 'https://cells.example.com/?room=abc123'\n"
         << "\n"
         << "Notes:\n"
         << "  CSV export keeps the first sheet and formula results as values; use -q to\n"
-        << "  silence fidelity warnings. Exit 0 on success, 1 on error.\n";
+        << "  silence fidelity warnings. Exit 0 on success, 1 on error.\n"
+        << "  Agents: use session start/exec/watch for multi-command collab; sync is one-shot.\n";
 }
 
 void print_version() { std::cout << "cells " << cells::cli::cli_version() << "\n"; }
@@ -434,7 +453,24 @@ int show_file_info(const Options& opts) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    // Check for sync subcommand first
+    // Session subcommand (daemon peer for agents) — pure JSON on stdout
+    cells::cli::SessionParseResult session_parse = cells::cli::parse_session_args(argc, argv);
+    if (session_parse.is_session) {
+        if (!session_parse.ok) {
+            std::cout << "{\"ok\":false,\"error\":\""
+                      << cells::cli::json_escape(session_parse.error) << "\"}\n";
+            return 1;
+        }
+        cells::cli::validate_session_options(session_parse);
+        if (!session_parse.ok) {
+            std::cout << "{\"ok\":false,\"error\":\""
+                      << cells::cli::json_escape(session_parse.error) << "\"}\n";
+            return 1;
+        }
+        return cells::cli::run_session_command(session_parse.options);
+    }
+
+    // Sync subcommand (one-shot blocking)
     cells::cli::SyncParseResult sync_parse = cells::cli::parse_sync_args(argc, argv);
     if (sync_parse.is_sync) {
         if (!sync_parse.ok) {

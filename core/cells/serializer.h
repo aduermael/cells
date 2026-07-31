@@ -104,6 +104,9 @@ private:
 
     // Serialize a single operation
     void serializeOperation(const Operation& op, std::ostream& out) const;
+
+    // Serialize durable peer knowledge (frontiers)
+    void serializePeerKnowledge(const Workbook& workbook, std::ostream& out) const;
 };
 
 // Escape a string for the .zcd format (handles quotes, newlines, etc.)

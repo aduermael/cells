@@ -948,7 +948,8 @@ protected:
         auto wb = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
         wb->setNodeId(nodeId);
 
-        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        // Shared sheet id across peers so COL_SET with sheetId targets the same sheet
+        auto sheet = std::make_unique<Sheet>(shared_sheet, "Sheet1");
         sheet->setWorkbook(wb.get());
 
         auto col = std::make_unique<Axis>(shared_col, true);
@@ -969,6 +970,7 @@ protected:
     ID node_a, node_b;
 
     // Shared IDs across workbooks
+    ID shared_sheet = ID("Sheet111");
     ID shared_col = generate_id();
     ID shared_row = generate_id();
     ID shared_cell = generate_id();
@@ -983,7 +985,7 @@ TEST_F(FormatConvergenceTest, ConcurrentCellFormatChangesConverge) {
     HLC hlc_a(1000, 0, node_a);
     std::string payloadA = R"({"fmt":")" + formatA.toBase64() + R"("})";
     Operation opA(hlc_a, OpType::CELL_SET, shared_cell, payloadA);
-    opA.sheetId = workbook_a->getSheetByIndex(0)->id;
+    opA.sheetId = shared_sheet;
 
     // Peer B sets percentage format at same time
     FormatBuffer formatB;
@@ -993,7 +995,7 @@ TEST_F(FormatConvergenceTest, ConcurrentCellFormatChangesConverge) {
     HLC hlc_b(1000, 0, node_b);
     std::string payloadB = R"({"fmt":")" + formatB.toBase64() + R"("})";
     Operation opB(hlc_b, OpType::CELL_SET, shared_cell, payloadB);
-    opB.sheetId = workbook_b->getSheetByIndex(0)->id;
+    opB.sheetId = shared_sheet;
 
     // Apply in different orders
     applyOperation(*workbook_a, opA);
@@ -1022,7 +1024,7 @@ TEST_F(FormatConvergenceTest, ConcurrentColumnFormatChangesConverge) {
     HLC hlc_a(1000, 0, node_a);
     std::string payloadA = R"({"fmt":")" + formatA.toBase64() + R"("})";
     Operation opA(hlc_a, OpType::COL_SET, shared_col, payloadA);
-    opA.sheetId = workbook_a->getSheetByIndex(0)->id;
+    opA.sheetId = shared_sheet;
 
     // Peer B sets column to currency format at same time
     FormatBuffer formatB;
@@ -1032,7 +1034,7 @@ TEST_F(FormatConvergenceTest, ConcurrentColumnFormatChangesConverge) {
     HLC hlc_b(1000, 0, node_b);
     std::string payloadB = R"({"fmt":")" + formatB.toBase64() + R"("})";
     Operation opB(hlc_b, OpType::COL_SET, shared_col, payloadB);
-    opB.sheetId = workbook_b->getSheetByIndex(0)->id;
+    opB.sheetId = shared_sheet;
 
     // Apply in different orders
     applyOperation(*workbook_a, opA);
@@ -1075,11 +1077,11 @@ TEST_F(FormatConvergenceTest, ThreePeersFormatConvergence) {
     std::string payloadC = R"({"fmt":")" + formatC.toBase64() + R"("})";
 
     Operation opA(hlc_a, OpType::CELL_SET, shared_cell, payloadA);
-    opA.sheetId = workbook_a->getSheetByIndex(0)->id;
+    opA.sheetId = shared_sheet;
     Operation opB(hlc_b, OpType::CELL_SET, shared_cell, payloadB);
-    opB.sheetId = workbook_b->getSheetByIndex(0)->id;
+    opB.sheetId = shared_sheet;
     Operation opC(hlc_c, OpType::CELL_SET, shared_cell, payloadC);
-    opC.sheetId = workbook_c->getSheetByIndex(0)->id;
+    opC.sheetId = shared_sheet;
 
     // Apply in different orders on each workbook
     applyOperation(*workbook_a, opA);

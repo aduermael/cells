@@ -189,6 +189,72 @@ Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const Form
 // Returns the number of operations created.
 size_t bootstrapOpLog(Workbook& workbook);
 
+// ---------------------------------------------------------------------------
+// Entering collaboration / join (shared by CLI SyncClient and WASM)
+// ---------------------------------------------------------------------------
+// Design:
+//  1) First join with empty local shell: publish NOTHING. Discard UI
+//     placeholders (empty Sheet1) and pull remote state via hello/sync.
+//  2) Local content already exists (edited offline, loaded file): bootstrap
+//     material state into the oplog so peers receive it.
+//  3) Already collaborating: leave state alone — ops are source of truth;
+//     reconnect only reconciles missing ops (compatible existing state).
+
+// Result of prepareWorkbookForSync.
+struct PrepareForSyncResult {
+    size_t bootstrappedOps{0};  // ops written by bootstrap (0 if pull-only)
+    size_t discardedSheets{0};  // empty placeholder sheets removed
+    bool alreadyCollaborating{false};
+};
+
+// Single entry point before P2P sync (called from SyncClient::startSync).
+// See design notes above. Safe to call when already collaborating (no-op).
+PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook);
+
+// True when every sheet has zero columns and zero rows (default empty UI shell).
+[[nodiscard]] bool isWorkbookContentEmpty(const Workbook& workbook);
+
+// Remove sheets that have no columns and no rows (createEmptyWorkbook placeholders).
+// Prefer prepareWorkbookForSync(); this is exposed for tests.
+size_t discardEmptyPlaceholderSheets(Workbook& workbook);
+
+// Index of the first sheet with columns/cells, or 0 if none / empty workbook.
+[[nodiscard]] size_t preferredActiveSheetIndex(const Workbook& workbook);
+
+// Create default Sheet1 via CRDT when workbook has no sheets (alone in room).
+// Does not check peer connectivity — caller must ensure we are not mid-join
+// waiting for remote state. Returns true if a sheet was created.
+bool ensureDefaultSheetViaCrdt(Workbook& workbook);
+
+// =============================================================================
+// Collab-safe ensure + grid helpers (shared by CLI Luau API and WASM engine)
+// =============================================================================
+// Local-only getOrCreate* mints IDs that peers never receive, so later CELL_SET
+// ops fail with INVALID_TARGET. Always use these for mutations that must sync.
+
+// Create column/row at grid position via COL_SET/ROW_SET if missing.
+// If outCreated is non-null, set to true when a new axis was created.
+Axis* ensureColumnViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position,
+                          bool* outCreated = nullptr);
+Axis* ensureRowViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t position,
+                       bool* outCreated = nullptr);
+
+// Create empty cell at (colId, rowId) via CELL_SET if missing.
+Cell* ensureCellViaCrdt(Workbook& workbook, Sheet& sheet, const ID& colId, const ID& rowId,
+                        bool* outCreated = nullptr);
+
+// Ensure column + row + empty cell at a grid position (0-based).
+Cell* ensureCellAtPositionViaCrdt(Workbook& workbook, Sheet& sheet, uint32_t colPos,
+                                  uint32_t rowPos, bool* outColCreated = nullptr,
+                                  bool* outRowCreated = nullptr, bool* outCellCreated = nullptr);
+
+// Resize column/row by position; creates the axis via CRDT if it does not exist.
+// Returns the axis (nullptr on failure). outCreated set when newly minted.
+Axis* setColumnWidthByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t width,
+                               bool* outCreated = nullptr);
+Axis* setRowHeightByPosition(Workbook& workbook, Sheet& sheet, uint32_t pos, uint32_t height,
+                             bool* outCreated = nullptr);
+
 }  // namespace cells
 
 #endif  // CELLS_CRDT_H_

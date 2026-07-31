@@ -485,9 +485,10 @@ Lines beginning with `#` are comments. Some common conventions:
 |--------|---------|
 | `#zcd v1` | Format version (optional, recommended for readability) |
 | `#oplog` | Start of operation log section |
+| `#peers` | Start of durable peer knowledge section |
 | `#cols`, `#rows`, `#cells` | Section dividers (optional, for human readability) |
 
-The parser recognizes lines by their prefix character (`D`, `N`, `S`, `V`, `C`, `R`, `X`, `RG`, `O`), so section markers are purely for human readability and not required.
+The parser recognizes lines by their prefix character (`D`, `N`, `S`, `V`, `C`, `R`, `X`, `RG`, `O`, `P`), so section markers are purely for human readability and not required.
 
 ## Operation Log
 
@@ -549,6 +550,28 @@ O 1705312200005.0.N3f8hJ2w CELL_DELETE nP6kR2mW {}
 ```
 
 Operations use unified SET commands that include all entity properties. Style (`sty`) and format (`fmt`) use content-addressed base64-encoded binary data.
+
+## Peer Knowledge
+
+Durable peer frontiers (`#peers` section) record what each known peer has received so offline work and later rejoin can reconcile cleanly. Live connection state is separate; disconnect must not erase this map.
+
+### Format
+
+```
+P <peer_id> <hlc>
+```
+
+- `peer_id`: 8-character peer/node ID
+- `hlc`: Highest HLC known to have been applied/received by that peer
+
+**Example:**
+```
+#peers
+P AbCdEf12 1705312200000.0.N3f8hJ2w
+P GhIjKl34 1705312200999.3.XyZaBcDe
+```
+
+Legacy files without `P` lines load with empty peer knowledge.
 
 ## Complete Example
 

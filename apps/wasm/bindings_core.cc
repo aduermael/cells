@@ -13,11 +13,8 @@
 //
 // =============================================================================
 
-#include "apps/wasm/bindings.h"
-
-#include <emscripten/bind.h>
-
 #include <algorithm>
+#include <emscripten/bind.h>
 #include <iomanip>
 #include <sstream>
 
@@ -38,6 +35,8 @@
 #include "core/cells/range.h"
 #include "core/log/include/Logger.h"
 
+#include "apps/wasm/bindings.h"
+
 namespace cells::wasm {
 
 // =============================================================================
@@ -46,7 +45,8 @@ namespace cells::wasm {
 // Matches the helper in bindings_viewport.cc. See that file for details.
 // CURRENCY/ACCOUNTING shows raw number, PERCENTAGE/DATE shows formatted value.
 
-static std::string computeEditValueForCore(double num, const std::string& displayValue, const FormatBuffer& format) {
+static std::string computeEditValueForCore(double num, const std::string& displayValue,
+                                           const FormatBuffer& format) {
     NumberFormatCategory category = format.getCategory();
 
     switch (category) {
@@ -87,11 +87,7 @@ static std::string computeEditValueForCore(double num, const std::string& displa
 // Constructor / Destructor
 // ============================================================================
 
-CellsEngine::CellsEngine()
-    : _workbook(nullptr),
-      _activeSheetIndex(0),
-      _listener(val::null()),
-      _agentListener(val::null()) {}
+CellsEngine::CellsEngine() : _workbook(nullptr), _activeSheetIndex(0), _listener(val::null()) {}
 
 CellsEngine::~CellsEngine() {
     disableSync();
@@ -294,7 +290,8 @@ void CellsEngine::setActiveSheet(int index) {
 
 void CellsEngine::setFreezePanes(int freezeCol, int freezeRow) {
     Sheet* sheet = activeSheet();
-    if (!sheet) return;
+    if (!sheet)
+        return;
 
     sheet->freezeCol = static_cast<uint16_t>(std::max(0, freezeCol));
     sheet->freezeRow = static_cast<uint16_t>(std::max(0, freezeRow));
@@ -550,7 +547,7 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
 }
 
 std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellIdStr,
-                                                        const std::string& value) {
+                                                       const std::string& value) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -610,7 +607,8 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
                 std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
                                           pending.colId.toString() + "\",\"row\":\"" +
                                           pending.rowId.toString() + "\"}";
-                Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+                Operation cellOp =
+                    makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
             }
 
@@ -823,7 +821,8 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
                 std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
                                           pending.colId.toString() + "\",\"row\":\"" +
                                           pending.rowId.toString() + "\"}";
-                Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+                Operation cellOp =
+                    makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
                 applyOperation(*_workbook, cellOp);
             }
 
@@ -864,7 +863,6 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
-
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -954,10 +952,11 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         // Currency shows raw number in formula bar; percentage shows formatted value
         std::string editValue = existingCell->value.raw;
         const FormatBuffer* cellFormat = _workbook->getEntityFormat(existingCell->id);
-        if (existingCell->value.type == CellValueType::NUMBER &&
-            cellFormat != nullptr && !cellFormat->isEmpty()) {
+        if (existingCell->value.type == CellValueType::NUMBER && cellFormat != nullptr &&
+            !cellFormat->isEmpty()) {
             double numValue = existingCell->value.asNumber();
-            FormatCodeResult formatted = cells::formatWithCode(numValue, cellFormat->toFormatCode());
+            FormatCodeResult formatted =
+                cells::formatWithCode(numValue, cellFormat->toFormatCode());
             if (formatted.success) {
                 editValue = computeEditValueForCore(numValue, formatted.text, *cellFormat);
             }
@@ -986,7 +985,6 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
     Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
-
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -1139,8 +1137,10 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
         return "{\"error\":\"Column not found\"}";
     }
 
-    if (width < 20) width = 20;
-    if (width > 1000) width = 1000;
+    if (width < 20)
+        width = 20;
+    if (width > 1000)
+        width = 1000;
 
     // Build full-state payload for resurrection correctness
     std::string payload = "{\"pos\":" + std::to_string(colAxis->position);
@@ -1184,52 +1184,18 @@ std::string CellsEngine::resizeColumnByPos(uint32_t pos, uint32_t width) {
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    if (width < 20) width = 20;
-    if (width > 1000) width = 1000;
+    if (width < 20)
+        width = 20;
+    if (width > 1000)
+        width = 1000;
 
-    Axis* column = sheet->getColumnByPosition(pos);
-    ID colId;
-    if (column != nullptr) {
-        colId = column->id;
-    }
-
+    // Shared core path (same as Luau setColumnWidth)
     bool colCreated = false;
-    if (!column) {
-        colId = generate_id();
-        colCreated = true;
-        // New column - no existing state to preserve
-        std::string insertPayload =
-            "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(width) + "}";
-        Operation insertOp = makeColSetOp(*_workbook, colId, insertPayload);
-        applyOperation(*_workbook, insertOp);
-        column = sheet->getColumn(colId);
-    } else {
-        // Build full-state payload for resurrection correctness
-        std::string resizePayload = "{\"pos\":" + std::to_string(column->position);
-        resizePayload += ",\"size\":" + std::to_string(width);
-        if (!column->name.empty()) {
-            resizePayload += ",\"name\":\"" + jsonEscape(column->name) + "\"";
-        }
-        if (column->hasStyle()) {
-            const StyleBuffer* sty = _workbook->getEntityStyle(colId);
-            if (sty) {
-                resizePayload += ",\"sty\":\"" + sty->toBase64() + "\"";
-            }
-        }
-        if (column->hasFormat()) {
-            const FormatBuffer* fmt = _workbook->getEntityFormat(colId);
-            if (fmt) {
-                resizePayload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
-            }
-        }
-        if (column->hidden()) {
-            resizePayload += ",\"hidden\":true";
-        }
-        resizePayload += "}";
-        Operation resizeOp = makeColSetOp(*_workbook, colId, resizePayload);
-        applyOperation(*_workbook, resizeOp);
+    Axis* column = setColumnWidthByPosition(*_workbook, *sheet, pos, width, &colCreated);
+    if (column == nullptr) {
+        return "{\"error\":\"Failed to resize column\"}";
     }
-
+    const ID colId = column->id;
 
     broadcastPendingOperations();
 
@@ -1265,8 +1231,10 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
         return "{\"error\":\"Row not found\"}";
     }
 
-    if (height < 10) height = 10;
-    if (height > 500) height = 500;
+    if (height < 10)
+        height = 10;
+    if (height > 500)
+        height = 500;
 
     // Build full-state payload for resurrection correctness
     std::string payload = "{\"pos\":" + std::to_string(rowAxis->position);
@@ -1307,49 +1275,18 @@ std::string CellsEngine::resizeRowByPos(uint32_t pos, uint32_t height) {
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    if (height < 10) height = 10;
-    if (height > 500) height = 500;
+    if (height < 10)
+        height = 10;
+    if (height > 500)
+        height = 500;
 
-    Axis* row = sheet->getRowByPosition(pos);
-    ID rowId;
-    if (row != nullptr) {
-        rowId = row->id;
-    }
-
+    // Shared core path (same as Luau setRowHeight)
     bool rowCreated = false;
-    if (!row) {
-        rowId = generate_id();
-        rowCreated = true;
-        // New row - no existing state to preserve
-        std::string insertPayload =
-            "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(height) + "}";
-        Operation insertOp = makeRowSetOp(*_workbook, rowId, insertPayload);
-        applyOperation(*_workbook, insertOp);
-        row = sheet->getRow(rowId);
-    } else {
-        // Build full-state payload for resurrection correctness
-        std::string resizePayload = "{\"pos\":" + std::to_string(row->position);
-        resizePayload += ",\"size\":" + std::to_string(height);
-        if (row->hasStyle()) {
-            const StyleBuffer* sty = _workbook->getEntityStyle(rowId);
-            if (sty) {
-                resizePayload += ",\"sty\":\"" + sty->toBase64() + "\"";
-            }
-        }
-        if (row->hasFormat()) {
-            const FormatBuffer* fmt = _workbook->getEntityFormat(rowId);
-            if (fmt) {
-                resizePayload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
-            }
-        }
-        if (row->hidden()) {
-            resizePayload += ",\"hidden\":true";
-        }
-        resizePayload += "}";
-        Operation resizeOp = makeRowSetOp(*_workbook, rowId, resizePayload);
-        applyOperation(*_workbook, resizeOp);
+    Axis* row = setRowHeightByPosition(*_workbook, *sheet, pos, height, &rowCreated);
+    if (row == nullptr) {
+        return "{\"error\":\"Failed to resize row\"}";
     }
-
+    const ID rowId = row->id;
 
     broadcastPendingOperations();
 
@@ -1414,7 +1351,6 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
-
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
     return "{\"success\":true}";
 }
@@ -1474,12 +1410,11 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         applyOperation(*_workbook, op);
     }
 
-
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     std::ostringstream json;
-    json << "{\"success\":true,\"id\":\""
-         << (column ? column->id.toString() : colId.toString()) << "\"}";
+    json << "{\"success\":true,\"id\":\"" << (column ? column->id.toString() : colId.toString())
+         << "\"}";
     return json.str();
 }
 
@@ -1599,11 +1534,13 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
         }
         if (col->hasStyle()) {
             const StyleBuffer* sty = _workbook->getEntityStyle(col->id);
-            if (sty) p += ",\"sty\":\"" + sty->toBase64() + "\"";
+            if (sty)
+                p += ",\"sty\":\"" + sty->toBase64() + "\"";
         }
         if (col->hasFormat()) {
             const FormatBuffer* fmt = _workbook->getEntityFormat(col->id);
-            if (fmt) p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            if (fmt)
+                p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
         }
         if (col->hidden()) {
             p += ",\"hidden\":true";
@@ -1617,8 +1554,8 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
         // Moving left: shift columns in [targetPos, currentPos) right by 1
         for (const ID& id : sheet->getColumnIds()) {
             Axis* col = sheet->getColumn(id);
-            if (col != nullptr && col->id != colId &&
-                col->position >= targetPos && col->position < currentPos) {
+            if (col != nullptr && col->id != colId && col->position >= targetPos &&
+                col->position < currentPos) {
                 std::string shiftPayload = buildColPayload(col, col->position + 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
@@ -1628,8 +1565,8 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
         // Moving right: shift columns in (currentPos, targetPos) left by 1
         for (const ID& id : sheet->getColumnIds()) {
             Axis* col = sheet->getColumn(id);
-            if (col != nullptr && col->id != colId &&
-                col->position > currentPos && col->position < targetPos) {
+            if (col != nullptr && col->id != colId && col->position > currentPos &&
+                col->position < targetPos) {
                 std::string shiftPayload = buildColPayload(col, col->position - 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
@@ -1687,11 +1624,13 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
         }
         if (row->hasStyle()) {
             const StyleBuffer* sty = _workbook->getEntityStyle(row->id);
-            if (sty) p += ",\"sty\":\"" + sty->toBase64() + "\"";
+            if (sty)
+                p += ",\"sty\":\"" + sty->toBase64() + "\"";
         }
         if (row->hasFormat()) {
             const FormatBuffer* fmt = _workbook->getEntityFormat(row->id);
-            if (fmt) p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            if (fmt)
+                p += ",\"fmt\":\"" + fmt->toBase64() + "\"";
         }
         if (row->hidden()) {
             p += ",\"hidden\":true";
@@ -1705,8 +1644,8 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
         // Moving up: shift rows in [targetPos, currentPos) down by 1
         for (const ID& id : sheet->getRowIds()) {
             Axis* row = sheet->getRow(id);
-            if (row != nullptr && row->id != rowId &&
-                row->position >= targetPos && row->position < currentPos) {
+            if (row != nullptr && row->id != rowId && row->position >= targetPos &&
+                row->position < currentPos) {
                 std::string shiftPayload = buildRowPayload(row, row->position + 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
@@ -1716,8 +1655,8 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
         // Moving down: shift rows in (currentPos, targetPos) up by 1
         for (const ID& id : sheet->getRowIds()) {
             Axis* row = sheet->getRow(id);
-            if (row != nullptr && row->id != rowId &&
-                row->position > currentPos && row->position < targetPos) {
+            if (row != nullptr && row->id != rowId && row->position > currentPos &&
+                row->position < targetPos) {
                 std::string shiftPayload = buildRowPayload(row, row->position - 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
                 applyOperation(*_workbook, shiftOp);
@@ -1861,8 +1800,8 @@ std::string CellsEngine::deleteRowById(const std::string& rowIdStr) {
 // ============================================================================
 
 std::string CellsEngine::fillRange(int sourceMinCol, int sourceMinRow, int sourceMaxCol,
-                                    int sourceMaxRow, int targetMinCol, int targetMinRow,
-                                    int targetMaxCol, int targetMaxRow) {
+                                   int sourceMaxRow, int targetMinCol, int targetMinRow,
+                                   int targetMaxCol, int targetMaxRow) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -1890,8 +1829,8 @@ std::string CellsEngine::fillRange(int sourceMinCol, int sourceMinRow, int sourc
 // Merge cell operations
 // ============================================================================
 
-std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
-                                        uint32_t endCol, uint32_t endRow) {
+std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                                       uint32_t endRow) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -2012,8 +1951,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     return "{\"success\":true,\"colSpan\":" + std::to_string(colSpan) +
-           ",\"rowSpan\":" + std::to_string(rowSpan) +
-           ",\"rangeId\":\"" + rangeId.toString() + "\"}";
+           ",\"rowSpan\":" + std::to_string(rowSpan) + ",\"rangeId\":\"" + rangeId.toString() +
+           "\"}";
 }
 
 std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
@@ -2047,8 +1986,7 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
     }
 
     // Find merge ranges containing this cell using the unified Range system
-    std::vector<Range*> mergeRanges =
-        sheet->getRangesAt(col, row, RangeFlags::MERGE);
+    std::vector<Range*> mergeRanges = sheet->getRangesAt(col, row, RangeFlags::MERGE);
 
     if (mergeRanges.empty()) {
         return "{\"error\":\"Cell is not part of a merged region\"}";
@@ -2146,8 +2084,8 @@ std::string CellsEngine::setTheme(const std::string& themeJson) {
         return "{\"success\":false,\"error\":\"No workbook\"}";
     }
 
-    // Parse the theme JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont, minorFont } }
-    // Simple JSON parsing — extract fields manually
+    // Parse the theme JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont,
+    // minorFont } } Simple JSON parsing — extract fields manually
     auto extractString = [](const std::string& json, const std::string& key) -> std::string {
         std::string needle = "\"" + key + "\":\"";
         auto pos = json.find(needle);
@@ -2234,7 +2172,8 @@ std::string CellsEngine::getNamedRanges() {
         json << "\"name\":\"" << jsonEscape(nr->name) << "\"";
 
         // Scope
-        json << ",\"scope\":\"" << (nr->scope == NamedRangeScope::WORKBOOK ? "workbook" : "sheet") << "\"";
+        json << ",\"scope\":\"" << (nr->scope == NamedRangeScope::WORKBOOK ? "workbook" : "sheet")
+             << "\"";
         if (nr->scope == NamedRangeScope::SHEET) {
             json << ",\"scopeSheetId\":\"" << nr->scopeSheetId.toString() << "\"";
         }

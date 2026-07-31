@@ -102,18 +102,16 @@ TEST_F(SyncManagerTest, AddPeerTwiceNoDoubleHello) {
 }
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithSameOpCount) {
-    // Both have 0 operations
+    // Both have 0 operations — still bidirectional exchange (request + response)
     sync_a->addPeer(node_b);
     auto hello_messages = sync_a->getOutgoingMessages();
     EXPECT_EQ(hello_messages.size(), 1);
 
-    // B receives hello from A
     auto result = sync_b->handleMessage(node_a, hello_messages[0].json);
 
-    // B should not need to request sync (same op count)
-    // Should be empty or just acknowledgment
-    EXPECT_EQ(result.messages.size(), 0);
-    // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
     EXPECT_FALSE(result.dataModified);
 }
 
@@ -122,17 +120,18 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithMoreOps) {
     Operation op = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_b, op);
 
-    // A sends hello to B (A has 0 ops)
     sync_a->addPeer(node_b);
     auto hello_messages = sync_a->getOutgoingMessages();
 
-    // B receives hello from A and should send sync-response
+    // B receives hello from A → always sync-request + full sync-response
     auto result = sync_b->handleMessage(node_a, hello_messages[0].json);
 
-    EXPECT_EQ(result.messages.size(), 1);
-    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_NE(result.messages[0].json.find("\"operations\":"), std::string::npos);
-    EXPECT_FALSE(result.dataModified);  // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"operations\":"), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("CELL_SET"), std::string::npos);
+    EXPECT_FALSE(result.dataModified);
 }
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
@@ -140,16 +139,38 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithFewerOps) {
     Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
     applyOperation(*workbook_a, op);
 
-    // B sends hello to A
     sync_b->addPeer(node_a);
     auto hello_messages = sync_b->getOutgoingMessages();
 
-    // A receives hello from B and should send sync-response (since A has more ops)
+    // A receives hello from B → always sync-request + full sync-response (includes A's ops)
     auto result = sync_a->handleMessage(node_b, hello_messages[0].json);
 
-    EXPECT_EQ(result.messages.size(), 1);
-    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_FALSE(result.dataModified);  // Hello doesn't modify data
+    ASSERT_EQ(result.messages.size(), 2);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_NE(result.messages[1].json.find("CELL_SET"), std::string::npos);
+    EXPECT_FALSE(result.dataModified);
+}
+
+TEST_F(SyncManagerTest, ConcurrentLocalOpsExchangedOnHello) {
+    // Divergent histories with same length: A and B each have one different CELL_SET
+    Operation op_a = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"1"})");
+    applyOperation(*workbook_a, op_a);
+    Operation op_b = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"2"})");
+    applyOperation(*workbook_b, op_b);
+
+    sync_a->addPeer(node_b);
+    auto hello_a = sync_a->getOutgoingMessages();
+    ASSERT_EQ(hello_a.size(), 1);
+
+    // B handles A's hello → sends full log including op_b
+    auto from_b = sync_b->handleMessage(node_a, hello_a[0].json);
+    ASSERT_EQ(from_b.messages.size(), 2);
+    EXPECT_NE(from_b.messages[1].json.find("\"v\":\"2\""), std::string::npos);
+
+    // A applies B's sync-response
+    auto applied = sync_a->handleMessage(node_b, from_b.messages[1].json);
+    EXPECT_TRUE(applied.dataModified || !applied.receivedOperations.empty());
 }
 
 TEST_F(SyncManagerTest, HandleSyncRequest) {
@@ -183,13 +204,13 @@ TEST_F(SyncManagerTest, HandleSyncResponse) {
 
     auto result = sync_b->handleMessage(node_a, syncResponse);
 
-    // No response needed for sync-response
-    EXPECT_EQ(result.messages.size(), 0);
+    // Joiner ACKs so the provider can record the frontier
+    ASSERT_EQ(result.messages.size(), 1);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"ack\""), std::string::npos);
     // Data WAS modified (operations applied)
     EXPECT_TRUE(result.dataModified);
 
-    // B applied the operation (oplog is pruned after sync because peer A is now synced)
-    // The cell value should be correctly updated
+    // B applied the operation
     EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "99");
 }
 
@@ -348,27 +369,268 @@ TEST_F(SyncManagerTest, FullSyncFlow) {
     auto hello_from_a = sync_a->getOutgoingMessages();
     EXPECT_EQ(hello_from_a.size(), 1);
 
-    // B receives hello and responds with sync-request (since A has more ops)
+    // B receives hello → bidirectional sync-request + full sync-response
     sync_b->addPeer(node_a);
     auto result_from_b = sync_b->handleMessage(node_a, hello_from_a[0].json);
-    // B should send sync-request since A reported 2 ops and B has 0
-    EXPECT_EQ(result_from_b.messages.size(), 1);
+    ASSERT_EQ(result_from_b.messages.size(), 2);
     EXPECT_NE(result_from_b.messages[0].json.find("\"type\":\"sync-request\""), std::string::npos);
-    EXPECT_FALSE(result_from_b.dataModified);  // Hello doesn't modify data
+    EXPECT_NE(result_from_b.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_FALSE(result_from_b.dataModified);
 
-    // A receives sync-request and responds with sync-response
+    // A receives B's full sync-response (empty ops) — no data change
+    auto apply_empty = sync_a->handleMessage(node_b, result_from_b.messages[1].json);
+    EXPECT_FALSE(apply_empty.dataModified);
+
+    // A receives B's sync-request and responds with full oplog
     auto result_from_a = sync_a->handleMessage(node_b, result_from_b.messages[0].json);
-    EXPECT_EQ(result_from_a.messages.size(), 1);
+    ASSERT_EQ(result_from_a.messages.size(), 1);
     EXPECT_NE(result_from_a.messages[0].json.find("\"type\":\"sync-response\""), std::string::npos);
-    EXPECT_FALSE(result_from_a.dataModified);  // Sync-request doesn't modify data
+    EXPECT_FALSE(result_from_a.dataModified);
 
-    // B receives sync-response with operations
+    // B receives sync-response with A's operations and ACKs
     auto final_result = sync_b->handleMessage(node_a, result_from_a.messages[0].json);
-    EXPECT_TRUE(final_result.dataModified);  // Sync-response DOES modify data
+    EXPECT_TRUE(final_result.dataModified);
+    ASSERT_EQ(final_result.messages.size(), 1);
+    EXPECT_NE(final_result.messages[0].json.find("\"type\":\"ack\""), std::string::npos);
 
-    // B applied all operations (oplog is pruned after sync because peer A is now synced)
-    // Verify the cell has the final value from op2
     EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "20");
+
+    // A records B's frontier from the ACK
+    sync_a->handleMessage(node_b, final_result.messages[0].json);
+    const auto* peerState = sync_a->getPeerSyncState(node_b);
+    ASSERT_NE(peerState, nullptr);
+    EXPECT_FALSE(peerState->lastSyncedHLC.isZero());
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+    EXPECT_EQ(workbook_a->getPeerFrontier(node_b), peerState->lastSyncedHLC);
+}
+
+// ---------------------------------------------------------------------------
+// Join: empty peer pulls state; provider records joiner frontier after ACK
+// ---------------------------------------------------------------------------
+TEST_F(SyncManagerTest, LateJoinPullsStateAndProviderRecordsFrontier) {
+    // A has document state (ops already applied)
+    Operation op1 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"42"})");
+    applyOperation(*workbook_a, op1);
+    Operation op2 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"s","v":"hello"})");
+    applyOperation(*workbook_a, op2);
+    ASSERT_EQ(workbook_a->getOpLog()->size(), 2);
+    ASSERT_EQ(workbook_b->getOpLog()->size(), 0);
+
+    // B (empty) joins: hello exchange
+    sync_b->addPeer(node_a);
+    auto hello_from_b = sync_b->getOutgoingMessages();
+    ASSERT_EQ(hello_from_b.size(), 1);
+
+    sync_a->addPeer(node_b);
+    auto from_a = sync_a->handleMessage(node_b, hello_from_b[0].json);
+    // A: sync-request + full sync-response with ops
+    ASSERT_EQ(from_a.messages.size(), 2);
+    EXPECT_NE(from_a.messages[1].json.find("\"type\":\"sync-response\""), std::string::npos);
+    EXPECT_NE(from_a.messages[1].json.find("CELL_SET"), std::string::npos);
+
+    // Before B applies, A's knowledge of B is still hello frontier (zero)
+    EXPECT_TRUE(sync_a->getPeerSyncState(node_b)->lastSyncedHLC.isZero());
+
+    // B applies A's sync-response → material state matches, ACK returned
+    auto applied = sync_b->handleMessage(node_a, from_a.messages[1].json);
+    EXPECT_TRUE(applied.dataModified);
+    ASSERT_EQ(applied.messages.size(), 1);
+    EXPECT_NE(applied.messages[0].json.find("\"type\":\"ack\""), std::string::npos);
+    EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "hello");
+
+    // A processes ACK → durable + live frontier covers ops B received
+    sync_a->handleMessage(node_b, applied.messages[0].json);
+    const auto* state = sync_a->getPeerSyncState(node_b);
+    ASSERT_NE(state, nullptr);
+    EXPECT_FALSE(state->lastSyncedHLC.isZero());
+    EXPECT_TRUE(state->isSynced);
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+    EXPECT_EQ(workbook_a->getPeerFrontier(node_b), state->lastSyncedHLC);
+    // Frontier should be at least the highest op HLC from A
+    EXPECT_GE(state->lastSyncedHLC, op2.hlc);
+}
+
+// ---------------------------------------------------------------------------
+// Disconnect preserves durable knowledge; rejoin seeds from it
+// ---------------------------------------------------------------------------
+TEST_F(SyncManagerTest, RemovePeerPreservesDurableKnowledge) {
+    Operation op = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"7"})");
+    applyOperation(*workbook_a, op);
+
+    sync_a->addPeer(node_b);
+    sync_a->getOutgoingMessages();
+
+    // Simulate ACK advancing frontier
+    std::string ack = R"({"type":"ack","hlc":")" + op.hlc.toString() + R"("})";
+    sync_a->handleMessage(node_b, ack);
+    ASSERT_EQ(workbook_a->getPeerFrontier(node_b), op.hlc);
+
+    // Disconnect
+    sync_a->removePeer(node_b);
+    EXPECT_FALSE(sync_a->hasPeer(node_b));
+    EXPECT_EQ(sync_a->peerCount(), 0);
+
+    // Durable knowledge remains on workbook
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+    EXPECT_EQ(workbook_a->getPeerFrontier(node_b), op.hlc);
+
+    // Re-add seeds live state from durable knowledge
+    sync_a->addPeer(node_b);
+    const auto* state = sync_a->getPeerSyncState(node_b);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->lastSyncedHLC, op.hlc);
+}
+
+// ---------------------------------------------------------------------------
+// Leave + offline edits + rejoin → both sides converge
+// ---------------------------------------------------------------------------
+TEST_F(SyncManagerTest, LeaveOfflineEditRejoinConverges) {
+    // Initial sync: A has value "1"
+    Operation op_init = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"1"})");
+    applyOperation(*workbook_a, op_init);
+
+    // Full join exchange A -> B
+    sync_a->addPeer(node_b);
+    auto hello_a = sync_a->getOutgoingMessages();
+    sync_b->addPeer(node_a);
+    auto from_b = sync_b->handleMessage(node_a, hello_a[0].json);
+    // B sends request+response; A answers request with full log
+    auto from_a = sync_a->handleMessage(node_b, from_b.messages[0].json);
+    auto b_applied = sync_b->handleMessage(node_a, from_a.messages[0].json);
+    EXPECT_TRUE(b_applied.dataModified);
+    // A records B's ACK
+    if (!b_applied.messages.empty()) {
+        sync_a->handleMessage(node_b, b_applied.messages[0].json);
+    }
+    EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "1");
+
+    // Also deliver B's empty/full response + any remaining exchange messages
+    for (const auto& msg : from_b.messages) {
+        if (msg.json.find("sync-response") != std::string::npos) {
+            auto r = sync_a->handleMessage(node_b, msg.json);
+            for (const auto& m : r.messages) {
+                sync_b->handleMessage(node_a, m.json);
+            }
+        }
+    }
+
+    // Both disconnect (simulate leave / go offline)
+    sync_a->removePeer(node_b);
+    sync_b->removePeer(node_a);
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+
+    // Offline edits on both sides
+    Operation op_a = makeCellSetOp(*workbook_a, cell_id, R"({"t":"n","v":"10"})");
+    applyOperation(*workbook_a, op_a);
+    Operation op_b = makeCellSetOp(*workbook_b, cell_id, R"({"t":"n","v":"20"})");
+    applyOperation(*workbook_b, op_b);
+
+    // Rejoin: full hello exchange both ways
+    sync_a->addPeer(node_b);
+    auto hello_rejoin_a = sync_a->getOutgoingMessages();
+    sync_b->addPeer(node_a);
+    auto hello_rejoin_b = sync_b->getOutgoingMessages();
+
+    // B handles A's hello → request + response (includes A's offline op)
+    auto re_from_b = sync_b->handleMessage(node_a, hello_rejoin_a[0].json);
+    ASSERT_GE(re_from_b.messages.size(), 2u);
+
+    // A handles B's hello → request + response (includes B's offline op)
+    auto re_from_a = sync_a->handleMessage(node_b, hello_rejoin_b[0].json);
+    ASSERT_GE(re_from_a.messages.size(), 2u);
+
+    // Apply each side's sync-response to the other and process ACKs
+    auto apply_on_a = sync_a->handleMessage(node_b, re_from_b.messages[1].json);
+    for (const auto& m : apply_on_a.messages) {
+        sync_b->handleMessage(node_a, m.json);
+    }
+    auto apply_on_b = sync_b->handleMessage(node_a, re_from_a.messages[1].json);
+    for (const auto& m : apply_on_b.messages) {
+        sync_a->handleMessage(node_b, m.json);
+    }
+
+    // Also handle sync-requests if needed (responses already sent on hello)
+    // LWW: higher HLC wins for the cell value
+    const std::string val_a = workbook_a->getSheet(sheet_id)->getCell(cell_id)->value.raw;
+    const std::string val_b = workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw;
+    EXPECT_EQ(val_a, val_b);
+    // Winner is whichever op has higher HLC
+    const std::string expected = (op_b.hlc > op_a.hlc) ? "20" : "10";
+    EXPECT_EQ(val_a, expected);
+}
+
+// Drive message exchange until both outgoing queues drain (and nested replies).
+void exchangeUntilIdle(SyncManager& a, const ID& id_a, SyncManager& b, const ID& id_b,
+                       int max_rounds = 40) {
+    auto enqueueResponses = [](SyncManager& sm, std::vector<OutgoingMessage>&& msgs) {
+        for (auto& m : msgs) {
+            if (m.isBroadcast()) {
+                sm.queueBroadcast(m.json);
+            } else {
+                sm.queueToPeer(m.peerId, m.json);
+            }
+        }
+    };
+
+    for (int round = 0; round < max_rounds; ++round) {
+        auto msgs_a = a.getOutgoingMessages();
+        auto msgs_b = b.getOutgoingMessages();
+        if (msgs_a.empty() && msgs_b.empty()) {
+            return;
+        }
+        for (const auto& m : msgs_a) {
+            if (m.isBroadcast() || m.peerId == id_b) {
+                auto r = b.handleMessage(id_a, m.json);
+                enqueueResponses(b, std::move(r.messages));
+            }
+        }
+        for (const auto& m : msgs_b) {
+            if (m.isBroadcast() || m.peerId == id_a) {
+                auto r = a.handleMessage(id_b, m.json);
+                enqueueResponses(a, std::move(r.messages));
+            }
+        }
+    }
+}
+
+TEST_F(SyncManagerTest, ComeAndGoFullExchangeConverges) {
+    // A builds initial content
+    Operation op1 = makeCellSetOp(*workbook_a, cell_id, R"({"t":"s","v":"base"})");
+    applyOperation(*workbook_a, op1);
+
+    // Connect and fully exchange
+    sync_a->addPeer(node_b);
+    sync_b->addPeer(node_a);
+    exchangeUntilIdle(*sync_a, node_a, *sync_b, node_b);
+    EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "base");
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+
+    // B leaves
+    sync_a->removePeer(node_b);
+    sync_b->removePeer(node_a);
+
+    // A edits while B is gone
+    Operation op_a = makeCellSetOp(*workbook_a, cell_id, R"({"t":"s","v":"fromA"})");
+    applyOperation(*workbook_a, op_a);
+
+    // B edits offline
+    Operation op_b = makeCellSetOp(*workbook_b, cell_id, R"({"t":"s","v":"fromB"})");
+    applyOperation(*workbook_b, op_b);
+
+    // Rejoin and exchange
+    sync_a->addPeer(node_b);
+    sync_b->addPeer(node_a);
+    exchangeUntilIdle(*sync_a, node_a, *sync_b, node_b);
+
+    const std::string val_a = workbook_a->getSheet(sheet_id)->getCell(cell_id)->value.raw;
+    const std::string val_b = workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw;
+    EXPECT_EQ(val_a, val_b);
+    const std::string expected = (op_b.hlc > op_a.hlc) ? "fromB" : "fromA";
+    EXPECT_EQ(val_a, expected);
+
+    // Both sides have durable peer knowledge again
+    EXPECT_TRUE(workbook_a->hasPeerKnowledge(node_b));
+    EXPECT_TRUE(workbook_b->hasPeerKnowledge(node_a));
 }
 
 }  // namespace

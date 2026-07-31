@@ -65,6 +65,8 @@ const COLLECTIONS = {
     'fill-auto-commit.test.mjs',
     // CRDT resurrection tests
     'collab-resurrection.test.mjs',
+    // CRDT leave/rejoin + late-join content
+    'collab-rejoin.test.mjs',
   ],
   collab: [
     'collab.test.mjs',
@@ -72,6 +74,7 @@ const COLLECTIONS = {
     'collab-demo.test.mjs',
     'collab-style-sync.test.mjs',
     'collab-resurrection.test.mjs',
+    'collab-rejoin.test.mjs',
   ],
 };
 

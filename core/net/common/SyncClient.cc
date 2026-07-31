@@ -6,6 +6,7 @@
 #include <random>
 #include <sstream>
 
+#include "core/cells/crdt.h"
 #include "core/cells/hlc.h"
 #include "core/cells/model.h"
 #include "core/cells/sync_manager.h"
@@ -123,6 +124,12 @@ void ConnectedPeer::peerConnectionDidReceiveDataChannel(RTCPeerConnection& /*pc*
 
     if (label == OPERATIONS_CHANNEL) {
         operations_channel = std::move(channel);
+        // Channel may already be OPEN before we set the delegate (common as answerer).
+        // Without this, notifyPeerReady never runs → SyncManager has no peers →
+        // broadcastOperations is a silent no-op (inbound still works).
+        if (operations_channel && operations_channel->isOpen() && sync_client) {
+            sync_client->handlePeerDataChannelOpen(id, label);
+        }
     } else if (label == PRESENCE_CHANNEL) {
         presence_channel = std::move(channel);
     }
@@ -187,11 +194,15 @@ void SyncClient::startSync(const std::string& room_id, const std::string& peer_i
 
     LOG_INFO("[Sync] Starting sync: room=%s peer=%s", room_id_.c_str(), peer_id_.c_str());
 
-    // Set node ID on workbook for HLC generation
+    // Set node ID on workbook for HLC generation before any bootstrap ops
     workbook_->setNodeId(cells::ID(peer_id_));
 
-    // Start collaboration mode
-    workbook_->startCollaboration();
+    // Shared join policy (CLI + WASM): empty shell → publish nothing and pull;
+    // local content → bootstrap; already collab → leave state alone.
+    {
+        const cells::PrepareForSyncResult prep = cells::prepareWorkbookForSync(*workbook_);
+        last_bootstrapped_ops_ = prep.bootstrappedOps;
+    }
 
     // Create SyncManager if not already created
     if (!sync_manager_) {
@@ -223,6 +234,7 @@ void SyncClient::stopSync() {
 
     room_id_.clear();
     peer_id_.clear();
+    expect_remote_peers_ = false;
     setState(SyncClientState::OFFLINE);
 }
 
@@ -231,7 +243,23 @@ void SyncClient::broadcastOperations() {
         return;
     }
 
+    // Ensure every RTC peer with an open operations channel is in SyncManager.
+    // Inbound ops can apply without addPeer; outbound broadcast requires peers.
+    for (const auto& pair : peers_) {
+        if (pair.second && pair.second->isReady()) {
+            // addPeer is a no-op if already tracked (no double hello)
+            if (!sync_manager_->hasPeer(cells::ID(pair.first))) {
+                LOG_INFO("[Sync] broadcastOperations: late-tracking peer %s", pair.first.c_str());
+                notifyPeerReady(pair.first);
+            }
+        }
+    }
+
+    // Delta broadcast (ops newer than peer watermarks) plus a full oplog push
+    // so concurrent/local ops made before a peer joined are never stranded.
+    // Receivers dedupe by HLC.
     sync_manager_->queueOperationsBroadcast();
+    sync_manager_->queueFullSyncToAllPeers();
     processOutgoing();
 }
 
@@ -242,13 +270,25 @@ void SyncClient::processOutgoing() {
 
     auto messages = sync_manager_->getOutgoingMessages();
     for (const auto& msg : messages) {
+        if (msg.json.empty()) {
+            continue;
+        }
         if (msg.isBroadcast()) {
             broadcastToPeers(msg.json);
         } else {
             sendToPeer(msg.peerId.toString(), msg.json);
         }
         stats_.messages_sent++;
+        // Count operation batches as operations_sent for agent observability
+        if (msg.json.find("\"type\":\"operations\"") != std::string::npos ||
+            msg.json.find("\"type\":\"sync-response\"") != std::string::npos) {
+            stats_.operations_sent++;
+        }
     }
+
+    // Re-evaluate ONLINE/SYNCING even when no messages (stuck SYNCING fix:
+    // previously updateSyncState only ran on peer messages/disconnect).
+    updateSyncState();
 }
 
 bool SyncClient::isConnected() const {
@@ -355,7 +395,34 @@ std::string SyncClient::generatePeerId() {
     return id;
 }
 
+bool SyncClient::shouldInitiateTo(const std::string& remote_peer_id) const {
+    // Perfect negotiation (impolite = higher id always offers). Same rule on
+    // every client so exactly one side creates the offer.
+    return peer_id_ > remote_peer_id;
+}
+
 ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool we_initiate) {
+    auto existing = peers_.find(peer_id);
+    if (existing != peers_.end()) {
+        if (we_initiate) {
+            LOG_INFO("[Sync] Peer %s already connecting (skip re-init)", peer_id.c_str());
+            return existing->second.get();
+        }
+        // Receiving an offer while we already initiated → glare
+        if (existing->second->we_initiated) {
+            if (shouldInitiateTo(peer_id)) {
+                // We are impolite: ignore their offer, keep ours
+                LOG_INFO("[Sync] Glare: ignoring offer from %s (we are impolite)", peer_id.c_str());
+                return nullptr;
+            }
+            // We are polite: roll back our offer and accept theirs
+            LOG_INFO("[Sync] Glare: rolling back our offer to %s (we are polite)", peer_id.c_str());
+            removePeer(peer_id);
+        } else {
+            return existing->second.get();
+        }
+    }
+
     LOG_INFO("[Sync] Connecting to peer: %s (initiator=%s)", peer_id.c_str(),
              we_initiate ? "true" : "false");
 
@@ -392,6 +459,41 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
     return ptr;
 }
 
+void SyncClient::initiateConnectionToPeer(const std::string& peer_id) {
+    if (peer_id.empty() || peer_id == peer_id_) {
+        return;
+    }
+    ConnectedPeer* peer = createPeerConnection(peer_id, true);
+    if (!peer || !peer->connection) {
+        return;
+    }
+    if (!peer->we_initiated) {
+        return;  // polite rollback path may have switched roles
+    }
+
+    peer->connection->createOffer(
+        // NOLINTNEXTLINE(bugprone-exception-escape)
+        [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
+            if (!success) {
+                LOG_INFO("[Sync] createOffer failed for %s", peer_id.c_str());
+                return;
+            }
+            auto it = peers_.find(peer_id);
+            if (it == peers_.end() || !it->second->connection) {
+                return;
+            }
+            it->second->connection->setLocalDescription(
+                sdp,
+                // NOLINTNEXTLINE(bugprone-exception-escape)
+                [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
+                    if (set_success) {
+                        LOG_INFO("[Sync] Sending offer to %s", peer_id.c_str());
+                        signaling_client_->sendOffer(peer_id, sdp);
+                    }
+                });
+        });
+}
+
 void SyncClient::removePeer(const std::string& peer_id) {
     auto it = peers_.find(peer_id);
     if (it == peers_.end()) {
@@ -405,6 +507,10 @@ void SyncClient::removePeer(const std::string& peer_id) {
     // (closing the connection triggers callbacks which might call removePeer again)
     auto peer = std::move(it->second);
     peers_.erase(it);
+    if (peers_.empty()) {
+        // Room may be empty now; allow ONLINE alone again
+        expect_remote_peers_ = false;
+    }
 
     // Clear data channel delegates to prevent callbacks on destroyed objects
     if (peer->operations_channel) {
@@ -448,6 +554,12 @@ void SyncClient::handleSyncMessage(const std::string& peer_id, const std::string
 
     stats_.messages_received++;
 
+    // Track peer for outbound broadcast even if we never got dataChannelDidOpen
+    // (answerer race) or never exchanged hello before the first ops batch.
+    if (!sync_manager_->hasPeer(cells::ID(peer_id))) {
+        sync_manager_->addPeer(cells::ID(peer_id));
+    }
+
     // Route message through SyncManager
     auto result = sync_manager_->handleMessage(cells::ID(peer_id), message);
 
@@ -460,6 +572,9 @@ void SyncClient::handleSyncMessage(const std::string& peer_id, const std::string
         }
         stats_.messages_sent++;
     }
+
+    // Flush anything handleMessage queued on _outgoing (not only result.messages)
+    processOutgoing();
 
     // Notify delegate about received operations
     if (!result.receivedOperations.empty() && delegate_) {
@@ -516,19 +631,36 @@ void SyncClient::sendPingToAll() {
 void SyncClient::sendToPeer(const std::string& peer_id, const std::string& message) {
     auto it = peers_.find(peer_id);
     if (it == peers_.end()) {
+        LOG_INFO("[Sync] sendToPeer: no RTC peer %s (drop %zu bytes)", peer_id.c_str(),
+                 message.size());
         return;
     }
 
     if (it->second->operations_channel && it->second->operations_channel->isOpen()) {
-        it->second->operations_channel->send(message);
+        if (!it->second->operations_channel->send(message)) {
+            LOG_INFO("[Sync] sendToPeer: send FAILED to %s (%zu bytes)", peer_id.c_str(),
+                     message.size());
+        }
+    } else {
+        LOG_INFO("[Sync] sendToPeer: channel not open for %s (drop %zu bytes)", peer_id.c_str(),
+                 message.size());
     }
 }
 
 void SyncClient::broadcastToPeers(const std::string& message) {
+    size_t sent = 0;
     for (auto& pair : peers_) {
         if (pair.second->operations_channel && pair.second->operations_channel->isOpen()) {
-            pair.second->operations_channel->send(message);
+            if (pair.second->operations_channel->send(message)) {
+                sent++;
+            } else {
+                LOG_INFO("[Sync] broadcastToPeers: send FAILED to %s", pair.first.c_str());
+            }
         }
+    }
+    if (sent == 0 && !peers_.empty()) {
+        LOG_INFO("[Sync] broadcastToPeers: 0/%zu peers accepted message (%zu bytes)", peers_.size(),
+                 message.size());
     }
 }
 
@@ -672,20 +804,28 @@ void SyncClient::updateSyncState() {
         return;
     }
 
-    // Check if we have any ready peers
+    // Check if we have any ready peers (data channel open)
     const size_t ready_count = getPeerCount();
+    const size_t connecting = peers_.size();
 
     if (ready_count == 0) {
-        // No peers - we're online (alone in the room)
-        if (state_ == SyncClientState::SYNCING) {
+        // No ready data channels. Stay SYNCING while:
+        //  - WebRTC peers are mid-handshake (connecting > 0), or
+        //  - we joined a room that already had peers (expect_remote_peers_)
+        //    and are still waiting for their offer (polite path).
+        // Going ONLINE alone here was minting a parallel Sheet1 on the CLI
+        // that never shared IDs with the browser document.
+        if (state_ == SyncClientState::SYNCING && connecting == 0 && !expect_remote_peers_) {
             setState(SyncClientState::ONLINE);
         }
         return;
     }
 
-    // Check if all peers are synced
+    // Check if all ready peers are CRDT-synced
     bool all_synced = true;
+    size_t tracked = 0;
     for (const auto& peer_id : sync_manager_->getPeerIds()) {
+        tracked++;
         const auto* peer_state = sync_manager_->getPeerSyncState(peer_id);
         if (peer_state && !peer_state->isSynced) {
             all_synced = false;
@@ -693,7 +833,14 @@ void SyncClient::updateSyncState() {
         }
     }
 
+    // Also require every RTC-ready peer to be in SyncManager
+    if (tracked < ready_count) {
+        all_synced = false;
+    }
+
     if (all_synced && state_ == SyncClientState::SYNCING) {
+        LOG_INFO("[Sync] All %zu peer(s) CRDT-synced → ONLINE", ready_count);
+        expect_remote_peers_ = false;
         setState(SyncClientState::ONLINE);
     }
 }
@@ -703,10 +850,14 @@ void SyncClient::notifyPeerReady(const std::string& peer_id) {
         return;
     }
 
-    // Add peer to SyncManager (queues hello message)
+    // Add peer to SyncManager (queues hello message → bidirectional full sync)
     sync_manager_->addPeer(cells::ID(peer_id));
 
-    // Flush outgoing messages
+    // Flush hello / sync-request / sync-response immediately
+    processOutgoing();
+
+    // Also push any local ops that predate the channel (belt and suspenders)
+    sync_manager_->queueFullSyncToAllPeers();
     processOutgoing();
 
     // Notify delegate
@@ -751,45 +902,43 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
                                             const std::vector<std::string>& existing_peers) {
     if (existing_peers.empty()) {
         // We're the first/only peer - go online
+        LOG_INFO("[Sync] Joined room alone → ONLINE");
+        expect_remote_peers_ = false;
         setState(SyncClientState::ONLINE);
-    } else {
-        // Existing peers will initiate connections to us via peer-joined
-        setState(SyncClientState::SYNCING);
+        return;
+    }
+
+    // Join with existing peers: do NOT wait for them to notice us. Previously
+    // only "existing peers initiate via peer-joined" — if the browser missed
+    // that event, the joiner sat in SYNCING forever. Perfect negotiation:
+    // higher peer id offers to each existing peer.
+    //
+    // expect_remote_peers_: polite joiners have peers_.empty() until the first
+    // offer arrives — without this flag updateSyncState would go ONLINE alone
+    // and callers (CLI session) would mint a second empty Sheet1.
+    LOG_INFO("[Sync] Joined room with %zu existing peer(s) → SYNCING", existing_peers.size());
+    expect_remote_peers_ = true;
+    setState(SyncClientState::SYNCING);
+    for (const auto& other : existing_peers) {
+        if (shouldInitiateTo(other)) {
+            LOG_INFO("[Sync] Joiner initiating to existing peer %s", other.c_str());
+            initiateConnectionToPeer(other);
+        } else {
+            LOG_INFO("[Sync] Waiting for offer from existing peer %s", other.c_str());
+        }
     }
 }
 
 void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
                                             const std::string& peer_id) {
-    // We initiate connection to new peer
-    ConnectedPeer* peer = createPeerConnection(peer_id, true);
-    if (!peer || !peer->connection) {
+    // Perfect negotiation: only the higher id creates the offer
+    if (!shouldInitiateTo(peer_id)) {
+        LOG_INFO("[Sync] peer-joined %s — waiting for their offer (we are polite)",
+                 peer_id.c_str());
         return;
     }
-
-    // Create offer
-    peer->connection->createOffer(
-        // NOLINTNEXTLINE(bugprone-exception-escape) - std::string copy is acceptable
-        [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
-            if (!success) {
-                return;
-            }
-
-            auto it = peers_.find(peer_id);
-            if (it == peers_.end()) {
-                return;
-            }
-
-            // Set local description
-            it->second->connection->setLocalDescription(
-                sdp,
-                // NOLINTNEXTLINE(bugprone-exception-escape)
-                [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
-                    if (set_success) {
-                        // Send offer to peer
-                        signaling_client_->sendOffer(peer_id, sdp);
-                    }
-                });
-        });
+    LOG_INFO("[Sync] peer-joined %s — initiating offer", peer_id.c_str());
+    initiateConnectionToPeer(peer_id);
 }
 
 void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
@@ -800,7 +949,8 @@ void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
 void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                                                 const std::string& from_peer,
                                                 const SessionDescription& sdp) {
-    // Accept peer connection
+    LOG_INFO("[Sync] Received offer from %s", from_peer.c_str());
+    // Accept peer connection (createPeerConnection handles glare)
     ConnectedPeer* peer = createPeerConnection(from_peer, false);
     if (!peer || !peer->connection) {
         return;

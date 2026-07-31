@@ -189,6 +189,9 @@ public:
     [[nodiscard]] const std::string& getPeerId() const { return peer_id_; }
     [[nodiscard]] bool isConnected() const;
 
+    // Ops bootstrapped by the last startSync prepare (0 if empty join / already collab).
+    [[nodiscard]] size_t lastBootstrappedOpCount() const { return last_bootstrapped_ops_; }
+
     // Peer information
     [[nodiscard]] size_t getPeerCount() const;
     [[nodiscard]] std::vector<PeerInfo> getPeers() const;
@@ -261,8 +264,15 @@ private:
     // Generate a random peer ID
     static std::string generatePeerId();
 
-    // Create peer connection to remote peer
+    // Perfect negotiation: higher peer id is the offerer (impolite).
+    // Ensures exactly one side creates the offer for a pair.
+    [[nodiscard]] bool shouldInitiateTo(const std::string& remote_peer_id) const;
+
+    // Create peer connection to remote peer. Returns nullptr on glare ignore.
     ConnectedPeer* createPeerConnection(const std::string& peer_id, bool we_initiate);
+
+    // Start WebRTC offer to peer (data channels + createOffer).
+    void initiateConnectionToPeer(const std::string& peer_id);
 
     // Remove peer
     void removePeer(const std::string& peer_id);
@@ -319,6 +329,15 @@ private:
     SyncClientState state_ = SyncClientState::OFFLINE;
     std::string room_id_;
     std::string peer_id_;
+
+    // When we join a room that already has peers, do not flip to ONLINE alone
+    // while waiting for their offers (polite joiner has peers_.empty() until
+    // the first offer). Minting a local Sheet1 in that window creates a second
+    // document that never merges with the browser's sheet.
+    bool expect_remote_peers_ = false;
+
+    // Result of prepareWorkbookForSync in the last startSync call
+    size_t last_bootstrapped_ops_{0};
 
     // Delegate
     SyncClientDelegate* delegate_ = nullptr;

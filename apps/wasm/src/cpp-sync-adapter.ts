@@ -322,25 +322,56 @@ export class CppSyncAdapter {
   }
 
   private _loadOrGeneratePeerId(): PeerId {
+    // sessionStorage (not localStorage): each browser tab is a distinct peer.
+    // Sharing localStorage peerId across tabs made the signaling server close
+    // the older connection when the second tab joined the same room.
     const storageKey = "cells.peerId";
     let peerId: string | null = null;
 
     try {
-      peerId = localStorage.getItem(storageKey);
+      peerId = sessionStorage.getItem(storageKey);
     } catch {
-      // localStorage not available
+      // sessionStorage not available
     }
 
     if (!peerId || peerId.length !== 8) {
       peerId = this._generateId();
       try {
-        localStorage.setItem(storageKey, peerId);
+        sessionStorage.setItem(storageKey, peerId);
       } catch {
-        // localStorage not available
+        // sessionStorage not available
       }
     }
 
     return peerId;
+  }
+
+  /** Poll until sync state is online/syncing, or timeout. */
+  private async _waitForSignalingReady(timeoutMs: number): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const state = await this._client.getSyncState();
+        const mapped = this._mapState(state.state);
+        if (
+          mapped === SyncState.ONLINE ||
+          mapped === SyncState.SYNCING
+        ) {
+          if (mapped !== this._state) {
+            this._setState(mapped);
+          }
+          return true;
+        }
+        // Hard failure if C++ already dropped to offline after connecting
+        if (mapped === SyncState.OFFLINE && this._state !== SyncState.CONNECTING) {
+          // Still connecting from our side; keep waiting until timeout
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
   }
 
   private _loadOrGenerateName(): string {
@@ -386,7 +417,7 @@ export class CppSyncAdapter {
     this._setState(SyncState.CONNECTING);
 
     try {
-      // Derive signaling URL from current page
+      // Derive signaling URL from current page (same origin as the UI).
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
       const url = `${protocol}//${host}/ws`;
@@ -404,6 +435,16 @@ export class CppSyncAdapter {
 
         // Start polling for state updates
         this._startPolling();
+
+        // Wait briefly for signaling to actually connect (enableSync is async).
+        // Surface hard failures instead of reporting "joined" while offline.
+        const ready = await this._waitForSignalingReady(8000);
+        if (!ready) {
+          throw new Error(
+            `Signaling failed to connect to ${url}. Is collab enabled on the server ` +
+              `(bazel run :serve prints "WebSocket signaling at …")?`,
+          );
+        }
 
         this._emitter.emit("roomjoined", roomId);
       } else {

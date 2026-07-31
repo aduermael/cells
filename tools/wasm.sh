@@ -19,8 +19,8 @@ cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/wasm/
 cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/wasm/
 
 echo "Building TypeScript..."
-cd apps/wasm && npm run build
-cd "$REPO_ROOT"
+# node + esbuild only — npm CLI not required at build time (see wasm-ts-build.sh)
+"$SCRIPT_DIR/wasm-ts-build.sh"
 
 echo "Copying HTML, CSS, and TypeScript definitions..."
 cp apps/wasm/static/index.html dist/wasm/

@@ -1304,16 +1304,3 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "agent_client",
-    srcs = ["agent_client.cc"],
-    hdrs = ["agent_client.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":luau_sandbox",
-        ":model",
-        "//core/net:http_request",
-        "//core/net:sse_parser",
-        "//core/net:url",
-    ],
-)

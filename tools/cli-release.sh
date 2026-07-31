@@ -12,7 +12,10 @@ if [ -n "${CELLS_VERSION:-}" ]; then
 fi
 
 echo "Building CLI (optimized)${CELLS_VERSION:+ version=$CELLS_VERSION}..."
-bazel build -c opt //apps/cli:cells "${extra_copt[@]}"
+# shellcheck disable=SC2046,SC2086
+bazel build -c opt //apps/cli:cells \
+  ${extra_copt[@]+"${extra_copt[@]}"} \
+  $(foreign_cc_toolchain_args)
 
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells dist/cli/cells

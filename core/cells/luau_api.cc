@@ -48,6 +48,8 @@ namespace cells {
 // ============================================================================
 // Helper functions (shared between API implementations)
 // ============================================================================
+// Collab-safe ensureColumnViaCrdt / ensureRowViaCrdt / ensureCellViaCrdt and
+// setColumnWidthByPosition / setRowHeightByPosition live in crdt.h (shared with WASM).
 
 // Helper: Escape a string for JSON
 static std::string jsonEscape(const std::string& str) {
@@ -325,12 +327,18 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: invalid reference '%s'", ref);
     }
 
-    // Get or create the column and row
-    const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colIdx));
-    const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(rowIdx));
+    // Same as WASM CellsEngine::createCell: missing axes must be CRDT ops.
+    // getOrCreateColumnByPosition only mutates local state — peers then reject
+    // CELL_SET with INVALID_TARGET (empty A1 fails; updating existing B1 works).
+    Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
+    Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
+    if (col == nullptr || row == nullptr) {
+        luaL_error(L, "setCell: failed to ensure column/row for '%s'", ref);
+    }
 
-    // Get or create the cell
-    const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+    // Prefer existing cell id; otherwise mint id (cell is created by applyOperation)
+    Cell* existingCell = sheet->getCellAt(col->id, row->id);
+    const ID cellId = existingCell != nullptr ? existingCell->id : generate_id();
 
     // Build payload based on value type
     std::string payload;
@@ -338,15 +346,18 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     const std::string rowIdStr = row->id.toString();
 
     // Helper to append existing style/format for full-state resurrection correctness
-    auto appendStyleFormat = [&payload, &workbook, &cell]() {
-        if (cell->hasStyle()) {
-            const StyleBuffer* sty = workbook->getEntityStyle(cell->id);
+    auto appendStyleFormat = [&payload, &workbook, &cellId, existingCell]() {
+        if (existingCell == nullptr) {
+            return;
+        }
+        if (existingCell->hasStyle()) {
+            const StyleBuffer* sty = workbook->getEntityStyle(cellId);
             if (sty) {
                 payload += R"(,"sty":")" + sty->toBase64() + R"(")";
             }
         }
-        if (cell->hasFormat()) {
-            const FormatBuffer* fmt = workbook->getEntityFormat(cell->id);
+        if (existingCell->hasFormat()) {
+            const FormatBuffer* fmt = workbook->getEntityFormat(cellId);
             if (fmt) {
                 payload += R"(,"fmt":")" + fmt->toBase64() + R"(")";
             }
@@ -434,10 +445,10 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                     DependencyGraph* depGraph = sheet->getDependencyGraph();
                     if (depGraph != nullptr) {
                         // First remove any existing dependencies for this cell
-                        depGraph->removeFormula(cell->id);
+                        depGraph->removeFormula(cellId);
 
                         // Add new dependencies with position resolver
-                        depGraph->addFormula(cell->id, ast.get(), [sheet](const ID& cellIdArg) {
+                        depGraph->addFormula(cellId, ast.get(), [sheet](const ID& cellIdArg) {
                             const Cell* depCell = sheet->getCell(cellIdArg);
                             if (depCell == nullptr) {
                                 return std::make_pair(static_cast<int32_t>(-1),
@@ -455,9 +466,9 @@ int LuauSandbox::luaCellSet(lua_State* L) {
 
                         // Mark as volatile if needed
                         if (FormulaResolver::containsVolatileFunction(ast.get())) {
-                            depGraph->markVolatile(cell->id);
+                            depGraph->markVolatile(cellId);
                         } else {
-                            depGraph->unmarkVolatile(cell->id);
+                            depGraph->unmarkVolatile(cellId);
                         }
                     }
                 }
@@ -477,18 +488,21 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         payload += "}";
     } else if (lua_isnil(L, 2) != 0) {
         // Clear the cell - remove from dependency graph first
+        if (existingCell == nullptr) {
+            return 0;  // nothing to clear
+        }
         DependencyGraph* depGraph = sheet->getDependencyGraph();
         if (depGraph != nullptr) {
-            depGraph->removeFormula(cell->id);
-            depGraph->unmarkVolatile(cell->id);
+            depGraph->removeFormula(cellId);
+            depGraph->unmarkVolatile(cellId);
         }
 
-        const Operation op = makeCellDeleteOp(*workbook, cell->id);
+        const Operation op = makeCellDeleteOp(*workbook, cellId);
         applyOperation(*workbook, op);
 
         // Trigger recalculation for dependents
-        markDirty(sheet, cell->id);
-        const std::vector<ID> changed = {cell->id};
+        markDirty(sheet, cellId);
+        const std::vector<ID> changed = {cellId};
         cells::recalculate(workbook, changed);
         cells::recalculateVolatile(sheet);
         return 0;
@@ -496,14 +510,15 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: unsupported value type");
     }
 
-    // Apply the operation via CRDT
-    const Operation op = makeCellSetOp(*workbook, cell->id, payload);
+    // Apply via CRDT with sheet id (matches WASM createCell) so peers apply on the
+    // correct sheet and create the cell if missing.
+    const Operation op = makeCellSetOp(*workbook, cellId, sheet->id, payload);
     applyOperation(*workbook, op);
 
     // Trigger recalculation: mark dependents dirty and recalculate
     // This ensures formulas that depend on this cell get updated
-    markDirty(sheet, cell->id);
-    const std::vector<ID> changed = {cell->id};
+    markDirty(sheet, cellId);
+    const std::vector<ID> changed = {cellId};
     cells::recalculate(workbook, changed);
     cells::recalculateVolatile(sheet);
 
@@ -544,6 +559,7 @@ int LuauSandbox::luaDocumentGetTitle(lua_State* L) {
 // ============================================================================
 // Cells API: setColumnWidth(col, options)
 // options.width: number (pixels)
+// Uses shared setColumnWidthByPosition (same core path as WASM resizeColumnByPos).
 // ============================================================================
 int LuauSandbox::luaColumnSetWidth(lua_State* L) {
     const char* colRef = luaL_checkstring(L, 1);
@@ -568,21 +584,17 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
         luaL_error(L, "setColumnWidth: invalid column '%s'", colRef);
     }
 
-    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
-    if (col == nullptr) {
-        luaL_error(L, "setColumnWidth: column '%s' not found", colRef);
+    if (setColumnWidthByPosition(*workbook, *sheet, static_cast<uint32_t>(colIdx),
+                                 static_cast<uint32_t>(width)) == nullptr) {
+        luaL_error(L, "setColumnWidth: failed for column '%s'", colRef);
     }
-
-    const std::string payload = R"({"size":)" + std::to_string(width) + "}";
-    const Operation op = makeColSetOp(*workbook, col->id, payload);
-    applyOperation(*workbook, op);
-
     return 0;
 }
 
 // ============================================================================
 // Cells API: setRowHeight(row, options)
 // options.height: number (pixels)
+// Uses shared setRowHeightByPosition (same core path as WASM resizeRowByPos).
 // ============================================================================
 int LuauSandbox::luaRowSetHeight(lua_State* L) {
     const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
@@ -606,15 +618,10 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
         luaL_error(L, "setRowHeight: invalid row number %d", rowNum);
     }
 
-    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
-    if (row == nullptr) {
-        luaL_error(L, "setRowHeight: row %d not found", rowNum);
+    if (setRowHeightByPosition(*workbook, *sheet, static_cast<uint32_t>(rowIdx),
+                               static_cast<uint32_t>(height)) == nullptr) {
+        luaL_error(L, "setRowHeight: failed for row %d", rowNum);
     }
-
-    const std::string payload = R"({"size":)" + std::to_string(height) + "}";
-    const Operation op = makeRowSetOp(*workbook, row->id, payload);
-    applyOperation(*workbook, op);
-
     return 0;
 }
 
@@ -660,6 +667,7 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
 // ============================================================================
 // Axis API: hideColumn(col)
 // Hide a column by letter (e.g., "A", "B", "AB")
+// Creates the column via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaHideColumn(lua_State* L) {
     const char* colRef = luaL_checkstring(L, 1);
@@ -676,9 +684,9 @@ int LuauSandbox::luaHideColumn(lua_State* L) {
         luaL_error(L, "hideColumn: invalid column '%s'", colRef);
     }
 
-    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    const Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
     if (col == nullptr) {
-        luaL_error(L, "hideColumn: column '%s' not found", colRef);
+        luaL_error(L, "hideColumn: failed to ensure column '%s'", colRef);
     }
 
     const Operation op = makeAxisSetHiddenOp(*workbook, col->id, true);
@@ -690,6 +698,7 @@ int LuauSandbox::luaHideColumn(lua_State* L) {
 // ============================================================================
 // Axis API: showColumn(col)
 // Show a hidden column by letter (e.g., "A", "B", "AB")
+// Creates the column via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaShowColumn(lua_State* L) {
     const char* colRef = luaL_checkstring(L, 1);
@@ -706,9 +715,9 @@ int LuauSandbox::luaShowColumn(lua_State* L) {
         luaL_error(L, "showColumn: invalid column '%s'", colRef);
     }
 
-    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    const Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
     if (col == nullptr) {
-        luaL_error(L, "showColumn: column '%s' not found", colRef);
+        luaL_error(L, "showColumn: failed to ensure column '%s'", colRef);
     }
 
     const Operation op = makeAxisSetHiddenOp(*workbook, col->id, false);
@@ -720,6 +729,7 @@ int LuauSandbox::luaShowColumn(lua_State* L) {
 // ============================================================================
 // Axis API: hideRow(row)
 // Hide a row by number (1-based)
+// Creates the row via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaHideRow(lua_State* L) {
     const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
@@ -735,9 +745,9 @@ int LuauSandbox::luaHideRow(lua_State* L) {
     }
 
     const int rowIdx = rowNum - 1;  // Convert to 0-based
-    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    const Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
     if (row == nullptr) {
-        luaL_error(L, "hideRow: row %d not found", rowNum);
+        luaL_error(L, "hideRow: failed to ensure row %d", rowNum);
     }
 
     const Operation op = makeAxisSetHiddenOp(*workbook, row->id, true);
@@ -749,6 +759,7 @@ int LuauSandbox::luaHideRow(lua_State* L) {
 // ============================================================================
 // Axis API: showRow(row)
 // Show a hidden row by number (1-based)
+// Creates the row via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaShowRow(lua_State* L) {
     const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
@@ -764,9 +775,9 @@ int LuauSandbox::luaShowRow(lua_State* L) {
     }
 
     const int rowIdx = rowNum - 1;  // Convert to 0-based
-    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    const Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
     if (row == nullptr) {
-        luaL_error(L, "showRow: row %d not found", rowNum);
+        luaL_error(L, "showRow: failed to ensure row %d", rowNum);
     }
 
     const Operation op = makeAxisSetHiddenOp(*workbook, row->id, false);
@@ -779,6 +790,7 @@ int LuauSandbox::luaShowRow(lua_State* L) {
 // Axis API: setColumnStyle(col, style)
 // Set default style for a column. Style is a table with style properties.
 // e.g., setColumnStyle("A", {bold=true, bgColor="#FF0000"})
+// Creates the column via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaSetColumnStyle(lua_State* L) {
     const char* colRef = luaL_checkstring(L, 1);
@@ -796,9 +808,9 @@ int LuauSandbox::luaSetColumnStyle(lua_State* L) {
         luaL_error(L, "setColumnStyle: invalid column '%s'", colRef);
     }
 
-    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    const Axis* col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
     if (col == nullptr) {
-        luaL_error(L, "setColumnStyle: column '%s' not found", colRef);
+        luaL_error(L, "setColumnStyle: failed to ensure column '%s'", colRef);
     }
 
     // Parse style table into CellStyle
@@ -863,6 +875,7 @@ int LuauSandbox::luaSetColumnStyle(lua_State* L) {
 // Axis API: setRowStyle(row, style)
 // Set default style for a row. Style is a table with style properties.
 // e.g., setRowStyle(1, {bold=true, bgColor="#FF0000"})
+// Creates the row via CRDT if missing.
 // ============================================================================
 int LuauSandbox::luaSetRowStyle(lua_State* L) {
     const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
@@ -879,9 +892,9 @@ int LuauSandbox::luaSetRowStyle(lua_State* L) {
     }
 
     const int rowIdx = rowNum - 1;  // Convert to 0-based
-    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    const Axis* row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
     if (row == nullptr) {
-        luaL_error(L, "setRowStyle: row %d not found", rowNum);
+        luaL_error(L, "setRowStyle: failed to ensure row %d", rowNum);
     }
 
     // Parse style table into CellStyle
@@ -1428,15 +1441,16 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
         std::swap(fromRow, toRow);
     }
 
-    // Apply format to all cells in range
+    // Apply format to all cells in range (shared ensureCellAtPositionViaCrdt)
     auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
 
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
-            // Get or create cell at this position
-            const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
-            const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
-            const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+            Cell* cell = ensureCellAtPositionViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c),
+                                                     static_cast<uint32_t>(r));
+            if (cell == nullptr) {
+                continue;
+            }
 
             if (formatBase64.empty()) {
                 const Operation op = makeCellClearFormatOp(*workbook, cell->id);
@@ -1487,9 +1501,11 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     if (lua_isnil(L, 2) != 0) {
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
-                const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
-                const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
-                const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+                Cell* cell = ensureCellAtPositionViaCrdt(
+                    *workbook, *sheet, static_cast<uint32_t>(c), static_cast<uint32_t>(r));
+                if (cell == nullptr) {
+                    continue;
+                }
 
                 const Operation op = makeCellClearStyleOp(*workbook, cell->id);
                 applyOperation(*workbook, op);
@@ -1596,9 +1612,11 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     if (style.isEmpty()) {
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
-                const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
-                const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
-                const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+                Cell* cell = ensureCellAtPositionViaCrdt(
+                    *workbook, *sheet, static_cast<uint32_t>(c), static_cast<uint32_t>(r));
+                if (cell == nullptr) {
+                    continue;
+                }
 
                 const Operation op = makeCellClearStyleOp(*workbook, cell->id);
                 applyOperation(*workbook, op);
@@ -1610,12 +1628,14 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     // Convert CellStyle to content-addressed StyleBuffer
     const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
 
-    // Apply CELL_SET_STYLE to all cells in range using content-addressed style
+    // Apply style to all cells in range (shared ensureCellAtPositionViaCrdt)
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
-            const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
-            const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
-            const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+            Cell* cell = ensureCellAtPositionViaCrdt(*workbook, *sheet, static_cast<uint32_t>(c),
+                                                     static_cast<uint32_t>(r));
+            if (cell == nullptr) {
+                continue;
+            }
 
             const Operation op = makeCellSetStyleOp(*workbook, cell->id, styleBuf);
             applyOperation(*workbook, op);

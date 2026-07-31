@@ -173,6 +173,9 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     if (oplog != nullptr && !oplog->empty()) {
         serializeOpLog(*oplog, out);
     }
+
+    // Serialize durable peer knowledge (frontiers for offline rejoin)
+    serializePeerKnowledge(workbook, out);
 }
 
 void Serializer::serializeHeader(const Workbook& workbook, std::ostream& out) const {
@@ -596,6 +599,23 @@ void Serializer::serializeOperation(const Operation& op, std::ostream& out) cons
     // Example: O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
     out << "O " << op.hlc.toString() << " " << opTypeToString(op.type) << " "
         << op.target_id.toString() << " " << op.payload << "\n";
+}
+
+void Serializer::serializePeerKnowledge(const Workbook& workbook, std::ostream& out) const {
+    const auto& knowledge = workbook.getPeerKnowledge();
+    if (knowledge.empty()) {
+        return;
+    }
+
+    // Format: P <peer_id> <hlc>
+    // Example: P AbCdEf12 1705312200000.0.N3f8hJ2w
+    out << "#peers\n";
+    for (const auto& pair : knowledge) {
+        if (pair.first.isNull()) {
+            continue;
+        }
+        out << "P " << pair.first.toString() << " " << pair.second.toString() << "\n";
+    }
 }
 
 // --- Convenience functions ---

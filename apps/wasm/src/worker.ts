@@ -11,7 +11,6 @@
 // Key responsibilities:
 // - Load and initialize the Emscripten-compiled WASM module
 // - Route messages to appropriate handlers (core or collab)
-// - Manage agent streaming for AI features
 // - Handle worker lifecycle and pending messages
 //
 // Architecture:
@@ -131,12 +130,6 @@ import {
     handleTokenizeLuau,
     handleGetAutocomplete,
     handleGetSpillRangeAt,
-    handleInitAgent,
-    handleIsAgentInitialized,
-    handleGetAgentConversationId,
-    handleClearAgentConversation,
-    handleCancelAgent,
-    handleIsAgentProcessing,
 } from "./worker-handlers.js";
 
 // Collaboration handlers
@@ -238,33 +231,6 @@ async function initModule(): Promise<void> {
             }
         });
 
-        // Register agent listener for AI events
-        // The agent callback receives (eventType, data) where data is JSON or text
-        // Note: engine is guaranteed non-null here since we're inside the init callback
-        const eng = engine!;
-        eng.setAgentListener((eventType: string, data: string) => {
-            // Handle special event to send tool results
-            if (eventType === "send_tool_result") {
-                const toolResult = JSON.parse(data);
-                const serverUrl = eng.getAgentServerUrl();
-                if (serverUrl != null) {
-                    streamAgentMessage(serverUrl + "/api/agent/tool-result", {
-                        conversation_id: eng.getAgentConversationId(),
-                        tool_use_id: toolResult.tool_use_id,
-                        result: toolResult.result,
-                        is_error: toolResult.is_error,
-                    });
-                }
-                return;
-            }
-
-            workerSelf.postMessage({
-                type: "agentEvent",
-                eventType: eventType, // 'text', 'tool_use', 'tool_result_needed', 'done', 'error'
-                data: data,
-            });
-        });
-
         isReady = true;
 
         // Notify main thread that we're ready
@@ -281,77 +247,6 @@ async function initModule(): Promise<void> {
             type: "error",
             error: "Failed to initialize WASM module: " + error,
         });
-    }
-}
-
-// ============================================================================
-// Agent Streaming Fetch
-// ============================================================================
-
-// Perform a streaming fetch to the agent server and feed chunks to C++
-async function streamAgentMessage(
-    url: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const isToolResult = url.includes("/tool-result");
-
-    try {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-            // Provide more context for tool result failures
-            if (isToolResult) {
-                const convId = body.conversation_id || "unknown";
-                const toolId = body.tool_use_id || "unknown";
-                console.error(
-                    `[Agent] Tool result failed: HTTP ${response.status} for conversation=${convId}, tool=${toolId}`,
-                );
-
-                // Try to read error body for more details
-                let errorDetail = response.statusText;
-                try {
-                    const errorText = await response.text();
-                    if (errorText) errorDetail = errorText;
-                } catch {
-                    // Ignore error reading body
-                }
-
-                throw new Error(
-                    `Failed to send tool result (${response.status}): ${errorDetail}. The AI session may have been lost - please try your request again.`,
-                );
-            }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-            throw new Error("ReadableStream not supported");
-        }
-
-        const decoder = new TextDecoder();
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            // Feed raw SSE data to C++ for parsing
-            const chunk = decoder.decode(value, { stream: true });
-            engine?.feedAgentStreamData(chunk);
-        }
-
-        // Signal stream end
-        engine?.endAgentStream();
-    } catch (err) {
-        const error = err instanceof Error ? err.message : String(err);
-        console.error(
-            `[Agent] Stream error (isToolResult=${isToolResult}):`,
-            error,
-        );
-        engine?.errorAgentStream(error);
     }
 }
 
@@ -860,83 +755,6 @@ function handleMessage(msg: WorkerRequest): void {
                 handleGetSpillRangeAt(engine, params, respond);
                 break;
 
-            // ================================================================
-            // AI Agent
-            // ================================================================
-            case "initAgent":
-                handleInitAgent(engine, params, respond);
-                break;
-            case "isAgentInitialized":
-                handleIsAgentInitialized(engine, params, respond);
-                break;
-            case "sendAgentMessage": {
-                // Use JavaScript streaming fetch for reliable SSE
-                const serverUrl = engine.getAgentServerUrl();
-                if (serverUrl == null) {
-                    respond({
-                        type: "error",
-                        error: "Agent server URL not set",
-                    });
-                    break;
-                }
-                const { prompt, conversationId } = params as {
-                    prompt: string;
-                    conversationId: string;
-                };
-                engine.setAgentStreaming(true);
-                respond({ type: "agentMessageSent", success: true });
-
-                // Perform streaming fetch
-                streamAgentMessage(serverUrl + "/api/agent/message", {
-                    prompt,
-                    conversation_id: conversationId || undefined,
-                });
-                break;
-            }
-            case "sendAgentToolResult": {
-                const serverUrl = engine.getAgentServerUrl();
-                if (serverUrl == null) {
-                    respond({
-                        type: "error",
-                        error: "Agent server URL not set",
-                    });
-                    break;
-                }
-                const {
-                    conversationId: convId,
-                    toolUseId,
-                    result,
-                    isError,
-                } = params as {
-                    conversationId: string;
-                    toolUseId: string;
-                    result: string;
-                    isError: boolean;
-                };
-                engine.setAgentStreaming(true);
-                respond({ type: "agentToolResultSent", success: true });
-
-                // Perform streaming fetch for tool result
-                streamAgentMessage(serverUrl + "/api/agent/tool-result", {
-                    conversation_id: convId,
-                    tool_use_id: toolUseId,
-                    result,
-                    is_error: isError,
-                });
-                break;
-            }
-            case "getAgentConversationId":
-                handleGetAgentConversationId(engine, params, respond);
-                break;
-            case "clearAgentConversation":
-                handleClearAgentConversation(engine, params, respond);
-                break;
-            case "cancelAgent":
-                handleCancelAgent(engine, params, respond);
-                break;
-            case "isAgentProcessing":
-                handleIsAgentProcessing(engine, params, respond);
-                break;
 
             default:
                 respond({

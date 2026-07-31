@@ -36,10 +36,12 @@ type SignalingMessage struct {
 }
 
 // WebSocket connection parameters
+// Generous timeouts: browser tabs can hitch during WASM/WebRTC work and miss a
+// single ping window; tearing them down mid-collab was a major reliability issue.
 const (
-	pingInterval = 30 * time.Second
-	pongTimeout  = 10 * time.Second
-	writeTimeout = 10 * time.Second
+	pingInterval = 25 * time.Second
+	pongTimeout  = 60 * time.Second
+	writeTimeout = 30 * time.Second
 )
 
 var upgrader = websocket.Upgrader{
@@ -51,7 +53,6 @@ var upgrader = websocket.Upgrader{
 }
 
 var roomManager *RoomManager
-var agentHandler *AgentHandler
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -162,6 +163,9 @@ func sendError(conn *websocket.Conn, code string, message string) {
 func pingRoutine(peer *Peer, done <-chan struct{}) {
 	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
+	// Tolerate a few failed pings before killing (transient main-thread stalls)
+	failures := 0
+	const maxFailures = 3
 
 	for {
 		select {
@@ -174,10 +178,15 @@ func pingRoutine(peer *Peer, done <-chan struct{}) {
 			peer.mu.Unlock()
 
 			if err != nil {
-				log.Printf("Ping failed for peer %s: %v", peer.ID, err)
-				peer.Conn.Close()
-				return
+				failures++
+				log.Printf("Ping failed for peer %s (%d/%d): %v", peer.ID, failures, maxFailures, err)
+				if failures >= maxFailures {
+					peer.Conn.Close()
+					return
+				}
+				continue
 			}
+			failures = 0
 		case <-done:
 			return
 		}
@@ -292,7 +301,6 @@ func main() {
 	port := flag.Int("port", 8081, "Port to listen on")
 	dir := flag.String("dir", "dist/wasm", "Directory to serve")
 	enableCollab := flag.Bool("enable-collab", false, "Enable collaboration WebSocket endpoint")
-	enableAgent := flag.Bool("enable-agent", false, "Enable AI agent endpoint (requires ANTHROPIC_API_KEY)")
 	maxRoomSize := flag.Int("max-room-size", 10, "Maximum peers per room")
 	roomTimeout := flag.Duration("room-timeout", time.Hour, "Timeout for empty rooms")
 	flag.Parse()
@@ -306,22 +314,6 @@ func main() {
 		log.Println("Collaboration enabled with WebSocket signaling at /ws")
 	}
 
-	// Initialize agent handler if enabled
-	if *enableAgent {
-		conversationStore := NewConversationStore(50, time.Hour) // 50 messages max, 1 hour timeout
-		stop := make(chan struct{})
-		conversationStore.StartCleanupRoutine(5*time.Minute, stop)
-
-		var err error
-		agentHandler, err = NewAgentHandler(conversationStore)
-		if err != nil {
-			log.Printf("ERROR: Agent initialization failed: %v", err)
-			log.Println("  Set ANTHROPIC_API_KEY environment variable to enable the AI agent")
-			log.Println("  Example: ANTHROPIC_API_KEY=sk-ant-... make wasm-serve")
-		} else {
-			log.Println("AI agent enabled at /api/agent/*")
-		}
-	}
 
 	// Resolve directory path
 	absDir, err := filepath.Abs(*dir)
@@ -371,20 +363,12 @@ func main() {
 	if *enableCollab {
 		mux.HandleFunc("/ws", handleWebSocket)
 	}
-	if agentHandler != nil {
-		mux.HandleFunc("/api/agent/message", agentHandler.HandleMessage)
-		mux.HandleFunc("/api/agent/tool-result", agentHandler.HandleToolResult)
-		mux.HandleFunc("/api/agent/clear", agentHandler.HandleClearConversation)
-	}
 	mux.Handle("/", fileHandler)
 
 	addr := fmt.Sprintf(":%d", *port)
 	fmt.Printf("Serving %s on http://localhost%s/\n", absDir, addr)
 	if *enableCollab {
 		fmt.Printf("WebSocket signaling at ws://localhost%s/ws\n", addr)
-	}
-	if agentHandler != nil {
-		fmt.Printf("AI agent API at http://localhost%s/api/agent/*\n", addr)
 	}
 	fmt.Println("Press Ctrl+C to stop")
 

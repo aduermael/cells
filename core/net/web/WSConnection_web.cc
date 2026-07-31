@@ -24,15 +24,19 @@ protected:
     }
 
     void _connect() override {
+        // createOnMainThread must be false: Cells WASM runs in a dedicated
+        // Web Worker (no Module on the page main thread). WebSocket is available
+        // on DedicatedWorkerGlobalScope. createOnMainThread=true only applies to
+        // pthreads of a main-thread Module and fails here with a generic error.
         EmscriptenWebSocketCreateAttributes attrs = {
             url_string_.c_str(),
             nullptr,  // protocols
-            EM_TRUE   // createOnMainThread
+            EM_FALSE  // create on this worker thread
         };
 
         socket_ = emscripten_websocket_new(&attrs);
         if (socket_ <= 0) {
-            onError("Failed to create WebSocket");
+            onError(std::string("Failed to create WebSocket: ") + url_string_);
             return;
         }
 

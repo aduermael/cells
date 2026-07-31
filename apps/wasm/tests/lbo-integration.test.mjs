@@ -1,5 +1,5 @@
 // Integration tests for Excel parity improvements with LBO model
-// Tests: column widths, text overflow, borders, zoom slider, AI panel positioning
+// Tests: column widths, text overflow, borders, zoom slider
 
 import { runTests } from './harness.mjs';
 import {
@@ -344,66 +344,6 @@ const tests = {
     zoomLevel = await ctx.page.$eval('#zoom-level', el => el.textContent);
     assertEqual(zoomAfterReturn, zoomAfterChange, 'Zoom should persist after returning to A1');
     assertEqual(zoomLevel, `${zoomAfterChange}%`, 'Display should persist after returning');
-  },
-
-  // Phase 4: AI panel positioning
-  'AI panel does not overlap zoom controls': async (ctx) => {
-    await ctx.page.goto(ctx.baseUrl);
-    await waitForAppReady(ctx.page);
-
-    await loadTestFile(ctx.page, 'xlsx/init_lbo_model_60min_is_revenue_cf_only.xlsx');
-    await sleep(500);
-
-    await ctx.page.waitForSelector('#bottom-bar:not(.hidden)', { timeout: 5000 });
-
-    // Click AI button to open panel (if it exists)
-    const aiButton = await ctx.page.$('#ai-btn');
-    if (!aiButton) {
-      console.log('AI button not present - skipping AI panel test');
-      return;
-    }
-
-    await aiButton.click();
-    await sleep(300);
-
-    // Check if chat panel is visible
-    const chatPanel = await ctx.page.$('#chat-panel');
-    if (!chatPanel) {
-      console.log('Chat panel not present - skipping positioning test');
-      return;
-    }
-
-    // Get positions of chat panel and zoom controls
-    const positions = await ctx.page.evaluate(() => {
-      const chatPanel = document.getElementById('chat-panel');
-      const zoomControls = document.querySelector('.zoom-controls');
-      const bottomBar = document.getElementById('bottom-bar');
-
-      if (!chatPanel || !zoomControls || !bottomBar) {
-        return null;
-      }
-
-      const chatRect = chatPanel.getBoundingClientRect();
-      const zoomRect = zoomControls.getBoundingClientRect();
-      const barRect = bottomBar.getBoundingClientRect();
-
-      return {
-        chatBottom: chatRect.bottom,
-        barTop: barRect.top,
-        zoomTop: zoomRect.top,
-        zoomBottom: zoomRect.bottom,
-      };
-    });
-
-    if (positions) {
-      console.log(`Chat panel bottom: ${positions.chatBottom}px, Bottom bar top: ${positions.barTop}px`);
-
-      // Chat panel should be above the bottom bar
-      assertTrue(
-        positions.chatBottom <= positions.barTop + 5, // Allow 5px tolerance
-        `Chat panel should not overlap bottom bar. Panel bottom: ${positions.chatBottom}, Bar top: ${positions.barTop}`
-      );
-    }
   },
 
   // Phase 2 (Border Deduplication): Adjacent borders don't double up

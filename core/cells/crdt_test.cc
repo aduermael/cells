@@ -1535,5 +1535,214 @@ TEST_F(FullStateOperationTest, SparseSetLosesPropertiesOnResurrection) {
     EXPECT_FALSE(cell->hasFormat()) << "Sparse SET does NOT include format";
 }
 
+// Browser createEmptyWorkbook adds a sheet outside the oplog; live COL/ROW/CELL
+// ops carry sheetId. Peers must materialize the sheet so those ops apply.
+TEST(CrdtSheetMaterialize, ColRowCellApplyWithoutSheetSet) {
+    auto peer = std::make_unique<Workbook>(generate_id(), "Peer");
+    peer->startCollaboration();
+    peer->setNodeId(generate_id());
+    // Empty peer — no sheets
+
+    const ID sheetId = generate_id();
+    const ID colId = generate_id();
+    const ID rowId = generate_id();
+    const ID cellId = generate_id();
+
+    // Simulate peer_ops=3 without SHEET_SET (historical browser bug)
+    Operation colOp = makeColSetOp(*peer, colId, sheetId, R"({"pos":1})");
+    Operation rowOp = makeRowSetOp(*peer, rowId, sheetId, R"({"pos":0})");
+    Operation cellOp = makeCellSetOp(*peer, cellId, sheetId,
+                                     "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() +
+                                         "\",\"row\":\"" + rowId.toString() + "\"}");
+
+    // mint HLCs on a temp workbook so ops have valid HLCs
+    auto src = std::make_unique<Workbook>(generate_id(), "Src");
+    src->startCollaboration();
+    src->setNodeId(generate_id());
+    colOp = makeColSetOp(*src, colId, sheetId, R"({"pos":1})");
+    rowOp = makeRowSetOp(*src, rowId, sheetId, R"({"pos":0})");
+    cellOp = makeCellSetOp(*src, cellId, sheetId,
+                           "{\"t\":\"n\",\"v\":\"123\",\"col\":\"" + colId.toString() +
+                               "\",\"row\":\"" + rowId.toString() + "\"}");
+
+    std::vector<Operation> ops = {colOp, rowOp, cellOp};
+    const size_t applied = applyOperations(*peer, ops);
+    EXPECT_EQ(applied, 3u) << "COL/ROW/CELL must apply by materializing missing sheet";
+    ASSERT_EQ(peer->sheets.size(), 1u);
+    EXPECT_EQ(peer->sheets[0]->id, sheetId);
+    Sheet* sh = peer->getSheet(sheetId);
+    ASSERT_NE(sh, nullptr);
+    Cell* c = sh->getCell(cellId);
+    ASSERT_NE(c, nullptr);
+    EXPECT_EQ(c->value.raw, "123");
+}
+
+TEST(CrdtSheetMaterialize, BootstrapEmitsSheetSet) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "W");
+    wb->startCollaboration();
+    wb->setNodeId(generate_id());
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    const ID sid = sheet->id;
+    wb->addSheet(std::move(sheet));
+
+    const size_t n = bootstrapOpLog(*wb);
+    EXPECT_GE(n, 1u);
+    bool found_sheet = false;
+    for (const auto& op : wb->getOpLog()->getAllOperations()) {
+        if (op.type == OpType::SHEET_SET && op.target_id == sid) {
+            found_sheet = true;
+        }
+    }
+    EXPECT_TRUE(found_sheet) << "bootstrapOpLog must emit SHEET_SET for empty sheets";
+}
+
+// ---------------------------------------------------------------------------
+// Late-join dual Sheet1: empty local shell must not compete with host document
+// ---------------------------------------------------------------------------
+
+TEST(CrdtJoinEmptyShell, DiscardEmptyPlaceholderSheets) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    wb->addSheet(std::move(sheet));
+    EXPECT_TRUE(isWorkbookContentEmpty(*wb));
+    EXPECT_EQ(wb->sheetCount(), 1u);
+
+    const size_t removed = discardEmptyPlaceholderSheets(*wb);
+    EXPECT_EQ(removed, 1u);
+    EXPECT_EQ(wb->sheetCount(), 0u);
+    EXPECT_TRUE(isWorkbookContentEmpty(*wb));
+}
+
+TEST(CrdtJoinEmptyShell, DiscardLeavesSheetsWithContent) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+
+    const ID sheetId = generate_id();
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(wb.get());
+    wb->addSheet(std::move(sheet));
+    Sheet* s = wb->getSheet(sheetId);
+    ASSERT_NE(s, nullptr);
+
+    // Empty sibling sheet (placeholder) + content sheet
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+
+    const ID colId = generate_id();
+    applyOperation(*wb, makeColSetOp(*wb, colId, sheetId, R"({"pos":0})"));
+    EXPECT_FALSE(isWorkbookContentEmpty(*wb));
+
+    const size_t removed = discardEmptyPlaceholderSheets(*wb);
+    EXPECT_EQ(removed, 1u);
+    EXPECT_EQ(wb->sheetCount(), 1u);
+    EXPECT_EQ(wb->sheets[0]->id, sheetId);
+}
+
+TEST(CrdtJoinEmptyShell, PreferredActiveSheetIsContentSheet) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+
+    // Index 0: empty placeholder (late joiner shell)
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+
+    // Index 1: host document with a cell
+    const ID sheetId = generate_id();
+    auto content = std::make_unique<Sheet>(sheetId, "Sheet1");
+    content->setWorkbook(wb.get());
+    wb->addSheet(std::move(content));
+    Sheet* s = wb->getSheet(sheetId);
+    ASSERT_NE(s, nullptr);
+
+    const ID colId = generate_id();
+    const ID rowId = generate_id();
+    const ID cellId = generate_id();
+    applyOperation(*wb, makeColSetOp(*wb, colId, sheetId, R"({"pos":0})"));
+    applyOperation(*wb, makeRowSetOp(*wb, rowId, sheetId, R"({"pos":0})"));
+    applyOperation(*wb, makeCellSetOp(*wb, cellId, sheetId,
+                                      "{\"t\":\"s\",\"v\":\"foo\",\"col\":\"" + colId.toString() +
+                                          "\",\"row\":\"" + rowId.toString() + "\"}"));
+
+    EXPECT_EQ(preferredActiveSheetIndex(*wb), 1u);
+    EXPECT_EQ(wb->getSheetByIndex(preferredActiveSheetIndex(*wb))->getCell(cellId)->value.raw,
+              "foo");
+}
+
+TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
+    // Host has content Sheet1
+    auto host = std::make_unique<Workbook>(generate_id(), "Untitled");
+    host->setNodeId(generate_id());
+    host->startCollaboration();
+    const ID hostSheet = generate_id();
+    host->addSheet(std::make_unique<Sheet>(hostSheet, "Sheet1"));
+    host->getSheet(hostSheet)->setWorkbook(host.get());
+    const ID colId = generate_id();
+    const ID rowId = generate_id();
+    const ID cellId = generate_id();
+    applyOperation(*host, makeSheetSetOp(*host, hostSheet, R"({"name":"Sheet1"})"));
+    applyOperation(*host, makeColSetOp(*host, colId, hostSheet, R"({"pos":0})"));
+    applyOperation(*host, makeRowSetOp(*host, rowId, hostSheet, R"({"pos":0})"));
+    applyOperation(*host, makeCellSetOp(*host, cellId, hostSheet,
+                                        "{\"t\":\"s\",\"v\":\"foo\",\"col\":\"" + colId.toString() +
+                                            "\",\"row\":\"" + rowId.toString() + "\"}"));
+
+    // Joiner: empty UI shell — prepareWorkbookForSync (shared CLI/WASM path)
+    auto joiner = std::make_unique<Workbook>(generate_id(), "Untitled");
+    joiner->setNodeId(generate_id());
+    joiner->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+    ASSERT_TRUE(isWorkbookContentEmpty(*joiner));
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*joiner);
+    EXPECT_EQ(prep.bootstrappedOps, 0u);
+    EXPECT_GE(prep.discardedSheets, 1u);
+    EXPECT_EQ(joiner->sheetCount(), 0u);
+    EXPECT_EQ(joiner->getOpLog()->size(), 0u);
+    EXPECT_TRUE(joiner->isCollaborating());
+
+    // Apply host ops (full join pull)
+    const size_t applied = applyOperations(*joiner, host->getOpLog()->getAllOperations());
+    EXPECT_GE(applied, 4u);
+    EXPECT_EQ(joiner->sheetCount(), 1u) << "must not have dual Sheet1 after join";
+    EXPECT_EQ(joiner->sheets[0]->id, hostSheet);
+    EXPECT_EQ(preferredActiveSheetIndex(*joiner), 0u);
+    EXPECT_EQ(joiner->getSheet(hostSheet)->getCell(cellId)->value.raw, "foo");
+}
+
+TEST(CrdtJoinEmptyShell, PrepareBootstrapsLocalContent) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    const ID sheetId = generate_id();
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(wb.get());
+    wb->addSheet(std::move(sheet));
+    applyOperation(*wb, makeColSetOp(*wb, generate_id(), sheetId, R"({"pos":0})"));
+
+    // Offline edits put ops in oplog; prepare bootstraps material state
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*wb);
+    EXPECT_FALSE(prep.alreadyCollaborating);
+    EXPECT_GE(prep.bootstrappedOps, 1u);
+    EXPECT_TRUE(wb->isCollaborating());
+    EXPECT_FALSE(wb->getOpLog()->empty());
+}
+
+TEST(CrdtJoinEmptyShell, PrepareAlreadyCollaboratingIsNoOp) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+    const size_t before = wb->getOpLog()->size();
+    const PrepareForSyncResult prep = prepareWorkbookForSync(*wb);
+    EXPECT_TRUE(prep.alreadyCollaborating);
+    EXPECT_EQ(prep.bootstrappedOps, 0u);
+    EXPECT_EQ(wb->getOpLog()->size(), before);
+}
+
+TEST(CrdtJoinEmptyShell, EnsureDefaultSheetOnlyWhenEmpty) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+    EXPECT_TRUE(ensureDefaultSheetViaCrdt(*wb));
+    EXPECT_EQ(wb->sheetCount(), 1u);
+    EXPECT_FALSE(ensureDefaultSheetViaCrdt(*wb));  // already has a sheet
+}
+
 }  // namespace
 }  // namespace cells

@@ -88,7 +88,9 @@ protected:
         auto wb = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
         wb->setNodeId(nodeId);
 
-        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        // Fixed sheet id so COL/ROW/CELL ops with sheetId apply to the same logical
+        // sheet on every peer (not a second sheet materialized by ensureSheetForOp).
+        auto sheet = std::make_unique<Sheet>(ID("Sheet111"), "Sheet1");
         sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
         // Create columns A and B (positions 0 and 1)

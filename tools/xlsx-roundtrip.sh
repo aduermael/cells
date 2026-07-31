@@ -26,7 +26,8 @@ cd "$REPO_ROOT"
 
 # Build CLI
 echo "Building CLI..."
-bazel build //apps/cli:cells
+# shellcheck disable=SC2046
+bazel build //apps/cli:cells $(foreign_cc_toolchain_args)
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells dist/cli/cells
 
