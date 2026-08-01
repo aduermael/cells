@@ -27,6 +27,29 @@ npm install -g @bazel/bazelisk
 sudo apt install clang clang-format clang-tidy
 ```
 
+### Windows
+
+Use **Bazelisk** (honors `.bazelversion`; do not install a standalone Bazel 9+ from Chocolatey — it breaks analysis). Visual Studio 2022 with the **Desktop development with C++** workload provides MSVC.
+
+```powershell
+winget install Bazel.Bazelisk
+# Optional helper (copies cells.exe to dist\cli\):
+#   .\tools\windows-build.ps1
+```
+
+Build the full CLI (same target as macOS/Linux):
+
+```powershell
+# Prefer bazelisk so the repo pin (7.5.0) is used
+bazelisk build //apps/cli:cells
+# Output: bazel-bin\apps\cli\cells.exe
+
+# Converter-only (no networking):
+bazelisk build //apps/cli:cells-converter
+```
+
+`bazel run :cli` uses a bash `sh_binary` and needs Git Bash on PATH; on Windows the direct `bazelisk build` commands above are the supported path.
+
 ## Building
 
 Build the CLI:
@@ -36,7 +59,7 @@ bazel run :cli           # Development build
 bazel run :cli-release   # Optimized build
 ```
 
-Output: `dist/cli/cells`
+Output: `dist/cli/cells` (on Windows: `bazel-bin/apps/cli/cells.exe`)
 
 Build the WASM web app:
 

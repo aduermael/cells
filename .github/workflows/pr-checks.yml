@@ -112,20 +112,16 @@ jobs:
           disk-cache: ${{ github.workflow }}-windows
           repository-cache: true
 
-      # Prefer preinstalled pkg-config for rules_foreign_cc (avoids broken
-      # MSVC bootstrap of pkgconfig from source).
-      - name: Install pkg-config
-        run: choco install pkgconfiglite -y --no-progress
-
       # One bazel invocation: build full cells CLI (via build_test) + net tests.
       # Multiple sequential bazel processes on Windows flakily fail with
       # "Couldn't delete action output directory: Permission denied".
-      # windows_backend_test is a file-reading structural test (runfiles-sensitive
-      # on Windows); it is covered on Linux unit tests instead.
+      # libdatachannel is pure Bazel (no rules_foreign_cc / pkg-config).
+      # windows_backend_test resolves data via RUNFILES_MANIFEST_FILE on Windows.
       - name: Build cells CLI and run net tests
         run: >
           bazel test
           //apps/cli:cells_cli_build_test
+          //core/net:windows_backend_test
           //core/net:ws_worker_state_test
           //core/net:rtc_test
           //core/net:signaling_test

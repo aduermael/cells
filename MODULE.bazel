@@ -13,25 +13,7 @@ bazel_dep(name = "apple_support", version = "2.0.0")
 # Emscripten SDK for WebAssembly builds
 bazel_dep(name = "emsdk", version = "4.0.17")
 
-# rules_foreign_cc for building CMake/Make projects (libdatachannel)
-# Pin past 0.15.1: Windows pkgconfig tool failed with missing
-# msvc_recommended_pragmas.h (bazel-contrib/rules_foreign_cc#1359 / #1459).
-# Fix merged Feb 2026; not yet in a BCR release as of this change.
-bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
-git_override(
-    module_name = "rules_foreign_cc",
-    remote = "https://github.com/bazel-contrib/rules_foreign_cc.git",
-    commit = "aeb4b899d4ded316ef1b32fcdc56306886a3f02c",
-)
-
-# Prefer system pkg-config over building pkgconfig from source.
-# Built pkgconfig is broken on Windows MSVC (wrapper genrule / glib includes).
-# Root-module toolchains take priority over dependency-registered ones.
-register_toolchains(
-    "@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain",
-)
-
-# OpenSSL for libdatachannel crypto
+# OpenSSL for libdatachannel crypto (BCR cc_library; pure-Bazel libdc deps)
 bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
 
 # libcurl for HTTP requests on Linux/native platforms
