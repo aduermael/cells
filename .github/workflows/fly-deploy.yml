@@ -5,6 +5,9 @@
 #   Secrets:
 #     FLY_API_TOKEN — flyctl deploy token (required)
 # Agents use the CLI externally; the Fly app only needs collab (no in-product AI).
+#
+# Release workflow also deploys Fly (same composite action) under a single
+# production approval together with the Homebrew tap update.
 
 name: Deploy server (Fly.io)
 
@@ -24,31 +27,8 @@ jobs:
       # actions/checkout@v4.2.2
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      # bazel-contrib/setup-bazel@0.15.0
-      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+      - name: Build and deploy to Fly.io
+        uses: ./.github/actions/deploy-fly
         with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}-wasm
-          repository-cache: true
-
-      # actions/setup-node@v4.4.0 — esbuild step inside wasm-dist
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/wasm/package-lock.json
-
-      - name: Install WASM frontend deps
-        working-directory: apps/wasm
-        run: npm ci
-
-      - name: Build production WASM (dist/wasm)
-        run: bazel run :wasm-dist
-
-      # superfly/flyctl-actions/setup-flyctl@v1.6
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
-
-      - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          fly_api_token: ${{ secrets.FLY_API_TOKEN }}
+          bazel_disk_cache_key: ${{ github.workflow }}-wasm

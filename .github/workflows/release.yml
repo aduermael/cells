@@ -1,6 +1,7 @@
 # Tag-triggered release: build multi-platform CLI binaries, package with
-# checksums, publish a GitHub Release. Optional Homebrew tap update when
-# secrets are configured. No npm distribution.
+# checksums, publish a GitHub Release, then (with a single production
+# environment approval) update the Homebrew tap and deploy the collab
+# server to Fly.io. No npm distribution.
 
 name: Release
 
@@ -15,7 +16,12 @@ on:
         required: true
         type: string
       update_homebrew:
-        description: "Update Homebrew tap when secrets are configured"
+        description: "Update Homebrew tap (production secrets + approval)"
+        required: true
+        default: true
+        type: boolean
+      deploy_fly:
+        description: "Deploy collab server to Fly.io (production secrets + approval)"
         required: true
         default: true
         type: boolean
@@ -42,6 +48,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
       update_homebrew: ${{ steps.release.outputs.update_homebrew }}
+      deploy_fly: ${{ steps.release.outputs.deploy_fly }}
       prerelease: ${{ steps.release.outputs.prerelease }}
 
     steps:
@@ -55,6 +62,7 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version }}
           INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
           INPUT_UPDATE_HOMEBREW: ${{ github.event.inputs.update_homebrew }}
+          INPUT_DEPLOY_FLY: ${{ github.event.inputs.deploy_fly }}
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
         run: |
@@ -72,10 +80,12 @@ jobs:
             fi
             release_tag="$REF_NAME"
             update_homebrew="true"
+            deploy_fly="true"
             prerelease="false"
           else
             release_tag="$INPUT_VERSION"
             update_homebrew="$INPUT_UPDATE_HOMEBREW"
+            deploy_fly="$INPUT_DEPLOY_FLY"
             prerelease="$INPUT_PRERELEASE"
           fi
 
@@ -83,6 +93,7 @@ jobs:
           # Prints tag= and version=; also appends to GITHUB_OUTPUT
           scripts/release/validate-tag.sh "$release_tag"
           echo "update_homebrew=$update_homebrew" >> "$GITHUB_OUTPUT"
+          echo "deploy_fly=$deploy_fly" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
   build-assets:
@@ -294,22 +305,32 @@ jobs:
           fi
           echo "url=$release_url" >> "$GITHUB_OUTPUT"
 
-  homebrew:
-    name: Update Homebrew tap
+  # Single production job so reviewers approve once for both Homebrew + Fly
+  # secrets (environment secrets are only visible to jobs that declare the env).
+  production:
+    name: Production (Homebrew + Fly)
     needs:
       - validate
       - github-release
-    if: needs.validate.outputs.update_homebrew == 'true'
+    if: >-
+      needs.validate.outputs.update_homebrew == 'true' ||
+      needs.validate.outputs.deploy_fly == 'true'
     runs-on: ubuntu-latest
-    # Environment secrets (HOMEBREW_RELEASE_APP_*) live here; also requires
-    # approval from production environment reviewers before the tap is updated.
     environment: production
+    concurrency:
+      # Share with fly-deploy.yml so manual and release deploys never overlap.
+      group: deploy-server
+      cancel-in-progress: false
     permissions:
       contents: read
 
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      # ----- Homebrew tap -----
       - name: Check Homebrew secrets
-        id: secrets
+        if: needs.validate.outputs.update_homebrew == 'true'
+        id: brew-secrets
         shell: bash
         env:
           CLIENT_ID: ${{ secrets.HOMEBREW_RELEASE_APP_CLIENT_ID }}
@@ -323,11 +344,12 @@ jobs:
             exit 0
           fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
-          # Default tap repo if not set
           echo "tap_repo=${TAP_REPO:-aduermael/homebrew-tap}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69  # v1.11.0
-        if: steps.secrets.outputs.configured == 'true'
+        if: >-
+          needs.validate.outputs.update_homebrew == 'true' &&
+          steps.brew-secrets.outputs.configured == 'true'
         id: tap-token
         with:
           # GitHub App client id (or numeric app id) for the homebrew-tap updater
@@ -337,20 +359,19 @@ jobs:
           repositories: homebrew-tap
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-        if: steps.secrets.outputs.configured == 'true'
+        if: >-
+          needs.validate.outputs.update_homebrew == 'true' &&
+          steps.brew-secrets.outputs.configured == 'true'
         with:
-          path: cells
-
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-        if: steps.secrets.outputs.configured == 'true'
-        with:
-          repository: ${{ steps.secrets.outputs.tap_repo }}
+          repository: ${{ steps.brew-secrets.outputs.tap_repo }}
           path: tap
           token: ${{ steps.tap-token.outputs.token }}
           persist-credentials: false
 
-      - name: Write and push formula
-        if: steps.secrets.outputs.configured == 'true'
+      - name: Write and push Homebrew formula
+        if: >-
+          needs.validate.outputs.update_homebrew == 'true' &&
+          steps.brew-secrets.outputs.configured == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ steps.tap-token.outputs.token }}
@@ -359,11 +380,11 @@ jobs:
           CELLS_REPO: aduermael/cells
         run: |
           set -euo pipefail
-          chmod +x cells/scripts/release/*.sh
+          chmod +x scripts/release/*.sh
           checksums="$(mktemp -d)"
           gh release download "$TAG" --repo "$CELLS_REPO" --pattern '*.sha256' --dir "$checksums" --clobber
 
-          cells/scripts/release/write-homebrew-formula.sh \
+          scripts/release/write-homebrew-formula.sh \
             --version "$VERSION" \
             --tag "$TAG" \
             --checksum-dir "$checksums" \
@@ -388,8 +409,19 @@ jobs:
           git commit -m "cells $TAG"
           git push
 
-      - name: Soft-skip notice
-        if: steps.secrets.outputs.configured != 'true'
+      - name: Homebrew soft-skip notice
+        if: >-
+          needs.validate.outputs.update_homebrew == 'true' &&
+          steps.brew-secrets.outputs.configured != 'true'
         run: |
           echo "Skipped Homebrew tap update (HOMEBREW_RELEASE_APP_CLIENT_ID / PRIVATE_KEY not set)."
           echo "Formula can still be generated with: scripts/release/write-homebrew-formula.sh"
+
+      # ----- Fly.io collab server -----
+      - name: Deploy collab server to Fly.io
+        if: needs.validate.outputs.deploy_fly == 'true'
+        uses: ./.github/actions/deploy-fly
+        with:
+          fly_api_token: ${{ secrets.FLY_API_TOKEN }}
+          bazel_disk_cache_key: release-fly-wasm
+
