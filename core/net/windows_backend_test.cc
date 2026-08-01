@@ -123,7 +123,56 @@ TEST(WindowsBackendTest, BazelSelectsWinHttpOnWindowsOnly) {
     EXPECT_NE(build.find("http_request_default"), std::string::npos);
     EXPECT_NE(build.find("ws_connection_default"), std::string::npos);
 
-    // WebRTC selection is unchanged (libdc default, not Windows-specific)
+    // WebRTC selection is libdatachannel for all non-WASM (including Windows)
     EXPECT_EQ(build.find("rtc_peer_connection_winhttp"), std::string::npos);
     EXPECT_EQ(build.find("rtc_data_channel_winhttp"), std::string::npos);
+    EXPECT_NE(build.find("rtc_peer_connection_libdc"), std::string::npos);
+    EXPECT_NE(build.find("rtc_data_channel_libdc"), std::string::npos);
+    EXPECT_NE(build.find("native/RTCPeerConnection_libdc.cc"), std::string::npos);
+    EXPECT_NE(build.find("native/RTCDataChannel_libdc.cc"), std::string::npos);
+    // MSVC-safe libdc wiring
+    EXPECT_NE(build.find("ws2_32.lib"), std::string::npos);
+    EXPECT_NE(build.find("bcrypt.lib"), std::string::npos);
+    EXPECT_NE(build.find("_LIBDC_COPTS"), std::string::npos);
+    EXPECT_NE(build.find("RTC_STATIC"), std::string::npos);
+}
+
+TEST(WindowsBackendTest, LibdatachannelBuildFileHasWindowsOutputs) {
+    // Resolve third_party BUILD relative to workspace (runfiles or source tree)
+    namespace fs = std::filesystem;
+    std::vector<std::string> candidates = {
+        "third_party/libdatachannel/BUILD.libdatachannel",
+        "../third_party/libdatachannel/BUILD.libdatachannel",
+    };
+    if (const char* srcdir = std::getenv("TEST_SRCDIR")) {
+        if (const char* workspace = std::getenv("TEST_WORKSPACE")) {
+            candidates.push_back(std::string(srcdir) + "/" + workspace +
+                                 "/third_party/libdatachannel/BUILD.libdatachannel");
+        }
+        candidates.push_back(std::string(srcdir) +
+                             "/_main/third_party/libdatachannel/BUILD.libdatachannel");
+        candidates.push_back(std::string(srcdir) +
+                             "/cells/third_party/libdatachannel/BUILD.libdatachannel");
+    }
+    std::string path;
+    for (const auto& c : candidates) {
+        if (fs::exists(c)) {
+            path = c;
+            break;
+        }
+    }
+    ASSERT_FALSE(path.empty()) << "BUILD.libdatachannel not found";
+    const std::string build = readAll(path);
+    ASSERT_FALSE(build.empty());
+
+    // MSVC static lib names (no lib prefix)
+    EXPECT_NE(build.find("datachannel.lib"), std::string::npos);
+    EXPECT_NE(build.find("juice.lib"), std::string::npos);
+    EXPECT_NE(build.find("usrsctp.lib"), std::string::npos);
+    // Unix names still present
+    EXPECT_NE(build.find("libdatachannel.a"), std::string::npos);
+    EXPECT_NE(build.find("libjuice.a"), std::string::npos);
+    // CRT alignment for MSVC
+    EXPECT_NE(build.find("CMAKE_MSVC_RUNTIME_LIBRARY"), std::string::npos);
+    EXPECT_NE(build.find("MultiThreadedDLL"), std::string::npos);
 }

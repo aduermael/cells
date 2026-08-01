@@ -1,7 +1,12 @@
-# Config setting for macOS platform detection
+# Config settings for platform detection
 config_setting(
     name = "is_macos",
     constraint_values = ["@platforms//os:macos"],
+)
+
+config_setting(
+    name = "is_windows",
+    constraint_values = ["@platforms//os:windows"],
 )
 
 # Sync argument parsing (shared by full CLI and converter-only)
@@ -85,7 +90,9 @@ cc_test(
     ],
 )
 
-# Full CLI binary with sync + session support (requires OpenSSL/libdatachannel)
+# Full CLI binary with sync (+ session on Unix).
+# Windows: session daemon uses POSIX sockets/fork — stub until Windows IPC lands.
+# Sync/WebRTC on Windows uses WinHTTP (signaling) + libdatachannel (RTC).
 cc_binary(
     name = "cells",
     srcs = [
@@ -93,11 +100,14 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
-        "session_command.cc",
         "session_command.h",
         "sync_command.cc",
         "sync_command.h",
-    ],
+    ] + select({
+        # Session daemon: Unix domain sockets + fork (not yet ported).
+        ":is_windows": ["session_command_stub.cc"],
+        "//conditions:default": ["session_command.cc"],
+    }),
     # Link CoreFoundation on macOS for CFRunLoop in sync_command
     linkopts = select({
         ":is_macos": [

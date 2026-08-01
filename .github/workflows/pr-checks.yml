@@ -97,7 +97,7 @@ jobs:
       - name: Run vet
         run: ./tools/vet.sh
 
-  # Compile/link Windows WinHTTP HTTP + WebSocket backends (not exercised on Linux).
+  # Windows networking: WinHTTP HTTP/WS + libdatachannel WebRTC + full CLI.
   windows-net:
     name: Windows net backends
     runs-on: windows-latest
@@ -114,6 +114,17 @@ jobs:
 
       - name: Build WinHTTP HTTP and WebSocket libraries
         run: bazel build //core/net:http_request_winhttp //core/net:ws_connection_winhttp
+
+      # WebRTC via libdatachannel (shared native path with Linux/macOS).
+      - name: Build WebRTC (libdatachannel) and sync client
+        run: bazel build //core/net:rtc_peer_connection //core/net:rtc_data_channel //core/net:sync_client
+
+      - name: Run Windows-related net unit tests
+        run: bazel test //core/net:windows_backend_test //core/net:ws_worker_state_test //core/net:rtc_test //core/net:signaling_test
+
+      # Full CLI with sync (session stubbed on Windows).
+      - name: Build full cells CLI
+        run: bazel build //apps/cli:cells
 
       # Converter-only CLI (no sync/WebRTC stack).
       - name: Build cells-converter CLI

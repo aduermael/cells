@@ -3,6 +3,10 @@
 #
 # This uses rules_foreign_cc cmake() rule to build libdatachannel
 # with its submodules (libjuice, usrsctp, plog).
+#
+# Unix installs lib*.a; MSVC installs *.lib (no lib prefix). Output names
+# follow the cmake target names with BUILD_SHARED_LIBS=OFF:
+#   datachannel, juice, usrsctp
 
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
@@ -11,41 +15,65 @@ filegroup(
     srcs = glob(["**"]),
 )
 
-cmake(
-    name = "libdatachannel",
-    # Build release by default
-    build_args = ["-j"],
-    cache_entries = {
-        # Disable features we don't need
-        "NO_MEDIA": "ON",           # No audio/video - we only need DataChannels
-        "NO_WEBSOCKET": "OFF",      # Keep WebSocket for signaling
-        # Use submodules (bundled), not system libs
-        "PREFER_SYSTEM_LIB": "OFF",
-        # Use OpenSSL for crypto
-        "USE_GNUTLS": "OFF",
-        "USE_MBEDTLS": "OFF",
-        # Use libjuice for ICE (default, lighter than libnice)
-        "USE_NICE": "OFF",
-        # Build static library for easier linking
-        "BUILD_SHARED_LIBS": "OFF",
-        # Build submodule libs as shared (so they install correctly)
-        "BUILD_SHARED_DEPS_LIBS": "OFF",
-        # Don't build examples/tests
-        "NO_EXAMPLES": "ON",
-        "NO_TESTS": "ON",
-    },
-    generate_args = ["-GNinja"],
-    lib_source = ":all_srcs",
-    # Static libs that get installed - main lib plus submodule dependencies
-    # Order matters: libdatachannel depends on libjuice and libusrsctp
-    out_static_libs = [
+# Static archive names differ between Unix (libfoo.a) and MSVC (foo.lib).
+_OUT_STATIC_LIBS = select({
+    "@platforms//os:windows": [
+        "datachannel.lib",
+        "juice.lib",
+        "usrsctp.lib",
+    ],
+    "//conditions:default": [
         "libdatachannel.a",
         "libjuice.a",
         "libusrsctp.a",
     ],
+})
+
+# Align MSVC CRT with Bazel default (/MD = MultiThreadedDLL).
+_CACHE_ENTRIES = select({
+    "@platforms//os:windows": {
+        "NO_MEDIA": "ON",
+        "NO_WEBSOCKET": "OFF",
+        "PREFER_SYSTEM_LIB": "OFF",
+        "USE_GNUTLS": "OFF",
+        "USE_MBEDTLS": "OFF",
+        "USE_NICE": "OFF",
+        "BUILD_SHARED_LIBS": "OFF",
+        "BUILD_SHARED_DEPS_LIBS": "OFF",
+        "NO_EXAMPLES": "ON",
+        "NO_TESTS": "ON",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
+        "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
+    },
+    "//conditions:default": {
+        "NO_MEDIA": "ON",
+        "NO_WEBSOCKET": "OFF",
+        "PREFER_SYSTEM_LIB": "OFF",
+        "USE_GNUTLS": "OFF",
+        "USE_MBEDTLS": "OFF",
+        "USE_NICE": "OFF",
+        "BUILD_SHARED_LIBS": "OFF",
+        "BUILD_SHARED_DEPS_LIBS": "OFF",
+        "NO_EXAMPLES": "ON",
+        "NO_TESTS": "ON",
+    },
+})
+
+cmake(
+    name = "libdatachannel",
+    # Build release by default
+    build_args = ["-j"],
+    cache_entries = _CACHE_ENTRIES,
+    generate_args = ["-GNinja"],
+    lib_source = ":all_srcs",
+    # Static libs that get installed - main lib plus submodule dependencies
+    # Order matters: libdatachannel depends on libjuice and libusrsctp
+    out_static_libs = _OUT_STATIC_LIBS,
     # Headers to expose
     out_include_dir = "include",
     # Build and install the static library
+    # datachannel-static ensures the static target is built; install places
+    # datachannel (static when BUILD_SHARED_LIBS=OFF) + juice + usrsctp.
     targets = ["datachannel-static", "install"],
     visibility = ["//visibility:public"],
     # Link against OpenSSL from BCR

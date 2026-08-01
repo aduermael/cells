@@ -5,13 +5,17 @@
 #   include/  - Public headers
 #   common/   - Shared implementation (all platforms)
 #   web/      - Emscripten/WASM implementations
-#   apple/    - iOS/macOS implementations (Objective-C++)
-#   windows/  - Windows implementations (WinHTTP OS stack)
-#   native/   - Linux (libcurl HTTP, libdatachannel WS/RTC)
+#   apple/    - iOS/macOS HTTP/WS (Objective-C++ / Foundation)
+#   windows/  - Windows HTTP/WS (WinHTTP OS stack)
+#   native/   - libcurl HTTP (Linux), libdatachannel WS (Linux),
+#               libdatachannel WebRTC (all native: Linux, macOS, Windows)
 #
-# Apple implementations use objc_library for Objective-C++ support.
-# On macOS/iOS, we select the objc_library targets; on other platforms
-# we use the default stub implementations.
+# Platform matrix:
+#   HTTP:       web | Apple Foundation | Linux curl | Windows WinHTTP
+#   WebSocket:  web | Apple Foundation | Linux libdc | Windows WinHTTP
+#   WebRTC:     web browser | native libdatachannel (//conditions:default)
+#
+# Apple objc_library targets are only selected on macOS/iOS.
 
 # Config settings for platform selection
 config_setting(
@@ -81,29 +85,50 @@ objc_library(
 
 # =============================================================================
 # Native WebRTC implementations using libdatachannel
-# For macOS, Linux, and other native platforms (not emscripten/WASM)
+# For macOS, Linux, Windows, and other native platforms (not emscripten/WASM)
 # =============================================================================
 #
-# libdatachannel provides lightweight C++ WebRTC Data Channels implementation.
-# It's used for native platforms instead of the stasel/WebRTC XCFramework
-# which had incomplete headers in the macOS slice.
+# libdatachannel provides lightweight C++ WebRTC Data Channels.
+# Used on all native platforms instead of stasel/WebRTC XCFramework
+# (Apple RTC*.mm sources exist but are not selected in this BUILD).
+#
+# Windows: HTTP/WS stay on WinHTTP; only RTC uses libdatachannel.
+
+# GCC/Clang vs MSVC c++17 flag (cl.exe rejects -std=)
+_LIBDC_COPTS = select({
+    ":is_windows": ["/std:c++17"],
+    "//conditions:default": ["-std=c++17"],
+})
+
+# System libs required when linking static libdatachannel on Windows
+_LIBDC_WINDOWS_LINKOPTS = select({
+    ":is_windows": [
+        "ws2_32.lib",
+        "bcrypt.lib",
+        "crypt32.lib",
+        "iphlpapi.lib",
+    ],
+    "//conditions:default": [],
+})
 
 # RTCDataChannel using libdatachannel (native platforms)
 cc_library(
     name = "rtc_data_channel_libdc",
     srcs = ["native/RTCDataChannel_libdc.cc"],
     hdrs = ["include/RTCDataChannel.h"],
-    copts = ["-std=c++17"],
+    copts = _LIBDC_COPTS,
+    defines = ["RTC_STATIC"],
     includes = ["."],
+    linkopts = _LIBDC_WINDOWS_LINKOPTS,
     deps = [
         ":rtc_data_channel_common",
         "@libdatachannel",
-        "@openssl//:ssl",     # libdatachannel links against OpenSSL
+        "@openssl//:ssl",  # libdatachannel links against OpenSSL
         "@openssl//:crypto",  # libdatachannel links against libcrypto
     ],
 )
 
-# HTTP request using libcurl (Linux/native platforms)
+# HTTP request using libcurl (Linux)
 cc_library(
     name = "http_request_curl",
     srcs = ["native/HttpRequest_curl.cc"],
@@ -135,7 +160,7 @@ cc_library(
     ],
 )
 
-# WebSocket connection using libdatachannel (Linux/native platforms)
+# WebSocket connection using libdatachannel (Linux)
 cc_library(
     name = "ws_connection_libdc",
     srcs = ["native/WSConnection_libdc.cc"],
@@ -143,8 +168,10 @@ cc_library(
     # alwayslink needed because WSConnection::make(url) calls WSConnection::make(scheme, host, port, path)
     # which is defined here but not directly referenced from other translation units
     alwayslink = True,
-    copts = ["-std=c++17"],
+    copts = _LIBDC_COPTS,
+    defines = ["RTC_STATIC"],
     includes = ["."],
+    linkopts = _LIBDC_WINDOWS_LINKOPTS,
     deps = [
         ":connection",
         ":url",
@@ -174,19 +201,21 @@ cc_library(
     ],
 )
 
-# RTCPeerConnection using libdatachannel (native platforms)
+# RTCPeerConnection using libdatachannel (native platforms incl. Windows)
 cc_library(
     name = "rtc_peer_connection_libdc",
     srcs = ["native/RTCPeerConnection_libdc.cc"],
     hdrs = ["include/RTCPeerConnection.h"],
-    copts = ["-std=c++17"],
+    copts = _LIBDC_COPTS,
+    defines = ["RTC_STATIC"],
     includes = ["."],
+    linkopts = _LIBDC_WINDOWS_LINKOPTS,
     deps = [
         ":ice_config",
         ":rtc_data_channel_libdc",
         ":rtc_peer_connection_common",
         "@libdatachannel",
-        "@openssl//:ssl",     # libdatachannel links against OpenSSL
+        "@openssl//:ssl",  # libdatachannel links against OpenSSL
         "@openssl//:crypto",  # libdatachannel links against libcrypto
     ],
 )
@@ -358,7 +387,7 @@ cc_test(
     ],
 )
 
-# Structural checks for Windows WinHTTP sources/selects (runs on all hosts)
+# Structural checks for Windows WinHTTP + WebRTC libdc wiring (runs on all hosts)
 cc_test(
     name = "windows_backend_test",
     srcs = ["windows_backend_test.cc"],
@@ -366,6 +395,7 @@ cc_test(
         "BUILD",
         "windows/HttpRequest_winhttp.cc",
         "windows/WSConnection_winhttp.cc",
+        "//third_party/libdatachannel:BUILD.libdatachannel",
     ],
     deps = [
         "@googletest//:gtest_main",

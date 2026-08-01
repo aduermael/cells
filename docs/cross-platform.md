@@ -36,8 +36,9 @@ The cells engine is designed for **web deployment only**. Native builds exist fo
 | Target | Compiler | Output | Use Case |
 |--------|----------|--------|----------|
 | WASM | Emscripten | cells_wasm.wasm + .js | Web application |
-| macOS | Clang | cells (binary) | CLI tool |
-| Linux | GCC/Clang | cells (binary) | CLI tool, CI |
+| macOS | Clang | cells (binary) | CLI tool (sync + session) |
+| Linux | GCC/Clang | cells (binary) | CLI tool (sync + session), CI |
+| Windows | MSVC | cells (binary) | CLI tool (sync; session stubbed) |
 
 Build commands (all via Bazel):
 - `bazel run :wasm-dist` - Build WASM and copy to dist/wasm/
