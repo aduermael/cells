@@ -100,13 +100,15 @@ _LIBDC_COPTS = select({
     "//conditions:default": ["-std=c++17"],
 })
 
-# System libs required when linking static libdatachannel on Windows
+# System libs required when linking static libdatachannel + OpenSSL on Windows
 _LIBDC_WINDOWS_LINKOPTS = select({
     ":is_windows": [
         "ws2_32.lib",
         "bcrypt.lib",
         "crypt32.lib",
         "iphlpapi.lib",
+        "advapi32.lib",  # OpenSSL CryptoAPI / event log
+        "user32.lib",  # OpenSSL OPENSSL_showfatal MessageBoxW
     ],
     "//conditions:default": [],
 })

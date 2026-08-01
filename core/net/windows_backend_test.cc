@@ -133,6 +133,8 @@ TEST(WindowsBackendTest, BazelSelectsWinHttpOnWindowsOnly) {
     // MSVC-safe libdc wiring
     EXPECT_NE(build.find("ws2_32.lib"), std::string::npos);
     EXPECT_NE(build.find("bcrypt.lib"), std::string::npos);
+    EXPECT_NE(build.find("advapi32.lib"), std::string::npos);
+    EXPECT_NE(build.find("user32.lib"), std::string::npos);
     EXPECT_NE(build.find("_LIBDC_COPTS"), std::string::npos);
     EXPECT_NE(build.find("RTC_STATIC"), std::string::npos);
 }
