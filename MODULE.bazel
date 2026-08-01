@@ -14,7 +14,15 @@ bazel_dep(name = "apple_support", version = "2.0.0")
 bazel_dep(name = "emsdk", version = "4.0.17")
 
 # rules_foreign_cc for building CMake/Make projects (libdatachannel)
+# Pin past 0.15.1: Windows pkgconfig tool failed with missing
+# msvc_recommended_pragmas.h (bazel-contrib/rules_foreign_cc#1359 / #1459).
+# Fix merged Feb 2026; not yet in a BCR release as of this change.
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+git_override(
+    module_name = "rules_foreign_cc",
+    remote = "https://github.com/bazel-contrib/rules_foreign_cc.git",
+    commit = "aeb4b899d4ded316ef1b32fcdc56306886a3f02c",
+)
 
 # OpenSSL for libdatachannel crypto
 bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
