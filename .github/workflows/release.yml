@@ -301,6 +301,9 @@ jobs:
       - github-release
     if: needs.validate.outputs.update_homebrew == 'true'
     runs-on: ubuntu-latest
+    # Environment secrets (HOMEBREW_RELEASE_APP_*) live here; also requires
+    # approval from production environment reviewers before the tap is updated.
+    environment: production
     permissions:
       contents: read
 
