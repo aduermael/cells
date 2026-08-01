@@ -1,32 +1,41 @@
 # Cells
 
-A modern spreadsheet engine! 
+Cells is a modern spreadsheet engine, built with agentic use primarily in mind. 
 
-Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for automation and scripting.
+It’s lightweight (~XMB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
 
-**[Demo](https://cells-app.fly.dev/)** | [GitHub Pages](https://aduermael.github.io/cells/) | [Documentation](./docs/)
+Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for your agents. 
 
-## What is Cells?
+You can test it on the [presentation web page](https://aduermael.github.io/cells/). 
 
-Cells is a spreadsheet engine that works two ways:
+*NOTE: it’s early and not yet a drop-in replacement for Excel. (about 120 formulas supported over almost 500 in Excel, charts not yet supported also)*
 
-1. **Web App:** A full spreadsheet UI in your browser. Real-time collaboration, Excel import/export.
+## Made for AI agents to work with, not an agent itself
 
-   <img style="max-width:500px" src="./docs/img/demo.gif">
+Cells defines no harness, no system prompts. The CLI is designed for agents though, delivering context-window-conscious structured outputs and using code as the main request interface. 
 
-2. **Headless CLI:** Run spreadsheet operations from the command line. Convert formats, batch process files, integrate into pipelines.
+Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build and Codex agents (using the CLI):
 
-	<img style="max-width:500px" src="./docs/img/cli.png">
+<img style="max-width:500px" src="./docs/img/demo.gif">
 
-Both share the same core engine, so formulas and files work identically across environments.
+## Scriptable
 
-**Key features:**
+Cells is built from the start as a fully scriptable Lua/Luau runtime. 
+(Python, VBA and TypeScript not yet supported but planned; they will under the hood be transpiled *into Luau*)
 
-- **Lightweight & Fast**
-- **Real-time collaboration** - Edit together with P2P sync
-- **Excel compatible** - Import and export .xlsx files seamlessly
-- **Fully scriptable** - Automate with [Luau](https://luau.org) scripts (Python, VBA, and TypeScript support planned)
-- **Git-friendly** - [Text-based file format](#collaboration--zcd-format-) that diffs cleanly
+<img style="max-width:400px" src="./docs/img/scripting.png">
+
+```bash
+# Run inline script
+cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
+
+# Run a script file
+cells -i data.xlsx output.csv --script transform.luau
+
+# Script-only mode (no output file)
+cells -i report.xlsx --script analyze.luau
+cells -i data.csv -e 'print(getCell("A1"))'
+```
 
 ## Install
 
@@ -35,25 +44,19 @@ Install methods for the **CLI**, in order of preference:
 ### 1. Agent skill (recommended)
 
 Best default for agentic workflows. Installs a skill that knows how to install
-and use the `cells` binary:
+and use `cells`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh
 ```
 
-The skill lands in `.agents/skills/cells`, `.claude/skills/cells`, and
-`.grok/skills/cells`. When `cells` is missing from `PATH`, agents run the
-bundled `install.sh` (Homebrew first, then direct release install — no npm).
+The skill gets installed for Claude Code, Codex and Grok Build in your working directory. After this, just prompt for spreadsheet work like `"Open file.xlsx and fix formulas"`.
 
 ### 2. Homebrew
 
 ```bash
 brew install aduermael/tap/cells
 ```
-
-Requires the [Homebrew tap](https://github.com/aduermael/homebrew-tap) to be
-published for a release. Formula assets are generated automatically on each
-`v*` tag when tap credentials are configured.
 
 ### 3. Direct install (`curl | sh`)
 
@@ -62,15 +65,6 @@ Downloads the platform binary from the latest GitHub Release:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh
 ```
-
-User-local install (no sudo):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh \
-  | env CELLS_INSTALL_DIR=$HOME/.local/bin sh
-```
-
-Pin a version: `CELLS_VERSION=v0.0.1`.
 
 ### 4. Build from source
 
@@ -82,11 +76,10 @@ bazel run :cli-release  # optimized
 ### Optional: run the collaboration server
 
 Not required for CLI conversion/scripting. Use this only if you want to host
-the web UI + signaling yourself.
+the web UI + signaling server yourself.
 
 | Method | Command |
 |--------|---------|
-| **Public demo** | [https://cells-app.fly.dev/](https://cells-app.fly.dev/) |
 | **Docker** | `docker build -t cells-server . && docker run -p 8080:8080 cells-server` |
 | **Local dev** | `bazel run :wasm-dist && bazel run :serve` → http://localhost:8081 |
 
@@ -99,12 +92,13 @@ cells session exec SESSION_ID -e 'setCell("A1", 1)'
 cells sync 'https://your-host/?room=YOUR_ROOM'
 ```
 
-Tag a release (`git tag v0.0.1 && git push origin v0.0.1`) to build multi-platform
-CLI assets and publish a GitHub Release automatically.
-
 ## Quick Start
 
 ### Web UI
+
+The simplest is to test the most recent release here: https://cells-app.fly.dev
+
+To build and run locally: 
 
 ```bash
 # Build and serve locally
@@ -146,24 +140,6 @@ cells -i budget.xlsx budget.csv --eval
 cells -i calculations.xlsx results.csv --eval
 ```
 
-#### Scripting
-
-<img style="max-width:400px" src="./docs/img/scripting.png">
-
-Run [Luau](https://luau.org) scripts to transform data, automate workflows, or analyze spreadsheets:
-
-```bash
-# Run a script file
-cells -i data.xlsx output.csv --script transform.luau
-
-# Run inline script
-cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
-
-# Script-only mode (no output file)
-cells -i report.xlsx --script analyze.luau
-cells -i data.csv -e 'print(getCell("A1"))'
-```
-
 #### Empty Workbook Creation
 
 Create new workbooks from scratch, optionally with scripted content:
@@ -177,7 +153,9 @@ cells output.xlsx
 cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 ```
 
-## Architecture 🏛️
+## Architecture
+
+Same engine, two shapes: **WebAssembly** in the browser, **native** for the CLI. The web UI stays intentionally thin (canvas + events in TypeScript). Spreadsheet logic (model, formulas, CRDT ops) lives in C++17 and is shared.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -198,28 +176,29 @@ cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 └─────────────────────────────────────────────────────┘
 ```
 
-The engine compiles to WebAssembly for the browser and native code for the CLI. All mutations go through CRDT operations, making collaboration a first-class feature rather than an afterthought.
+### Collaboration & `.zcd`
 
-### Collaboration & ZCD Format 📄
+Realtime sync is **WebRTC peer-to-peer**. A small signaling server only helps clients find each other (offers, answers, ICE). Once a DataChannel is up, document ops and presence travel between peers, not through a central document store. Concurrent edits merge automatically with CRDTs.
 
-Cells uses peer-to-peer sync via WebRTC. Document data travels directly between clients with no relay servers. Concurrent edits merge automatically using CRDTs.
+The native format is **`.zcd`** (Zero Conflict Document). It is plain text on purpose, built around collab and clean git diffs:
 
-The native `.zcd` format (Zero Conflict Document) is designed for this:
+- **One entity per line:** edit a cell, column, or row → exactly one line changes
+- **Content-addressed styles/formats:** same style encodes to the same base64 blob (auto-deduped; the content *is* the identity)
+- **CRDT operation log:** full edit history for sync and conflict resolution
 
-- **One entity per line** - Editing a cell changes exactly one line, minimal diffs
-- **Content-addressed styles** - Styles/formats stored as base64 hashes, auto-deduplicated
-- **CRDT operation log** - Full edit history for sync and conflict resolution
+A tiny workbook (value `42` in one cell, formula `=A1*10` next to it) looks roughly like this:
 
 ```
 D yRUosCbW "Untitled"
 S FD3KLIgo "Sheet1"
-C C4Jr2s32 1
-C pYYl3eZ1 2
-R Zv6vRn4q 1
+C C4Jr2s32 0
+C pYYl3eZ1 1
+R Zv6vRn4q 0
 X XO5lD1Nh C4Jr2s32 Zv6vRn4q n 42 fmt:DwICAQEk
 X 1MvyBXyr pYYl3eZ1 Zv6vRn4q f "=~~XO5lD1Nh*10" fmt:DwICAQEk sty:BAAB
 ```
-<sub>
+
+Formulas store stable cell IDs (`~~XO5lD1Nh`), not A1 coordinates, so inserts and renames do not break references. Below the snapshot, the op log records how the doc got there:
 
 ```
 #oplog
@@ -227,28 +206,7 @@ O 1769998913268.0.atyBEwwf CELL_SET XO5lD1Nh {"t":"n","v":"42","col":"C4Jr2s32",
 O 1769998921630.0.atyBEwwf CELL_SET 1MvyBXyr {"t":"f","v":"=~~XO5lD1Nh*10","col":"pYYl3eZ1","row":"Zv6vRn4q"}
 ```
 
-</sub>
-
-See [docs/persistence.md](./docs/persistence.md) for the full specification.
-
-For detailed architecture documentation, see [docs/](./docs/).
-
-## AI Agents 🤖
-
-Cells does **not** host an in-product AI agent. Humans use the web client; agents use the **CLI** (and the agent skill) like any other tool—Codex, Claude Code, Grok, or anything else.
-
-**Collaborate with an agent:** open the Collaborate menu in the web UI, copy the room link, and give it to an agent. The agent starts a long-running **session** so the CLI peer stays connected while it runs multiple scripts:
-
-```bash
-cells session start '<room-url>' --name 'CLI Agent'
-cells session exec SESSION_ID -e 'setCell("A1", 42)'
-cells session watch SESSION_ID --duration 30
-cells session stop SESSION_ID
-```
-
-Sessions auto-stop after idle minutes (default 30; `--idle-minutes N`). For a one-shot blocking listener, `cells sync '<room-url>'` still works.
-
-Install the skill (CLI + docs) with `./install-skill.sh` or see [skill/SKILL.md](./skill/SKILL.md). In this repository, skills are also symlinked for local agent discovery under `.agents/skills/cells`, `.claude/skills/cells`, and `.grok/skills/cells`.
+Full format spec: [docs/persistence.md](./docs/persistence.md). Deeper architecture notes live under [docs/](./docs/).
 
 ## Requirements 📋
 
@@ -279,41 +237,6 @@ bazel run :check            # All checks (test + lint + types)
 
 # Landing site (GitHub Pages artifact)
 ./tools/prepare-pages.sh    # → dist/pages/
-```
-
-## Deploy 🚀
-
-Production deploys are **manual** GitHub Actions workflows (no auto-deploy on push):
-
-| Workflow | What it deploys |
-|----------|-----------------|
-| **Deploy server (Fly.io)** | Collaboration server + WASM app → [cells-app.fly.dev](https://cells-app.fly.dev/) |
-| **Deploy website (GitHub Pages)** | Minimal landing page (iframe demo + links) → GitHub Pages |
-| **Deploy all** | Both of the above (reuses the same workflows) |
-
-### GitHub `production` environment secrets
-
-| Secret | Where | Required | Purpose |
-|--------|-------|----------|---------|
-| `FLY_API_TOKEN` | GitHub Environment **production** | Yes (server) | `flyctl deploy` |
-
-### Fly app secrets (not GitHub)
-
-Set with `fly secrets set` on the `cells-app` app:
-
-| Secret | Required | Purpose |
-|--------|----------|---------|
-| *(none required for agent features)* | — | Agents use the CLI; the server only needs collab for multi-peer rooms |
-
-### One-time GitHub Pages setting
-
-**Settings → Pages → Build and deployment → Source: GitHub Actions**
-
-Local preview of the landing page:
-
-```bash
-./tools/prepare-pages.sh
-# open dist/pages/index.html (iframe still loads the live Fly app)
 ```
 
 ## Documentation 📚
