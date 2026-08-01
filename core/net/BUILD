@@ -397,7 +397,6 @@ cc_test(
         "BUILD",
         "windows/HttpRequest_winhttp.cc",
         "windows/WSConnection_winhttp.cc",
-        "//third_party/libdatachannel:BUILD.libdatachannel",
     ],
     deps = [
         "@googletest//:gtest_main",
