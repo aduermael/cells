@@ -53,6 +53,14 @@ _USRSCTP_OS_DEFINES = select({
     "//conditions:default": [],
 })
 
+# -std=c11 enables strict ISO C and hides POSIX netdb/socket APIs on glibc
+# unless a feature-test macro is set. usrsctp already uses _GNU_SOURCE on Linux;
+# juice/libdc need the same on non-Windows for getaddrinfo, NI_*, etc.
+_POSIX_LOCAL_DEFINES = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": ["_GNU_SOURCE"],
+})
+
 # Silence a few noisy upstream warnings on GCC/Clang only
 _GCC_WARN = select({
     "@platforms//os:windows": [],
@@ -165,11 +173,11 @@ cc_library(
             "ws2_32.lib",
             "bcrypt.lib",
         ],
-        "//conditions:default": [],
+        "//conditions:default": ["-lpthread"],
     }),
     local_defines = [
         "USE_NETTLE=0",
-    ] + _WIN_LOCAL_DEFINES,
+    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES,
 )
 
 # -----------------------------------------------------------------------------
@@ -265,7 +273,7 @@ cc_library(
         "USE_NICE=0",
         "RTC_SYSTEM_JUICE=0",
         "RTC_SYSTEM_SRTP=0",
-    ] + _WIN_LOCAL_DEFINES,
+    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES,
     deps = [
         ":juice",
         ":plog",

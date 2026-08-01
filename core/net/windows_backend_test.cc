@@ -44,8 +44,9 @@ std::string findFile(const std::string& relative) {
             const std::string key = line.substr(0, sp);
             const std::string path = line.substr(sp + 1);
             for (const auto& want : keys) {
-                if (key == want || key.size() >= want.size() &&
-                                       key.compare(key.size() - want.size(), want.size(), want) == 0) {
+                if (key == want ||
+                    (key.size() >= want.size() &&
+                     key.compare(key.size() - want.size(), want.size(), want) == 0)) {
                     if (fs::exists(path)) {
                         return path;
                     }
