@@ -112,6 +112,11 @@ jobs:
           disk-cache: ${{ github.workflow }}-windows
           repository-cache: true
 
+      # Prefer preinstalled pkg-config for rules_foreign_cc (avoids broken
+      # MSVC bootstrap of pkgconfig from source).
+      - name: Install pkg-config
+        run: choco install pkgconfiglite -y --no-progress
+
       - name: Build WinHTTP HTTP and WebSocket libraries
         run: bazel build //core/net:http_request_winhttp //core/net:ws_connection_winhttp
 

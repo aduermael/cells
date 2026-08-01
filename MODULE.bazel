@@ -24,6 +24,13 @@ git_override(
     commit = "aeb4b899d4ded316ef1b32fcdc56306886a3f02c",
 )
 
+# Prefer system pkg-config over building pkgconfig from source.
+# Built pkgconfig is broken on Windows MSVC (wrapper genrule / glib includes).
+# Root-module toolchains take priority over dependency-registered ones.
+register_toolchains(
+    "@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain",
+)
+
 # OpenSSL for libdatachannel crypto
 bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
 
