@@ -97,9 +97,11 @@ jobs:
       - name: Run vet
         run: ./tools/vet.sh
 
-  # Windows networking: WinHTTP HTTP/WS + libdatachannel WebRTC + full CLI.
-  windows-net:
-    name: Windows net backends
+  # Windows CLI build gate: full cells + cells-converter under MSVC
+  # (WinHTTP HTTP/WS + libdatachannel WebRTC link via the product binary).
+  # Net unit tests stay on Linux unit-tests job; not re-run here.
+  windows-cli:
+    name: Windows CLI
     runs-on: windows-latest
     steps:
       # actions/checkout@v4.2.2
@@ -112,16 +114,8 @@ jobs:
           disk-cache: ${{ github.workflow }}-windows
           repository-cache: true
 
-      # One bazel invocation: build full cells CLI (via build_test) + net tests.
-      # Multiple sequential bazel processes on Windows flakily fail with
-      # "Couldn't delete action output directory: Permission denied".
-      # libdatachannel is pure Bazel (no rules_foreign_cc / pkg-config).
-      # windows_backend_test resolves data via RUNFILES_MANIFEST_FILE on Windows.
-      - name: Build cells CLI and run net tests
-        run: >
-          bazel test
-          //apps/cli:cells_cli_build_test
-          //core/net:windows_backend_test
-          //core/net:ws_worker_state_test
-          //core/net:rtc_test
-          //core/net:signaling_test
+      # Single bazel invocation (multiple sequential bazel processes on Windows
+      # flakily fail with "Couldn't delete action output directory").
+      # cells_cli_build_test covers //apps/cli:cells and //apps/cli:cells-converter.
+      - name: Build cells CLI (and converter)
+        run: bazel test //apps/cli:cells_cli_build_test
