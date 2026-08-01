@@ -1,3 +1,5 @@
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+
 # Config settings for platform detection
 config_setting(
     name = "is_macos",
@@ -7,6 +9,15 @@ config_setting(
 config_setting(
     name = "is_windows",
     constraint_values = ["@platforms//os:windows"],
+)
+
+# Ensures full + converter CLIs link successfully (used by Windows CI).
+build_test(
+    name = "cells_cli_build_test",
+    targets = [
+        ":cells",
+        ":cells-converter",
+    ],
 )
 
 # Sync argument parsing (shared by full CLI and converter-only)

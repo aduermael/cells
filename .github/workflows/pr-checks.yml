@@ -117,23 +117,13 @@ jobs:
       - name: Install pkg-config
         run: choco install pkgconfiglite -y --no-progress
 
-      # Single build invocation: WinHTTP + libdatachannel WebRTC + full CLI.
-      # (Multiple sequential bazel builds on Windows can hit flaky output-dir
-      # permission errors between steps.)
-      - name: Build networking stack and cells CLI
-        run: >
-          bazel build
-          //core/net:http_request_winhttp
-          //core/net:ws_connection_winhttp
-          //core/net:rtc_peer_connection
-          //core/net:rtc_data_channel
-          //core/net:sync_client
-          //apps/cli:cells
-          //apps/cli:cells-converter
-
-      - name: Run Windows-related net unit tests
+      # One bazel invocation: build full cells CLI (via build_test) + net tests.
+      # Multiple sequential bazel processes on Windows flakily fail with
+      # "Couldn't delete action output directory: Permission denied".
+      - name: Build cells CLI and run net tests
         run: >
           bazel test
+          //apps/cli:cells_cli_build_test
           //core/net:windows_backend_test
           //core/net:ws_worker_state_test
           //core/net:rtc_test
