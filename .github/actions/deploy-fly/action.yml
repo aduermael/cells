@@ -1,0 +1,47 @@
+# Build production WASM (dist/wasm) and deploy the collab server to Fly.io.
+# Caller must checkout the repo first and pass FLY_API_TOKEN.
+name: Deploy server to Fly.io
+description: Build production WASM and deploy with flyctl
+
+inputs:
+  fly_api_token:
+    description: Fly.io API token (FLY_API_TOKEN)
+    required: true
+  bazel_disk_cache_key:
+    description: Disk cache key suffix for setup-bazel
+    required: false
+    default: fly-deploy
+
+runs:
+  using: composite
+  steps:
+    - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+      with:
+        bazelisk-cache: true
+        disk-cache: ${{ inputs.bazel_disk_cache_key }}
+        repository-cache: true
+
+    # actions/setup-node@v4.4.0 — esbuild step inside wasm-dist
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: "22"
+        cache: npm
+        cache-dependency-path: apps/wasm/package-lock.json
+
+    - name: Install WASM frontend deps
+      shell: bash
+      working-directory: apps/wasm
+      run: npm ci
+
+    - name: Build production WASM (dist/wasm)
+      shell: bash
+      run: bazel run :wasm-dist
+
+    # superfly/flyctl-actions/setup-flyctl@v1.6
+    - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+
+    - name: Deploy to Fly.io
+      shell: bash
+      run: flyctl deploy --remote-only
+      env:
+        FLY_API_TOKEN: ${{ inputs.fly_api_token }}
