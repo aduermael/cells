@@ -312,7 +312,7 @@ test("buildCollabDetailsHtml version override goes through real function", () =>
 });
 
 test("esbuild __CELLS_VERSION__ define stamps shipped collab version label", () => {
-  // Drive the real stamp path used by tools/wasm-ts-build.sh / build.mjs
+  // Drive the real stamp path used by tools/wasm-ts-build.sh
   assert.ok(
     stampedCode.includes("7.6.5"),
     "stamped bundle must contain injected version string",

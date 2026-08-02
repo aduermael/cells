@@ -159,8 +159,8 @@ mkdir -p "$out_dir"
 product_version="$(cells_resolve_product_version)"
 echo "Stamping frontend CELLS_VERSION=${product_version}"
 
-# Same options as apps/wasm/scripts/build.mjs (single source of flags here for no-node path).
-# Keep in sync if you change the node-based script.
+# Production TS bundle flags (bazel run :wasm / :wasm-dist / :wasm-debug).
+# apps/wasm/scripts/build.mjs is optional/npm-only and does not stamp version.
 # esbuild --define expects a JSON value; quote so the replacement is a string literal.
 common_flags=(
   --bundle

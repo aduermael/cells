@@ -34,11 +34,11 @@ cells_tag_from_version() {
   esac
 }
 
-# Default product version for unstamped/dev builds (web UI + CLI header).
+# Default product version for unstamped/dev builds (web UI).
 # shellcheck disable=SC2034
 CELLS_DEFAULT_VERSION="${CELLS_DEFAULT_VERSION:-0.0.1}"
 
-# Resolve product version for builds (CLI stamp, WASM UI stamp).
+# Resolve product version for WASM/UI stamp (tools/wasm-ts-build.sh).
 # Priority: CELLS_VERSION env (v-prefix optional) → nearest git semver tag → default.
 # Prints bare semver to stdout (no leading v), e.g. 0.0.5.
 # Optional: CELLS_VERSION_GIT_DIR / REPO_ROOT for git -C when cwd is not the repo root.
