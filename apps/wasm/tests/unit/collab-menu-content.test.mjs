@@ -183,18 +183,26 @@ test("buildCollabDetailsHtml returns real panel markup with required pieces", ()
   assert.ok(html.includes("Debug mode"), "debug mode");
   assert.ok(html.includes('id="collab-debug-mode"'), "debug checkbox");
 
-  // Skill link (skill + CLI)
+  // Skill link (skill + CLI) — bottom of main content, above debug
   assert.ok(html.includes(SKILL_INSTALL.label), "skill label");
   assert.ok(html.includes(SKILL_INSTALL.href), "skill href");
   assert.ok(html.includes("collab-skill-link"), "skill link class");
+  const copyIdx = html.indexOf("collab-copy-link-btn");
+  const peersIdx = html.indexOf("collab-peers-row");
+  const skillIdx = html.indexOf("collab-skill-link");
+  const debugIdx = html.indexOf("collab-debug-section");
+  const versionIdx = html.indexOf("collab-version");
+  assert.ok(copyIdx >= 0 && peersIdx > copyIdx, "peers after copy link");
+  assert.ok(
+    skillIdx > peersIdx && skillIdx < debugIdx,
+    "skill link after peers and above debug mode",
+  );
+  assert.ok(versionIdx > debugIdx, "version is below debug");
 
   // Version at bottom
   const versionLabel = formatCellsVersionLabel();
   assert.ok(html.includes('id="collab-version"'), "version element");
   assert.ok(html.includes(versionLabel), "version text");
-  const debugIdx = html.indexOf("collab-debug-section");
-  const versionIdx = html.indexOf("collab-version");
-  assert.ok(debugIdx >= 0 && versionIdx > debugIdx, "version is below debug");
 
   for (const id of COLLAB_PANEL_IDS) {
     assert.ok(html.includes(id), `panel must include ${id}`);

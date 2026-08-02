@@ -22,9 +22,8 @@ export function formatCellsVersionLabel(version: string = CELLS_VERSION): string
 
 /**
  * Build the collaborate details panel inner HTML.
- * Default: share link, skill/CLI install link, nickname, status, peers,
- * debug mode, version footer.
- * Debug mode expands latency, force reconnect, and debug data tools.
+ * Order: share link, nickname, status, peers, skill/CLI link, debug mode,
+ * version footer. Debug mode expands latency, force reconnect, and tools.
  */
 export function buildCollabDetailsHtml(options?: {
   version?: string;
@@ -38,7 +37,6 @@ export function buildCollabDetailsHtml(options?: {
   return `
             <div class="collab-status-share-section">
                 <button type="button" class="btn btn-primary btn-block" id="collab-copy-link-btn">Copy Link</button>
-                <a class="collab-skill-link" href="${escapeAttr(skillHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(skillLabel)}</a>
             </div>
             <div class="collab-status-details-divider"></div>
             <div class="collab-status-details-row name-row">
@@ -57,6 +55,7 @@ export function buildCollabDetailsHtml(options?: {
                 <span class="value" id="collab-detail-peers">0</span>
             </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
+            <a class="collab-skill-link" href="${escapeAttr(skillHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(skillLabel)}</a>
             <div class="collab-status-details-debug" id="collab-debug-section">
                 <div class="debug-toggle">
                     <label>
