@@ -34,6 +34,14 @@
 #include <direct.h>
 #include <io.h>
 #include <process.h>
+// wingdi.h defines ERROR as 0; collides with CellValueType::ERROR.
+#ifdef ERROR
+#undef ERROR
+#endif
+// winnt.h DELETE access mask; collides with OpType/HttpMethod DELETE elsewhere.
+#ifdef DELETE
+#undef DELETE
+#endif
 #pragma comment(lib, "ws2_32.lib")
 #else
 #include <csignal>
