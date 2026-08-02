@@ -1094,8 +1094,8 @@ size_t materializeSheetContentViaCrdt(Workbook& target, const ID& targetSheetId,
             continue;
         }
 
-        const bool isEmpty = cell->value.type == CellValueType::STRING &&
-                             cell->value.raw.empty() && cell->formula == nullptr;
+        const bool isEmpty = cell->value.type == CellValueType::STRING && cell->value.raw.empty() &&
+                             cell->formula == nullptr;
         if (isEmpty && !cell->hasStyle() && !cell->hasFormat()) {
             continue;
         }
@@ -1209,8 +1209,7 @@ SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
             applyOperation(target, makeSheetSetOp(target, cur->id, payload));
             ++result.opsApplied;
         }
-        result.opsApplied +=
-            materializeSheetContentViaCrdt(target, cur->id, source, *sourceSheet);
+        result.opsApplied += materializeSheetContentViaCrdt(target, cur->id, source, *sourceSheet);
         result.activeSheetIndex = currentSheetIndex;
         result.sheetCount = target.sheetCount();
         result.success = true;
@@ -1282,8 +1281,7 @@ SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
         applyOperation(target, makeSheetSetOp(target, newSheetId, payload));
         ++result.opsApplied;
     }
-    result.opsApplied +=
-        materializeSheetContentViaCrdt(target, newSheetId, source, *sourceSheet);
+    result.opsApplied += materializeSheetContentViaCrdt(target, newSheetId, source, *sourceSheet);
 
     applyOperation(target, makeSheetDeleteOp(target, oldSheetId));
     ++result.opsApplied;
@@ -1291,8 +1289,7 @@ SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
     // Active index: position of new sheet
     result.activeSheetIndex = 0;
     for (size_t i = 0; i < target.sheetCount(); ++i) {
-        if (target.getSheetByIndex(i) != nullptr &&
-            target.getSheetByIndex(i)->id == newSheetId) {
+        if (target.getSheetByIndex(i) != nullptr && target.getSheetByIndex(i)->id == newSheetId) {
             result.activeSheetIndex = i;
             break;
         }

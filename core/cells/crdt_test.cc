@@ -1766,14 +1766,14 @@ std::unique_ptr<Workbook> makeSourceSheetWithCells(const std::string& sheetName,
     applyOperation(*src, makeColSetOp(*src, colA, sid, R"({"pos":0})"));
     applyOperation(*src, makeColSetOp(*src, colB, sid, R"({"pos":1})"));
     applyOperation(*src, makeRowSetOp(*src, row1, sid, R"({"pos":0})"));
-    applyOperation(*src, makeCellSetOp(*src, generate_id(), sid,
-                                       std::string("{\"t\":\"s\",\"v\":\"") + a1 +
-                                           "\",\"col\":\"" + colA.toString() + "\",\"row\":\"" +
-                                           row1.toString() + "\"}"));
-    applyOperation(*src, makeCellSetOp(*src, generate_id(), sid,
-                                       std::string("{\"t\":\"s\",\"v\":\"") + b1 +
-                                           "\",\"col\":\"" + colB.toString() + "\",\"row\":\"" +
-                                           row1.toString() + "\"}"));
+    applyOperation(*src,
+                   makeCellSetOp(*src, generate_id(), sid,
+                                 std::string("{\"t\":\"s\",\"v\":\"") + a1 + "\",\"col\":\"" +
+                                     colA.toString() + "\",\"row\":\"" + row1.toString() + "\"}"));
+    applyOperation(*src,
+                   makeCellSetOp(*src, generate_id(), sid,
+                                 std::string("{\"t\":\"s\",\"v\":\"") + b1 + "\",\"col\":\"" +
+                                     colB.toString() + "\",\"row\":\"" + row1.toString() + "\"}"));
     return src;
 }
 
@@ -1811,8 +1811,7 @@ TEST(CrdtSheetImport, NewSheetIncrementsCount) {
 
     auto src = makeSourceSheetWithCells("Imported", "x", "y");
     const size_t before = target->sheetCount();
-    const SheetImportResult r =
-        importSheetViaCrdt(*target, *src, 0, SheetImportMode::NEW_SHEET, 0);
+    const SheetImportResult r = importSheetViaCrdt(*target, *src, 0, SheetImportMode::NEW_SHEET, 0);
     ASSERT_TRUE(r.success) << r.error;
     EXPECT_EQ(target->sheetCount(), before + 1);
     EXPECT_EQ(r.activeSheetIndex, before);
@@ -1833,8 +1832,7 @@ TEST(CrdtSheetImport, ReplaceDeletesOldSheetIdAndKeepsCount) {
     auto src = makeSourceSheetWithCells("Sheet1", "from", "csv");
     const size_t before = target->sheetCount();
     const size_t oplogBefore = target->getOpLog()->size();
-    const SheetImportResult r =
-        importSheetViaCrdt(*target, *src, 0, SheetImportMode::REPLACE, 0);
+    const SheetImportResult r = importSheetViaCrdt(*target, *src, 0, SheetImportMode::REPLACE, 0);
     ASSERT_TRUE(r.success) << r.error;
     EXPECT_EQ(target->sheetCount(), before) << "replace must not leave N+1 sheets";
     EXPECT_EQ(target->getSheet(oldId), nullptr) << "old sheet id must be gone";
@@ -1866,8 +1864,7 @@ TEST(CrdtSheetImport, ReplacePeerAppliesOpsWithoutDualSheet) {
 
     // Host replaces sheet via CRDT import
     auto src = makeSourceSheetWithCells("Sheet1", "peer", "sync");
-    const SheetImportResult r =
-        importSheetViaCrdt(*host, *src, 0, SheetImportMode::REPLACE, 0);
+    const SheetImportResult r = importSheetViaCrdt(*host, *src, 0, SheetImportMode::REPLACE, 0);
     ASSERT_TRUE(r.success) << r.error;
     EXPECT_EQ(host->sheetCount(), 1u);
 
