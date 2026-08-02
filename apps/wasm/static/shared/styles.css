@@ -1784,16 +1784,19 @@ canvas {
     color: var(--color-text-placeholder);
 }
 
-/* Version footer */
+/* Version footer — quiet, minimal footprint */
 .collab-status-details-version {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--color-border);
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
     text-align: center;
-    font-size: 11px;
+    font-size: 10px;
+    line-height: 1;
     color: var(--color-text-placeholder);
-    letter-spacing: 0.02em;
+    opacity: 0.7;
+    letter-spacing: 0.01em;
     user-select: none;
+    pointer-events: none;
 }
 
 /* Share tooltip */
