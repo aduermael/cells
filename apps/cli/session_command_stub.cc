@@ -1,5 +1,5 @@
 // Stub session command for builds without session daemon support.
-// Used for Alpine/converter-only builds and Windows (session IPC not ported yet).
+// Used for converter-only / Alpine lightweight builds (full CLI uses session_command.cc).
 
 #include "session_command.h"
 
@@ -12,11 +12,8 @@ void print_session_help(const char* program_name) {
 }
 
 int run_session_command(const SessionCliOptions& /*opts*/) {
-    std::cout << "{\"ok\":false,\"error\":\"session command is not supported in this build"
-#ifdef _WIN32
-                 " (Windows session IPC not yet implemented; use cells sync for one-shot collab)"
-#endif
-                 "\"}\n";
+    std::cout << "{\"ok\":false,\"error\":\"session command is not supported in this build "
+                 "(converter-only); use the full cells binary for collab sessions\"}\n";
     return 1;
 }
 

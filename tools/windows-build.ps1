@@ -1,4 +1,4 @@
-# Build the cells CLI on Windows (full binary with sync/WebRTC).
+# Build the cells CLI on Windows (full binary with sync/WebRTC + session).
 # Requires: Bazelisk (honors .bazelversion), VS 2022 C++ tools.
 # Usage (from repo root):
 #   .\tools\windows-build.ps1

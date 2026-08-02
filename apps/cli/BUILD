@@ -102,8 +102,8 @@ cc_test(
     ],
 )
 
-# Full CLI binary with sync (+ session on Unix).
-# Windows: session daemon uses POSIX sockets/fork — stub until Windows IPC lands.
+# Full CLI binary with sync + session daemon.
+# Session IPC: AF_UNIX sockets (POSIX + Windows 10+). Daemon: fork+exec / CreateProcess.
 # Sync/WebRTC on Windows uses WinHTTP (signaling) + libdatachannel (RTC).
 cc_binary(
     name = "cells",
@@ -112,19 +112,20 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
+        "session_command.cc",
         "session_command.h",
         "sync_command.cc",
         "sync_command.h",
-    ] + select({
-        # Session daemon: Unix domain sockets + fork (not yet ported).
-        ":is_windows": ["session_command_stub.cc"],
-        "//conditions:default": ["session_command.cc"],
-    }),
-    # Link CoreFoundation on macOS for CFRunLoop in sync_command
+    ],
+    # Link CoreFoundation on macOS for CFRunLoop in sync_command;
+    # ws2_32 for AF_UNIX / WSAPoll session IPC on Windows.
     linkopts = select({
         ":is_macos": [
             "-framework",
             "CoreFoundation",
+        ],
+        ":is_windows": [
+            "ws2_32.lib",
         ],
         "//conditions:default": [],
     }),
