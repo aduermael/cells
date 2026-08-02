@@ -154,14 +154,15 @@ esbuild_bin="$(resolve_esbuild)"
 mkdir -p "$out_dir"
 
 # Product version stamp for collab menu / UI (env → git tag → default).
+# Same resolver as apps/wasm/scripts/build.mjs (shared common.sh helper).
 # shellcheck source=../scripts/release/common.sh
 . "$REPO_ROOT/scripts/release/common.sh"
 product_version="$(cells_resolve_product_version)"
 echo "Stamping frontend CELLS_VERSION=${product_version}"
 
 # Production TS bundle flags (bazel run :wasm / :wasm-dist / :wasm-debug).
-# apps/wasm/scripts/build.mjs is optional/npm-only and does not stamp version.
 # esbuild --define expects a JSON value; quote so the replacement is a string literal.
+# product_version is validated semver (or default), so it is safe to interpolate.
 common_flags=(
   --bundle
   --format=esm

@@ -1,4 +1,6 @@
 // CLI version string. Release builds stamp this via -DCELLS_VERSION=\"x.y.z\".
+// Unstamped default must stay in sync with scripts/release/common.sh
+// CELLS_DEFAULT_VERSION and apps/wasm/src/version.ts (release_test.sh).
 
 #ifndef APPS_CLI_CLI_VERSION_H_
 #define APPS_CLI_CLI_VERSION_H_
