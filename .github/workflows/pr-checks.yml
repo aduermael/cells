@@ -97,9 +97,28 @@ jobs:
       - name: Run vet
         run: ./tools/vet.sh
 
-  # Windows CLI build gate: full cells + cells-converter under MSVC
-  # (WinHTTP HTTP/WS + libdatachannel WebRTC link via the product binary).
-  # Net unit tests stay on Linux unit-tests job; not re-run here.
+  # Desktop CLI link gates: full cells + cells-converter on each OS.
+  # (HTTP/WS backends + libdatachannel WebRTC via the product binary.)
+  # Net unit tests stay on the unit-tests job; not re-run here.
+  # cells_cli_build_test covers //apps/cli:cells and //apps/cli:cells-converter.
+
+  linux-cli:
+    name: Linux CLI
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-linux
+          repository-cache: true
+
+      - name: Build cells CLI (and converter)
+        run: bazel test //apps/cli:cells_cli_build_test
+
   windows-cli:
     name: Windows CLI
     runs-on: windows-latest
@@ -116,6 +135,22 @@ jobs:
 
       # Single bazel invocation (multiple sequential bazel processes on Windows
       # flakily fail with "Couldn't delete action output directory").
-      # cells_cli_build_test covers //apps/cli:cells and //apps/cli:cells-converter.
+      - name: Build cells CLI (and converter)
+        run: bazel test //apps/cli:cells_cli_build_test
+
+  macos-cli:
+    name: macOS CLI
+    runs-on: macos-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-macos
+          repository-cache: true
+
       - name: Build cells CLI (and converter)
         run: bazel test //apps/cli:cells_cli_build_test

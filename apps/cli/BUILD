@@ -12,7 +12,7 @@ config_setting(
     constraint_values = ["@platforms//os:windows"],
 )
 
-# Ensures full + converter CLIs link successfully (used by Windows CI).
+# Ensures full + converter CLIs link successfully (used by Linux/Windows/macOS PR CI).
 build_test(
     name = "cells_cli_build_test",
     targets = [
