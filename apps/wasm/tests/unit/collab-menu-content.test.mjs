@@ -187,6 +187,14 @@ test("buildCollabDetailsHtml returns real panel markup with required pieces", ()
   assert.ok(html.includes(SKILL_INSTALL.label), "skill label");
   assert.ok(html.includes(SKILL_INSTALL.href), "skill href");
   assert.ok(html.includes("collab-skill-link"), "skill link class");
+  assert.ok(
+    html.includes("collab-skill-link-icon"),
+    "external-link icon for skill URL",
+  );
+  assert.ok(
+    html.includes('target="_blank"'),
+    "skill link opens in a new tab",
+  );
   const copyIdx = html.indexOf("collab-copy-link-btn");
   const peersIdx = html.indexOf("collab-peers-row");
   const skillIdx = html.indexOf("collab-skill-link");
@@ -198,6 +206,10 @@ test("buildCollabDetailsHtml returns real panel markup with required pieces", ()
     "skill link after peers and above debug mode",
   );
   assert.ok(versionIdx > debugIdx, "version is below debug");
+  assert.ok(
+    html.includes("collab-status-details-footer"),
+    "footer wraps skill + debug + version",
+  );
 
   // Version at bottom
   const versionLabel = formatCellsVersionLabel();
@@ -263,10 +275,17 @@ test("collab-ui.ts wires panel builder and debug extras", () => {
   assert.ok(!src.includes("collab-agent-hint"));
 });
 
-test("styles define skill link and version footer; drop old agent styles", () => {
+test("styles: skill underlined + external icon, debug centered, balanced footer", () => {
   const css = fs.readFileSync(stylesPath, "utf8");
   assert.ok(css.includes(".collab-skill-link"));
+  assert.ok(css.includes("text-decoration: underline"));
+  assert.ok(css.includes(".collab-skill-link-icon"));
+  assert.ok(css.includes(".collab-status-details-footer"));
   assert.ok(css.includes(".collab-status-details-version"));
+  assert.ok(
+    css.includes("justify-content: center"),
+    "debug toggle centered",
+  );
   assert.ok(!css.includes(".collab-agent-hint"));
   assert.ok(!css.includes(".collab-agent-docs"));
 });

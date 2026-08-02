@@ -1589,7 +1589,9 @@ canvas {
     }
 }
 
-/* Connection details popup */
+/* Connection details popup
+   Spacing rhythm: panel 12px padding; section dividers 12px;
+   rows 6px vertical; footer block 12px gap. */
 .collab-status-details {
     position: absolute;
     top: 100%;
@@ -1608,7 +1610,7 @@ canvas {
         opacity 0.15s ease,
         transform 0.15s ease,
         visibility 0.15s ease;
-    padding: 14px;
+    padding: 12px;
 }
 
 .collab-status-badge.show-details .collab-status-details {
@@ -1623,7 +1625,7 @@ canvas {
     align-items: center;
     font-size: 12px;
     color: var(--color-text-secondary);
-    padding: 4px 0;
+    padding: 6px 0;
 }
 
 .collab-status-details-row .label {
@@ -1636,14 +1638,14 @@ canvas {
 }
 
 .collab-status-details-peers {
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 .collab-status-details-peers .peer-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: 3px 0;
+    padding: 4px 0;
     font-size: 12px;
 }
 
@@ -1718,22 +1720,38 @@ canvas {
     align-items: stretch;
 }
 
-/* Skill/CLI install — bottom of main content, above debug mode */
-.collab-skill-link {
-    display: block;
+/* Centered footer block: skill link + debug + version */
+.collab-status-details-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     margin-top: 12px;
-    padding-top: 10px;
+    padding-top: 12px;
     border-top: 1px solid var(--color-border);
-    text-align: center;
+}
+
+/* Skill/CLI install — underlined external link */
+.collab-skill-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     font-size: 12px;
+    line-height: 1.3;
     color: var(--color-text-muted);
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
     transition: color var(--transition-fast);
 }
 
 .collab-skill-link:hover {
     color: var(--color-primary);
-    text-decoration: underline;
+}
+
+.collab-skill-link-icon {
+    flex-shrink: 0;
+    opacity: 0.85;
 }
 
 /* Divider */
@@ -1748,7 +1766,7 @@ canvas {
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
-    padding-bottom: 2px;
+    padding: 0;
 }
 
 .collab-status-details-row.name-row .label {
@@ -1766,7 +1784,8 @@ canvas {
 
 .collab-name-edit-inline input {
     width: 100%;
-    padding: 7px 10px;
+    box-sizing: border-box;
+    padding: 8px 10px;
     font-size: 13px;
     color: var(--color-text-primary);
     background: var(--color-bg-input);
@@ -1789,8 +1808,8 @@ canvas {
 
 /* Version footer — quiet, minimal footprint */
 .collab-status-details-version {
-    margin-top: 8px;
-    padding-top: 0;
+    margin: 0;
+    padding: 0;
     border-top: none;
     text-align: center;
     font-size: 10px;
@@ -1837,16 +1856,23 @@ canvas {
     border-color: transparent transparent #212529 transparent;
 }
 
-/* Debug section in status details */
+/* Debug section — centered with skill link + version */
 .collab-status-details-debug {
-    margin-top: 10px;
-    padding-top: 0;
+    margin: 0;
+    padding: 0;
     border-top: none;
+    width: 100%;
+}
+
+.collab-status-details-debug .debug-toggle {
+    display: flex;
+    justify-content: center;
 }
 
 .collab-status-details-debug .debug-toggle label {
-    display: flex;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     font-size: 11px;
     color: var(--color-text-placeholder);
@@ -1870,12 +1896,13 @@ canvas {
 .collab-status-details-debug .debug-actions {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
-    margin-top: var(--spacing-sm);
+    gap: 6px;
+    margin-top: 10px;
+    width: 100%;
 }
 
 .collab-status-details-debug .debug-actions .collab-status-details-row {
-    padding: 2px 0 6px;
+    padding: 4px 0;
 }
 
 .collab-status-details-debug .debug-actions .value.poor {

@@ -28,6 +28,10 @@ import { SyncState } from "./cpp-sync-adapter";
 import { generateRandomName } from "./presence";
 import { getMenuStateManager } from "./menu-state";
 import { buildCollabDetailsHtml } from "./collab-menu-content";
+import {
+    loadStoredDisplayName,
+    saveStoredDisplayName,
+} from "./display-name";
 import type { SyncStateType, PeerPresence, RoomId } from "./types";
 
 // ============================================================================
@@ -235,24 +239,30 @@ export class CollabUI {
     }
 
     /**
-     * Get the initial display name from storage or generate a new one
+     * Get the initial display name from storage or generate a new one.
+     * Uses localStorage so the nickname survives browser restarts.
      */
     private _getInitialDisplayName(): string {
+        let local: Storage | null = null;
+        let session: Storage | null = null;
         try {
-            const storedName = localStorage.getItem("cells.displayName");
-            if (storedName) {
-                return storedName;
-            }
+            local = localStorage;
         } catch {
-            // localStorage not available
+            local = null;
         }
-        // Generate and store a new name
+        try {
+            session = sessionStorage;
+        } catch {
+            session = null;
+        }
+
+        const stored = loadStoredDisplayName(local, session);
+        if (stored) {
+            return stored;
+        }
+
         const newName = generateRandomName();
-        try {
-            localStorage.setItem("cells.displayName", newName);
-        } catch {
-            // localStorage not available
-        }
+        saveStoredDisplayName(newName, local, session);
         return newName;
     }
 
@@ -318,10 +328,10 @@ export class CollabUI {
                     nameInput.blur();
                 } else if (e.key === "Escape") {
                     e.preventDefault();
-                    // Restore original name
-                    if (this._presenceManager?.localName) {
-                        nameInput.value = this._presenceManager.localName;
-                    }
+                    // Restore original name from presence or persisted storage
+                    nameInput.value =
+                        this._presenceManager?.localName ??
+                        this._getInitialDisplayName();
                     nameInput.blur();
                 }
             });
@@ -595,12 +605,20 @@ export class CollabUI {
         const newName = nameInput.value.trim();
 
         if (newName) {
-            // Persist to localStorage for future sessions
+            // Persist for all future browser sessions
+            let local: Storage | null = null;
+            let session: Storage | null = null;
             try {
-                localStorage.setItem("cells.displayName", newName);
+                local = localStorage;
             } catch {
-                // localStorage not available
+                local = null;
             }
+            try {
+                session = sessionStorage;
+            } catch {
+                session = null;
+            }
+            saveStoredDisplayName(newName, local, session);
 
             if (this._presenceManager) {
                 await this._presenceManager.setLocalName(newName);

@@ -55,7 +55,8 @@ export function buildCollabDetailsHtml(options?: {
                 <span class="value" id="collab-detail-peers">0</span>
             </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
-            <a class="collab-skill-link" href="${escapeAttr(skillHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(skillLabel)}</a>
+            <div class="collab-status-details-footer">
+            <a class="collab-skill-link" href="${escapeAttr(skillHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(skillLabel)}<svg class="collab-skill-link-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
             <div class="collab-status-details-debug" id="collab-debug-section">
                 <div class="debug-toggle">
                     <label>
@@ -74,6 +75,7 @@ export function buildCollabDetailsHtml(options?: {
                 </div>
             </div>
             <div class="collab-status-details-version" id="collab-version">${escapeHtml(versionLabel)}</div>
+            </div>
         `;
 }
 

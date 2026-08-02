@@ -17,6 +17,7 @@ for (const name of [
   'editing-session.test.mjs',
   'theme.test.mjs',
   'collab-menu-content.test.mjs',
+  'display-name.test.mjs',
 ]) {
   await import(join(unitDir, name));
 }
