@@ -1674,6 +1674,7 @@ std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     Operation removeOp = makeRangeDeleteOp(*_workbook, range->id, payload.str());
     applyOperation(*_workbook, removeOp);
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
 
