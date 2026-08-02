@@ -1,32 +1,61 @@
 // Session client + daemon: long-running collab peer for non-interactive agents.
+// IPC: Unix domain sockets (POSIX + Windows 10+ AF_UNIX). Daemon: fork+exec / CreateProcess.
 
 #include "session_command.h"
 
-#include <csignal>
 #include <cstring>
 
 #include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <chrono>
-#include <errno.h>
-#include <fcntl.h>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <limits.h>
 #include <memory>
-#include <poll.h>
-#include <signal.h>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <vector>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <afunix.h>
+#include <windows.h>
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+// wingdi.h defines ERROR as 0; collides with CellValueType::ERROR.
+#ifdef ERROR
+#undef ERROR
+#endif
+// winnt.h DELETE access mask; collides with OpType/HttpMethod DELETE elsewhere.
+#ifdef DELETE
+#undef DELETE
+#endif
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <csignal>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <poll.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
-#include <thread>
 #include <unistd.h>
-#include <vector>
+#endif
 
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
@@ -51,95 +80,348 @@
 namespace cells::cli {
 namespace {
 
+// ---------------------------------------------------------------------------
+// Platform socket / process helpers
+// ---------------------------------------------------------------------------
+
+#ifdef _WIN32
+using sock_t = SOCKET;
+constexpr sock_t kInvalidSock = INVALID_SOCKET;
+using socklen_t = int;
+
+struct PollFd {
+    sock_t fd = kInvalidSock;
+    short events = 0;
+    short revents = 0;
+};
+
+constexpr short kPollIn = POLLRDNORM;
+constexpr short kPollOut = POLLWRNORM;
+constexpr short kPollHup = POLLHUP;
+constexpr short kPollErr = POLLERR;
+
+inline bool sock_valid(sock_t fd) {
+    return fd != kInvalidSock;
+}
+
+inline void sock_close(sock_t fd) {
+    if (sock_valid(fd)) {
+        ::closesocket(fd);
+    }
+}
+
+inline int last_sock_err() {
+    return ::WSAGetLastError();
+}
+
+inline bool would_block_connect(int err) {
+    return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
+}
+
+inline bool is_eintr(int err) {
+    return err == WSAEINTR;
+}
+
+inline int set_nonblocking(sock_t fd, bool nonblock) {
+    u_long mode = nonblock ? 1 : 0;
+    return ::ioctlsocket(fd, FIONBIO, &mode);
+}
+
+inline int poll_fds(PollFd* fds, unsigned n, int timeout_ms) {
+    if (n == 0) {
+        return 0;
+    }
+    std::vector<WSAPOLLFD> w(n);
+    for (unsigned i = 0; i < n; ++i) {
+        w[i].fd = fds[i].fd;
+        w[i].events = fds[i].events;
+        w[i].revents = 0;
+    }
+    int rc = ::WSAPoll(w.data(), static_cast<ULONG>(n), timeout_ms);
+    for (unsigned i = 0; i < n; ++i) {
+        fds[i].revents = w[i].revents;
+    }
+    return rc;
+}
+
+inline int sock_send(sock_t fd, const char* data, int len) {
+    return ::send(fd, data, len, 0);
+}
+
+inline int sock_recv(sock_t fd, char* buf, int len) {
+    return ::recv(fd, buf, len, 0);
+}
+
+inline void remove_path(const std::string& path) {
+    ::DeleteFileA(path.c_str());
+}
+
+inline std::int64_t current_pid() {
+    return static_cast<std::int64_t>(::GetCurrentProcessId());
+}
+
+inline void kill_process(std::int64_t pid, bool /*force*/) {
+    if (pid <= 0) {
+        return;
+    }
+    HANDLE h = ::OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+    if (h == nullptr) {
+        return;
+    }
+    ::TerminateProcess(h, 1);
+    ::CloseHandle(h);
+}
+
+inline std::string get_cwd() {
+    char cwd[4096];
+    if (::_getcwd(cwd, sizeof(cwd)) != nullptr) {
+        return std::string(cwd);
+    }
+    return {};
+}
+
+bool ensure_sockets_ready() {
+    static std::once_flag once;
+    static bool ok = false;
+    std::call_once(once, []() {
+        WSADATA wsa{};
+        ok = (::WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
+    });
+    return ok;
+}
+
+#else  // !_WIN32
+
+using sock_t = int;
+constexpr sock_t kInvalidSock = -1;
+
+struct PollFd {
+    sock_t fd = kInvalidSock;
+    short events = 0;
+    short revents = 0;
+};
+
+constexpr short kPollIn = POLLIN;
+constexpr short kPollOut = POLLOUT;
+constexpr short kPollHup = POLLHUP;
+constexpr short kPollErr = POLLERR;
+
+inline bool sock_valid(sock_t fd) {
+    return fd >= 0;
+}
+
+inline void sock_close(sock_t fd) {
+    if (sock_valid(fd)) {
+        ::close(fd);
+    }
+}
+
+inline int last_sock_err() {
+    return errno;
+}
+
+inline bool would_block_connect(int err) {
+    return err == EINPROGRESS || err == EWOULDBLOCK;
+}
+
+inline bool is_eintr(int err) {
+    return err == EINTR;
+}
+
+inline int set_nonblocking(sock_t fd, bool nonblock) {
+    int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        return -1;
+    }
+    if (nonblock) {
+        return ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+    return ::fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+}
+
+inline int poll_fds(PollFd* fds, unsigned n, int timeout_ms) {
+    if (n == 0) {
+        return 0;
+    }
+    std::vector<pollfd> p(n);
+    for (unsigned i = 0; i < n; ++i) {
+        p[i].fd = fds[i].fd;
+        p[i].events = fds[i].events;
+        p[i].revents = 0;
+    }
+    int rc = ::poll(p.data(), static_cast<nfds_t>(n), timeout_ms);
+    for (unsigned i = 0; i < n; ++i) {
+        fds[i].revents = p[i].revents;
+    }
+    return rc;
+}
+
+inline int sock_send(sock_t fd, const char* data, int len) {
+    return static_cast<int>(::write(fd, data, static_cast<size_t>(len)));
+}
+
+inline int sock_recv(sock_t fd, char* buf, int len) {
+    return static_cast<int>(::read(fd, buf, static_cast<size_t>(len)));
+}
+
+inline void remove_path(const std::string& path) {
+    ::unlink(path.c_str());
+}
+
+inline std::int64_t current_pid() {
+    return static_cast<std::int64_t>(::getpid());
+}
+
+inline void kill_process(std::int64_t pid, bool force) {
+    if (pid <= 0) {
+        return;
+    }
+    ::kill(static_cast<pid_t>(pid), force ? SIGKILL : SIGTERM);
+}
+
+inline std::string get_cwd() {
+    char cwd[4096];
+    if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+        return std::string(cwd);
+    }
+    return {};
+}
+
+inline bool ensure_sockets_ready() {
+    return true;
+}
+
+#endif  // _WIN32
+
 std::atomic<bool> g_daemon_shutdown{false};
 
+#ifdef _WIN32
+BOOL WINAPI daemon_console_handler(DWORD type) {
+    if (type == CTRL_C_EVENT || type == CTRL_BREAK_EVENT || type == CTRL_CLOSE_EVENT ||
+        type == CTRL_SHUTDOWN_EVENT) {
+        g_daemon_shutdown = true;
+        return TRUE;
+    }
+    return FALSE;
+}
+#else
 void daemon_signal_handler(int /*sig*/) {
     g_daemon_shutdown = true;
 }
+#endif
 
 // ---------------------------------------------------------------------------
-// Unix socket helpers
+// Unix domain socket helpers (POSIX + Windows AF_UNIX)
 // ---------------------------------------------------------------------------
 
-int create_listen_socket(const std::string& path) {
-    ::unlink(path.c_str());
-    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) {
-        return -1;
+// AF_UNIX path for bind/connect (Windows prefers backslashes; sun_path max ~108).
+std::string ipc_socket_path(std::string path) {
+#ifdef _WIN32
+    for (char& c : path) {
+        if (c == '/') {
+            c = '\\';
+        }
+    }
+#endif
+    return path;
+}
+
+sock_t create_listen_socket(const std::string& path_in) {
+    if (!ensure_sockets_ready()) {
+        return kInvalidSock;
+    }
+    const std::string path = ipc_socket_path(path_in);
+    remove_path(path);
+    sock_t fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (!sock_valid(fd)) {
+        return kInvalidSock;
     }
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     if (path.size() >= sizeof(addr.sun_path)) {
-        ::close(fd);
-        return -1;
+        sock_close(fd);
+        return kInvalidSock;
     }
     std::strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
     if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-        ::close(fd);
-        return -1;
+        sock_close(fd);
+        return kInvalidSock;
     }
     if (::listen(fd, 16) != 0) {
-        ::close(fd);
-        ::unlink(path.c_str());
-        return -1;
+        sock_close(fd);
+        remove_path(path);
+        return kInvalidSock;
     }
-    // non-blocking accept
-    int flags = ::fcntl(fd, F_GETFL, 0);
-    ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    if (set_nonblocking(fd, true) != 0) {
+        sock_close(fd);
+        remove_path(path);
+        return kInvalidSock;
+    }
     return fd;
 }
 
-int connect_socket(const std::string& path, int timeout_ms = 5000) {
-    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) {
-        return -1;
+sock_t connect_socket(const std::string& path_in, int timeout_ms = 5000) {
+    if (!ensure_sockets_ready()) {
+        return kInvalidSock;
+    }
+    const std::string path = ipc_socket_path(path_in);
+    sock_t fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (!sock_valid(fd)) {
+        return kInvalidSock;
     }
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     if (path.size() >= sizeof(addr.sun_path)) {
-        ::close(fd);
-        return -1;
+        sock_close(fd);
+        return kInvalidSock;
     }
     std::strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
 
-    // non-blocking connect with poll
-    int flags = ::fcntl(fd, F_GETFL, 0);
-    ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    int rc = ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-    if (rc != 0 && errno != EINPROGRESS) {
-        ::close(fd);
-        return -1;
+    if (set_nonblocking(fd, true) != 0) {
+        sock_close(fd);
+        return kInvalidSock;
     }
+    int rc = ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
     if (rc != 0) {
-        pollfd pfd{};
-        pfd.fd = fd;
-        pfd.events = POLLOUT;
-        rc = ::poll(&pfd, 1, timeout_ms);
-        if (rc <= 0) {
-            ::close(fd);
-            return -1;
+        int err = last_sock_err();
+        if (!would_block_connect(err)) {
+            sock_close(fd);
+            return kInvalidSock;
         }
-        int err = 0;
-        socklen_t len = sizeof(err);
-        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) != 0 || err != 0) {
-            ::close(fd);
-            return -1;
+        PollFd pfd{};
+        pfd.fd = fd;
+        pfd.events = kPollOut;
+        rc = poll_fds(&pfd, 1, timeout_ms);
+        if (rc <= 0) {
+            sock_close(fd);
+            return kInvalidSock;
+        }
+        int so_err = 0;
+        socklen_t len = sizeof(so_err);
+        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&so_err), &len) != 0 ||
+            so_err != 0) {
+            sock_close(fd);
+            return kInvalidSock;
         }
     }
     // back to blocking for request/response simplicity
-    ::fcntl(fd, F_SETFL, flags);
+    set_nonblocking(fd, false);
     return fd;
 }
 
-bool write_all(int fd, const std::string& data) {
+bool write_all(sock_t fd, const std::string& data) {
     const char* p = data.data();
     std::size_t left = data.size();
     while (left > 0) {
-        ssize_t n = ::write(fd, p, left);
+        int chunk = left > static_cast<std::size_t>(1 << 20) ? (1 << 20) : static_cast<int>(left);
+        int n = sock_send(fd, p, chunk);
         if (n < 0) {
-            if (errno == EINTR) {
+            if (is_eintr(last_sock_err())) {
                 continue;
             }
+            return false;
+        }
+        if (n == 0) {
             return false;
         }
         p += n;
@@ -149,13 +431,13 @@ bool write_all(int fd, const std::string& data) {
 }
 
 // Read one line (up to max_bytes). Returns empty on EOF/error.
-std::string read_line(int fd, std::size_t max_bytes = 8 * 1024 * 1024) {
+std::string read_line(sock_t fd, std::size_t max_bytes = 8 * 1024 * 1024) {
     std::string out;
     char buf[4096];
     while (out.size() < max_bytes) {
-        ssize_t n = ::read(fd, buf, sizeof(buf));
+        int n = sock_recv(fd, buf, static_cast<int>(sizeof(buf)));
         if (n < 0) {
-            if (errno == EINTR) {
+            if (is_eintr(last_sock_err())) {
                 continue;
             }
             return {};
@@ -187,8 +469,8 @@ std::string read_file_contents(const std::string& path) {
 SessionResponse rpc(const std::string& socket_path, const std::string& request_line) {
     SessionResponse fail;
     fail.ok = false;
-    int fd = connect_socket(socket_path);
-    if (fd < 0) {
+    sock_t fd = connect_socket(socket_path);
+    if (!sock_valid(fd)) {
         fail.error = "Cannot connect to session socket (is the session running?)";
         return fail;
     }
@@ -197,12 +479,12 @@ SessionResponse rpc(const std::string& socket_path, const std::string& request_l
         msg.push_back('\n');
     }
     if (!write_all(fd, msg)) {
-        ::close(fd);
+        sock_close(fd);
         fail.error = "Failed to write to session socket";
         return fail;
     }
     std::string line = read_line(fd);
-    ::close(fd);
+    sock_close(fd);
     if (line.empty()) {
         fail.error = "Empty response from session";
         return fail;
@@ -272,20 +554,24 @@ public:
         sync_->setLocalName(meta_.name.empty() ? "CLI Agent" : meta_.name);
 
         listen_fd_ = create_listen_socket(socket_path_);
-        if (listen_fd_ < 0) {
+        if (!sock_valid(listen_fd_)) {
             std::cerr << "Error: cannot create session socket: " << socket_path_ << "\n";
             return 1;
         }
 
         // Update pid in meta (daemon pid)
-        meta_.pid = static_cast<std::int64_t>(::getpid());
+        meta_.pid = current_pid();
         write_session_meta(root_, meta_);
         write_session_pid(root_, meta_.id, meta_.pid);
 
+#ifdef _WIN32
+        ::SetConsoleCtrlHandler(daemon_console_handler, TRUE);
+#else
         std::signal(SIGINT, daemon_signal_handler);
         std::signal(SIGTERM, daemon_signal_handler);
         // Ignore SIGPIPE from closed clients
         std::signal(SIGPIPE, SIG_IGN);
+#endif
 
         // Optional debug log under session dir (always on if CELLS_SESSION_DEBUG,
         // or write lightweight state transitions to session log).
@@ -323,18 +609,18 @@ public:
             if (c.watching) {
                 write_all(c.fd, end_line);
             }
-            ::close(c.fd);
+            sock_close(c.fd);
         }
         clients_.clear();
 
         if (sync_) {
             sync_->stopSync();
         }
-        if (listen_fd_ >= 0) {
-            ::close(listen_fd_);
-            listen_fd_ = -1;
+        if (sock_valid(listen_fd_)) {
+            sock_close(listen_fd_);
+            listen_fd_ = kInvalidSock;
         }
-        ::unlink(socket_path_.c_str());
+        remove_path(socket_path_);
         remove_session_dir(root_, meta_.id);
         return 0;
     }
@@ -417,7 +703,7 @@ public:
 
 private:
     struct Client {
-        int fd = -1;
+        sock_t fd = kInvalidSock;
         std::string buf;
         bool watching = false;
         bool close_after_write = false;
@@ -565,8 +851,8 @@ private:
 
     void accept_clients() {
         while (true) {
-            int cfd = ::accept(listen_fd_, nullptr, nullptr);
-            if (cfd < 0) {
+            sock_t cfd = ::accept(listen_fd_, nullptr, nullptr);
+            if (!sock_valid(cfd)) {
                 break;
             }
             Client c;
@@ -576,17 +862,16 @@ private:
     }
 
     void service_clients() {
-        pollfd pfds[64];
         // Only poll a batch; simple single-threaded
         std::vector<std::size_t> indices;
         for (std::size_t i = 0; i < clients_.size() && indices.size() < 64; ++i) {
-            if (clients_[i].fd >= 0 && !clients_[i].watching) {
+            if (sock_valid(clients_[i].fd) && !clients_[i].watching) {
                 indices.push_back(i);
             }
         }
         // For watchers we only write; still need to detect disconnect via POLLIN/POLLHUP
         for (std::size_t i = 0; i < clients_.size() && indices.size() < 64; ++i) {
-            if (clients_[i].fd >= 0 && clients_[i].watching) {
+            if (sock_valid(clients_[i].fd) && clients_[i].watching) {
                 indices.push_back(i);
             }
         }
@@ -595,31 +880,32 @@ private:
             return;
         }
 
-        nfds_t n = 0;
+        PollFd pfds[64];
+        unsigned n = 0;
         for (std::size_t idx : indices) {
             pfds[n].fd = clients_[idx].fd;
-            pfds[n].events = POLLIN | POLLHUP | POLLERR;
+            pfds[n].events = static_cast<short>(kPollIn | kPollHup | kPollErr);
             pfds[n].revents = 0;
             ++n;
         }
-        int pr = ::poll(pfds, n, 0);
+        int pr = poll_fds(pfds, n, 0);
         if (pr <= 0) {
             // still handle close_after_write
             cleanup_clients();
             return;
         }
 
-        for (nfds_t j = 0; j < n; ++j) {
+        for (unsigned j = 0; j < n; ++j) {
             Client& c = clients_[indices[j]];
-            if (pfds[j].revents & (POLLHUP | POLLERR)) {
+            if (pfds[j].revents & (kPollHup | kPollErr)) {
                 c.close_after_write = true;
                 continue;
             }
-            if (!(pfds[j].revents & POLLIN)) {
+            if (!(pfds[j].revents & kPollIn)) {
                 continue;
             }
             char buf[4096];
-            ssize_t nr = ::read(c.fd, buf, sizeof(buf));
+            int nr = sock_recv(c.fd, buf, static_cast<int>(sizeof(buf)));
             if (nr <= 0) {
                 c.close_after_write = true;
                 continue;
@@ -861,9 +1147,9 @@ private:
 
     void cleanup_clients() {
         for (auto it = clients_.begin(); it != clients_.end();) {
-            if (it->close_after_write || it->fd < 0) {
-                if (it->fd >= 0) {
-                    ::close(it->fd);
+            if (it->close_after_write || !sock_valid(it->fd)) {
+                if (sock_valid(it->fd)) {
+                    sock_close(it->fd);
                 }
                 it = clients_.erase(it);
             } else {
@@ -878,7 +1164,7 @@ private:
     RoomTarget target_;
     std::unique_ptr<Workbook> workbook_;
     std::unique_ptr<net::SyncClient> sync_;
-    int listen_fd_ = -1;
+    sock_t listen_fd_ = kInvalidSock;
     std::vector<Client> clients_;
     std::int64_t last_activity_ms_ = 0;
     bool stop_requested_ = false;
@@ -924,7 +1210,14 @@ int emit_json_error(std::string_view error, std::string_view id = {}) {
 }
 
 std::string resolve_self_executable() {
-#if defined(__APPLE__)
+#if defined(_WIN32)
+    char buf[MAX_PATH];
+    DWORD n = ::GetModuleFileNameA(nullptr, buf, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) {
+        return {};
+    }
+    return std::string(buf, n);
+#elif defined(__APPLE__)
     char buf[PATH_MAX];
     uint32_t size = sizeof(buf);
     if (_NSGetExecutablePath(buf, &size) == 0) {
@@ -946,7 +1239,64 @@ std::string resolve_self_executable() {
 #endif
 }
 
+#ifdef _WIN32
+std::string quote_win_arg(const std::string& arg) {
+    // Minimal Windows command-line quoting for CreateProcess.
+    if (arg.find_first_of(" \t\"") == std::string::npos) {
+        return arg;
+    }
+    std::string out = "\"";
+    for (char c : arg) {
+        if (c == '"') {
+            out += "\\\"";
+        } else {
+            out += c;
+        }
+    }
+    out += '"';
+    return out;
+}
+
+// Spawn detached daemon process; returns pid or 0 on failure.
+std::int64_t spawn_session_daemon(const std::string& self, const std::string& id,
+                                  const std::string& url, const std::string& sock,
+                                  const std::string& root, const std::string& idle_str,
+                                  const std::string& name) {
+    std::ostringstream cmd;
+    cmd << quote_win_arg(self) << " session _run " << id << ' ' << quote_win_arg(url) << " --socket "
+        << quote_win_arg(sock) << " --root " << quote_win_arg(root) << " --idle-minutes " << idle_str
+        << " --name " << quote_win_arg(name);
+    std::string cmd_str = cmd.str();
+    std::vector<char> cmd_mut(cmd_str.begin(), cmd_str.end());
+    cmd_mut.push_back('\0');
+
+    STARTUPINFOA si{};
+    si.cb = sizeof(si);
+    // Detach std handles unless debugging
+    const bool debug = std::getenv("CELLS_SESSION_DEBUG") != nullptr;
+    PROCESS_INFORMATION pi{};
+    DWORD flags = CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW;
+    if (!debug) {
+        flags |= DETACHED_PROCESS;
+    }
+
+    BOOL ok = ::CreateProcessA(self.c_str(), cmd_mut.data(), nullptr, nullptr, FALSE, flags, nullptr,
+                               nullptr, &si, &pi);
+    if (!ok) {
+        return 0;
+    }
+    std::int64_t pid = static_cast<std::int64_t>(pi.dwProcessId);
+    ::CloseHandle(pi.hThread);
+    ::CloseHandle(pi.hProcess);
+    return pid;
+}
+#endif
+
 int cmd_start(const SessionCliOptions& opts) {
+    if (!ensure_sockets_ready()) {
+        return emit_json_error("failed to initialize sockets (WSAStartup)");
+    }
+
     RoomTarget target = parse_room_target(opts.url);
     if (!target.ok) {
         return emit_json_error(target.error);
@@ -979,6 +1329,14 @@ int cmd_start(const SessionCliOptions& opts) {
     std::string sock = session_socket_path(root, id);
     std::string idle_str = std::to_string(opts.idle_minutes);
 
+#ifdef _WIN32
+    // CreateProcess re-exec: cells session _run <id> <url> --socket ... --root ...
+    std::int64_t pid = spawn_session_daemon(self, id, target.url, sock, root, idle_str, meta.name);
+    if (pid == 0) {
+        remove_session_dir(root, id);
+        return emit_json_error("CreateProcess failed for session daemon");
+    }
+#else
     // Fork + re-exec a clean process (avoids post-fork networking issues on macOS).
     // The child runs: cells session _run <id> <url> --socket ... --root ... ...
     pid_t pid = ::fork();
@@ -1005,6 +1363,7 @@ int cmd_start(const SessionCliOptions& opts) {
                 "--name", meta.name.c_str(), static_cast<char*>(nullptr));
         _exit(127);
     }
+#endif
 
     meta.pid = static_cast<std::int64_t>(pid);
     write_session_meta(root, meta);
@@ -1019,11 +1378,11 @@ int cmd_start(const SessionCliOptions& opts) {
             remove_session_dir(root, id);
             return emit_json_error("session daemon exited during startup", id);
         }
-        int fd = connect_socket(sock, 200);
-        if (fd >= 0) {
+        sock_t fd = connect_socket(sock, 200);
+        if (sock_valid(fd)) {
             write_all(fd, "{\"op\":\"ping\"}\n");
             std::string line = read_line(fd);
-            ::close(fd);
+            sock_close(fd);
             if (!line.empty() && json_get_bool(line, "ok").value_or(false)) {
                 ipc_ready = true;
                 break;
@@ -1034,7 +1393,7 @@ int cmd_start(const SessionCliOptions& opts) {
     }
 
     if (!ipc_ready) {
-        ::kill(pid, SIGTERM);
+        kill_process(meta.pid, true);
         remove_session_dir(root, id);
         return emit_json_error("session daemon did not become ready (IPC)", id);
     }
@@ -1149,10 +1508,10 @@ int cmd_stop(const SessionCliOptions& opts) {
     SessionResponse r = rpc(sock, "{\"op\":\"stop\"}");
     if (!r.ok && process_alive(meta->pid)) {
         // Force kill if RPC failed
-        ::kill(static_cast<pid_t>(meta->pid), SIGTERM);
+        kill_process(meta->pid, false);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         if (process_alive(meta->pid)) {
-            ::kill(static_cast<pid_t>(meta->pid), SIGKILL);
+            kill_process(meta->pid, true);
         }
         remove_session_dir(root, opts.session_id);
         emit_json_stdout("{\"ok\":true,\"id\":\"" + json_escape(opts.session_id) +
@@ -1190,14 +1549,35 @@ int cmd_status(const SessionCliOptions& opts) {
 }
 
 std::string absolutize_path(const std::string& path) {
-    if (path.empty() || path[0] == '/') {
+    if (path.empty()) {
         return path;
     }
-    char cwd[4096];
-    if (::getcwd(cwd, sizeof(cwd))) {
-        return std::string(cwd) + "/" + path;
+#ifdef _WIN32
+    // Absolute: drive letter, UNC, or root-relative
+    if ((path.size() >= 2 && std::isalpha(static_cast<unsigned char>(path[0])) && path[1] == ':') ||
+        (path.size() >= 2 && path[0] == '\\' && path[1] == '\\') || path[0] == '/' ||
+        path[0] == '\\') {
+        return path;
     }
-    return path;
+    std::string cwd = get_cwd();
+    if (cwd.empty()) {
+        return path;
+    }
+    char sep = (cwd.find('\\') != std::string::npos) ? '\\' : '/';
+    if (!cwd.empty() && cwd.back() != '/' && cwd.back() != '\\') {
+        cwd.push_back(sep);
+    }
+    return cwd + path;
+#else
+    if (path[0] == '/') {
+        return path;
+    }
+    std::string cwd = get_cwd();
+    if (cwd.empty()) {
+        return path;
+    }
+    return cwd + "/" + path;
+#endif
 }
 
 int cmd_exec(const SessionCliOptions& opts) {
@@ -1291,12 +1671,12 @@ int cmd_watch(const SessionCliOptions& opts) {
         return emit_json_error("session not found", opts.session_id);
     }
     std::string sock = session_socket_path(root, opts.session_id);
-    int fd = connect_socket(sock);
-    if (fd < 0) {
+    sock_t fd = connect_socket(sock);
+    if (!sock_valid(fd)) {
         return emit_json_error("cannot connect to session", opts.session_id);
     }
     if (!write_all(fd, "{\"op\":\"watch\"}\n")) {
-        ::close(fd);
+        sock_close(fd);
         return emit_json_error("failed to start watch", opts.session_id);
     }
 
@@ -1314,9 +1694,9 @@ int cmd_watch(const SessionCliOptions& opts) {
                 break;
             }
         }
-        pollfd pfd{};
+        PollFd pfd{};
         pfd.fd = fd;
-        pfd.events = POLLIN;
+        pfd.events = kPollIn;
         int timeout = 200;
         if (max_sec > 0) {
             auto elapsed =
@@ -1330,9 +1710,9 @@ int cmd_watch(const SessionCliOptions& opts) {
                 timeout = 1;
             }
         }
-        int pr = ::poll(&pfd, 1, timeout);
+        int pr = poll_fds(&pfd, 1, timeout);
         if (pr < 0) {
-            if (errno == EINTR) {
+            if (is_eintr(last_sock_err())) {
                 continue;
             }
             break;
@@ -1340,7 +1720,7 @@ int cmd_watch(const SessionCliOptions& opts) {
         if (pr == 0) {
             continue;
         }
-        ssize_t n = ::read(fd, tmp, sizeof(tmp));
+        int n = sock_recv(fd, tmp, static_cast<int>(sizeof(tmp)));
         if (n <= 0) {
             break;
         }
@@ -1361,17 +1741,20 @@ int cmd_watch(const SessionCliOptions& opts) {
             emit_json_stdout(line);
             // End if watch_end
             if (json_get_bool(line, "watch_end").value_or(false)) {
-                ::close(fd);
+                sock_close(fd);
                 return 0;
             }
         }
     }
-    ::close(fd);
+    sock_close(fd);
     return 0;
 }
 
 int cmd_daemon(const SessionCliOptions& opts) {
-    // Direct daemon entry (for testing / re-exec). Not the normal path (fork from start).
+    if (!ensure_sockets_ready()) {
+        return emit_json_error("failed to initialize sockets (WSAStartup)");
+    }
+    // Direct daemon entry (for testing / re-exec). Not the normal path (spawn from start).
     RoomTarget target = parse_room_target(opts.url);
     if (!target.ok) {
         return emit_json_error(target.error);
@@ -1384,7 +1767,7 @@ int cmd_daemon(const SessionCliOptions& opts) {
     meta.name = opts.name;
     meta.idle_minutes = opts.idle_minutes;
     meta.started_at_ms = now_unix_ms();
-    meta.pid = ::getpid();
+    meta.pid = current_pid();
     create_session_dir(root, meta.id);
     write_session_meta(root, meta);
     std::string sock =
