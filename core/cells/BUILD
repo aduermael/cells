@@ -1242,12 +1242,14 @@ cc_test(
     name = "fill_range_test",
     srcs = ["fill_range_test.cc"],
     deps = [
+        ":crdt",
         ":fill_range",
         ":formula_display",
         ":formula_parser",
         ":formula_resolver",
         ":id",
         ":model",
+        ":operation",
         "@googletest//:gtest_main",
     ],
 )

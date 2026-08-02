@@ -301,6 +301,31 @@ std::string buildFormulaPayload(const std::string& formula, const cells::ID& col
     return ss.str();
 }
 
+// Collab-safe write: mint missing col/row/cell via CRDT so peers can apply CELL_SET.
+// Prefer existing cell id at (col,row); mint only when creating (identity-stable LWW).
+// Local getOrCreate* would mint unsynced IDs → remote INVALID_TARGET (fill sync bug).
+bool writeFilledCell(Workbook* workbook, Sheet* sheet, uint32_t colPos, uint32_t rowPos,
+                     const std::string& typeChar, const std::string& valueStr) {
+    Axis* colAxis = ensureColumnViaCrdt(*workbook, *sheet, colPos);
+    Axis* rowAxis = ensureRowViaCrdt(*workbook, *sheet, rowPos);
+    if (colAxis == nullptr || rowAxis == nullptr) {
+        return false;
+    }
+
+    Cell* existing = sheet->getCellAt(colAxis->id, rowAxis->id);
+    const ID cellId = existing != nullptr ? existing->id : generate_id();
+
+    std::string payload;
+    if (typeChar == "f") {
+        payload = buildFormulaPayload(valueStr, colAxis->id, rowAxis->id);
+    } else {
+        payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
+    }
+
+    applyOperation(*workbook, makeCellSetOp(*workbook, cellId, sheet->id, payload));
+    return true;
+}
+
 }  // namespace
 
 FillDirection getFillDirection(int sourceMinCol, int sourceMinRow, int sourceMaxCol,
@@ -521,14 +546,6 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 detectPattern(sheet, col, sourceMinRow, col, sourceMaxRow, direction);
 
             for (int row = sourceMaxRow + 1; row <= targetMaxRow; ++row) {
-                // Ensure axes exist
-                const Axis* rowAxis = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(row));
-                const Axis* colAxis =
-                    sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(col));
-                if (!rowAxis || !colAxis) {
-                    continue;
-                }
-
                 // Calculate extrapolated value
                 const int index = row - sourceMaxRow;  // 1, 2, 3...
 
@@ -563,25 +580,10 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                // Get or create cell
-                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
-                if (!cell) {
-                    continue;
+                if (writeFilledCell(workbook, sheet, static_cast<uint32_t>(col),
+                                    static_cast<uint32_t>(row), typeChar, valueStr)) {
+                    cellsFilled++;
                 }
-
-                // Build payload and apply
-                std::string payload;
-                if (typeChar == "f") {
-                    payload = buildFormulaPayload(valueStr, colAxis->id, rowAxis->id);
-                } else {
-                    payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
-                }
-
-                // Always use CRDT operations
-                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
-                applyOperation(*workbook, op);
-
-                cellsFilled++;
             }
         }
     } else if (direction == FillDirection::UP) {
@@ -601,13 +603,6 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
             }
 
             for (int row = sourceMinRow - 1; row >= targetMinRow; --row) {
-                const Axis* rowAxis = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(row));
-                const Axis* colAxis =
-                    sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(col));
-                if (!rowAxis || !colAxis) {
-                    continue;
-                }
-
                 const int index = sourceMinRow - row;  // 1, 2, 3... going up
 
                 std::string valueStr;
@@ -642,24 +637,10 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
-                if (!cell) {
-                    continue;
+                if (writeFilledCell(workbook, sheet, static_cast<uint32_t>(col),
+                                    static_cast<uint32_t>(row), typeChar, valueStr)) {
+                    cellsFilled++;
                 }
-
-                // Build payload and apply
-                std::string payload;
-                if (typeChar == "f") {
-                    payload = buildFormulaPayload(valueStr, colAxis->id, rowAxis->id);
-                } else {
-                    payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
-                }
-
-                // Always use CRDT operations
-                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
-                applyOperation(*workbook, op);
-
-                cellsFilled++;
             }
         }
     } else if (direction == FillDirection::RIGHT) {
@@ -669,13 +650,6 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 detectPattern(sheet, sourceMinCol, row, sourceMaxCol, row, direction);
 
             for (int col = sourceMaxCol + 1; col <= targetMaxCol; ++col) {
-                const Axis* rowAxis = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(row));
-                const Axis* colAxis =
-                    sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(col));
-                if (!rowAxis || !colAxis) {
-                    continue;
-                }
-
                 const int index = col - sourceMaxCol;
 
                 std::string valueStr;
@@ -710,24 +684,10 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
-                if (!cell) {
-                    continue;
+                if (writeFilledCell(workbook, sheet, static_cast<uint32_t>(col),
+                                    static_cast<uint32_t>(row), typeChar, valueStr)) {
+                    cellsFilled++;
                 }
-
-                // Build payload and apply
-                std::string payload;
-                if (typeChar == "f") {
-                    payload = buildFormulaPayload(valueStr, colAxis->id, rowAxis->id);
-                } else {
-                    payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
-                }
-
-                // Always use CRDT operations
-                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
-                applyOperation(*workbook, op);
-
-                cellsFilled++;
             }
         }
     } else if (direction == FillDirection::LEFT) {
@@ -745,13 +705,6 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
             }
 
             for (int col = sourceMinCol - 1; col >= targetMinCol; --col) {
-                const Axis* rowAxis = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(row));
-                const Axis* colAxis =
-                    sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(col));
-                if (!rowAxis || !colAxis) {
-                    continue;
-                }
-
                 const int index = sourceMinCol - col;
 
                 std::string valueStr;
@@ -786,24 +739,10 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
-                if (!cell) {
-                    continue;
+                if (writeFilledCell(workbook, sheet, static_cast<uint32_t>(col),
+                                    static_cast<uint32_t>(row), typeChar, valueStr)) {
+                    cellsFilled++;
                 }
-
-                // Build payload and apply
-                std::string payload;
-                if (typeChar == "f") {
-                    payload = buildFormulaPayload(valueStr, colAxis->id, rowAxis->id);
-                } else {
-                    payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
-                }
-
-                // Always use CRDT operations
-                const Operation op = makeCellSetOp(*workbook, cell->id, payload);
-                applyOperation(*workbook, op);
-
-                cellsFilled++;
             }
         }
     }

@@ -502,7 +502,10 @@ std::vector<std::pair<ID, ID>> calculateSpillRange(Sheet* sheet, Cell* masterCel
             const uint32_t targetColPos = startColPos + static_cast<uint32_t>(c);
             const uint32_t targetRowPos = startRowPos + static_cast<uint32_t>(r);
 
-            // Get or create column at target position
+            // Spill position collection needs axes for layout. Local getOrCreate is
+            // intentional here: spill *values* are written via CRDT CELL_SET elsewhere;
+            // concurrent multi-peer spill axis minting is a deeper concern deferred
+            // from the fill-sync fix (ensure*ViaCrdt needs Workbook, not on this path).
             const Axis* const col = sheet->getOrCreateColumnByPosition(targetColPos);
             if (!col) {
                 // Failed to create column - abort

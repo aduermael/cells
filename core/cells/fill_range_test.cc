@@ -1,10 +1,18 @@
 #include "core/cells/fill_range.h"
 
+#include <cstdio>
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "core/cells/crdt.h"
 #include "core/cells/formula_display.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_resolver.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/operation.h"
 
 #include "gtest/gtest.h"
 
@@ -503,6 +511,341 @@ TEST_F(FillRangeTest, DetectPattern_Formula) {
     EXPECT_EQ(pattern.type, PatternType::FORMULA);
     EXPECT_FALSE(pattern.formulaASTs.empty());
     EXPECT_NE(pattern.formulaASTs[0], nullptr);
+}
+
+// =============================================================================
+// Multi-peer fill sync (reproduces debug/fill-issue)
+// =============================================================================
+// Peer A sets a seed cell and fill-extends into empty rows/cols. Peer B must
+// receive filled values after exchanging real OpLog ops (not a reimplementation).
+// Root cause was local getOrCreate* minting axes/cells without COL/ROW_SET.
+
+namespace {
+
+// Look up cell value by grid position (0-based). Returns nullopt if missing.
+std::optional<std::string> cellRawAt(Sheet* s, uint32_t colPos, uint32_t rowPos) {
+    const Axis* col = s->getColumnByPosition(colPos);
+    const Axis* row = s->getRowByPosition(rowPos);
+    if (col == nullptr || row == nullptr) {
+        return std::nullopt;
+    }
+    // Count live cells at this grid position (dual-entity failure mode)
+    int count = 0;
+    std::string raw;
+    for (const auto& cellId : s->getCellIds()) {
+        const Cell* c = s->getCell(cellId);
+        if (c == nullptr) {
+            continue;
+        }
+        const Axis* cCol = s->getColumn(c->colId);
+        const Axis* cRow = s->getRow(c->rowId);
+        if (cCol != nullptr && cRow != nullptr && cCol->position == colPos &&
+            cRow->position == rowPos) {
+            ++count;
+            raw = c->value.raw;
+        }
+    }
+    if (count == 0) {
+        return std::nullopt;
+    }
+    EXPECT_EQ(count, 1) << "expected single cell entity at (" << colPos << "," << rowPos << ")";
+    return raw;
+}
+
+int countCellsAtPosition(Sheet* s, uint32_t colPos, uint32_t rowPos) {
+    int count = 0;
+    for (const auto& cellId : s->getCellIds()) {
+        const Cell* c = s->getCell(cellId);
+        if (c == nullptr) {
+            continue;
+        }
+        const Axis* cCol = s->getColumn(c->colId);
+        const Axis* cRow = s->getRow(c->rowId);
+        if (cCol != nullptr && cRow != nullptr && cCol->position == colPos &&
+            cRow->position == rowPos) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+int countRowsAtPosition(Sheet* s, uint32_t rowPos) {
+    int count = 0;
+    for (const auto& rowId : s->getRowIds()) {
+        const Axis* r = s->getRow(rowId);
+        if (r != nullptr && r->position == rowPos) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+// Shared-sheet two-peer fixture: same sheet id; structure minted only via CRDT.
+struct PeerPair {
+    std::unique_ptr<Workbook> wb_a;
+    std::unique_ptr<Workbook> wb_b;
+    Sheet* sheet_a{nullptr};
+    Sheet* sheet_b{nullptr};
+    ID sheet_id;
+    size_t ops_before_a{0};
+    size_t ops_before_b{0};
+
+    static PeerPair create() {
+        PeerPair p;
+        p.sheet_id = generate_id();
+
+        p.wb_a = std::make_unique<Workbook>(generate_id(), "PeerA");
+        p.wb_a->setNodeId(generate_id());
+        p.wb_a->startCollaboration();
+        auto sa = std::make_unique<Sheet>(p.sheet_id, "Sheet1");
+        sa->setWorkbook(p.wb_a.get());
+        p.wb_a->addSheet(std::move(sa));
+        p.sheet_a = p.wb_a->getSheetByIndex(0);
+
+        p.wb_b = std::make_unique<Workbook>(generate_id(), "PeerB");
+        p.wb_b->setNodeId(generate_id());
+        p.wb_b->startCollaboration();
+        auto sb = std::make_unique<Sheet>(p.sheet_id, "Sheet1");
+        sb->setWorkbook(p.wb_b.get());
+        p.wb_b->addSheet(std::move(sb));
+        p.sheet_b = p.wb_b->getSheetByIndex(0);
+
+        // Seed empty SHEET is already present; no axes until CRDT ensure/set.
+        p.ops_before_a = p.wb_a->getOpLog()->size();
+        p.ops_before_b = p.wb_b->getOpLog()->size();
+        return p;
+    }
+
+    std::vector<Operation> newOpsA() const {
+        const auto& all = wb_a->getOpLog()->getAllOperations();
+        return std::vector<Operation>(all.begin() + static_cast<std::ptrdiff_t>(ops_before_a),
+                                      all.end());
+    }
+
+    std::vector<Operation> newOpsB() const {
+        const auto& all = wb_b->getOpLog()->getAllOperations();
+        return std::vector<Operation>(all.begin() + static_cast<std::ptrdiff_t>(ops_before_b),
+                                      all.end());
+    }
+
+    void markOpsConsumed() {
+        ops_before_a = wb_a->getOpLog()->size();
+        ops_before_b = wb_b->getOpLog()->size();
+    }
+
+    // Apply peer A's new ops to B (returns applied count).
+    size_t exchangeAtoB() {
+        const auto ops = newOpsA();
+        const size_t n = applyOperations(*wb_b, ops);
+        ops_before_a = wb_a->getOpLog()->size();
+        return n;
+    }
+
+    size_t exchangeBtoA() {
+        const auto ops = newOpsB();
+        const size_t n = applyOperations(*wb_a, ops);
+        ops_before_b = wb_b->getOpLog()->size();
+        return n;
+    }
+
+    // Set numeric value at position via CRDT (mirrors product setCell path).
+    void setNumberA(uint32_t colPos, uint32_t rowPos, double value) {
+        Cell* cell = ensureCellAtPositionViaCrdt(*wb_a, *sheet_a, colPos, rowPos);
+        ASSERT_NE(cell, nullptr);
+        const Axis* col = sheet_a->getColumnByPosition(colPos);
+        const Axis* row = sheet_a->getRowByPosition(rowPos);
+        ASSERT_NE(col, nullptr);
+        ASSERT_NE(row, nullptr);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.15g", value);
+        const std::string payload = std::string(R"({"t":"n","v":")") + buf + R"(","col":")" +
+                                    col->id.toString() + R"(","row":")" + row->id.toString() +
+                                    R"("})";
+        applyOperation(*wb_a, makeCellSetOp(*wb_a, cell->id, sheet_a->id, payload));
+    }
+
+    void setNumberB(uint32_t colPos, uint32_t rowPos, double value) {
+        Cell* cell = ensureCellAtPositionViaCrdt(*wb_b, *sheet_b, colPos, rowPos);
+        ASSERT_NE(cell, nullptr);
+        const Axis* col = sheet_b->getColumnByPosition(colPos);
+        const Axis* row = sheet_b->getRowByPosition(rowPos);
+        ASSERT_NE(col, nullptr);
+        ASSERT_NE(row, nullptr);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.15g", value);
+        const std::string payload = std::string(R"({"t":"n","v":")") + buf + R"(","col":")" +
+                                    col->id.toString() + R"(","row":")" + row->id.toString() +
+                                    R"("})";
+        applyOperation(*wb_b, makeCellSetOp(*wb_b, cell->id, sheet_b->id, payload));
+    }
+};
+
+}  // namespace
+
+// Story: peer A sets B2=10, fills B2→B10; peer B must see filled values (not only seed).
+TEST(FillRangeCollabTest, FillDown_SyncsFilledCellsToPeer) {
+    PeerPair peers = PeerPair::create();
+
+    // Peer A: B2 = 10 (col 1, row 1)
+    peers.setNumberA(1, 1, 10.0);
+    size_t applied = peers.exchangeAtoB();
+    EXPECT_GT(applied, 0u);
+
+    // Peer B sees seed
+    auto seed = cellRawAt(peers.sheet_b, 1, 1);
+    ASSERT_TRUE(seed.has_value());
+    EXPECT_EQ(*seed, "10");
+
+    // Peer A fills B2 → B10 (source B2, target B2:B10)
+    FillResult fill = fillRange(peers.wb_a.get(), peers.sheet_a, 1, 1, 1, 1, 1, 1, 1, 9);
+    ASSERT_TRUE(fill.success) << fill.error;
+    EXPECT_EQ(fill.cellsFilled, 8);  // B3..B10
+
+    // Fill into empty rows must emit ROW_SET (not local-only mint)
+    const auto fillOps = peers.newOpsA();
+    bool saw_row_set = false;
+    for (const auto& op : fillOps) {
+        if (op.type == OpType::ROW_SET) {
+            saw_row_set = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(saw_row_set) << "fill into new rows must emit ROW_SET for peers";
+    EXPECT_GE(fillOps.size(), 8u);
+
+    // Exchange fill ops A → B — every op must apply (no INVALID_TARGET)
+    applied = applyOperations(*peers.wb_b, fillOps);
+    EXPECT_EQ(applied, fillOps.size())
+        << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
+    peers.markOpsConsumed();
+
+    // After exchange, peer B must have filled values at B2..B10
+    for (uint32_t row = 1; row <= 9; ++row) {
+        auto val = cellRawAt(peers.sheet_b, 1, row);
+        ASSERT_TRUE(val.has_value()) << "peer B missing cell at B" << (row + 1);
+        EXPECT_EQ(*val, "10") << "peer B B" << (row + 1);
+        EXPECT_EQ(countCellsAtPosition(peers.sheet_b, 1, row), 1);
+        EXPECT_EQ(countRowsAtPosition(peers.sheet_b, row), 1);
+    }
+}
+
+// Concurrent pattern: A fills B2→B10; after fill ops reach B, B sets B9=42;
+// after full exchange each peer has exactly one value at B9 (no dual overlay).
+TEST(FillRangeCollabTest, FillThenPeerSet_SingleValueAtPosition) {
+    PeerPair peers = PeerPair::create();
+
+    peers.setNumberA(1, 1, 10.0);
+    EXPECT_GT(peers.exchangeAtoB(), 0u);
+
+    FillResult fill = fillRange(peers.wb_a.get(), peers.sheet_a, 1, 1, 1, 1, 1, 1, 1, 9);
+    ASSERT_TRUE(fill.success);
+    EXPECT_EQ(fill.cellsFilled, 8);
+
+    // Fill must fully apply on B (including axes)
+    const auto fillOps = peers.newOpsA();
+    const size_t appliedFill = applyOperations(*peers.wb_b, fillOps);
+    EXPECT_EQ(appliedFill, fillOps.size())
+        << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
+    peers.markOpsConsumed();
+
+    // B9 (col 1, row 8) is 10 on both after fill
+    ASSERT_EQ(cellRawAt(peers.sheet_b, 1, 8).value_or(""), "10");
+
+    // Peer B sets B9 = 42 (on the shared axis/cell identity)
+    peers.setNumberB(1, 8, 42.0);
+    const auto bOps = peers.newOpsB();
+    const size_t appliedB = applyOperations(*peers.wb_a, bOps);
+    EXPECT_EQ(appliedB, bOps.size());
+
+    // Single entity at B9 on both peers
+    EXPECT_EQ(countCellsAtPosition(peers.sheet_a, 1, 8), 1);
+    EXPECT_EQ(countCellsAtPosition(peers.sheet_b, 1, 8), 1);
+    EXPECT_EQ(countRowsAtPosition(peers.sheet_a, 8), 1);
+    EXPECT_EQ(countRowsAtPosition(peers.sheet_b, 8), 1);
+
+    // LWW: both agree on one value (42 wins if B's set is later HLC)
+    auto aVal = cellRawAt(peers.sheet_a, 1, 8);
+    auto bVal = cellRawAt(peers.sheet_b, 1, 8);
+    ASSERT_TRUE(aVal.has_value());
+    ASSERT_TRUE(bVal.has_value());
+    EXPECT_EQ(*aVal, *bVal);
+    EXPECT_EQ(*aVal, "42");
+}
+
+// Fill right into missing columns must sync COL_SET + values.
+TEST(FillRangeCollabTest, FillRight_SyncsFilledCellsToPeer) {
+    PeerPair peers = PeerPair::create();
+
+    peers.setNumberA(0, 0, 5.0);  // A1 = 5
+    EXPECT_GT(peers.exchangeAtoB(), 0u);
+
+    // Fill A1 → E1
+    FillResult fill = fillRange(peers.wb_a.get(), peers.sheet_a, 0, 0, 0, 0, 0, 0, 4, 0);
+    ASSERT_TRUE(fill.success);
+    EXPECT_EQ(fill.cellsFilled, 4);
+
+    const auto ops = peers.newOpsA();
+    bool saw_col_set = false;
+    for (const auto& op : ops) {
+        if (op.type == OpType::COL_SET) {
+            saw_col_set = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(saw_col_set) << "fill right into new cols must emit COL_SET";
+
+    EXPECT_EQ(applyOperations(*peers.wb_b, ops), ops.size());
+
+    for (uint32_t col = 0; col <= 4; ++col) {
+        auto val = cellRawAt(peers.sheet_b, col, 0);
+        ASSERT_TRUE(val.has_value()) << "peer B missing col " << col;
+        EXPECT_EQ(*val, "5");
+        EXPECT_EQ(countCellsAtPosition(peers.sheet_b, col, 0), 1);
+    }
+}
+
+// Multi-cell source fill (linear) replicates to peer.
+TEST(FillRangeCollabTest, FillDown_LinearSequence_SyncsToPeer) {
+    PeerPair peers = PeerPair::create();
+
+    peers.setNumberA(0, 0, 1.0);  // A1
+    peers.setNumberA(0, 1, 2.0);  // A2
+    EXPECT_GT(peers.exchangeAtoB(), 0u);
+
+    FillResult fill = fillRange(peers.wb_a.get(), peers.sheet_a, 0, 0, 0, 1, 0, 0, 0, 4);
+    ASSERT_TRUE(fill.success);
+    EXPECT_EQ(fill.cellsFilled, 3);  // A3,A4,A5
+
+    const auto ops = peers.newOpsA();
+    EXPECT_EQ(applyOperations(*peers.wb_b, ops), ops.size());
+
+    EXPECT_EQ(cellRawAt(peers.sheet_b, 0, 0).value_or(""), "1");
+    EXPECT_EQ(cellRawAt(peers.sheet_b, 0, 1).value_or(""), "2");
+    EXPECT_EQ(cellRawAt(peers.sheet_b, 0, 2).value_or(""), "3");
+    EXPECT_EQ(cellRawAt(peers.sheet_b, 0, 3).value_or(""), "4");
+    EXPECT_EQ(cellRawAt(peers.sheet_b, 0, 4).value_or(""), "5");
+}
+
+// Fill up into missing higher rows (toward row 1 from a mid seed).
+TEST(FillRangeCollabTest, FillUp_SyncsFilledCellsToPeer) {
+    PeerPair peers = PeerPair::create();
+
+    peers.setNumberA(0, 4, 7.0);  // A5 = 7
+    EXPECT_GT(peers.exchangeAtoB(), 0u);
+
+    // Source A5, target A1:A5 → fill up into A1..A4
+    FillResult fill = fillRange(peers.wb_a.get(), peers.sheet_a, 0, 4, 0, 4, 0, 0, 0, 4);
+    ASSERT_TRUE(fill.success);
+    EXPECT_EQ(fill.cellsFilled, 4);
+
+    const auto ops = peers.newOpsA();
+    EXPECT_EQ(applyOperations(*peers.wb_b, ops), ops.size());
+
+    for (uint32_t row = 0; row <= 4; ++row) {
+        auto val = cellRawAt(peers.sheet_b, 0, row);
+        ASSERT_TRUE(val.has_value()) << "missing A" << (row + 1);
+        EXPECT_EQ(*val, "7");
+    }
 }
 
 }  // namespace
