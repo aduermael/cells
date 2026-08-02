@@ -715,8 +715,7 @@ TEST(FillRangeCollabTest, FillDown_SyncsFilledCellsToPeer) {
 
     // Exchange fill ops A → B — every op must apply (no INVALID_TARGET)
     applied = applyOperations(*peers.wb_b, fillOps);
-    EXPECT_EQ(applied, fillOps.size())
-        << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
+    EXPECT_EQ(applied, fillOps.size()) << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
     peers.markOpsConsumed();
 
     // After exchange, peer B must have filled values at B2..B10
@@ -744,8 +743,7 @@ TEST(FillRangeCollabTest, FillThenPeerSet_SingleValueAtPosition) {
     // Fill must fully apply on B (including axes)
     const auto fillOps = peers.newOpsA();
     const size_t appliedFill = applyOperations(*peers.wb_b, fillOps);
-    EXPECT_EQ(appliedFill, fillOps.size())
-        << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
+    EXPECT_EQ(appliedFill, fillOps.size()) << "peer B must apply all fill ops (ROW_SET + CELL_SET)";
     peers.markOpsConsumed();
 
     // B9 (col 1, row 8) is 10 on both after fill
