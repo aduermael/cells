@@ -89,6 +89,13 @@ public:
     std::string loadFromCSV(const std::string& content, char delimiter, bool hasHeader);
     std::string loadFromXLSXDataPtr(uintptr_t ptr, size_t size);
 
+    // In-document import (keeps current Workbook / SyncClient). mode: "into_current" |
+    // "replace" | "new_sheet". Single-sheet sources only for xlsx (errors if multi-sheet).
+    std::string importSheetFromCSV(const std::string& content, char delimiter, bool hasHeader,
+                                   const std::string& mode);
+    std::string importSheetFromXLSXDataPtr(uintptr_t ptr, size_t size, const std::string& mode);
+    bool isActiveSheetEmpty() const;
+
     // ========================================================================
     // Sheet info methods (bindings_core.cc)
     // ========================================================================

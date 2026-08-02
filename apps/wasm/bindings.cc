@@ -96,6 +96,10 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("loadFromCells", &cells::wasm::CellsEngine::loadFromCells)
         .function("loadFromCSV", &cells::wasm::CellsEngine::loadFromCSV)
         .function("loadFromXLSXDataPtr", &cells::wasm::CellsEngine::loadFromXLSXDataPtr)
+        .function("importSheetFromCSV", &cells::wasm::CellsEngine::importSheetFromCSV)
+        .function("importSheetFromXLSXDataPtr",
+                  &cells::wasm::CellsEngine::importSheetFromXLSXDataPtr)
+        .function("isActiveSheetEmpty", &cells::wasm::CellsEngine::isActiveSheetEmpty)
         // Sheet info
         .function("getSheetInfo", &cells::wasm::CellsEngine::getSheetInfo)
         .function("getSheetCount", &cells::wasm::CellsEngine::getSheetCount)

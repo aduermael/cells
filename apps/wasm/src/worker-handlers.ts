@@ -147,6 +147,79 @@ export function handleLoad(
     }
 }
 
+/**
+ * Import a single-sheet file into the current workbook via CRDT (no Workbook swap).
+ * mode: "into_current" | "replace" | "new_sheet"
+ */
+export function handleImportSheet(
+    engine: CellsEngine,
+    Module: CellsModule,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const format = params.format as string;
+    const mode = (params.mode as string) || "into_current";
+    let result: JsonResult;
+
+    if (format === "csv") {
+        const content = decodeWithEncodingDetection(params.data as ArrayBuffer);
+        const delimiterCode = params.delimiter
+            ? (params.delimiter as string).charCodeAt(0)
+            : 0;
+        const hasHeader = params.hasHeader !== false;
+        try {
+            result = JSON.parse(
+                engine.importSheetFromCSV(content, delimiterCode, hasHeader, mode),
+            ) as JsonResult;
+        } catch (e) {
+            const err = e instanceof Error ? e.message : String(e);
+            respond({ type: "error", error: `CSV import failed: ${err}` });
+            return;
+        }
+    } else if (format === "xlsx") {
+        const bytes = new Uint8Array(params.data as ArrayBuffer);
+        const ptr = Module._malloc(bytes.length);
+        Module.HEAPU8.set(bytes, ptr);
+        result = JSON.parse(
+            engine.importSheetFromXLSXDataPtr(ptr, bytes.length, mode),
+        ) as JsonResult;
+        Module._free(ptr);
+    } else {
+        respond({ type: "error", error: "Import supports csv/xlsx only" });
+        return;
+    }
+
+    if (result.error) {
+        respond({
+            type: "error",
+            error: result.error as string,
+            sheetCount: result.sheetCount as number | undefined,
+        });
+        return;
+    }
+
+    const sheetCount = engine.getSheetCount();
+    const sheetNames: string[] = [];
+    for (let i = 0; i < sheetCount; i++) {
+        sheetNames.push(engine.getSheetName(i));
+    }
+    respond({
+        type: "imported",
+        sheetCount,
+        sheetNames,
+        activeSheetIndex: result.activeSheetIndex as number,
+        ops: result.ops as number,
+    });
+}
+
+export function handleIsActiveSheetEmpty(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    respond({ type: "activeSheetEmpty", empty: engine.isActiveSheetEmpty() });
+}
+
 export function handleExport(
     engine: CellsEngine,
     Module: CellsModule,

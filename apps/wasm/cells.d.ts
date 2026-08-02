@@ -383,6 +383,26 @@ declare module 'cells-wasm' {
      */
     loadFromXLSXData(data: string): string;
 
+    /**
+     * Import CSV into the current workbook via CRDT (no Workbook swap).
+     * @param mode - "into_current" | "replace" | "new_sheet"
+     */
+    importSheetFromCSV(
+        content: string,
+        delimiter: number,
+        hasHeader: boolean,
+        mode: string,
+    ): string;
+
+    /**
+     * Import single-sheet XLSX into the current workbook via CRDT.
+     * @param mode - "into_current" | "replace" | "new_sheet"
+     */
+    importSheetFromXLSXDataPtr(ptr: number, length: number, mode: string): string;
+
+    /** True when the active sheet has no columns/rows/cells */
+    isActiveSheetEmpty(): boolean;
+
     // ========================================================================
     // Sheet info methods
     // ========================================================================

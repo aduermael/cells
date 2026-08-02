@@ -276,6 +276,72 @@ export async function showConfirm(options: ModalOptions): Promise<boolean> {
   return ModalManager.getInstance().show(options);
 }
 
+/** Result of the import-into-sheet choice dialog */
+export type ImportSheetChoice = "replace" | "new_sheet" | "cancel";
+
+/**
+ * Prompt when dropping a file onto a non-empty sheet.
+ * Three actions: replace current, load as new sheet, or cancel.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function showImportSheetChoice(fileLabel: string): Promise<ImportSheetChoice> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.innerHTML = `
+      <div class="modal-header">
+        <h2 class="modal-title">Import ${escapeHtml(fileLabel)}</h2>
+      </div>
+      <div class="modal-body">
+        The current sheet is not empty. How should this file be imported?
+      </div>
+      <div class="modal-footer modal-footer-stack">
+        <button class="btn btn-primary" type="button" data-choice="replace">Replace current sheet</button>
+        <button class="btn" type="button" data-choice="new_sheet">Load in new sheet</button>
+        <button class="btn" type="button" data-choice="cancel">Cancel</button>
+      </div>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add("visible"));
+
+    const finish = (choice: ImportSheetChoice) => {
+      overlay.classList.remove("visible");
+      setTimeout(() => overlay.remove(), 150);
+      document.removeEventListener("keydown", onKey);
+      resolve(choice);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish("cancel");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    modal.querySelectorAll("[data-choice]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const choice = (btn as HTMLElement).dataset.choice as ImportSheetChoice;
+        finish(choice || "cancel");
+      });
+    });
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) finish("cancel");
+    });
+    (modal.querySelector("[data-choice=replace]") as HTMLButtonElement | null)?.focus();
+  });
+}
+
 /**
  * Get the singleton modal manager instance
  */

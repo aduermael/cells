@@ -504,10 +504,48 @@ canvas {
     align-items: center;
     justify-content: center;
     z-index: 200;
+    pointer-events: none;
 }
 
 #drop-zone.visible {
     display: flex;
+    pointer-events: auto;
+}
+
+/* Top-left: open as new document (same as Open button) */
+#drop-zone-new-doc {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 168px;
+    padding: 12px 14px;
+    background: var(--color-bg-primary);
+    border: 2px dashed var(--color-text-muted);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 12px var(--color-shadow);
+    text-align: left;
+    pointer-events: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+#drop-zone-new-doc.drop-target-active {
+    border-color: var(--color-primary);
+    background: rgba(5, 134, 1, 0.12);
+}
+
+#drop-zone-new-doc strong {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-primary);
+}
+
+#drop-zone-new-doc #drop-zone-new-doc-hint:not([hidden]) {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+    font-weight: normal;
 }
 
 #drop-zone-content {
@@ -521,12 +559,7 @@ canvas {
 #drop-zone-content h2 {
     font-size: 18px;
     color: var(--color-primary);
-    margin-bottom: 8px;
-}
-
-#drop-zone-content p {
-    font-size: 13px;
-    color: var(--color-text-muted);
+    margin: 0;
 }
 
 /* Empty State */
@@ -2501,8 +2534,30 @@ canvas {
     padding: 0 24px 20px;
 }
 
+.modal-footer-stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+/* Full-width stacked actions: avoid .btn fixed height + padding clash */
+.modal-footer-stack .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: auto;
+    min-height: 36px;
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 1.3;
+    white-space: normal;
+    text-align: center;
+    box-sizing: border-box;
+}
+
 /* Modal buttons use .btn and .btn.btn-primary with padding/font override */
-.modal-footer .btn {
+.modal-footer:not(.modal-footer-stack) .btn {
     padding: 8px 16px;
     font-size: 13px;
     border-radius: var(--border-radius);

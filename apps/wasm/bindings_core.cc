@@ -2239,6 +2239,8 @@ std::string CellsEngine::getNamedRanges() {
 // ============================================================================
 
 void CellsEngine::createEmptyWorkbook() {
+    // New document: tear down collab before replacing Workbook under SyncClient.
+    disableSync();
     _workbook = std::make_unique<Workbook>(generate_id(), "Untitled");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
     _workbook->addSheet(std::move(sheet));

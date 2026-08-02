@@ -30,6 +30,14 @@ export interface CellsEngine {
     loadFromCells(content: string): string;
     loadFromCSV(content: string, delimiter: number, hasHeader: boolean): string;
     loadFromXLSXDataPtr(ptr: number, length: number): string;
+    importSheetFromCSV(
+        content: string,
+        delimiter: number,
+        hasHeader: boolean,
+        mode: string,
+    ): string;
+    importSheetFromXLSXDataPtr(ptr: number, length: number, mode: string): string;
+    isActiveSheetEmpty(): boolean;
 
     // Sheet info
     getSheetInfo(): string;

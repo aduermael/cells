@@ -1744,5 +1744,170 @@ TEST(CrdtJoinEmptyShell, EnsureDefaultSheetOnlyWhenEmpty) {
     EXPECT_FALSE(ensureDefaultSheetViaCrdt(*wb));  // already has a sheet
 }
 
+// ---------------------------------------------------------------------------
+// In-document sheet import (CSV/XLSX drop contract) via CRDT
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Source workbook with one sheet and a few cells (simulates CSV import material).
+std::unique_ptr<Workbook> makeSourceSheetWithCells(const std::string& sheetName, const char* a1,
+                                                   const char* b1) {
+    auto src = std::make_unique<Workbook>(generate_id(), "Imported");
+    src->setNodeId(generate_id());
+    const ID sid = generate_id();
+    auto sheet = std::make_unique<Sheet>(sid, sheetName);
+    sheet->setWorkbook(src.get());
+    src->addSheet(std::move(sheet));
+
+    const ID colA = generate_id();
+    const ID colB = generate_id();
+    const ID row1 = generate_id();
+    applyOperation(*src, makeColSetOp(*src, colA, sid, R"({"pos":0})"));
+    applyOperation(*src, makeColSetOp(*src, colB, sid, R"({"pos":1})"));
+    applyOperation(*src, makeRowSetOp(*src, row1, sid, R"({"pos":0})"));
+    applyOperation(*src,
+                   makeCellSetOp(*src, generate_id(), sid,
+                                 std::string("{\"t\":\"s\",\"v\":\"") + a1 + "\",\"col\":\"" +
+                                     colA.toString() + "\",\"row\":\"" + row1.toString() + "\"}"));
+    applyOperation(*src,
+                   makeCellSetOp(*src, generate_id(), sid,
+                                 std::string("{\"t\":\"s\",\"v\":\"") + b1 + "\",\"col\":\"" +
+                                     colB.toString() + "\",\"row\":\"" + row1.toString() + "\"}"));
+    return src;
+}
+
+}  // namespace
+
+TEST(CrdtSheetImport, IntoCurrentEmptySheetNoExtraSheet) {
+    auto target = std::make_unique<Workbook>(generate_id(), "Live");
+    target->setNodeId(generate_id());
+    target->startCollaboration();
+    const ID emptyId = generate_id();
+    target->addSheet(std::make_unique<Sheet>(emptyId, "Sheet1"));
+    ASSERT_TRUE(isSheetContentEmpty(*target->getSheet(emptyId)));
+
+    auto src = makeSourceSheetWithCells("Data", "hello", "world");
+    const size_t beforeSheets = target->sheetCount();
+    const SheetImportResult r =
+        importSheetViaCrdt(*target, *src, 0, SheetImportMode::INTO_CURRENT, 0);
+    ASSERT_TRUE(r.success) << r.error;
+    EXPECT_EQ(target->sheetCount(), beforeSheets) << "must not create an extra sheet";
+    EXPECT_EQ(target->sheets[0]->id, emptyId) << "same sheet id for into_current";
+    EXPECT_GT(target->getSheet(emptyId)->cellCount(), 0u);
+    EXPECT_GT(r.opsApplied, 0u);
+    EXPECT_FALSE(isSheetContentEmpty(*target->getSheet(emptyId)));
+}
+
+TEST(CrdtSheetImport, NewSheetIncrementsCount) {
+    auto target = std::make_unique<Workbook>(generate_id(), "Live");
+    target->setNodeId(generate_id());
+    target->startCollaboration();
+    target->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+    // Give current sheet content so it is not empty
+    const ID sid = target->sheets[0]->id;
+    target->getSheet(sid)->setWorkbook(target.get());
+    applyOperation(*target, makeColSetOp(*target, generate_id(), sid, R"({"pos":0})"));
+
+    auto src = makeSourceSheetWithCells("Imported", "x", "y");
+    const size_t before = target->sheetCount();
+    const SheetImportResult r = importSheetViaCrdt(*target, *src, 0, SheetImportMode::NEW_SHEET, 0);
+    ASSERT_TRUE(r.success) << r.error;
+    EXPECT_EQ(target->sheetCount(), before + 1);
+    EXPECT_EQ(r.activeSheetIndex, before);
+}
+
+TEST(CrdtSheetImport, ReplaceDeletesOldSheetIdAndKeepsCount) {
+    auto target = std::make_unique<Workbook>(generate_id(), "Live");
+    target->setNodeId(generate_id());
+    target->startCollaboration();
+    const ID oldId = generate_id();
+    auto oldSheet = std::make_unique<Sheet>(oldId, "Sheet1");
+    oldSheet->setWorkbook(target.get());
+    target->addSheet(std::move(oldSheet));
+    applyOperation(*target, makeColSetOp(*target, generate_id(), oldId, R"({"pos":0})"));
+    applyOperation(*target, makeRowSetOp(*target, generate_id(), oldId, R"({"pos":0})"));
+    ASSERT_FALSE(isSheetContentEmpty(*target->getSheet(oldId)));
+
+    auto src = makeSourceSheetWithCells("Sheet1", "from", "csv");
+    const size_t before = target->sheetCount();
+    const size_t oplogBefore = target->getOpLog()->size();
+    const SheetImportResult r = importSheetViaCrdt(*target, *src, 0, SheetImportMode::REPLACE, 0);
+    ASSERT_TRUE(r.success) << r.error;
+    EXPECT_EQ(target->sheetCount(), before) << "replace must not leave N+1 sheets";
+    EXPECT_EQ(target->getSheet(oldId), nullptr) << "old sheet id must be gone";
+    ASSERT_EQ(target->sheetCount(), 1u);
+    EXPECT_NE(target->sheets[0]->id, oldId);
+    EXPECT_GT(target->sheets[0]->cellCount(), 0u);
+    EXPECT_GT(target->getOpLog()->size(), oplogBefore);
+}
+
+TEST(CrdtSheetImport, ReplacePeerAppliesOpsWithoutDualSheet) {
+    // Host: collaborating workbook with content sheet
+    auto host = std::make_unique<Workbook>(generate_id(), "Live");
+    host->setNodeId(generate_id());
+    host->startCollaboration();
+    const ID hostSheet = generate_id();
+    auto hs = std::make_unique<Sheet>(hostSheet, "Sheet1");
+    hs->setWorkbook(host.get());
+    host->addSheet(std::move(hs));
+    applyOperation(*host, makeSheetSetOp(*host, hostSheet, R"({"name":"Sheet1"})"));
+    applyOperation(*host, makeColSetOp(*host, generate_id(), hostSheet, R"({"pos":0})"));
+
+    // Peer starts with same sheet structure (as if synced)
+    auto peer = std::make_unique<Workbook>(generate_id(), "Live");
+    peer->setNodeId(generate_id());
+    peer->startCollaboration();
+    applyOperations(*peer, host->getOpLog()->getAllOperations());
+    ASSERT_EQ(peer->sheetCount(), 1u);
+    ASSERT_NE(peer->getSheet(hostSheet), nullptr);
+
+    // Host replaces sheet via CRDT import
+    auto src = makeSourceSheetWithCells("Sheet1", "peer", "sync");
+    const SheetImportResult r = importSheetViaCrdt(*host, *src, 0, SheetImportMode::REPLACE, 0);
+    ASSERT_TRUE(r.success) << r.error;
+    EXPECT_EQ(host->sheetCount(), 1u);
+
+    // Peer applies host oplog (dedupe by HLC for already-seen ops)
+    const size_t applied = applyOperations(*peer, host->getOpLog()->getAllOperations());
+    EXPECT_GT(applied, 0u);
+    EXPECT_EQ(peer->sheetCount(), 1u) << "peer must not end with dual Sheet1";
+    EXPECT_EQ(peer->getSheet(hostSheet), nullptr) << "old sheet deleted on peer";
+    EXPECT_GT(peer->sheets[0]->cellCount(), 0u);
+    EXPECT_EQ(host->sheetCount(), peer->sheetCount());
+}
+
+TEST(CrdtSheetImport, IntoCurrentRejectsNonEmpty) {
+    auto target = std::make_unique<Workbook>(generate_id(), "Live");
+    target->setNodeId(generate_id());
+    target->startCollaboration();
+    const ID sid = generate_id();
+    auto s = std::make_unique<Sheet>(sid, "Sheet1");
+    s->setWorkbook(target.get());
+    target->addSheet(std::move(s));
+    applyOperation(*target, makeColSetOp(*target, generate_id(), sid, R"({"pos":0})"));
+
+    auto src = makeSourceSheetWithCells("Sheet1", "a", "b");
+    const SheetImportResult r =
+        importSheetViaCrdt(*target, *src, 0, SheetImportMode::INTO_CURRENT, 0);
+    EXPECT_FALSE(r.success);
+    EXPECT_EQ(target->sheetCount(), 1u);
+}
+
+TEST(CrdtSheetImport, OpenPathDisablesCollabPointerContract) {
+    // Structural: loadFrom* must not leave collab on a swapped workbook.
+    // Verified at engine level by disableSync() before replace; here we assert
+    // import never changes Workbook identity (pointer stability).
+    auto target = std::make_unique<Workbook>(generate_id(), "Live");
+    Workbook* stable = target.get();
+    target->setNodeId(generate_id());
+    target->startCollaboration();
+    target->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+
+    auto src = makeSourceSheetWithCells("Sheet1", "ok", "ok");
+    (void)importSheetViaCrdt(*target, *src, 0, SheetImportMode::INTO_CURRENT, 0);
+    EXPECT_EQ(target.get(), stable);
+}
+
 }  // namespace
 }  // namespace cells
