@@ -6,6 +6,26 @@
 
 package(default_visibility = ["//visibility:public"])
 
+# MSVC rejects GCC-style -std= and -Wno-* flags; use platform selects.
+_CXX17 = select({
+    "@platforms//os:windows": ["/std:c++17"],
+    "//conditions:default": ["-std=c++17"],
+})
+
+_CXX11 = select({
+    "@platforms//os:windows": ["/std:c++11"],
+    "//conditions:default": ["-std=c++11"],
+})
+
+# GCC/Clang-only warning suppressions for upstream Luau sources.
+_GCC_WARN_UNUSED = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": [
+        "-Wno-unused-variable",
+        "-Wno-unused-but-set-variable",
+    ],
+})
+
 # Common utilities shared across Luau components
 cc_library(
     name = "luau_common",
@@ -14,8 +34,8 @@ cc_library(
         "Common/src/TimeTrace.cpp",
     ],
     hdrs = glob(["Common/include/Luau/*.h"]),
+    copts = _CXX17,
     includes = ["Common/include"],
-    copts = ["-std=c++17"],
 )
 
 # Abstract Syntax Tree representation
@@ -32,8 +52,8 @@ cc_library(
         "Ast/src/PrettyPrinter.cpp",
     ],
     hdrs = glob(["Ast/include/Luau/*.h"]),
+    copts = _CXX17,
     includes = ["Ast/include"],
-    copts = ["-std=c++17"],
     deps = [":luau_common"],
 )
 
@@ -57,14 +77,10 @@ cc_library(
         "Compiler/include/luacode.h",
         "Compiler/src/*.h",
     ]),
+    copts = _CXX17 + _GCC_WARN_UNUSED,
     includes = [
         "Compiler/include",
         "Compiler/src",
-    ],
-    copts = [
-        "-std=c++17",
-        # Suppress warnings in upstream Luau code we don't control
-        "-Wno-unused-but-set-variable",
     ],
     deps = [":luau_ast"],
 )
@@ -112,11 +128,11 @@ cc_library(
         "VM/include/*.h",
         "VM/src/*.h",
     ]),
+    copts = _CXX11,
     includes = [
         "VM/include",
         "VM/src",
     ],
-    copts = ["-std=c++11"],
     deps = [":luau_common"],
 )
 
@@ -129,8 +145,8 @@ cc_library(
         "Config/src/LuauConfig.cpp",
     ],
     hdrs = glob(["Config/include/Luau/*.h"]),
+    copts = _CXX17,
     includes = ["Config/include"],
-    copts = ["-std=c++17"],
     deps = [
         ":luau_ast",
         ":luau_compiler",
@@ -146,13 +162,8 @@ cc_library(
         "Analysis/src/*.h",
     ]),
     hdrs = glob(["Analysis/include/Luau/*.h"]),
+    copts = _CXX17 + _GCC_WARN_UNUSED,
     includes = ["Analysis/include"],
-    copts = [
-        "-std=c++17",
-        # Suppress warnings in upstream Luau code we don't control
-        "-Wno-unused-variable",
-        "-Wno-unused-but-set-variable",
-    ],
     deps = [
         ":luau_ast",
         ":luau_compiler",

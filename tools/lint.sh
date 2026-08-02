@@ -98,7 +98,7 @@ done
 # Test files (_test.cc) are excluded because they depend on external test
 # framework headers (gtest) that aren't available to clang-tidy
 # Native files (core/net/native/) are excluded because they depend on
-# libdatachannel headers built by cmake (not available to clang-tidy)
+# libdatachannel is pure Bazel; headers live in the external repo checkout
 if [ ${#FILES[@]} -eq 0 ]; then
     while IFS= read -r -d '' file; do
         FILES+=("$file")

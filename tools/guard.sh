@@ -37,16 +37,9 @@ fi
 export REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
 export SCRIPT_DIR="$REPO_ROOT/tools"
 
-# Append preinstalled foreign_cc toolchains when system cmake+ninja exist.
-# Safe under `set -u` on macOS bash 3.2 (empty "${arr[@]}" is unbound there).
-# Usage: bazel build //apps/cli:cells $(foreign_cc_toolchain_args)
-# (unquoted command substitution is intentional — args have no spaces)
+# Historical no-op: libdatachannel is pure Bazel (no rules_foreign_cc).
+# Kept so existing call sites `$(foreign_cc_toolchain_args)` stay valid.
+# Safe under `set -u` on macOS bash 3.2 (empty expansion is unbound there).
 foreign_cc_toolchain_args() {
-  if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
-    printf '%s ' \
-      --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain \
-      --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain \
-      --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain \
-      --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain
-  fi
+  :
 }

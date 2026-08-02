@@ -1,9 +1,7 @@
 // Default (stub) WebSocket implementation
-// Used for platforms without native WebSocket support
-// Note: Apple has a native implementation but it requires objc_library, so for now
-// we fall back to stub on macOS as well when building with cc_library
+// Used for platforms without a real backend (Windows uses WinHTTP; Linux libdatachannel).
 
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 
 #include "core/net/include/WSConnection.h"
 
@@ -38,4 +36,4 @@ std::unique_ptr<WSConnection> WSConnection::make(const std::string& scheme, cons
 
 }  // namespace cells::net
 
-#endif  // !__EMSCRIPTEN__
+#endif  // !__EMSCRIPTEN__ && !_WIN32

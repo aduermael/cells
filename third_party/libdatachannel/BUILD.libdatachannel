@@ -1,53 +1,284 @@
-# BUILD file for libdatachannel
+# BUILD file for libdatachannel (pure Bazel cc_library graph)
 # https://github.com/paullouisageneau/libdatachannel - MPL 2.0 License
 #
-# This uses rules_foreign_cc cmake() rule to build libdatachannel
-# with its submodules (libjuice, usrsctp, plog).
+# Builds libdatachannel + bundled plog, libjuice, and usrsctp as cc_library
+# targets (same pattern as third_party/luau). OpenSSL comes from BCR as a
+# normal CcInfo dep — avoids CMake FindOpenSSL staging issues on Windows MSVC
+# while keeping one graph for macOS, Linux, and Windows.
+#
+# Feature parity with the previous foreign CMake configuration:
+#   NO_MEDIA=ON, NO_WEBSOCKET=OFF, USE_GNUTLS=OFF, USE_NICE=OFF,
+#   PREFER_SYSTEM_LIB=OFF, BUILD_SHARED_LIBS=OFF
 
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+package(default_visibility = ["//visibility:public"])
 
-filegroup(
-    name = "all_srcs",
-    srcs = glob(["**"]),
+# GCC/Clang vs MSVC language standards
+_C11 = select({
+    "@platforms//os:windows": [],  # MSVC defaults are fine for C11-ish sources
+    "//conditions:default": ["-std=c11"],
+})
+
+_CXX17 = select({
+    "@platforms//os:windows": ["/std:c++17"],
+    "//conditions:default": ["-std=c++17"],
+})
+
+# Windows OS defines used by libdatachannel / juice / usrsctp
+_WIN_LOCAL_DEFINES = select({
+    "@platforms//os:windows": [
+        "WIN32_LEAN_AND_MEAN",
+        "NOMINMAX",
+        "_CRT_SECURE_NO_WARNINGS",
+    ],
+    "//conditions:default": [],
+})
+
+# System libs required when linking static juice/usrsctp/libdc + OpenSSL
+_WIN_LINKOPTS = select({
+    "@platforms//os:windows": [
+        "ws2_32.lib",
+        "bcrypt.lib",
+        "crypt32.lib",
+        "iphlpapi.lib",
+        "advapi32.lib",
+        "user32.lib",
+    ],
+    "//conditions:default": [],
+})
+
+_USRSCTP_OS_DEFINES = select({
+    "@platforms//os:linux": ["_GNU_SOURCE"],
+    "@platforms//os:macos": ["__APPLE_USE_RFC_2292"],
+    "@platforms//os:ios": ["__APPLE_USE_RFC_2292"],
+    "//conditions:default": [],
+})
+
+# -std=c11 enables strict ISO C and hides POSIX netdb/socket APIs on glibc
+# unless a feature-test macro is set. usrsctp already uses _GNU_SOURCE on Linux;
+# juice/libdc need the same on non-Windows for getaddrinfo, NI_*, etc.
+_POSIX_LOCAL_DEFINES = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": ["_GNU_SOURCE"],
+})
+
+# Silence a few noisy upstream warnings on GCC/Clang only
+_GCC_WARN = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": [
+        "-Wno-unused-parameter",
+        "-Wno-address-of-packed-member",
+        "-Wno-deprecated-declarations",
+    ],
+})
+
+# -----------------------------------------------------------------------------
+# plog (header-only logging used by libdatachannel)
+# -----------------------------------------------------------------------------
+cc_library(
+    name = "plog",
+    hdrs = glob(["deps/plog/include/**/*.h"]),
+    includes = ["deps/plog/include"],
 )
 
-cmake(
-    name = "libdatachannel",
-    # Build release by default
-    build_args = ["-j"],
-    cache_entries = {
-        # Disable features we don't need
-        "NO_MEDIA": "ON",           # No audio/video - we only need DataChannels
-        "NO_WEBSOCKET": "OFF",      # Keep WebSocket for signaling
-        # Use submodules (bundled), not system libs
-        "PREFER_SYSTEM_LIB": "OFF",
-        # Use OpenSSL for crypto
-        "USE_GNUTLS": "OFF",
-        "USE_MBEDTLS": "OFF",
-        # Use libjuice for ICE (default, lighter than libnice)
-        "USE_NICE": "OFF",
-        # Build static library for easier linking
-        "BUILD_SHARED_LIBS": "OFF",
-        # Build submodule libs as shared (so they install correctly)
-        "BUILD_SHARED_DEPS_LIBS": "OFF",
-        # Don't build examples/tests
-        "NO_EXAMPLES": "ON",
-        "NO_TESTS": "ON",
-    },
-    generate_args = ["-GNinja"],
-    lib_source = ":all_srcs",
-    # Static libs that get installed - main lib plus submodule dependencies
-    # Order matters: libdatachannel depends on libjuice and libusrsctp
-    out_static_libs = [
-        "libdatachannel.a",
-        "libjuice.a",
-        "libusrsctp.a",
+# -----------------------------------------------------------------------------
+# usrsctp (SCTP for WebRTC data channels) — userspace build, no kernel INET
+# -----------------------------------------------------------------------------
+cc_library(
+    name = "usrsctp",
+    srcs = [
+        "deps/usrsctp/usrsctplib/netinet/sctp_asconf.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_auth.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_bsd_addr.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_callout.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_cc_functions.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_crc32.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_indata.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_input.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_output.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_pcb.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_peeloff.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_sha1.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_ss_functions.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_sysctl.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_timer.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_userspace.c",
+        "deps/usrsctp/usrsctplib/netinet/sctp_usrreq.c",
+        "deps/usrsctp/usrsctplib/netinet/sctputil.c",
+        "deps/usrsctp/usrsctplib/netinet6/sctp6_usrreq.c",
+        "deps/usrsctp/usrsctplib/user_environment.c",
+        "deps/usrsctp/usrsctplib/user_mbuf.c",
+        "deps/usrsctp/usrsctplib/user_recv_thread.c",
+        "deps/usrsctp/usrsctplib/user_socket.c",
+    ] + glob([
+        "deps/usrsctp/usrsctplib/**/*.h",
+    ]),
+    hdrs = ["deps/usrsctp/usrsctplib/usrsctp.h"],
+    copts = _C11 + _GCC_WARN,
+    includes = ["deps/usrsctp/usrsctplib"],
+    linkopts = select({
+        "@platforms//os:windows": [
+            "ws2_32.lib",
+            "iphlpapi.lib",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "__Userspace__",
+        "SCTP_SIMPLE_ALLOCATOR",
+        "SCTP_PROCESS_LEVEL_LOCKS",
+    ] + _USRSCTP_OS_DEFINES + _WIN_LOCAL_DEFINES,
+)
+
+# -----------------------------------------------------------------------------
+# libjuice (ICE / STUN / TURN) — bundled, not system
+# -----------------------------------------------------------------------------
+cc_library(
+    name = "juice",
+    srcs = [
+        "deps/libjuice/src/addr.c",
+        "deps/libjuice/src/agent.c",
+        "deps/libjuice/src/base64.c",
+        "deps/libjuice/src/conn.c",
+        "deps/libjuice/src/conn_mux.c",
+        "deps/libjuice/src/conn_poll.c",
+        "deps/libjuice/src/conn_thread.c",
+        "deps/libjuice/src/const_time.c",
+        "deps/libjuice/src/crc32.c",
+        "deps/libjuice/src/hash.c",
+        "deps/libjuice/src/hmac.c",
+        "deps/libjuice/src/ice.c",
+        "deps/libjuice/src/juice.c",
+        "deps/libjuice/src/log.c",
+        "deps/libjuice/src/random.c",
+        "deps/libjuice/src/server.c",
+        "deps/libjuice/src/stun.c",
+        "deps/libjuice/src/tcp.c",
+        "deps/libjuice/src/timestamp.c",
+        "deps/libjuice/src/turn.c",
+        "deps/libjuice/src/udp.c",
+    ] + glob([
+        "deps/libjuice/src/*.h",
+    ]),
+    hdrs = glob(["deps/libjuice/include/**/*.h"]),
+    copts = _C11 + _GCC_WARN,
+    defines = ["JUICE_STATIC"],
+    # Public: juice/juice.h; also include/juice + src so upstream #include "juice.h" works
+    includes = [
+        "deps/libjuice/include",
+        "deps/libjuice/include/juice",
+        "deps/libjuice/src",
     ],
-    # Headers to expose
-    out_include_dir = "include",
-    # Build and install the static library
-    targets = ["datachannel-static", "install"],
-    visibility = ["//visibility:public"],
-    # Link against OpenSSL from BCR
-    deps = ["@openssl"],
+    linkopts = select({
+        "@platforms//os:windows": [
+            "ws2_32.lib",
+            "bcrypt.lib",
+        ],
+        "//conditions:default": ["-lpthread"],
+    }),
+    local_defines = [
+        "USE_NETTLE=0",
+    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES,
+)
+
+# -----------------------------------------------------------------------------
+# libdatachannel (WebRTC data channels + WebSocket; media disabled)
+# -----------------------------------------------------------------------------
+cc_library(
+    name = "libdatachannel",
+    srcs = [
+        # Public API sources
+        "src/av1rtppacketizer.cpp",
+        "src/candidate.cpp",
+        "src/capi.cpp",
+        "src/channel.cpp",
+        "src/configuration.cpp",
+        "src/datachannel.cpp",
+        "src/dependencydescriptor.cpp",
+        "src/description.cpp",
+        "src/global.cpp",
+        "src/h264rtpdepacketizer.cpp",
+        "src/h264rtppacketizer.cpp",
+        "src/h265nalunit.cpp",
+        "src/h265rtpdepacketizer.cpp",
+        "src/h265rtppacketizer.cpp",
+        "src/iceudpmuxlistener.cpp",
+        "src/mediahandler.cpp",
+        "src/message.cpp",
+        "src/nalunit.cpp",
+        "src/pacinghandler.cpp",
+        "src/peerconnection.cpp",
+        "src/plihandler.cpp",
+        "src/rembhandler.cpp",
+        "src/rtcpnackresponder.cpp",
+        "src/rtcpreceivingsession.cpp",
+        "src/rtcpsrreporter.cpp",
+        "src/rtp.cpp",
+        "src/rtpdepacketizer.cpp",
+        "src/rtppacketizationconfig.cpp",
+        "src/rtppacketizer.cpp",
+        "src/track.cpp",
+        "src/websocket.cpp",
+        "src/websocketserver.cpp",
+        # Implementation
+        "src/impl/certificate.cpp",
+        "src/impl/channel.cpp",
+        "src/impl/datachannel.cpp",
+        "src/impl/dtlssrtptransport.cpp",
+        "src/impl/dtlstransport.cpp",
+        "src/impl/http.cpp",
+        "src/impl/httpproxytransport.cpp",
+        "src/impl/icetransport.cpp",
+        "src/impl/iceudpmuxlistener.cpp",
+        "src/impl/init.cpp",
+        "src/impl/logcounter.cpp",
+        "src/impl/peerconnection.cpp",
+        "src/impl/pollinterrupter.cpp",
+        "src/impl/pollservice.cpp",
+        "src/impl/processor.cpp",
+        "src/impl/sctptransport.cpp",
+        "src/impl/sha.cpp",
+        "src/impl/tcptransport.cpp",
+        "src/impl/tcpserver.cpp",
+        "src/impl/threadpool.cpp",
+        "src/impl/tls.cpp",
+        "src/impl/tlstransport.cpp",
+        "src/impl/track.cpp",
+        "src/impl/transport.cpp",
+        "src/impl/utils.cpp",
+        "src/impl/verifiedtlstransport.cpp",
+        "src/impl/websocket.cpp",
+        "src/impl/websocketserver.cpp",
+        "src/impl/wshandshake.cpp",
+        "src/impl/wstransport.cpp",
+    ] + glob([
+        "src/**/*.hpp",
+        "src/**/*.h",
+    ]),
+    hdrs = glob(["include/rtc/**/*.h", "include/rtc/**/*.hpp"]),
+    copts = _CXX17 + _GCC_WARN,
+    defines = [
+        "RTC_STATIC",
+        "RTC_ENABLE_WEBSOCKET=1",
+        "RTC_ENABLE_MEDIA=0",
+    ],
+    includes = [
+        "include",
+        "include/rtc",
+        "src",
+    ],
+    linkopts = _WIN_LINKOPTS,
+    local_defines = [
+        "RTC_EXPORTS",
+        "USE_GNUTLS=0",
+        "USE_NICE=0",
+        "RTC_SYSTEM_JUICE=0",
+        "RTC_SYSTEM_SRTP=0",
+    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES,
+    deps = [
+        ":juice",
+        ":plog",
+        ":usrsctp",
+        "@openssl//:crypto",
+        "@openssl//:ssl",
+    ],
 )

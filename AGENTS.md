@@ -19,7 +19,7 @@ under an ignored path). Reviewers should not see plan files in the diff.
 **Format rules:**
 - **Title + optional body** — brief title (50 chars), optional bullet points
 - **Maximum 5 lines** — keep it brief
-- **Include "Co-Authored-By:" lines** — add `Co-Authored-By: Claude <noreply@anthropic.com>` at the end when an agent co-authored the change
+- **Do not add `Co-Authored-By:` trailers** (no Claude, Grok, or other agent attribution)
 
 ### Verification
 

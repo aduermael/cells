@@ -48,12 +48,11 @@ std::string json_escape(std::string_view s) {
 }
 
 std::string write_temp_output(std::string_view content) {
+#ifndef _WIN32
     const char* tmpdir = std::getenv("TMPDIR");
     if (tmpdir == nullptr || tmpdir[0] == '\0') {
         tmpdir = "/tmp";
     }
-
-#ifndef _WIN32
     std::string path_buf = std::string(tmpdir) + "/cells-out-XXXXXX";
     std::vector<char> tmpl(path_buf.begin(), path_buf.end());
     tmpl.push_back('\0');
@@ -76,6 +75,13 @@ std::string write_temp_output(std::string_view content) {
     }
     return path;
 #else
+    const char* tmpdir = std::getenv("TEMP");
+    if (tmpdir == nullptr || tmpdir[0] == '\0') {
+        tmpdir = std::getenv("TMP");
+    }
+    if (tmpdir == nullptr || tmpdir[0] == '\0') {
+        tmpdir = ".";
+    }
     std::string path = std::string(tmpdir) + "/cells-out-" + std::to_string(std::rand());
     std::ofstream out(path, std::ios::binary);
     if (!out) {

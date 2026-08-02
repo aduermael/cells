@@ -1,7 +1,7 @@
 // Linux/native HTTP request implementation using libcurl
 // Uses curl multi interface for async operations with a dedicated thread
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
 
 #include <cstring>
 
@@ -259,4 +259,4 @@ std::unique_ptr<HttpRequest> HttpRequest::make(HttpMethod method, const std::str
 
 }  // namespace cells::net
 
-#endif  // !__EMSCRIPTEN__ && !__APPLE__
+#endif  // !__EMSCRIPTEN__ && !__APPLE__ && !_WIN32

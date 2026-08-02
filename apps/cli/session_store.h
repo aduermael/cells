@@ -24,7 +24,7 @@ struct SessionMeta {
 
 // Resolve root directory for sessions.
 // Order: CELLS_SESSION_DIR env, else $XDG_RUNTIME_DIR/cells/sessions,
-// else $TMPDIR/cells-sessions-<uid>, else /tmp/cells-sessions-<uid>.
+// else $TMPDIR/cells-sessions-<uid> (Unix) / %TEMP%/cells-sessions (Windows).
 std::string session_root_dir();
 
 // Paths for a session id under root.

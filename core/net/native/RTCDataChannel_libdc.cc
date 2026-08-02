@@ -1,5 +1,5 @@
 // RTCDataChannel implementation using libdatachannel
-// For native platforms (macOS, Linux, etc.) - not emscripten
+// For native platforms (macOS, Linux, Windows, etc.) - not emscripten
 
 #if !defined(__EMSCRIPTEN__)
 

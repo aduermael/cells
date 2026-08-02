@@ -96,3 +96,26 @@ jobs:
 
       - name: Run vet
         run: ./tools/vet.sh
+
+  # Windows CLI build gate: full cells + cells-converter under MSVC
+  # (WinHTTP HTTP/WS + libdatachannel WebRTC link via the product binary).
+  # Net unit tests stay on Linux unit-tests job; not re-run here.
+  windows-cli:
+    name: Windows CLI
+    runs-on: windows-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-windows
+          repository-cache: true
+
+      # Single bazel invocation (multiple sequential bazel processes on Windows
+      # flakily fail with "Couldn't delete action output directory").
+      # cells_cli_build_test covers //apps/cli:cells and //apps/cli:cells-converter.
+      - name: Build cells CLI (and converter)
+        run: bazel test //apps/cli:cells_cli_build_test

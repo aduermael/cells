@@ -1,17 +1,24 @@
 #include "session_store.h"
 
 #include <cstdlib>
-#include <cstring>
 
 #include <chrono>
-#include <dirent.h>
+#include <filesystem>
 #include <fstream>
-#include <signal.h>
 #include <sstream>
-#include <sys/stat.h>
+#include <system_error>
+#include <vector>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <vector>
+#endif
 
 #include "output_spill.h"
 #include "session_protocol.h"
@@ -19,30 +26,18 @@
 namespace cells::cli {
 namespace {
 
+namespace fs = std::filesystem;
+
 bool mkdir_p(const std::string& path) {
     if (path.empty()) {
         return false;
     }
-    struct stat st {};
-    if (::stat(path.c_str(), &st) == 0) {
-        return S_ISDIR(st.st_mode);
+    std::error_code ec;
+    if (fs::is_directory(path, ec)) {
+        return true;
     }
-    // create parents
-    std::size_t pos = 1;
-    while (pos < path.size()) {
-        pos = path.find('/', pos);
-        std::string sub = (pos == std::string::npos) ? path : path.substr(0, pos);
-        if (::stat(sub.c_str(), &st) != 0) {
-            if (::mkdir(sub.c_str(), 0755) != 0 && errno != EEXIST) {
-                return false;
-            }
-        }
-        if (pos == std::string::npos) {
-            break;
-        }
-        ++pos;
-    }
-    return true;
+    fs::create_directories(path, ec);
+    return fs::is_directory(path, ec);
 }
 
 std::string read_file(const std::string& path) {
@@ -64,6 +59,23 @@ bool write_file(const std::string& path, const std::string& content) {
     return static_cast<bool>(out);
 }
 
+const char* default_temp_dir() {
+#ifdef _WIN32
+    if (const char* t = std::getenv("TEMP"); t != nullptr && t[0] != '\0') {
+        return t;
+    }
+    if (const char* t = std::getenv("TMP"); t != nullptr && t[0] != '\0') {
+        return t;
+    }
+    return ".";
+#else
+    if (const char* t = std::getenv("TMPDIR"); t != nullptr && t[0] != '\0') {
+        return t;
+    }
+    return "/tmp";
+#endif
+}
+
 }  // namespace
 
 std::string session_root_dir() {
@@ -77,12 +89,13 @@ std::string session_root_dir() {
             return std::string(xdg) + "/cells/sessions";
         }
     }
-    const char* tmp = std::getenv("TMPDIR");
-    if (tmp == nullptr || tmp[0] == '\0') {
-        tmp = "/tmp";
-    }
+    const char* tmp = default_temp_dir();
+#ifdef _WIN32
+    return std::string(tmp) + "/cells-sessions";
+#else
     uid_t uid = ::getuid();
     return std::string(tmp) + "/cells-sessions-" + std::to_string(static_cast<unsigned long>(uid));
+#endif
 }
 
 std::string session_dir(const std::string& root, const std::string& id) {
@@ -105,11 +118,7 @@ bool create_session_dir(const std::string& root, const std::string& id) {
     if (!mkdir_p(root)) {
         return false;
     }
-    std::string dir = session_dir(root, id);
-    if (::mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
-        return false;
-    }
-    return true;
+    return mkdir_p(session_dir(root, id));
 }
 
 std::string encode_session_meta(const SessionMeta& meta) {
@@ -169,36 +178,50 @@ bool process_alive(std::int64_t pid) {
     if (pid <= 0) {
         return false;
     }
+#ifdef _WIN32
+    HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (h == nullptr) {
+        return false;
+    }
+    DWORD exit_code = 0;
+    const bool alive = ::GetExitCodeProcess(h, &exit_code) && exit_code == STILL_ACTIVE;
+    ::CloseHandle(h);
+    return alive;
+#else
     return ::kill(static_cast<pid_t>(pid), 0) == 0;
+#endif
 }
 
 void remove_session_dir(const std::string& root, const std::string& id) {
-    std::string dir = session_dir(root, id);
-    // unlink known files then rmdir
-    ::unlink(session_socket_path(root, id).c_str());
-    ::unlink(session_meta_path(root, id).c_str());
-    ::unlink(session_pid_path(root, id).c_str());
-    ::rmdir(dir.c_str());
+    std::error_code ec;
+    fs::remove(session_socket_path(root, id), ec);
+    fs::remove(session_meta_path(root, id), ec);
+    fs::remove(session_pid_path(root, id), ec);
+    fs::remove(session_dir(root, id), ec);
 }
 
 std::vector<std::string> list_session_ids(const std::string& root) {
     std::vector<std::string> ids;
-    DIR* d = ::opendir(root.c_str());
-    if (d == nullptr) {
+    std::error_code ec;
+    if (!fs::is_directory(root, ec)) {
         return ids;
     }
-    while (dirent* ent = ::readdir(d)) {
-        if (ent->d_name[0] == '.') {
+    for (const auto& ent : fs::directory_iterator(root, ec)) {
+        if (ec) {
+            break;
+        }
+        if (!ent.is_directory(ec)) {
             continue;
         }
-        std::string id = ent->d_name;
-        std::string meta = session_meta_path(root, id);
-        struct stat st {};
-        if (::stat(meta.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+        const std::string id = ent.path().filename().string();
+        if (id.empty() || id[0] == '.') {
+            continue;
+        }
+        std::error_code meta_ec;
+        if (fs::is_regular_file(session_meta_path(root, id), meta_ec)) {
             ids.push_back(id);
         }
     }
-    ::closedir(d);
     return ids;
 }
 

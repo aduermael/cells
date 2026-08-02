@@ -36,13 +36,17 @@ The cells engine is designed for **web deployment only**. Native builds exist fo
 | Target | Compiler | Output | Use Case |
 |--------|----------|--------|----------|
 | WASM | Emscripten | cells_wasm.wasm + .js | Web application |
-| macOS | Clang | cells (binary) | CLI tool |
-| Linux | GCC/Clang | cells (binary) | CLI tool, CI |
+| macOS | Clang | cells (binary) | CLI tool (sync + session) |
+| Linux | GCC/Clang | cells (binary) | CLI tool (sync + session), CI |
+| Windows | MSVC | cells (binary) | CLI tool (sync; session stubbed) |
+
+Native networking third-party stack (all desktop OSes): **libdatachannel** is built as pure Bazel `cc_library` targets (plog, juice, usrsctp, libdatachannel) with BCR **OpenSSL** — same graph on macOS, Linux, and Windows. HTTP/WS remain OS-native (Foundation / curl / WinHTTP).
 
 Build commands (all via Bazel):
 - `bazel run :wasm-dist` - Build WASM and copy to dist/wasm/
 - `bazel run :cli` - Build and run native CLI (debug)
 - `bazel run :cli-release` - Build and run native CLI (release)
+- Windows: `bazelisk build //apps/cli:cells` → `bazel-bin/apps/cli/cells.exe`
 
 ## Web-Specific Architecture
 
