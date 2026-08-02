@@ -35,12 +35,12 @@ bazel_dep(name = "pugixml", version = "1.14")
 # Apple platform rules (for Objective-C++ support on macOS/iOS)
 bazel_dep(name = "rules_apple", version = "4.5.3")
 
-# rules_apple pulls rules_swift whose older Windows autoconfig hard-fails when
-# swiftc.exe is absent. 2.9.0+ treats that as optional (needed for Windows CI
-# of pure C++/WinHTTP targets that never use Swift).
+# rules_apple pulls rules_swift; pin a Bazel 9-compatible release:
+# - 2.9.0+ treats missing swiftc.exe as optional (Windows CI of pure C++ targets)
+# - 3.x loads CcInfo from rules_cc (native CcInfo was removed in Bazel 9)
 single_version_override(
     module_name = "rules_swift",
-    version = "2.9.0",
+    version = "3.6.1",
 )
 
 # Compile Commands Extractor (helly25 fork — upstream is unmaintained; Bazel 9
