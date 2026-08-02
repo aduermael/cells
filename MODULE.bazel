@@ -43,12 +43,14 @@ single_version_override(
     version = "2.9.0",
 )
 
-# Hedron's Compile Commands Extractor
+# Compile Commands Extractor (helly25 fork — upstream is unmaintained; Bazel 9
+# removed native py_binary, which breaks the hedronvision pin).
+# https://github.com/helly25/bazel-compile-commands-extractor
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    commit = "1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+    commit = "1f9360db1834d115c48279d38a97f30d64d3fd4a",
+    remote = "https://github.com/helly25/bazel-compile-commands-extractor.git",
 )
 
 # rules_perl - needed to define system Perl toolchain (transitive dep of openssl)
