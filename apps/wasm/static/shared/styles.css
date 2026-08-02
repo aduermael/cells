@@ -1595,7 +1595,7 @@ canvas {
     top: 100%;
     right: 0;
     margin-top: var(--spacing-xs);
-    width: 260px;
+    width: 240px;
     background: var(--color-bg-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
@@ -1608,7 +1608,7 @@ canvas {
         opacity 0.15s ease,
         transform 0.15s ease,
         visibility 0.15s ease;
-    padding: 16px;
+    padding: 14px;
 }
 
 .collab-status-badge.show-details .collab-status-details {
@@ -1617,17 +1617,13 @@ canvas {
     transform: translateY(0);
 }
 
-.collab-status-details-header {
-    display: none;
-}
-
 .collab-status-details-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 12px;
     color: var(--color-text-secondary);
-    padding: var(--spacing-xs) 0;
+    padding: 4px 0;
 }
 
 .collab-status-details-row .label {
@@ -1636,25 +1632,24 @@ canvas {
 
 .collab-status-details-row .value {
     font-weight: 500;
+    color: var(--color-text-primary);
 }
 
 .collab-status-details-peers {
-    margin-top: var(--spacing-sm);
-    padding-top: var(--spacing-sm);
-    border-top: 1px solid var(--color-border);
+    margin-top: 4px;
 }
 
 .collab-status-details-peers .peer-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: var(--spacing-xs) 0;
+    padding: 3px 0;
     font-size: 12px;
 }
 
 .collab-status-details-peers .peer-color {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
 }
@@ -1662,6 +1657,9 @@ canvas {
 .collab-status-details-peers .peer-name {
     color: var(--color-text-primary);
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Collaborate button - extends .btn.btn-icon */
@@ -1713,58 +1711,49 @@ canvas {
     transform: translateY(0);
 }
 
-/* Share section in modal */
+/* Share section */
 .collab-status-share-section {
-    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
 }
 
-.collab-agent-hint {
+.collab-skill-link {
     display: block;
-    font-size: var(--font-size-xs);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    margin: 0 0 var(--spacing-sm);
-    background: var(--color-bg-secondary);
-    border-radius: var(--border-radius);
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-.collab-agent-docs {
-    margin-bottom: var(--spacing-sm);
-}
-
-.collab-agent-docs a {
-    color: var(--color-primary);
-}
-
-.collab-share-description {
+    text-align: center;
     font-size: 12px;
     color: var(--color-text-muted);
-    margin: 0 0 12px 0;
-    line-height: 1.5;
-    text-align: center;
+    text-decoration: none;
+    transition: color var(--transition-fast);
 }
 
-/* Copy link button uses .btn.btn-primary.btn-block.btn-lg */
+.collab-skill-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
 
 /* Divider */
 .collab-status-details-divider {
     height: 1px;
     background: var(--color-border);
-    margin: 16px 0;
+    margin: 12px 0;
 }
 
-/* Name row styling */
+/* Name / nickname row */
 .collab-status-details-row.name-row {
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
+    padding-bottom: 2px;
 }
 
 .collab-status-details-row.name-row .label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
-    color: var(--color-text-secondary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
 }
 
 /* Inline name input */
@@ -1774,7 +1763,7 @@ canvas {
 
 .collab-name-edit-inline input {
     width: 100%;
-    padding: 8px 10px;
+    padding: 7px 10px;
     font-size: 13px;
     color: var(--color-text-primary);
     background: var(--color-bg-input);
@@ -1793,6 +1782,18 @@ canvas {
 
 .collab-name-edit-inline input::placeholder {
     color: var(--color-text-placeholder);
+}
+
+/* Version footer */
+.collab-status-details-version {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+    font-size: 11px;
+    color: var(--color-text-placeholder);
+    letter-spacing: 0.02em;
+    user-select: none;
 }
 
 /* Share tooltip */
@@ -1830,25 +1831,10 @@ canvas {
     border-color: transparent transparent #212529 transparent;
 }
 
-/* Latency warning style */
-.collab-status-details-row .value.poor {
-    color: var(--color-danger);
-    font-weight: 600;
-}
-
-/* Actions panel in status details */
-.collab-status-details-actions {
-    margin-top: var(--spacing-sm);
-    padding-top: var(--spacing-sm);
-    border-top: 1px solid var(--color-border);
-}
-
-/* Reconnect button uses .btn.btn-block */
-
 /* Debug section in status details */
 .collab-status-details-debug {
-    margin-top: 16px;
-    padding-top: 12px;
+    margin-top: 12px;
+    padding-top: 10px;
     border-top: 1px solid var(--color-border);
 }
 
@@ -1880,6 +1866,15 @@ canvas {
     flex-direction: column;
     gap: var(--spacing-xs);
     margin-top: var(--spacing-sm);
+}
+
+.collab-status-details-debug .debug-actions .collab-status-details-row {
+    padding: 2px 0 6px;
+}
+
+.collab-status-details-debug .debug-actions .value.poor {
+    color: var(--color-danger);
+    font-weight: 600;
 }
 
 /* Debug buttons use .btn.btn-sm.btn-block (and .btn-danger for danger variant) */
