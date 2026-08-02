@@ -1,5 +1,9 @@
 #include "core/cells/functions/fn_math.h"
 
+// MSVC only exposes M_PI / M_PI_2 / M_PI_4 when this is set before <cmath>.
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 
 #include <gtest/gtest.h>

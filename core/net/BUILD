@@ -17,6 +17,8 @@
 #
 # Apple objc_library targets are only selected on macOS/iOS.
 
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test", "objc_library")
+
 # Config settings for platform selection
 config_setting(
     name = "is_macos",

@@ -11,16 +11,17 @@ build:linux --cxxopt=-std=c++17
 
 # Windows-specific settings (MSVC)
 build:windows --cxxopt=/std:c++17
+# Bazel 9 defaults to manifest-only runfiles on Windows; unit tests that open
+# data paths like testdata/*.csv need a real runfiles tree under the binary.
+build:windows --enable_runfiles
 
 # WebAssembly (Emscripten) build configuration
-build:wasm --incompatible_enable_cc_toolchain_resolution
 build:wasm --cxxopt=-fexceptions
 build:wasm --linkopt=-fexceptions
 build:wasm --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING
 
 # WebAssembly debug build (includes DWARF for Chrome DevTools debugging)
 # See: https://developer.chrome.com/docs/devtools/wasm
-build:wasm-debug --incompatible_enable_cc_toolchain_resolution
 build:wasm-debug --cxxopt=-fexceptions
 build:wasm-debug --linkopt=-fexceptions
 build:wasm-debug --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING

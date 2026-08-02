@@ -54,7 +54,7 @@ This runs unit tests, lint, type checks, E2E tests, and formatter check.
 
 ### Directory Structure
 ```
-WORKSPACE                   # Bazel workspace root
+MODULE.bazel                # Bazel module root
 core/
 ├── BUILD                   # Bazel build file
 └── cells/                  # Main library
