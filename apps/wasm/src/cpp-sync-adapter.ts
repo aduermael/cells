@@ -23,6 +23,10 @@
 // =============================================================================
 
 import { generateRandomName, getColorForPeer } from "./presence";
+import {
+  loadStoredDisplayName,
+  saveStoredDisplayName,
+} from "./display-name";
 import type {
   PeerId,
   RoomId,
@@ -375,25 +379,37 @@ export class CppSyncAdapter {
   }
 
   private _loadOrGenerateName(): string {
-    const storageKey = "cells.displayName";
-    let name: string | null = null;
-
-    try {
-      name = sessionStorage.getItem(storageKey);
-    } catch {
-      // sessionStorage not available
+    // localStorage: nickname should survive restarts and match the collab UI.
+    // sessionStorage is only used as a migration source from older builds.
+    const { local, session } = this._nameStorage();
+    const stored = loadStoredDisplayName(local, session);
+    if (stored) {
+      return stored;
     }
 
-    if (!name) {
-      name = generateRandomName();
-      try {
-        sessionStorage.setItem(storageKey, name);
-      } catch {
-        // sessionStorage not available
-      }
-    }
-
+    const name = generateRandomName();
+    saveStoredDisplayName(name, local, session);
     return name;
+  }
+
+  /** Safe access to browser storage for nickname persistence. */
+  private _nameStorage(): {
+    local: Storage | null;
+    session: Storage | null;
+  } {
+    let local: Storage | null = null;
+    let session: Storage | null = null;
+    try {
+      local = localStorage;
+    } catch {
+      local = null;
+    }
+    try {
+      session = sessionStorage;
+    } catch {
+      session = null;
+    }
+    return { local, session };
   }
 
   private _generateId(): string {
@@ -692,11 +708,8 @@ export class CppSyncAdapter {
    */
   async setLocalName(name: string): Promise<void> {
     this._localName = name;
-    try {
-      sessionStorage.setItem("cells.displayName", name);
-    } catch {
-      // sessionStorage not available
-    }
+    const { local, session } = this._nameStorage();
+    saveStoredDisplayName(name, local, session);
     await this._client.setSyncLocalName(name);
     this._emitter.emit("localnamechanged", name);
   }

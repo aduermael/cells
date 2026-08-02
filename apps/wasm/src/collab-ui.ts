@@ -3,17 +3,19 @@
 // =============================================================================
 //
 // UI components for real-time collaboration: status indicator, share button,
-// peer avatars, and share link modal.
+// peer list, nickname, debug mode, and version footer.
 //
 // This is a UI-ONLY module. All data mutations go through CRDT operations
-// in the C++ core via the WASM bridge.
+// in the C++ core via the WASM bridge. Panel markup comes from
+// collab-menu-content.ts (pure, unit-tested).
 //
 // Key responsibilities:
 // - Status dot: shows connection state (connected/connecting/disconnected)
-// - Share button: opens share modal with room link
-// - Peer indicators: shows connected collaborators with color avatars
-// - Share modal: displays shareable link, allows name change
-// - Debug panel: shows sync stats, allows force reconnect
+// - Share button: copies room link
+// - Nickname input: local display name
+// - Status / peers: connection state and remote collaborators
+// - Debug mode: export debug data / reset sync
+// - Version label at the bottom of the panel
 //
 // Coordinates with:
 // - CppSyncAdapter: sync state, peer presence, connection control
@@ -25,7 +27,12 @@
 import { SyncState } from "./cpp-sync-adapter";
 import { generateRandomName } from "./presence";
 import { getMenuStateManager } from "./menu-state";
-import type { SyncStateType, PeerPresence, RoomId, SyncStats } from "./types";
+import { buildCollabDetailsHtml } from "./collab-menu-content";
+import {
+    loadStoredDisplayName,
+    saveStoredDisplayName,
+} from "./display-name";
+import type { SyncStateType, PeerPresence, RoomId } from "./types";
 
 // ============================================================================
 // Types
@@ -36,7 +43,6 @@ interface CollabManager {
     state: SyncStateType;
     roomId: RoomId | null;
     debugMode: boolean;
-    stats: SyncStats;
     on(event: string, callback: (...args: unknown[]) => void): void;
     off(event: string, callback: (...args: unknown[]) => void): void;
     getConnectedPeerCount(): number;
@@ -212,58 +218,10 @@ export class CollabUI {
         this._statusDot =
             this._collaborateBtn.querySelector(".collab-status-dot");
 
-        // Create details panel (inside status badge for positioning)
+        // Create details panel (share, nickname, status, peers, debug, version)
         this._detailsPanel = document.createElement("div");
         this._detailsPanel.className = "collab-status-details";
-        this._detailsPanel.innerHTML = `
-            <div class="collab-status-details-header">Collaborate</div>
-            <div class="collab-status-share-section">
-                <p class="collab-share-description">Share this link to collaborate in real-time — with people or with an agent (Codex, Claude Code, Grok, etc.). Agents join via the CLI session (peer stays connected):</p>
-                <code class="collab-agent-hint">cells session start '&lt;room-url&gt;'</code>
-                <p class="collab-share-description collab-agent-docs">Install skill/CLI: <a href="https://github.com/aduermael/cells#ai-agents-" target="_blank" rel="noopener">docs</a> · <a href="https://github.com/aduermael/cells/blob/main/skill/SKILL.md" target="_blank" rel="noopener">skill</a> · <a href="https://github.com/aduermael/cells/blob/main/install-skill.sh" target="_blank" rel="noopener">install-skill.sh</a></p>
-                <button class="btn btn-primary btn-block btn-lg" id="collab-copy-link-btn">Copy Link</button>
-            </div>
-            <div class="collab-status-details-divider"></div>
-            <div class="collab-status-details-row name-row">
-                <span class="label">Your Name</span>
-                <div class="collab-name-edit-inline">
-                    <input type="text" id="collab-name-input" maxlength="20" placeholder="Enter your name">
-                </div>
-            </div>
-            <div class="collab-status-details-divider" id="collab-connection-divider" style="display: none;"></div>
-            <div class="collab-status-details-row" id="collab-status-row" style="display: none;">
-                <span class="label">Status</span>
-                <span class="value" id="collab-detail-status">Offline</span>
-            </div>
-            <div class="collab-status-details-row" id="collab-peers-row" style="display: none;">
-                <span class="label">Peers</span>
-                <span class="value" id="collab-detail-peers">0</span>
-            </div>
-            <div class="collab-status-details-row" id="collab-latency-row" style="display: none;">
-                <span class="label">Latency</span>
-                <span class="value" id="collab-detail-latency">-</span>
-            </div>
-            <div class="collab-status-details-row" id="collab-stats-row" style="display: none;">
-                <span class="label">Sync</span>
-                <span class="value" id="collab-detail-stats">-</span>
-            </div>
-            <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
-            <div class="collab-status-details-actions" id="collab-actions" style="display: none;">
-                <button class="btn btn-block" id="collab-reconnect-btn">Force Reconnect</button>
-            </div>
-            <div class="collab-status-details-debug" id="collab-debug-section">
-                <div class="debug-toggle">
-                    <label>
-                        <input type="checkbox" id="collab-debug-mode">
-                        Debug mode
-                    </label>
-                </div>
-                <div class="debug-actions" id="collab-debug-actions" style="display: none;">
-                    <button class="btn btn-sm btn-block" id="collab-export-debug">Export Debug Data</button>
-                    <button class="btn btn-sm btn-block btn-danger" id="collab-reset-sync">Reset Sync State</button>
-                </div>
-            </div>
-        `;
+        this._detailsPanel.innerHTML = buildCollabDetailsHtml();
         // Append details panel to collaborate button
         this._collaborateBtn.appendChild(this._detailsPanel);
 
@@ -281,24 +239,30 @@ export class CollabUI {
     }
 
     /**
-     * Get the initial display name from storage or generate a new one
+     * Get the initial display name from storage or generate a new one.
+     * Uses localStorage so the nickname survives browser restarts.
      */
     private _getInitialDisplayName(): string {
+        let local: Storage | null = null;
+        let session: Storage | null = null;
         try {
-            const storedName = localStorage.getItem("cells.displayName");
-            if (storedName) {
-                return storedName;
-            }
+            local = localStorage;
         } catch {
-            // localStorage not available
+            local = null;
         }
-        // Generate and store a new name
+        try {
+            session = sessionStorage;
+        } catch {
+            session = null;
+        }
+
+        const stored = loadStoredDisplayName(local, session);
+        if (stored) {
+            return stored;
+        }
+
         const newName = generateRandomName();
-        try {
-            localStorage.setItem("cells.displayName", newName);
-        } catch {
-            // localStorage not available
-        }
+        saveStoredDisplayName(newName, local, session);
         return newName;
     }
 
@@ -364,10 +328,10 @@ export class CollabUI {
                     nameInput.blur();
                 } else if (e.key === "Escape") {
                     e.preventDefault();
-                    // Restore original name
-                    if (this._presenceManager?.localName) {
-                        nameInput.value = this._presenceManager.localName;
-                    }
+                    // Restore original name from presence or persisted storage
+                    nameInput.value =
+                        this._presenceManager?.localName ??
+                        this._getInitialDisplayName();
                     nameInput.blur();
                 }
             });
@@ -391,17 +355,6 @@ export class CollabUI {
             });
         }
 
-        // Force reconnect button
-        const reconnectBtn = this._detailsPanel?.querySelector(
-            "#collab-reconnect-btn",
-        );
-        if (reconnectBtn) {
-            reconnectBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                void this._handleForceReconnect();
-            });
-        }
-
         // Debug mode toggle
         const debugToggle = this._detailsPanel?.querySelector(
             "#collab-debug-mode",
@@ -415,6 +368,17 @@ export class CollabUI {
             });
             // Initialize checkbox state
             this._updateDebugModeCheckbox();
+        }
+
+        // Force reconnect (debug only)
+        const reconnectBtn = this._detailsPanel?.querySelector(
+            "#collab-reconnect-btn",
+        );
+        if (reconnectBtn) {
+            reconnectBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                void this._handleForceReconnect();
+            });
         }
 
         // Export debug data button
@@ -440,7 +404,7 @@ export class CollabUI {
     }
 
     /**
-     * Handle force reconnect button click
+     * Handle force reconnect button click (debug mode)
      */
     private async _handleForceReconnect(): Promise<void> {
         if (
@@ -462,6 +426,9 @@ export class CollabUI {
             this._collabManager.setDebugMode(enabled);
         }
         this._updateDebugActionsVisibility();
+        if (enabled) {
+            this._updateLatencyDisplay();
+        }
     }
 
     /**
@@ -519,6 +486,48 @@ export class CollabUI {
         ) as HTMLInputElement | null;
         if (debugActions && checkbox) {
             debugActions.style.display = checkbox.checked ? "" : "none";
+        }
+        if (checkbox?.checked) {
+            this._updateLatencyDisplay();
+        }
+    }
+
+    /**
+     * Whether debug mode is currently enabled in the UI
+     */
+    private _isDebugModeEnabled(): boolean {
+        const checkbox = this._detailsPanel?.querySelector(
+            "#collab-debug-mode",
+        ) as HTMLInputElement | null;
+        return checkbox?.checked ?? false;
+    }
+
+    /**
+     * Update the latency display (debug mode only)
+     */
+    private _updateLatencyDisplay(): void {
+        if (!this._collabManager || !this._isDebugModeEnabled()) return;
+
+        const latencyValue = this._detailsPanel?.querySelector(
+            "#collab-detail-latency",
+        ) as HTMLElement | null;
+        if (!latencyValue) return;
+
+        const avgLatency = this._collabManager.getAverageLatency();
+
+        if (avgLatency !== null && this._currentState === SyncState.ONLINE) {
+            const isPoor = avgLatency > 500;
+            latencyValue.textContent = `${avgLatency}ms`;
+            latencyValue.classList.toggle("poor", isPoor);
+            if (isPoor) {
+                latencyValue.title = "Connection quality is poor";
+            } else {
+                latencyValue.removeAttribute("title");
+            }
+        } else {
+            latencyValue.textContent = "-";
+            latencyValue.classList.remove("poor");
+            latencyValue.removeAttribute("title");
         }
     }
 
@@ -596,12 +605,20 @@ export class CollabUI {
         const newName = nameInput.value.trim();
 
         if (newName) {
-            // Persist to localStorage for future sessions
+            // Persist for all future browser sessions
+            let local: Storage | null = null;
+            let session: Storage | null = null;
             try {
-                localStorage.setItem("cells.displayName", newName);
+                local = localStorage;
             } catch {
-                // localStorage not available
+                local = null;
             }
+            try {
+                session = sessionStorage;
+            } catch {
+                session = null;
+            }
+            saveStoredDisplayName(newName, local, session);
 
             if (this._presenceManager) {
                 await this._presenceManager.setLocalName(newName);
@@ -725,27 +742,8 @@ export class CollabUI {
                 DETAILED_STATUS_TEXT[state] ?? STATUS_TEXT[state] ?? "Unknown";
         }
 
-        // Show connection info rows when we're in collaboration mode (link copied or joined via URL)
+        // Show status dot when collaboration is active (in a room or link copied)
         const isInRoom = this._collabManager?.roomId != null;
-        const showConnectionInfo = isInRoom || this._linkCopied;
-
-        const connectionDivider = this._detailsPanel?.querySelector(
-            "#collab-connection-divider",
-        ) as HTMLElement | null;
-        const statusRow = this._detailsPanel?.querySelector(
-            "#collab-status-row",
-        ) as HTMLElement | null;
-        const peersRow = this._detailsPanel?.querySelector(
-            "#collab-peers-row",
-        ) as HTMLElement | null;
-
-        if (connectionDivider)
-            connectionDivider.style.display = showConnectionInfo ? "" : "none";
-        if (statusRow)
-            statusRow.style.display = showConnectionInfo ? "" : "none";
-        if (peersRow) peersRow.style.display = showConnectionInfo ? "" : "none";
-
-        // Show status dot when collaboration is active
         if (isInRoom || this._linkCopied) {
             if (this._statusDot) {
                 this._statusDot.style.display = "";
@@ -753,11 +751,8 @@ export class CollabUI {
             this._linkCopied = true;
         }
 
-        // Update latency display visibility
+        // Refresh latency when online state changes (debug mode)
         this._updateLatencyDisplay();
-
-        // Update actions panel visibility
-        this._updateActionsVisibility();
     }
 
     /**
@@ -774,84 +769,6 @@ export class CollabUI {
         if (detailPeers) {
             detailPeers.textContent = this._peerCount.toString();
         }
-    }
-
-    /**
-     * Update the latency display
-     */
-    private _updateLatencyDisplay(): void {
-        if (!this._collabManager) return;
-
-        const latencyRow = this._detailsPanel?.querySelector(
-            "#collab-latency-row",
-        ) as HTMLElement | null;
-        const latencyValue = this._detailsPanel?.querySelector(
-            "#collab-detail-latency",
-        ) as HTMLElement | null;
-
-        if (!latencyRow || !latencyValue) return;
-
-        const avgLatency = this._collabManager.getAverageLatency();
-
-        if (avgLatency !== null && this._currentState === SyncState.ONLINE) {
-            latencyRow.style.display = "";
-            const isPoor = avgLatency > 500;
-            latencyValue.textContent = `${avgLatency}ms`;
-            latencyValue.classList.toggle("poor", isPoor);
-            if (isPoor) {
-                latencyValue.title = "Connection quality is poor";
-            } else {
-                latencyValue.removeAttribute("title");
-            }
-        } else {
-            latencyRow.style.display = "none";
-        }
-    }
-
-    /**
-     * Update the data transfer stats display
-     */
-    updateStats(): void {
-        if (!this._collabManager) return;
-
-        const statsRow = this._detailsPanel?.querySelector(
-            "#collab-stats-row",
-        ) as HTMLElement | null;
-        const statsValue = this._detailsPanel?.querySelector(
-            "#collab-detail-stats",
-        ) as HTMLElement | null;
-
-        if (!statsRow || !statsValue) return;
-
-        const stats = this._collabManager.stats;
-
-        if (stats && this._currentState === SyncState.ONLINE) {
-            statsRow.style.display = "";
-            // Show sent/received and oplog size (for debugging sync issues)
-            const oplogInfo =
-                stats.oplogSize > 0 ? ` (${stats.oplogSize} ops)` : "";
-            statsValue.textContent = `${stats.operationsSent}↑ ${stats.operationsReceived}↓${oplogInfo}`;
-        } else {
-            statsRow.style.display = "none";
-        }
-    }
-
-    /**
-     * Update the actions panel visibility
-     */
-    private _updateActionsVisibility(): void {
-        const actionsPanel = this._detailsPanel?.querySelector(
-            "#collab-actions",
-        ) as HTMLElement | null;
-        if (!actionsPanel) return;
-
-        // Show actions when connecting or online (to allow force reconnect)
-        const showActions =
-            this._currentState === SyncState.CONNECTING ||
-            this._currentState === SyncState.SYNCING ||
-            this._currentState === SyncState.ONLINE;
-
-        actionsPanel.style.display = showActions ? "" : "none";
     }
 
     /**
@@ -908,7 +825,8 @@ export class CollabUI {
         this._collaborateBtn?.classList.add("show-details");
         this._updatePeerCount();
         this._updatePeersList();
-        this._updateState(this._currentState); // Refresh connection info visibility
+        this._updateState(this._currentState);
+        this._updateLatencyDisplay();
     }
 
     /**
