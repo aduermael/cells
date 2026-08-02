@@ -49,6 +49,28 @@ fi
 assert_eq "version from tag" "0.0.1" "$(cells_version_from_tag v0.0.1)"
 assert_eq "tag from version" "v0.0.1" "$(cells_tag_from_version 0.0.1)"
 assert_eq "asset name" "cells-linux-arm64.tar.gz" "$(cells_asset_name linux arm64)"
+
+echo "== resolve product version =="
+# Explicit env wins (v-prefix optional)
+assert_eq "resolve env bare" "9.8.7" "$(CELLS_VERSION=9.8.7 cells_resolve_product_version)"
+assert_eq "resolve env v-prefix" "9.8.7" "$(CELLS_VERSION=v9.8.7 cells_resolve_product_version)"
+# Without env, prefer nearest git semver tag when available
+unset CELLS_VERSION || true
+export REPO_ROOT="$REPO_ROOT"
+resolved="$(cells_resolve_product_version)"
+if git -C "$REPO_ROOT" describe --tags --abbrev=0 >/dev/null 2>&1; then
+  tag="$(git -C "$REPO_ROOT" describe --tags --abbrev=0)"
+  if cells_is_semver_tag "$tag"; then
+    expected="$(cells_version_from_tag "$tag")"
+    assert_eq "resolve git tag" "$expected" "$resolved"
+  else
+    assert_eq "resolve default (non-semver tag)" "$CELLS_DEFAULT_VERSION" "$resolved"
+  fi
+else
+  assert_eq "resolve default (no tags)" "$CELLS_DEFAULT_VERSION" "$resolved"
+fi
+# Env must not be polluted for later tests
+unset CELLS_VERSION || true
 assert_eq "release latest url" \
   "https://github.com/aduermael/cells/releases/latest/download" \
   "$(cells_release_base_url aduermael/cells latest)"

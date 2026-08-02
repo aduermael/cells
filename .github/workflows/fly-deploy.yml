@@ -24,8 +24,11 @@ jobs:
       group: deploy-server
       cancel-in-progress: false
     steps:
-      # actions/checkout@v4.2.2
+      # actions/checkout@v4.2.2 — tags needed so WASM UI can stamp from git describe
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Build and deploy to Fly.io
         uses: ./.github/actions/deploy-fly

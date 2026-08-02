@@ -34,6 +34,31 @@ cells_tag_from_version() {
   esac
 }
 
+# Default product version for unstamped/dev builds (web UI + CLI header).
+# shellcheck disable=SC2034
+CELLS_DEFAULT_VERSION="${CELLS_DEFAULT_VERSION:-0.0.1}"
+
+# Resolve product version for builds (CLI stamp, WASM UI stamp).
+# Priority: CELLS_VERSION env (v-prefix optional) → nearest git semver tag → default.
+# Prints bare semver to stdout (no leading v), e.g. 0.0.5.
+# Optional: CELLS_VERSION_GIT_DIR / REPO_ROOT for git -C when cwd is not the repo root.
+cells_resolve_product_version() {
+  if [ -n "${CELLS_VERSION:-}" ]; then
+    echo "${CELLS_VERSION#v}"
+    return 0
+  fi
+  root="${CELLS_VERSION_GIT_DIR:-${REPO_ROOT:-.}}"
+  tag=""
+  if command -v git >/dev/null 2>&1 && [ -d "$root" ]; then
+    tag="$(git -C "$root" describe --tags --abbrev=0 2>/dev/null || true)"
+  fi
+  if [ -n "$tag" ] && cells_is_semver_tag "$tag"; then
+    cells_version_from_tag "$tag"
+    return 0
+  fi
+  echo "$CELLS_DEFAULT_VERSION"
+}
+
 # OS name used in asset filenames: macos | linux
 cells_detect_os() {
   case "$(uname -s)" in

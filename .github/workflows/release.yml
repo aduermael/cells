@@ -326,6 +326,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       # ----- Homebrew tap -----
       - name: Check Homebrew secrets
@@ -424,4 +427,6 @@ jobs:
         with:
           fly_api_token: ${{ secrets.FLY_API_TOKEN }}
           bazel_disk_cache_key: release-fly-wasm
+          # Stamp WASM collab-menu version the same way CLI binaries are stamped
+          cells_version: ${{ needs.validate.outputs.version }}
 
