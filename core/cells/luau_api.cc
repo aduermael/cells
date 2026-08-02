@@ -250,7 +250,8 @@ int LuauSandbox::luaCellGet(lua_State* L) {
 
     // Get context
     Sheet* sheet = getSheet(L);
-    if (sheet == nullptr || getWorkbook(L) == nullptr) {
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
         luaL_error(L, "getCell: no context set");
     }
 
@@ -261,7 +262,7 @@ int LuauSandbox::luaCellGet(lua_State* L) {
         luaL_error(L, "getCell: invalid reference '%s'", ref);
     }
 
-    // Get or create the column and row
+    // Lookup only first; mint via CRDT when create=true so peers get COL/ROW/CELL_SET.
     // NOLINTBEGIN(misc-const-correctness)
     Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
     Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
@@ -272,12 +273,15 @@ int LuauSandbox::luaCellGet(lua_State* L) {
         return 1;
     }
 
-    // Create column/row if needed
+    // Create column/row via CRDT if needed (local getOrCreate* is not collab-safe)
     if (col == nullptr) {
-        col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colIdx));
+        col = ensureColumnViaCrdt(*workbook, *sheet, static_cast<uint32_t>(colIdx));
     }
     if (row == nullptr) {
-        row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(rowIdx));
+        row = ensureRowViaCrdt(*workbook, *sheet, static_cast<uint32_t>(rowIdx));
+    }
+    if (col == nullptr || row == nullptr) {
+        luaL_error(L, "getCell: failed to ensure column/row for '%s'", ref);
     }
 
     // Get the cell
@@ -289,9 +293,9 @@ int LuauSandbox::luaCellGet(lua_State* L) {
         return 1;
     }
 
-    // Create cell if needed
+    // Create cell via CRDT if needed
     if (cell == nullptr) {
-        cell = sheet->getOrCreateCellAt(col->id, row->id);
+        cell = ensureCellViaCrdt(*workbook, *sheet, col->id, row->id);
     }
     // NOLINTEND(misc-const-correctness)
 
