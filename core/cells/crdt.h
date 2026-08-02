@@ -226,6 +226,32 @@ size_t discardEmptyPlaceholderSheets(Workbook& workbook);
 // waiting for remote state. Returns true if a sheet was created.
 bool ensureDefaultSheetViaCrdt(Workbook& workbook);
 
+// True when a sheet has zero columns, rows, and cells (empty grid shell).
+[[nodiscard]] bool isSheetContentEmpty(const Sheet& sheet);
+
+// How to place imported sheet material into an existing workbook.
+enum class SheetImportMode : std::uint8_t {
+    INTO_CURRENT,  // Fill the active empty sheet (same sheet id)
+    REPLACE,       // Create new sheet + content, then delete the old sheet
+    NEW_SHEET,     // Append a new sheet with imported content
+};
+
+struct SheetImportResult {
+    bool success{false};
+    size_t opsApplied{0};
+    size_t activeSheetIndex{0};
+    size_t sheetCount{0};
+    std::string error;
+};
+
+// Import one sheet from `source` into `target` via CRDT ops (applyOperation).
+// Safe while collaborating: never replaces the Workbook pointer. Remaps entity
+// IDs so source UUIDs never collide with the live document.
+// Formula cells are imported as their computed values (structure fidelity).
+SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
+                                     size_t sourceSheetIndex, SheetImportMode mode,
+                                     size_t currentSheetIndex);
+
 // =============================================================================
 // Collab-safe ensure + grid helpers (shared by CLI Luau API and WASM engine)
 // =============================================================================

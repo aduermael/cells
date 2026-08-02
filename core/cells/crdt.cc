@@ -27,6 +27,9 @@
 
 #include <algorithm>
 #include <charconv>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
@@ -972,6 +975,331 @@ bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
     const Operation op = makeSheetSetOp(workbook, sheetId, R"({"name":"Sheet1"})");
     applyOperation(workbook, op);
     return true;
+}
+
+bool isSheetContentEmpty(const Sheet& sheet) {
+    return sheet.columnCount() == 0 && sheet.rowCount() == 0 && sheet.cellCount() == 0;
+}
+
+namespace {
+
+// Materialize source sheet grid into an existing target sheet via CRDT ops.
+// Mints new col/row/cell/range IDs; formula cells become computed values.
+size_t materializeSheetContentViaCrdt(Workbook& target, const ID& targetSheetId,
+                                      const Workbook& source, const Sheet& sourceSheet) {
+    size_t count = 0;
+    std::unordered_map<ID, ID, IDHash> colMap;
+    std::unordered_map<ID, ID, IDHash> rowMap;
+
+    // Columns by position
+    std::vector<std::pair<uint32_t, const Axis*>> columns;
+    for (const ID& colId : sourceSheet.getColumnIds()) {
+        const Axis* axis = source.getColumn(colId);
+        if (axis != nullptr) {
+            columns.emplace_back(axis->position, axis);
+        }
+    }
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    for (const auto& [pos, axis] : columns) {
+        const ID newId = generate_id();
+        colMap[axis->id] = newId;
+        std::string payload = "{\"pos\":" + std::to_string(pos);
+        if (axis->sizeSet()) {
+            payload += ",\"size\":" + std::to_string(axis->size);
+        }
+        if (axis->sizeOriginal > 0) {
+            char buf[32];
+            auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), axis->sizeOriginal);
+            payload += ",\"sizeOriginal\":";
+            payload.append(buf, static_cast<size_t>(ptr - buf));
+        }
+        if (!axis->name.empty()) {
+            payload += ",\"name\":\"" + internal::jsonEscape(axis->name) + "\"";
+        }
+        if (axis->hasStyle()) {
+            const StyleBuffer* sty = source.getEntityStyle(axis->id);
+            if (sty != nullptr) {
+                payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (axis->hasFormat()) {
+            const FormatBuffer* fmt = source.getEntityFormat(axis->id);
+            if (fmt != nullptr) {
+                payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        if (axis->hidden()) {
+            payload += ",\"hidden\":true";
+        }
+        payload += "}";
+        applyOperation(target, makeColSetOp(target, newId, targetSheetId, payload));
+        ++count;
+    }
+
+    // Rows by position
+    std::vector<std::pair<uint32_t, const Axis*>> rows;
+    for (const ID& rowId : sourceSheet.getRowIds()) {
+        const Axis* axis = source.getRow(rowId);
+        if (axis != nullptr) {
+            rows.emplace_back(axis->position, axis);
+        }
+    }
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    for (const auto& [pos, axis] : rows) {
+        const ID newId = generate_id();
+        rowMap[axis->id] = newId;
+        std::string payload = "{\"pos\":" + std::to_string(pos);
+        if (axis->sizeSet()) {
+            payload += ",\"size\":" + std::to_string(axis->size);
+        }
+        if (axis->sizeOriginal > 0) {
+            char buf[32];
+            auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), axis->sizeOriginal);
+            payload += ",\"sizeOriginal\":";
+            payload.append(buf, static_cast<size_t>(ptr - buf));
+        }
+        if (axis->hasStyle()) {
+            const StyleBuffer* sty = source.getEntityStyle(axis->id);
+            if (sty != nullptr) {
+                payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (axis->hasFormat()) {
+            const FormatBuffer* fmt = source.getEntityFormat(axis->id);
+            if (fmt != nullptr) {
+                payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        if (axis->hidden()) {
+            payload += ",\"hidden\":true";
+        }
+        payload += "}";
+        applyOperation(target, makeRowSetOp(target, newId, targetSheetId, payload));
+        ++count;
+    }
+
+    // Cells (formulas → computed values for ID-remap safety)
+    for (const ID& cellId : sourceSheet.getCellIds()) {
+        const Cell* cell = source.getCell(cellId);
+        if (cell == nullptr) {
+            continue;
+        }
+        auto colIt = colMap.find(cell->colId);
+        auto rowIt = rowMap.find(cell->rowId);
+        if (colIt == colMap.end() || rowIt == rowMap.end()) {
+            continue;
+        }
+
+        const bool isEmpty = cell->value.type == CellValueType::STRING &&
+                             cell->value.raw.empty() && cell->formula == nullptr;
+        if (isEmpty && !cell->hasStyle() && !cell->hasFormat()) {
+            continue;
+        }
+
+        const ID newCellId = generate_id();
+        std::string payload = "{\"col\":\"" + colIt->second.toString() + "\"";
+        payload += ",\"row\":\"" + rowIt->second.toString() + "\"";
+
+        // Always materialize as value (even if source had a formula)
+        if (!isEmpty || cell->formula != nullptr) {
+            const char typeChar = valueTypeToChar(cell->value.type);
+            payload += ",\"t\":\"" + std::string(1, typeChar) + "\"";
+            payload += ",\"v\":\"" + internal::jsonEscape(cell->value.raw) + "\"";
+        } else {
+            payload += ",\"t\":\"s\",\"v\":\"\"";
+        }
+
+        if (cell->hasStyle()) {
+            const StyleBuffer* sty = source.getEntityStyle(cell->id);
+            if (sty != nullptr) {
+                payload += ",\"sty\":\"" + sty->toBase64() + "\"";
+            }
+        }
+        if (cell->hasFormat()) {
+            const FormatBuffer* fmt = source.getEntityFormat(cell->id);
+            if (fmt != nullptr) {
+                payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
+            }
+        }
+        payload += "}";
+        applyOperation(target, makeCellSetOp(target, newCellId, targetSheetId, payload));
+        ++count;
+    }
+
+    // Ranges (merges / style ranges) with remapped corners
+    for (const ID& rangeId : sourceSheet.getRangeIds()) {
+        const Range* range = source.getRange(rangeId);
+        if (range == nullptr) {
+            continue;
+        }
+        auto sc = colMap.find(range->startColId);
+        auto sr = rowMap.find(range->startRowId);
+        auto ec = colMap.find(range->endColId);
+        auto er = rowMap.find(range->endRowId);
+        if (sc == colMap.end() || sr == rowMap.end() || ec == colMap.end() || er == rowMap.end()) {
+            continue;
+        }
+        const ID newRangeId = generate_id();
+        std::string payload = "{\"startCol\":\"" + sc->second.toString() + "\"";
+        payload += ",\"startRow\":\"" + sr->second.toString() + "\"";
+        payload += ",\"endCol\":\"" + ec->second.toString() + "\"";
+        payload += ",\"endRow\":\"" + er->second.toString() + "\"";
+        payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
+        if (range->style.has_value()) {
+            payload += ",\"sty\":\"" + range->style->toBase64() + "\"";
+        }
+        if (range->format.has_value()) {
+            payload += ",\"fmt\":\"" + range->format->toBase64() + "\"";
+        }
+        payload += "}";
+        applyOperation(target, makeRangeSetOp(target, newRangeId, payload));
+        ++count;
+    }
+
+    return count;
+}
+
+}  // namespace
+
+SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
+                                     size_t sourceSheetIndex, SheetImportMode mode,
+                                     size_t currentSheetIndex) {
+    SheetImportResult result;
+    if (sourceSheetIndex >= source.sheetCount()) {
+        result.error = "Source sheet index out of range";
+        return result;
+    }
+    const Sheet* sourceSheet = source.sheets[sourceSheetIndex].get();
+    if (sourceSheet == nullptr) {
+        result.error = "Source sheet not found";
+        return result;
+    }
+
+    if (target.sheets.empty() && mode != SheetImportMode::NEW_SHEET) {
+        // No sheet yet: create one then fill (same as NEW_SHEET path)
+        mode = SheetImportMode::NEW_SHEET;
+        currentSheetIndex = 0;
+    }
+
+    if (mode == SheetImportMode::INTO_CURRENT || mode == SheetImportMode::REPLACE) {
+        if (currentSheetIndex >= target.sheetCount()) {
+            result.error = "Current sheet index out of range";
+            return result;
+        }
+    }
+
+    if (mode == SheetImportMode::INTO_CURRENT) {
+        Sheet* cur = target.getSheetByIndex(currentSheetIndex);
+        if (cur == nullptr) {
+            result.error = "Current sheet not found";
+            return result;
+        }
+        if (!isSheetContentEmpty(*cur)) {
+            result.error = "Current sheet is not empty";
+            return result;
+        }
+        // Optional: adopt source sheet name if current is default
+        if (!sourceSheet->name.empty() && cur->name != sourceSheet->name) {
+            const std::string payload =
+                "{\"name\":\"" + internal::jsonEscape(sourceSheet->name) + "\"}";
+            applyOperation(target, makeSheetSetOp(target, cur->id, payload));
+            ++result.opsApplied;
+        }
+        result.opsApplied +=
+            materializeSheetContentViaCrdt(target, cur->id, source, *sourceSheet);
+        result.activeSheetIndex = currentSheetIndex;
+        result.sheetCount = target.sheetCount();
+        result.success = true;
+        return result;
+    }
+
+    if (mode == SheetImportMode::NEW_SHEET) {
+        const ID newSheetId = generate_id();
+        std::string name = sourceSheet->name.empty() ? "Sheet1" : sourceSheet->name;
+        // Avoid duplicate names
+        bool taken = false;
+        for (size_t i = 0; i < target.sheetCount(); ++i) {
+            const Sheet* s = target.getSheetByIndex(i);
+            if (s != nullptr && s->name == name) {
+                taken = true;
+                break;
+            }
+        }
+        if (taken) {
+            int suffix = 2;
+            std::string candidate;
+            do {
+                candidate = name + " " + std::to_string(suffix++);
+                taken = false;
+                for (size_t i = 0; i < target.sheetCount(); ++i) {
+                    const Sheet* s = target.getSheetByIndex(i);
+                    if (s != nullptr && s->name == candidate) {
+                        taken = true;
+                        break;
+                    }
+                }
+            } while (taken);
+            name = candidate;
+        }
+        const std::string payload = "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
+        applyOperation(target, makeSheetSetOp(target, newSheetId, payload));
+        ++result.opsApplied;
+        result.opsApplied +=
+            materializeSheetContentViaCrdt(target, newSheetId, source, *sourceSheet);
+        result.activeSheetIndex = target.sheetCount() > 0 ? target.sheetCount() - 1 : 0;
+        // Prefer index of the new sheet by id
+        for (size_t i = 0; i < target.sheetCount(); ++i) {
+            if (target.getSheetByIndex(i) != nullptr &&
+                target.getSheetByIndex(i)->id == newSheetId) {
+                result.activeSheetIndex = i;
+                break;
+            }
+        }
+        result.sheetCount = target.sheetCount();
+        result.success = true;
+        return result;
+    }
+
+    // REPLACE: create new sheet with content, then delete the old one
+    Sheet* oldSheet = target.getSheetByIndex(currentSheetIndex);
+    if (oldSheet == nullptr) {
+        result.error = "Current sheet not found";
+        return result;
+    }
+    const ID oldSheetId = oldSheet->id;
+    std::string name = sourceSheet->name.empty() ? oldSheet->name : sourceSheet->name;
+    if (name.empty()) {
+        name = "Sheet1";
+    }
+
+    const ID newSheetId = generate_id();
+    {
+        const std::string payload = "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
+        applyOperation(target, makeSheetSetOp(target, newSheetId, payload));
+        ++result.opsApplied;
+    }
+    result.opsApplied +=
+        materializeSheetContentViaCrdt(target, newSheetId, source, *sourceSheet);
+
+    applyOperation(target, makeSheetDeleteOp(target, oldSheetId));
+    ++result.opsApplied;
+
+    // Active index: position of new sheet
+    result.activeSheetIndex = 0;
+    for (size_t i = 0; i < target.sheetCount(); ++i) {
+        if (target.getSheetByIndex(i) != nullptr &&
+            target.getSheetByIndex(i)->id == newSheetId) {
+            result.activeSheetIndex = i;
+            break;
+        }
+    }
+    result.sheetCount = target.sheetCount();
+    result.success = true;
+    return result;
 }
 
 size_t bootstrapOpLog(Workbook& workbook) {

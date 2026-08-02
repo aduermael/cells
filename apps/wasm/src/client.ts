@@ -280,6 +280,31 @@ export class CellsClient {
     return this.loadFile(data, "xlsx");
   }
 
+  /**
+   * Import a single-sheet file into the current workbook (CRDT-safe; keeps collab).
+   * mode: into_current | replace | new_sheet
+   */
+  async importSheet(
+    data: ArrayBuffer,
+    format: "csv" | "xlsx",
+    mode: "into_current" | "replace" | "new_sheet",
+    options: { delimiter?: string; hasHeader?: boolean } = {},
+  ): Promise<LoadFileResult & { activeSheetIndex?: number; ops?: number }> {
+    const params: Record<string, unknown> = { format, data, mode, ...options };
+    const response = await this._send("importSheet", params, [data]);
+    return {
+      sheetCount: response.sheetCount as number,
+      sheetNames: response.sheetNames as string[],
+      activeSheetIndex: response.activeSheetIndex as number | undefined,
+      ops: response.ops as number | undefined,
+    };
+  }
+
+  async isActiveSheetEmpty(): Promise<boolean> {
+    const response = await this._send("isActiveSheetEmpty");
+    return Boolean(response.empty);
+  }
+
   async createEmpty(): Promise<{ sheetCount: number }> {
     const response = await this._send("createEmpty");
     return { sheetCount: response.sheetCount as number };

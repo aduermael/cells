@@ -36,6 +36,8 @@ import type {
 // Core spreadsheet handlers
 import {
     handleLoad,
+    handleImportSheet,
+    handleIsActiveSheetEmpty,
     handleExport,
     handleGetSheetInfo,
     handleQueryViewport,
@@ -282,6 +284,12 @@ function handleMessage(msg: WorkerRequest): void {
             // ================================================================
             case "load":
                 handleLoad(engine, Module, params, respond);
+                break;
+            case "importSheet":
+                handleImportSheet(engine, Module, params, respond);
+                break;
+            case "isActiveSheetEmpty":
+                handleIsActiveSheetEmpty(engine, params, respond);
                 break;
             case "export":
                 handleExport(engine, Module, params, respond);

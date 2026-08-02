@@ -27,8 +27,14 @@ import { CellsClient } from "./client";
 import { WasmDataSource, type DataChangeType } from "./wasm-data-source";
 import { detectFormat, getBaseName, downloadBlob } from "./utils";
 import { getMenuStateManager } from "./menu-state";
-import { showConfirm } from "./modal";
+import { showConfirm, showImportSheetChoice } from "./modal";
 import type { FileFormat } from "./types";
+
+/** How a file enters the app */
+export type FileEntryMode = "new_document" | "import";
+
+/** In-document import placement */
+export type SheetImportMode = "into_current" | "replace" | "new_sheet";
 
 // =============================================================================
 // Types
@@ -136,11 +142,23 @@ export class FileLoader {
   // =========================================================================
 
   /**
-   * Load a file from a File object (e.g., from file input or drag/drop)
+   * Load a file as a clean new document (Open button / new-document drop).
+   * Always leaves the collab room first so SyncClient is not left on a
+   * destroyed Workbook.
    */
-  async loadFile(file: File): Promise<void> {
-    const { loading, error, emptyState, saveFileToIndexedDB, saveFileMeta } =
-      this.config;
+  async loadFileAsNewDocument(file: File): Promise<void> {
+    const {
+      leaveCollaborationRoom,
+      clearRoomIdFromUrl,
+      loading,
+      error,
+      emptyState,
+      saveFileToIndexedDB,
+      saveFileMeta,
+    } = this.config;
+
+    leaveCollaborationRoom();
+    clearRoomIdFromUrl();
 
     loading.textContent = "";
     loading.innerHTML =
@@ -149,7 +167,6 @@ export class FileLoader {
     error.style.display = "none";
     emptyState.classList.add("hidden");
 
-    // Set up progress callback to update loading indicator with cell count
     const client = await this.ensureWasmClient();
     const fileName = file.name;
     client.setOnLoadProgress((cellsLoaded: number, totalEstimate: number) => {
@@ -179,8 +196,6 @@ export class FileLoader {
       const format = detectFormat(file.name, data);
       const baseName = getBaseName(file.name);
 
-      // Persist file to IndexedDB BEFORE loading into WASM
-      // (WASM may detach the ArrayBuffer, making it unclonable)
       try {
         await saveFileToIndexedDB(data);
         saveFileMeta(file.name, format);
@@ -189,7 +204,6 @@ export class FileLoader {
       }
 
       await this.loadFileData(data, format, baseName);
-
       loading.style.display = "none";
     } catch (e) {
       console.error("Error loading file:", e);
@@ -197,9 +211,152 @@ export class FileLoader {
       error.textContent = "Failed to load: " + (e as Error).message;
       error.style.display = "block";
     } finally {
-      // Remove progress callback
       client.removeOnLoadProgress();
     }
+  }
+
+  /**
+   * Drag-drop into the current document (CSV / single-sheet XLSX).
+   * Empty active sheet → fill current; non-empty → prompt replace vs new sheet.
+   * Multi-sheet XLSX / ZCD fall back to new-document Open semantics.
+   */
+  async importFileIntoDocument(file: File): Promise<void> {
+    const { loading, error, emptyState } = this.config;
+    const client = await this.ensureWasmClient();
+
+    // Need a workbook context for in-document import
+    if (!this.hasFileLoaded) {
+      await this.createEmptyWorkbook();
+    }
+
+    const data = await file.arrayBuffer();
+    // Keep a copy for possible new-document fallback (ArrayBuffer may transfer)
+    const dataCopy = data.slice(0);
+    const format = detectFormat(file.name, data);
+
+    if (format === "zcd") {
+      // Full document formats always open as new document
+      await this.loadFileAsNewDocument(
+        new File([dataCopy], file.name, { type: file.type }),
+      );
+      return;
+    }
+
+    if (format !== "csv" && format !== "xlsx") {
+      await this.loadFileAsNewDocument(
+        new File([dataCopy], file.name, { type: file.type }),
+      );
+      return;
+    }
+
+    loading.textContent = "";
+    loading.innerHTML =
+      '<span class="spinner"></span>Importing ' + file.name + "...";
+    loading.style.display = "block";
+    error.style.display = "none";
+    emptyState.classList.add("hidden");
+
+    try {
+      const empty = await client.isActiveSheetEmpty();
+      let mode: SheetImportMode = "into_current";
+      if (!empty) {
+        const choice = await showImportSheetChoice(file.name);
+        if (choice === "cancel") {
+          loading.style.display = "none";
+          return;
+        }
+        mode = choice;
+      }
+
+      try {
+        const result = await client.importSheet(data, format, mode);
+        await this.afterInDocumentImport(getBaseName(file.name), result);
+        loading.style.display = "none";
+      } catch (importErr) {
+        const msg =
+          importErr instanceof Error ? importErr.message : String(importErr);
+        // Multi-sheet XLSX → open as new document instead
+        if (msg.includes("multi_sheet") || format === "xlsx") {
+          console.warn("In-document import fallback to new document:", msg);
+          loading.style.display = "none";
+          await this.loadFileAsNewDocument(
+            new File([dataCopy], file.name, { type: file.type }),
+          );
+          return;
+        }
+        throw importErr;
+      }
+    } catch (e) {
+      console.error("Error importing file:", e);
+      loading.style.display = "none";
+      error.textContent = "Failed to import: " + (e as Error).message;
+      error.style.display = "block";
+    }
+  }
+
+  /** Refresh UI after CRDT in-document import (workbook pointer unchanged). */
+  private async afterInDocumentImport(
+    baseName: string,
+    result: { sheetCount: number; sheetNames?: string[]; activeSheetIndex?: number },
+  ): Promise<void> {
+    const {
+      canvas,
+      formattingToolbar,
+      formulaBar,
+      bottomBar,
+      emptyState,
+      onDataSourceCreated,
+      onDataChanged,
+      resetViewState,
+      resizeCanvas,
+      fetchSheetInfo,
+      fetchViewport,
+      fetchSheets,
+      render,
+      updateFormulaBar,
+      getDataSource,
+    } = this.config;
+
+    const client = await this.ensureWasmClient();
+    let dataSource = getDataSource();
+    if (!dataSource) {
+      dataSource = new WasmDataSource(client);
+      dataSource.setOnChange(onDataChanged);
+      onDataSourceCreated(dataSource);
+    }
+    // Keep existing workbook name unless untitled
+    if (!dataSource.workbookName || dataSource.workbookName === "Untitled") {
+      dataSource.setWorkbookName(baseName);
+    }
+    this.hasFileLoaded = true;
+
+    if (typeof result.activeSheetIndex === "number") {
+      await client.setActiveSheet(result.activeSheetIndex);
+    }
+
+    resetViewState();
+    const exportBtn = document.getElementById("export-btn") as HTMLButtonElement | null;
+    const newBtn = document.getElementById("new-btn");
+    if (exportBtn) exportBtn.disabled = false;
+    if (newBtn) newBtn.style.display = "";
+
+    canvas.style.display = "block";
+    formattingToolbar.classList.remove("hidden");
+    formulaBar.classList.remove("hidden");
+    bottomBar.classList.remove("hidden");
+    emptyState.classList.add("hidden");
+    resizeCanvas();
+
+    await fetchSheetInfo();
+    await fetchViewport();
+    await fetchSheets();
+    render();
+    updateFormulaBar();
+  }
+
+  /** @deprecated Prefer loadFileAsNewDocument; kept for call-site clarity */
+  async loadFile(file: File): Promise<void> {
+    return this.loadFileAsNewDocument(file);
   }
 
   /**
@@ -497,7 +654,7 @@ export class FileLoader {
   // =========================================================================
 
   /**
-   * Set up file input change handler
+   * Set up file input change handler (Open button → always new document)
    */
   setupFileInput(): void {
     const { fileInput } = this.config;
@@ -506,24 +663,41 @@ export class FileLoader {
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
       if (file) {
-        this.loadFile(file);
+        void this.loadFileAsNewDocument(file);
         target.value = "";
       }
     });
   }
 
   /**
-   * Open file picker
+   * Open file picker (new document)
    */
   openFile(): void {
     this.config.fileInput.click();
   }
 
   /**
-   * Set up drag and drop handlers on the document
+   * Set up drag and drop: main area = in-document import; top-left = Open.
    */
   setupDragAndDrop(): void {
     const { dropZone } = this.config;
+    const newDocZone = document.getElementById("drop-zone-new-doc");
+
+    const hideDropUi = () => {
+      dropZone.classList.remove("visible");
+      newDocZone?.classList.remove("drop-target-active");
+    };
+
+    const isOverNewDocZone = (clientX: number, clientY: number): boolean => {
+      if (!newDocZone) return false;
+      const rect = newDocZone.getBoundingClientRect();
+      return (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      );
+    };
 
     document.addEventListener("dragenter", (e) => {
       e.preventDefault();
@@ -537,22 +711,32 @@ export class FileLoader {
       e.preventDefault();
       this.dragCounter--;
       if (this.dragCounter === 0) {
-        dropZone.classList.remove("visible");
+        hideDropUi();
       }
     });
 
     document.addEventListener("dragover", (e) => {
       e.preventDefault();
+      if (!dropZone.classList.contains("visible")) return;
+      if (isOverNewDocZone(e.clientX, e.clientY)) {
+        newDocZone?.classList.add("drop-target-active");
+      } else {
+        newDocZone?.classList.remove("drop-target-active");
+      }
     });
 
     document.addEventListener("drop", (e) => {
       e.preventDefault();
       this.dragCounter = 0;
-      dropZone.classList.remove("visible");
+      const openAsNew = isOverNewDocZone(e.clientX, e.clientY);
+      hideDropUi();
 
       const file = e.dataTransfer?.files[0];
-      if (file) {
-        this.loadFile(file);
+      if (!file) return;
+      if (openAsNew) {
+        void this.loadFileAsNewDocument(file);
+      } else {
+        void this.importFileIntoDocument(file);
       }
     });
   }

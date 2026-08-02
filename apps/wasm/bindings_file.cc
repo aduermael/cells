@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <sstream>
 
+#include "core/cells/crdt.h"
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
 #include "core/cells/dependency_graph.h"
@@ -33,7 +34,37 @@
 
 namespace cells::wasm {
 
+namespace {
+
+SheetImportMode parseImportMode(const std::string& mode, std::string& error) {
+    if (mode == "into_current") {
+        return SheetImportMode::INTO_CURRENT;
+    }
+    if (mode == "replace") {
+        return SheetImportMode::REPLACE;
+    }
+    if (mode == "new_sheet") {
+        return SheetImportMode::NEW_SHEET;
+    }
+    error = "Invalid import mode (use into_current, replace, or new_sheet)";
+    return SheetImportMode::INTO_CURRENT;
+}
+
+std::string importResultJson(const SheetImportResult& r) {
+    if (!r.success) {
+        return "{\"error\":\"" + jsonEscape(r.error.empty() ? "Import failed" : r.error) + "\"}";
+    }
+    std::ostringstream json;
+    json << "{\"success\":true,\"sheetCount\":" << r.sheetCount
+         << ",\"activeSheetIndex\":" << r.activeSheetIndex << ",\"ops\":" << r.opsApplied << "}";
+    return json.str();
+}
+
+}  // namespace
+
 std::string CellsEngine::loadFromCells(const std::string& content) {
+    // Open = new document: drop any live SyncClient before replacing Workbook.
+    disableSync();
     auto result = cells::parse(content);
     if (!result.ok()) {
         return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
@@ -91,6 +122,8 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
 }
 
 std::string CellsEngine::loadFromCSV(const std::string& content, char delimiter, bool hasHeader) {
+    // Open = new document: drop any live SyncClient before replacing Workbook.
+    disableSync();
     CSVReadOptions opts;
     opts.hasHeader = hasHeader;
     if (delimiter == '\0') {
@@ -118,7 +151,103 @@ std::string CellsEngine::loadFromCSV(const std::string& content, char delimiter,
     return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
 }
 
+bool CellsEngine::isActiveSheetEmpty() const {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return true;
+    }
+    const Sheet* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    return sheet == nullptr || isSheetContentEmpty(*sheet);
+}
+
+std::string CellsEngine::importSheetFromCSV(const std::string& content, char delimiter,
+                                            bool hasHeader, const std::string& mode) {
+    if (!_workbook) {
+        return "{\"error\":\"No workbook\"}";
+    }
+    std::string modeErr;
+    const SheetImportMode importMode = parseImportMode(mode, modeErr);
+    if (!modeErr.empty()) {
+        return "{\"error\":\"" + jsonEscape(modeErr) + "\"}";
+    }
+
+    CSVReadOptions opts;
+    opts.hasHeader = hasHeader;
+    if (delimiter == '\0') {
+        opts.autoDetectDelimiter = true;
+    } else {
+        opts.autoDetectDelimiter = false;
+        opts.delimiter = delimiter;
+    }
+    opts.progressCallback = [this](size_t cellsLoaded, size_t totalEstimate) {
+        notifyLoadProgress(cellsLoaded, totalEstimate);
+    };
+
+    auto parsed = readCSV(content, opts);
+    if (!parsed.ok()) {
+        return "{\"error\":\"" + jsonEscape(parsed.error->message) + "\"}";
+    }
+    if (!parsed.workbook || parsed.workbook->sheetCount() == 0) {
+        return "{\"error\":\"CSV produced no sheets\"}";
+    }
+
+    SheetImportResult r =
+        importSheetViaCrdt(*_workbook, *parsed.workbook, 0, importMode, _activeSheetIndex);
+    if (!r.success) {
+        return importResultJson(r);
+    }
+    _activeSheetIndex = r.activeSheetIndex;
+    rebuildViewportIndex();
+    broadcastPendingOperations();
+    notifyListeners(ChangeType::SHEET_CHANGED);
+    notifyListeners(ChangeType::DATA_LOADED);
+    return importResultJson(r);
+}
+
+std::string CellsEngine::importSheetFromXLSXDataPtr(uintptr_t ptr, size_t size,
+                                                    const std::string& mode) {
+    if (!_workbook) {
+        return "{\"error\":\"No workbook\"}";
+    }
+    std::string modeErr;
+    const SheetImportMode importMode = parseImportMode(mode, modeErr);
+    if (!modeErr.empty()) {
+        return "{\"error\":\"" + jsonEscape(modeErr) + "\"}";
+    }
+
+    const char* data = reinterpret_cast<const char*>(ptr);
+    XLSXReadOptions options;
+    options.progressCallback = [this](size_t cellsLoaded, size_t totalEstimate) {
+        notifyLoadProgress(cellsLoaded, totalEstimate);
+    };
+    auto parsed = readXLSXFromMemory(data, size, options);
+    if (!parsed.ok()) {
+        return "{\"error\":\"" + jsonEscape(parsed.error->message) + "\"}";
+    }
+    if (!parsed.workbook || parsed.workbook->sheetCount() == 0) {
+        return "{\"error\":\"XLSX produced no sheets\"}";
+    }
+    // In-document import is single-sheet only; multi-sheet uses Open (new document).
+    if (parsed.workbook->sheetCount() > 1) {
+        return "{\"error\":\"multi_sheet\",\"sheetCount\":" +
+               std::to_string(parsed.workbook->sheetCount()) + "}";
+    }
+
+    SheetImportResult r =
+        importSheetViaCrdt(*_workbook, *parsed.workbook, 0, importMode, _activeSheetIndex);
+    if (!r.success) {
+        return importResultJson(r);
+    }
+    _activeSheetIndex = r.activeSheetIndex;
+    rebuildViewportIndex();
+    broadcastPendingOperations();
+    notifyListeners(ChangeType::SHEET_CHANGED);
+    notifyListeners(ChangeType::DATA_LOADED);
+    return importResultJson(r);
+}
+
 std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
+    // Open = new document: drop any live SyncClient before replacing Workbook.
+    disableSync();
     const char* data = reinterpret_cast<const char*>(ptr);
 
     XLSXReadOptions options;

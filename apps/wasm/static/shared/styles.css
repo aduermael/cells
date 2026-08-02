@@ -504,10 +504,47 @@ canvas {
     align-items: center;
     justify-content: center;
     z-index: 200;
+    pointer-events: none;
 }
 
 #drop-zone.visible {
     display: flex;
+    pointer-events: auto;
+}
+
+/* Top-left: open as new document (same as Open button) */
+#drop-zone-new-doc {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 168px;
+    padding: 12px 14px;
+    background: var(--color-bg-primary);
+    border: 2px dashed var(--color-text-muted);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 12px var(--color-shadow);
+    text-align: left;
+    pointer-events: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+#drop-zone-new-doc.drop-target-active {
+    border-color: var(--color-primary);
+    background: rgba(5, 134, 1, 0.12);
+}
+
+#drop-zone-new-doc strong {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+}
+
+#drop-zone-new-doc span {
+    display: block;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--color-text-muted);
 }
 
 #drop-zone-content {
@@ -2499,6 +2536,16 @@ canvas {
     justify-content: flex-end;
     gap: 8px;
     padding: 0 24px 20px;
+}
+
+.modal-footer-stack {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.modal-footer-stack .btn {
+    width: 100%;
+    justify-content: center;
 }
 
 /* Modal buttons use .btn and .btn.btn-primary with padding/font override */
