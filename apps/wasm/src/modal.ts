@@ -283,6 +283,14 @@ export type ImportSheetChoice = "replace" | "new_sheet" | "cancel";
  * Prompt when dropping a file onto a non-empty sheet.
  * Three actions: replace current, load as new sheet, or cancel.
  */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function showImportSheetChoice(fileLabel: string): Promise<ImportSheetChoice> {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
@@ -293,7 +301,7 @@ export function showImportSheetChoice(fileLabel: string): Promise<ImportSheetCho
     modal.setAttribute("aria-modal", "true");
     modal.innerHTML = `
       <div class="modal-header">
-        <h2 class="modal-title">Import ${fileLabel}</h2>
+        <h2 class="modal-title">Import ${escapeHtml(fileLabel)}</h2>
       </div>
       <div class="modal-body">
         The current sheet is not empty. How should this file be imported?

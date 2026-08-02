@@ -28,13 +28,19 @@ import { WasmDataSource, type DataChangeType } from "./wasm-data-source";
 import { detectFormat, getBaseName, downloadBlob } from "./utils";
 import { getMenuStateManager } from "./menu-state";
 import { showConfirm, showImportSheetChoice } from "./modal";
+import { getRoomIdFromUrl } from "./room-url";
+import {
+  canImportIntoDocument,
+  newDocumentDropHint,
+  resolveInDocumentImportMode,
+  type SheetImportMode,
+} from "./file-entry-policy";
 import type { FileFormat } from "./types";
 
 /** How a file enters the app */
 export type FileEntryMode = "new_document" | "import";
 
-/** In-document import placement */
-export type SheetImportMode = "into_current" | "replace" | "new_sheet";
+export type { SheetImportMode };
 
 // =============================================================================
 // Types
@@ -234,20 +240,13 @@ export class FileLoader {
     const dataCopy = data.slice(0);
     const format = detectFormat(file.name, data);
 
-    if (format === "zcd") {
-      // Full document formats always open as new document
+    if (!canImportIntoDocument(format) || (format !== "csv" && format !== "xlsx")) {
       await this.loadFileAsNewDocument(
         new File([dataCopy], file.name, { type: file.type }),
       );
       return;
     }
-
-    if (format !== "csv" && format !== "xlsx") {
-      await this.loadFileAsNewDocument(
-        new File([dataCopy], file.name, { type: file.type }),
-      );
-      return;
-    }
+    const importFormat: "csv" | "xlsx" = format;
 
     loading.textContent = "";
     loading.innerHTML =
@@ -258,25 +257,26 @@ export class FileLoader {
 
     try {
       const empty = await client.isActiveSheetEmpty();
-      let mode: SheetImportMode = "into_current";
-      if (!empty) {
+      let placement = resolveInDocumentImportMode(empty, null);
+      if (placement === "prompt") {
         const choice = await showImportSheetChoice(file.name);
-        if (choice === "cancel") {
-          loading.style.display = "none";
-          return;
-        }
-        mode = choice;
+        placement = resolveInDocumentImportMode(false, choice);
       }
+      if (placement === "cancel" || placement === "prompt") {
+        loading.style.display = "none";
+        return;
+      }
+      const mode: SheetImportMode = placement;
 
       try {
-        const result = await client.importSheet(data, format, mode);
+        const result = await client.importSheet(data, importFormat, mode);
         await this.afterInDocumentImport(getBaseName(file.name), result);
         loading.style.display = "none";
       } catch (importErr) {
         const msg =
           importErr instanceof Error ? importErr.message : String(importErr);
-        // Multi-sheet XLSX → open as new document instead
-        if (msg.includes("multi_sheet") || format === "xlsx") {
+        // Multi-sheet XLSX reported by WASM → open as new document
+        if (msg.includes("multi_sheet")) {
           console.warn("In-document import fallback to new document:", msg);
           loading.style.display = "none";
           await this.loadFileAsNewDocument(
@@ -682,10 +682,24 @@ export class FileLoader {
   setupDragAndDrop(): void {
     const { dropZone } = this.config;
     const newDocZone = document.getElementById("drop-zone-new-doc");
+    const newDocHint = document.getElementById("drop-zone-new-doc-hint");
 
     const hideDropUi = () => {
       dropZone.classList.remove("visible");
       newDocZone?.classList.remove("drop-target-active");
+    };
+
+    const refreshNewDocHint = () => {
+      if (!newDocHint) return;
+      // Room in URL means an active collab session for this tab.
+      const hint = newDocumentDropHint(getRoomIdFromUrl() !== null);
+      if (hint) {
+        newDocHint.textContent = hint;
+        newDocHint.hidden = false;
+      } else {
+        newDocHint.textContent = "";
+        newDocHint.hidden = true;
+      }
     };
 
     const isOverNewDocZone = (clientX: number, clientY: number): boolean => {
@@ -703,6 +717,7 @@ export class FileLoader {
       e.preventDefault();
       this.dragCounter++;
       if (this.dragCounter === 1) {
+        refreshNewDocHint();
         dropZone.classList.add("visible");
       }
     });
