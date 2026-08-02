@@ -1897,12 +1897,12 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 10px;
+    margin-top: 6px;
     width: 100%;
 }
 
 .collab-status-details-debug .debug-actions .collab-status-details-row {
-    padding: 4px 0;
+    padding: 0 0 2px;
 }
 
 .collab-status-details-debug .debug-actions .value.poor {
