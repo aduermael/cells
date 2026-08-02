@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 # Config settings for platform detection
 config_setting(

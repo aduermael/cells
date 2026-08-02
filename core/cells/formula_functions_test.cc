@@ -1,5 +1,9 @@
 #include "core/cells/formula_functions.h"
 
+// MSVC only exposes M_PI when this is set before <cmath>.
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 #include <cstring>
 

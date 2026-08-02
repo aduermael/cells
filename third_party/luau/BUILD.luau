@@ -4,6 +4,8 @@
 # Luau is a fast, safe, gradually typed scripting language derived from Lua.
 # This BUILD file defines cc_library targets for the VM, Compiler, and AST.
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 # MSVC rejects GCC-style -std= and -Wno-* flags; use platform selects.
@@ -155,6 +157,16 @@ cc_library(
 )
 
 # Analysis: type checking, linting, and autocomplete
+# NativeStackGuard.cpp uses GetCurrentThreadStackLimits (Windows 8+).
+# Bazel's default MSVC _WIN32_WINNT can be too low; pin to Win10.
+_WIN32_STACK_API = select({
+    "@platforms//os:windows": [
+        "_WIN32_WINNT=0x0A00",
+        "WINVER=0x0A00",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "luau_analysis",
     srcs = glob([
@@ -164,6 +176,7 @@ cc_library(
     hdrs = glob(["Analysis/include/Luau/*.h"]),
     copts = _CXX17 + _GCC_WARN_UNUSED,
     includes = ["Analysis/include"],
+    local_defines = _WIN32_STACK_API,
     deps = [
         ":luau_ast",
         ":luau_compiler",

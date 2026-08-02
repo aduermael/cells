@@ -41,11 +41,12 @@ TEST(OutputSpillTest, LargePayloadSpillsToTempWithJsonPointer) {
     // Path should live under temp
     EXPECT_NE(r.path.find("cells-out-"), std::string::npos);
 
-    // stdout is JSON pointing at the file
+    // stdout is JSON pointing at the file (path is JSON-escaped; Windows
+    // backslashes become \\ so match via json_escape, not the raw path).
     EXPECT_NE(r.stdout_text.find("\"path\":"), std::string::npos);
     EXPECT_NE(r.stdout_text.find("\"bytes\":"), std::string::npos);
     EXPECT_NE(r.stdout_text.find("\"preview\":"), std::string::npos);
-    EXPECT_NE(r.stdout_text.find(r.path), std::string::npos);
+    EXPECT_NE(r.stdout_text.find(json_escape(r.path)), std::string::npos);
 
     // Full body matches
     EXPECT_EQ(read_file(r.path), payload);

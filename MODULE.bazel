@@ -4,34 +4,38 @@ module(
 )
 
 # Platforms for OS-specific configurations
-bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "platforms", version = "1.0.0")
 
 # Apple support (CC toolchain for objc_library)
-# Must appear before rules_cc if present
-bazel_dep(name = "apple_support", version = "2.0.0")
+# Must appear before rules_cc so Apple toolchains are selected
+bazel_dep(name = "apple_support", version = "2.8.0")
 
-# Emscripten SDK for WebAssembly builds
-bazel_dep(name = "emsdk", version = "4.0.17")
+# C++ / Objective-C / shell rules (no longer built into Bazel 9)
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_shell", version = "0.8.0")
+
+# Emscripten SDK for WebAssembly builds (6.x required for Bazel 9)
+bazel_dep(name = "emsdk", version = "6.0.3")
 
 # OpenSSL for libdatachannel crypto (BCR cc_library; pure-Bazel libdc deps)
-bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
+bazel_dep(name = "openssl", version = "3.5.5.bcr.4")
 
 # libcurl for HTTP requests on Linux/native platforms
 bazel_dep(name = "curl", version = "8.11.0.bcr.4")
 
 # Google Test
-bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
 
 # Skylib (build_test and utilities)
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
 
 # Native XLSX parsing - XML parser
 bazel_dep(name = "pugixml", version = "1.14")
 
 # Apple platform rules (for Objective-C++ support on macOS/iOS)
-bazel_dep(name = "rules_apple", version = "4.3.3")
+bazel_dep(name = "rules_apple", version = "4.5.3")
 
-# rules_apple pulls rules_swift@2.4.0, whose Windows autoconfig hard-fails when
+# rules_apple pulls rules_swift whose older Windows autoconfig hard-fails when
 # swiftc.exe is absent. 2.9.0+ treats that as optional (needed for Windows CI
 # of pure C++/WinHTTP targets that never use Swift).
 single_version_override(
@@ -43,48 +47,52 @@ single_version_override(
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
 
 # rules_perl - needed to define system Perl toolchain (transitive dep of openssl)
-bazel_dep(name = "rules_perl", version = "0.5.0")
+bazel_dep(name = "rules_perl", version = "1.1.0")
 
 # System Perl toolchain for Alpine/musl builds
 # The OpenSSL BCR package depends on rules_perl, which downloads glibc-linked
 # Perl binaries that don't work on musl. This registers a toolchain that uses
 # system Perl (/usr/bin/perl) instead, with higher priority than the default.
 system_perl = use_repo_rule("//toolchains/perl:system_perl.bzl", "system_perl")
+
 system_perl(name = "system_perl")
+
 register_toolchains("//toolchains/perl:system_perl_toolchain")
 
 # WebRTC XCFramework from stasel/WebRTC for Apple platforms
 # https://github.com/stasel/WebRTC - BSD 3-Clause License
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 http_archive(
     name = "webrtc_xcframework",
-    url = "https://github.com/stasel/WebRTC/releases/download/141.0.0/WebRTC-M141.xcframework.zip",
-    sha256 = "e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f",
     build_file = "//third_party/webrtc:BUILD.webrtc",
+    sha256 = "e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f",
+    url = "https://github.com/stasel/WebRTC/releases/download/141.0.0/WebRTC-M141.xcframework.zip",
 )
 
 # libdatachannel - C++ WebRTC DataChannel implementation for native platforms
 # https://github.com/paullouisageneau/libdatachannel - MPL 2.0 License
 # Using git_repository to get submodules (libjuice, usrsctp, plog)
 git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+
 git_repository(
     name = "libdatachannel",
+    build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
+    recursive_init_submodules = True,
     remote = "https://github.com/paullouisageneau/libdatachannel.git",
     tag = "v0.24.0",
-    recursive_init_submodules = True,
-    build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
 )
 
 # Luau - Fast, safe, gradually typed scripting language from Roblox
 # https://github.com/luau-lang/luau - MIT License
 git_repository(
     name = "luau",
+    build_file = "//third_party/luau:BUILD.luau",
     remote = "https://github.com/luau-lang/luau.git",
     tag = "0.703",
-    build_file = "//third_party/luau:BUILD.luau",
 )

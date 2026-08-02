@@ -5,6 +5,8 @@
 # For now, macOS uses the default stderr-based logger. The .mm implementation
 # can be enabled later when rules_apple is added to the workspace.
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "log",
     srcs = [

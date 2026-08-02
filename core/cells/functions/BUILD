@@ -1,6 +1,8 @@
 # Individual formula function implementations
 # Source files exported for inclusion in //core/cells:formula_eval
 
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
 package(default_visibility = ["//core/cells:__pkg__"])
 
 # Export source files for inclusion in formula_eval

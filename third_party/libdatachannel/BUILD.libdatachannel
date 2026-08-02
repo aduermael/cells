@@ -10,6 +10,8 @@
 #   NO_MEDIA=ON, NO_WEBSOCKET=OFF, USE_GNUTLS=OFF, USE_NICE=OFF,
 #   PREFER_SYSTEM_LIB=OFF, BUILD_SHARED_LIBS=OFF
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 # GCC/Clang vs MSVC language standards
@@ -250,11 +252,20 @@ cc_library(
         "src/impl/websocketserver.cpp",
         "src/impl/wshandshake.cpp",
         "src/impl/wstransport.cpp",
-    ] + glob([
-        "src/**/*.hpp",
-        "src/**/*.h",
-    ]),
-    hdrs = glob(["include/rtc/**/*.h", "include/rtc/**/*.hpp"]),
+    ] + glob(
+        [
+            "src/**/*.hpp",
+            "src/**/*.h",
+        ],
+        allow_empty = True,
+    ),
+    hdrs = glob(
+        [
+            "include/rtc/**/*.h",
+            "include/rtc/**/*.hpp",
+        ],
+        allow_empty = True,
+    ),
     copts = _CXX17 + _GCC_WARN,
     defines = [
         "RTC_STATIC",

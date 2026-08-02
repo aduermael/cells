@@ -40,7 +40,7 @@ winget install Bazel.Bazelisk
 Build the full CLI (same target as macOS/Linux):
 
 ```powershell
-# Prefer bazelisk so the repo pin (7.5.0) is used
+# Prefer bazelisk so the repo pin (9.2.0) is used
 bazelisk build //apps/cli:cells
 # Output: bazel-bin\apps\cli\cells.exe
 
@@ -272,7 +272,7 @@ cells/
 ├── tools/                  # Build/lint scripts and utilities
 │   └── serve/              # Local WASM server
 ├── MODULE.bazel            # Bazel module definition
-└── WORKSPACE               # Bazel workspace
+└── .bazelversion           # Bazelisk pin (9.2.x)
 ```
 
 ## Quick Reference
