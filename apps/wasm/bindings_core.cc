@@ -888,6 +888,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
     cells::recalculate(_workbook.get(), changed);
     cells::recalculateVolatile(sheet);
 
+    broadcastPendingOperations();
     notifyListeners(ChangeType::CELL_CHANGED);
 
     std::ostringstream json;
@@ -976,6 +977,10 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
             json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
         }
         json << "}";
+        // Axis COL/ROW ops may have been applied even when the cell already existed.
+        if (colCreated || rowCreated) {
+            broadcastPendingOperations();
+        }
         return json.str();
     }
 
@@ -996,6 +1001,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     if (newCell) {
         _viewportIndex.onCellAdded(newCell);
     }
+    broadcastPendingOperations();
     notifyListeners(ChangeType::CELL_CHANGED);
 
     std::ostringstream json;
@@ -1351,6 +1357,7 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
     return "{\"success\":true}";
 }
@@ -1410,6 +1417,7 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         applyOperation(*_workbook, op);
     }
 
+    broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     std::ostringstream json;
@@ -1579,6 +1587,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     Operation op = makeColSetOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1669,6 +1678,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1755,6 +1765,7 @@ std::string CellsEngine::deleteColumnById(const std::string& colIdStr) {
         return "{\"error\":\"Failed to delete column\"}";
     }
 
+    broadcastPendingOperations();
     _viewportIndex.onAxisDeleted(colId, true);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1789,6 +1800,7 @@ std::string CellsEngine::deleteRowById(const std::string& rowIdStr) {
         return "{\"error\":\"Failed to delete row\"}";
     }
 
+    broadcastPendingOperations();
     _viewportIndex.onAxisDeleted(rowId, false);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1819,6 +1831,7 @@ std::string CellsEngine::fillRange(int sourceMinCol, int sourceMinRow, int sourc
         return "{\"error\":\"" + jsonEscape(result.error) + "\"}";
     }
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
 
@@ -1947,6 +1960,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, payload.str());
     applyOperation(*_workbook, rangeOp);
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -2000,6 +2014,7 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
     Operation removeOp = makeRangeDeleteOp(*_workbook, mergeRange->id, payload.str());
     applyOperation(*_workbook, removeOp);
 
+    broadcastPendingOperations();
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -2026,6 +2041,7 @@ void CellsEngine::setWorkbookName(const std::string& name) {
     Operation op = makeWorkbookSetOp(*_workbook, payload.str());
     applyOperation(*_workbook, op);
 
+    broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 }
 
