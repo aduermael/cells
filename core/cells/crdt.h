@@ -221,6 +221,12 @@ size_t discardEmptyPlaceholderSheets(Workbook& workbook);
 // Index of the first sheet with columns/cells, or 0 if none / empty workbook.
 [[nodiscard]] size_t preferredActiveSheetIndex(const Workbook& workbook);
 
+// After remote ops: keep the user's active sheet. Only remaps when the index
+// is invalid (e.g. peer deleted the active sheet) — then clamps to last sheet.
+// Never auto-switch for empty placeholders or remote edits on other sheets.
+[[nodiscard]] size_t resolveActiveSheetAfterRemoteChange(const Workbook& workbook,
+                                                         size_t activeIndex);
+
 // Create default Sheet1 via CRDT when workbook has no sheets (alone in room).
 // Does not check peer connectivity — caller must ensure we are not mid-join
 // waiting for remote state. Returns true if a sheet was created.
