@@ -129,7 +129,12 @@ struct ConnectedPeer : public RTCPeerConnectionDelegate, public DataChannelDeleg
     std::unique_ptr<RTCDataChannel> operations_channel;  // For sync operations
     std::unique_ptr<RTCDataChannel> presence_channel;    // For presence data
     bool we_initiated{false};                            // True if we created the offer
-    int64_t last_ping_time_ms{0};                        // For latency calculation
+    // True after we have sent our offer/answer over signaling. Local ICE
+    // candidates gathered before that (libdatachannel starts on createDataChannel)
+    // are held so the remote does not receive them before it has a PeerConnection.
+    bool local_sdp_sent{false};
+    std::vector<ICECandidate> pending_local_candidates;
+    int64_t last_ping_time_ms{0};  // For latency calculation
     int latency_ms{-1};
 
     // Reference back to SyncClient for callbacks
@@ -314,6 +319,12 @@ private:
     // had_rtc_attempt: true when an RTC peer existed and died without a channel.
     void noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt);
 
+    // After sendOffer/sendAnswer: mark local SDP sent and flush held candidates.
+    void markLocalSdpSentAndFlushIce(const std::string& peer_id);
+
+    // Apply any ICE candidates that arrived before createPeerConnection.
+    void flushEarlyRemoteIce(const std::string& peer_id);
+
     // Config
     SyncClientConfig config_;
 
@@ -329,6 +340,11 @@ private:
 
     // Connected peers
     std::map<std::string, std::unique_ptr<ConnectedPeer>> peers_;
+
+    // ICE candidates that arrived via signaling before we created a PC for that
+    // peer (common when initiator gathers before sending the offer). Flushed in
+    // createPeerConnection / after setRemoteDescription path.
+    std::map<std::string, std::vector<ICECandidate>> early_remote_ice_;
 
     // State
     SyncClientState state_ = SyncClientState::OFFLINE;

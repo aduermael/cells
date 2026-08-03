@@ -1,7 +1,12 @@
 // Tests for SyncClient join / ONLINE policy (shipped paths).
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <gtest/gtest.h>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "core/cells/model.h"
@@ -14,22 +19,30 @@ namespace {
 class RecordingDelegate : public SyncClientDelegate {
 public:
     void syncClientStateDidChange(SyncClient& /*client*/, SyncClientState state) override {
+        std::lock_guard<std::mutex> lock(mu);
         states.push_back(state);
         last_state = state;
     }
     void syncClientPeerDidChange(SyncClient& /*client*/, const PeerInfo& /*peer*/) override {}
     void syncClientPeerDidDisconnect(SyncClient& /*client*/, const std::string& peer_id) override {
+        std::lock_guard<std::mutex> lock(mu);
         disconnected.push_back(peer_id);
+        disconnect_count.fetch_add(1);
     }
     void syncClientDataDidChange(SyncClient& /*client*/) override {}
     void syncClientDidError(SyncClient& /*client*/, const std::string& error) override {
+        std::lock_guard<std::mutex> lock(mu);
         errors.push_back(error);
+        error_count.fetch_add(1);
     }
 
+    std::mutex mu;
     std::vector<SyncClientState> states;
     SyncClientState last_state = SyncClientState::OFFLINE;
     std::vector<std::string> disconnected;
     std::vector<std::string> errors;
+    std::atomic<int> disconnect_count{0};
+    std::atomic<int> error_count{0};
 };
 
 // Dummy signaling ref for injecting SignalingClientDelegate callbacks (unused body).
@@ -74,8 +87,11 @@ TEST(SyncClientJoinTest, FailedRtcJoinDoesNotGoOnlineEmpty) {
     EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
     EXPECT_EQ(client.getPeerCount(), 0u);
     EXPECT_TRUE(wb.sheets.empty());
-    ASSERT_FALSE(delegate.errors.empty());
-    EXPECT_NE(delegate.errors.back().find("WebRTC connections failed"), std::string::npos);
+    {
+        std::lock_guard<std::mutex> lock(delegate.mu);
+        ASSERT_FALSE(delegate.errors.empty());
+        EXPECT_NE(delegate.errors.back().find("WebRTC connections failed"), std::string::npos);
+    }
 
     // processOutgoing must not flip ONLINE either.
     client.processOutgoing();
@@ -118,6 +134,45 @@ TEST(SyncClientJoinTest, PeerLeftBeforeRtcAllowsOnlineAlone) {
     client.processOutgoing();
 
     EXPECT_EQ(client.getState(), SyncClientState::ONLINE);
+
+    client.stopSync();
+}
+
+// Early trickle ICE from the initiator often arrives before the offer. Those
+// must be buffered (not dropped) so host candidates are not lost — browser↔CLI
+// local repro where CLI candidates precede the offer on the wire.
+TEST(SyncClientJoinTest, EarlyRemoteIceBufferedWithoutPeer) {
+    Workbook wb;
+    SyncClientConfig config;
+    config.signaling_url = "ws://127.0.0.1:1/ws";
+
+    SyncClient client(&wb, config);
+    RecordingDelegate delegate;
+    client.setDelegate(&delegate);
+
+    // Polite: wait for offer from higher id (no PC yet).
+    client.startSync("room-ice", "AAAA0000");
+    client.signalingClientDidJoinRoom(dummySignaling(), "room-ice", {"ZZZZ9999"});
+    EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
+    EXPECT_TRUE(client.getPeers().empty());
+
+    // Initiator trickles host candidates before the offer hits us — must not
+    // throw / crash / mark join failed (no RTC attempt yet).
+    ICECandidate early("candidate:1 1 udp 2130706431 10.0.0.2 54321 typ host", "0", 0);
+    client.signalingClientDidReceiveICECandidate(dummySignaling(), "ZZZZ9999", early);
+    client.signalingClientDidReceiveICECandidate(
+        dummySignaling(), "ZZZZ9999",
+        ICECandidate("candidate:2 1 udp 1694498815 203.0.113.5 54322 typ srflx raddr 10.0.0.2 "
+                     "rport 54321",
+                     "0", 0));
+
+    EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
+    EXPECT_TRUE(client.getPeers().empty());
+    EXPECT_EQ(delegate.error_count.load(), 0);
+    EXPECT_EQ(delegate.disconnect_count.load(), 0);
+
+    // Real flush of early ICE is covered by native two-PC rtc_test + two-CLI
+    // session join; createPeerConnection calls flushEarlyRemoteIce.
 
     client.stopSync();
 }

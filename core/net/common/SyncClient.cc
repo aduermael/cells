@@ -240,6 +240,7 @@ void SyncClient::stopSync() {
     join_failure_reported_ = false;
     any_rtc_join_attempt_failed_ = false;
     outstanding_join_peers_.clear();
+    early_remote_ice_.clear();
     setState(SyncClientState::OFFLINE);
 }
 
@@ -461,6 +462,11 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
     // NOLINTNEXTLINE(misc-const-correctness)
     ConnectedPeer* ptr = peer.get();
     peers_[peer_id] = std::move(peer);
+
+    // Candidates that arrived before this PC existed (initiator gathered before
+    // offer reached us). Feed them into the PC (buffered until remote desc).
+    flushEarlyRemoteIce(peer_id);
+
     return ptr;
 }
 
@@ -494,6 +500,8 @@ void SyncClient::initiateConnectionToPeer(const std::string& peer_id) {
                     if (set_success) {
                         LOG_INFO("[Sync] Sending offer to %s", peer_id.c_str());
                         signaling_client_->sendOffer(peer_id, sdp);
+                        // Offer first, then any ICE that gathered during createDataChannel.
+                        markLocalSdpSentAndFlushIce(peer_id);
                     }
                 });
         });
@@ -520,6 +528,7 @@ void SyncClient::removePeer(const std::string& peer_id) {
     // (closing the connection triggers callbacks which might call removePeer again)
     auto peer = std::move(it->second);
     peers_.erase(it);
+    early_remote_ice_.erase(peer_id);
     // Clear data channel delegates to prevent callbacks on destroyed objects
     if (peer->operations_channel) {
         peer->operations_channel->setDelegate(nullptr);
@@ -881,6 +890,49 @@ void SyncClient::notifyPeerReady(const std::string& peer_id) {
     }
 }
 
+void SyncClient::markLocalSdpSentAndFlushIce(const std::string& peer_id) {
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return;
+    }
+    ConnectedPeer* peer = it->second.get();
+    peer->local_sdp_sent = true;
+    std::vector<ICECandidate> pending;
+    pending.swap(peer->pending_local_candidates);
+    if (!pending.empty()) {
+        LOG_INFO("[Sync] Flushing %zu held local ICE candidate(s) to %s", pending.size(),
+                 peer_id.c_str());
+    }
+    for (const auto& c : pending) {
+        signaling_client_->sendICECandidate(peer_id, c);
+    }
+}
+
+void SyncClient::flushEarlyRemoteIce(const std::string& peer_id) {
+    auto early = early_remote_ice_.find(peer_id);
+    if (early == early_remote_ice_.end() || early->second.empty()) {
+        return;
+    }
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end() || !it->second->connection) {
+        return;
+    }
+    std::vector<ICECandidate> pending;
+    pending.swap(early->second);
+    early_remote_ice_.erase(early);
+    LOG_INFO("[Sync] Applying %zu early remote ICE candidate(s) from %s", pending.size(),
+             peer_id.c_str());
+    for (const auto& c : pending) {
+        it->second->connection->addIceCandidate(
+            c, [peer_id](bool success, const std::string& error) {
+                if (!success) {
+                    LOG_INFO("[Sync] early addIceCandidate failed for %s: %s", peer_id.c_str(),
+                             error.c_str());
+                }
+            });
+    }
+}
+
 void SyncClient::noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt) {
     outstanding_join_peers_.erase(peer_id);
     if (had_rtc_attempt && !ever_had_ready_peer_) {
@@ -1063,6 +1115,7 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                             if (set_success) {
                                 LOG_INFO("[Sync] Sending answer to %s", from_peer.c_str());
                                 signaling_client_->sendAnswer(from_peer, answer);
+                                markLocalSdpSentAndFlushIce(from_peer);
                             } else {
                                 LOG_INFO("[Sync] setLocalDescription(answer) failed for %s: %s",
                                          from_peer.c_str(), err.c_str());
@@ -1096,8 +1149,13 @@ void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client
                                                        const ICECandidate& candidate) {
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
-        // Candidate before createPeerConnection — drop (cannot buffer without PC).
-        LOG_INFO("[Sync] ICE candidate from unknown peer %s (ignored)", from_peer.c_str());
+        // Initiator often trickles host/srflx candidates before the offer arrives.
+        // Hold them until createPeerConnection (see flushEarlyRemoteIce).
+        if (!candidate.isEmpty()) {
+            early_remote_ice_[from_peer].push_back(candidate);
+            LOG_INFO("[Sync] Buffering early ICE candidate from %s (%zu held)", from_peer.c_str(),
+                     early_remote_ice_[from_peer].size());
+        }
         return;
     }
 
@@ -1178,7 +1236,18 @@ void SyncClient::handlePeerMessage(const std::string& peer_id, const std::string
 }
 
 void SyncClient::handlePeerICECandidate(const std::string& peer_id, const ICECandidate& candidate) {
-    // Send ICE candidate to peer via signaling
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return;
+    }
+    // Hold until offer/answer is on the wire so the remote has a PC (and
+    // preferably remote description) before applying our host candidates.
+    // Without this, libdatachannel emits candidates during createDataChannel
+    // before sendOffer — browsers drop them (no PC yet).
+    if (!it->second->local_sdp_sent) {
+        it->second->pending_local_candidates.push_back(candidate);
+        return;
+    }
     signaling_client_->sendICECandidate(peer_id, candidate);
 }
 
