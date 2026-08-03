@@ -15,6 +15,7 @@ if (process.env.BAZEL_RUN !== '1') {
   console.error('Available commands:');
   console.error('  bazel run :wasm-dist    # Build WASM distribution');
   console.error('  bazel run :check        # Run all checks (unit tests, lint, type-check, e2e)');
+  console.error('  bazel run :test-js      # Run JS/TS unit tests');
   console.error('  bazel run :e2e          # Run E2E tests');
   console.error('  bazel run :e2e-headed   # Run E2E tests with visible browser');
   console.error('  bazel run :check-types  # Run TypeScript type checking');
