@@ -152,6 +152,19 @@ export function initApp(): AppContext {
     render: renderProxy,
     updateFormulaBar: updateFormulaBarProxy,
     updateScrollbars: updateScrollbarsProxy,
+    refreshWorkbookTitle: async () => {
+      const dataSource = app.dataSource;
+      const titleEditor = components.workbookTitleEditor;
+      if (!dataSource || !titleEditor) return;
+      try {
+        const name = await dataSource.client.getWorkbookName();
+        if (!name) return;
+        dataSource.setWorkbookName(name);
+        titleEditor.setTitleFromRemote(name);
+      } catch (e) {
+        console.error("Error refreshing workbook title:", e);
+      }
+    },
   });
 
   // =========================================================================

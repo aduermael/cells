@@ -113,7 +113,8 @@ std::string CellsEngine::applyRemoteOperation(const std::string& opJson) {
     ApplyResult result = applyOperation(*_workbook, op);
 
     // Determine notification type based on operation type
-    // Axis and sheet operations need STRUCTURE_CHANGED so viewport gets refreshed
+    // Axis, sheet, and workbook ops need STRUCTURE_CHANGED so UI refreshes
+    // (viewport, sheet tabs, workbook title)
     auto getNotificationType = [](OpType type) -> ChangeType {
         switch (type) {
             case OpType::COL_SET:
@@ -122,6 +123,7 @@ std::string CellsEngine::applyRemoteOperation(const std::string& opJson) {
             case OpType::ROW_DELETE:
             case OpType::SHEET_SET:
             case OpType::SHEET_DELETE:
+            case OpType::WORKBOOK_SET:
                 return ChangeType::STRUCTURE_CHANGED;
             default:
                 return ChangeType::CELL_CHANGED;
@@ -223,7 +225,7 @@ std::string CellsEngine::applyRemoteOperations(const std::string& opsJson) {
         }
     }
 
-    // Check if any operations affect structure (axes, sheets)
+    // Check if any operations affect structure (axes, sheets, workbook props)
     bool hasStructureOps = false;
     for (const auto& op : ops) {
         switch (op.type) {
@@ -233,6 +235,7 @@ std::string CellsEngine::applyRemoteOperations(const std::string& opsJson) {
             case OpType::ROW_DELETE:
             case OpType::SHEET_SET:
             case OpType::SHEET_DELETE:
+            case OpType::WORKBOOK_SET:
                 hasStructureOps = true;
                 break;
             default:

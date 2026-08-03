@@ -13,6 +13,7 @@ import {
   clickCell,
   setCellValue,
   getFormulaBarContent,
+  getWorkbookName,
   assertEqual,
   assertTrue,
   sleep,
@@ -264,6 +265,39 @@ async function runCollabTests() {
         const content = await getFormulaBarContent(ctx.page);
         assertEqual(content, '=E10+1', 'Formula should still show =E10+1');
       }, { retries: 5, initialDelay: 500 });
+    }));
+
+    // Test 7: Document title/name syncs between peers
+    results.push(await runTest('Workbook title syncs between peers', async () => {
+      const roomId = generateRoomId();
+
+      await joinRoom(ctx.page, ctx.baseUrl, roomId);
+      await joinRoom(page2, ctx.baseUrl, roomId);
+
+      await waitForPeerConnection(ctx.page, 10000);
+      await waitForPeerConnection(page2, 10000);
+
+      // Peer 1 renames the workbook via the title editor
+      await ctx.page.click('#workbook-title');
+      await sleep(100);
+      await ctx.page.evaluate(() => {
+        const el = document.getElementById('workbook-title');
+        if (!el) return;
+        el.focus();
+        el.textContent = 'Collab Shared Doc';
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      });
+      await sleep(300);
+
+      // Peer 1 should show the new title
+      const name1 = await getWorkbookName(ctx.page);
+      assertEqual(name1, 'Collab Shared Doc', 'Peer 1 should show renamed title');
+
+      // Peer 2 should receive the WORKBOOK_SET and update the header title
+      await assertWithRetry(async () => {
+        const name2 = await getWorkbookName(page2);
+        assertEqual(name2, 'Collab Shared Doc', 'Title should sync to peer 2');
+      }, { retries: 8, initialDelay: 400 });
     }));
 
   } finally {

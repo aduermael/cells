@@ -1723,16 +1723,18 @@ TEST(CrdtJoinEmptyShell, RemoteChangeSwitchesWhenActiveDeleted) {
 }
 
 TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
-    // Host has content Sheet1
-    auto host = std::make_unique<Workbook>(generate_id(), "Untitled");
+    // Host has content Sheet1 + document identity (Model B)
+    auto host = std::make_unique<Workbook>(generate_id(), "HostDoc");
     host->setNodeId(generate_id());
     host->startCollaboration();
+    const ID hostDocId = host->id;
     const ID hostSheet = generate_id();
     host->addSheet(std::make_unique<Sheet>(hostSheet, "Sheet1"));
     host->getSheet(hostSheet)->setWorkbook(host.get());
     const ID colId = generate_id();
     const ID rowId = generate_id();
     const ID cellId = generate_id();
+    applyOperation(*host, makeWorkbookSetOp(*host, R"({"name":"HostDoc"})"));
     applyOperation(*host, makeSheetSetOp(*host, hostSheet, R"({"name":"Sheet1"})"));
     applyOperation(*host, makeColSetOp(*host, colId, hostSheet, R"({"pos":0})"));
     applyOperation(*host, makeRowSetOp(*host, rowId, hostSheet, R"({"pos":0})"));
@@ -1745,6 +1747,7 @@ TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
     joiner->setNodeId(generate_id());
     joiner->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
     ASSERT_TRUE(isWorkbookContentEmpty(*joiner));
+    ASSERT_NE(joiner->id, hostDocId);
     const PrepareForSyncResult prep = prepareWorkbookForSync(*joiner);
     EXPECT_EQ(prep.bootstrappedOps, 0u);
     EXPECT_GE(prep.discardedSheets, 1u);
@@ -1754,11 +1757,14 @@ TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
 
     // Apply host ops (full join pull)
     const size_t applied = applyOperations(*joiner, host->getOpLog()->getAllOperations());
-    EXPECT_GE(applied, 4u);
+    EXPECT_GE(applied, 5u);
     EXPECT_EQ(joiner->sheetCount(), 1u) << "must not have dual Sheet1 after join";
     EXPECT_EQ(joiner->sheets[0]->id, hostSheet);
     EXPECT_EQ(preferredActiveSheetIndex(*joiner), 0u);
     EXPECT_EQ(joiner->getSheet(hostSheet)->getCell(cellId)->value.raw, "foo");
+    // Model B: empty joiner adopts host document UUID and name
+    EXPECT_EQ(joiner->id, hostDocId);
+    EXPECT_EQ(joiner->name, "HostDoc");
 }
 
 TEST(CrdtJoinEmptyShell, PrepareBootstrapsLocalContent) {
@@ -1793,9 +1799,41 @@ TEST(CrdtJoinEmptyShell, EnsureDefaultSheetOnlyWhenEmpty) {
     auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
     wb->setNodeId(generate_id());
     wb->startCollaboration();
+    const ID docId = wb->id;
     EXPECT_TRUE(ensureDefaultSheetViaCrdt(*wb));
     EXPECT_EQ(wb->sheetCount(), 1u);
-    EXPECT_FALSE(ensureDefaultSheetViaCrdt(*wb));  // already has a sheet
+    // Model B: alone-online also publishes document identity
+    bool hasDocOp = false;
+    for (const auto& op : wb->getOpLog()->getAllOperations()) {
+        if (op.type == OpType::WORKBOOK_SET) {
+            hasDocOp = true;
+            EXPECT_EQ(op.target_id, docId);
+            break;
+        }
+    }
+    EXPECT_TRUE(hasDocOp);
+    EXPECT_FALSE(ensureDefaultSheetViaCrdt(*wb));  // already has sheet + doc identity
+}
+
+TEST(CrdtJoinEmptyShell, AloneOnlineDocumentIdentityPullsOntoJoiner) {
+    // Host alone online mints sheet + document identity
+    auto host = std::make_unique<Workbook>(generate_id(), "RoomDoc");
+    host->setNodeId(generate_id());
+    host->startCollaboration();
+    const ID hostDocId = host->id;
+    EXPECT_TRUE(ensureDefaultSheetViaCrdt(*host));
+    EXPECT_EQ(host->sheetCount(), 1u);
+    EXPECT_EQ(host->id, hostDocId);
+
+    auto joiner = std::make_unique<Workbook>(generate_id(), "Untitled");
+    joiner->setNodeId(generate_id());
+    ASSERT_NE(joiner->id, hostDocId);
+    prepareWorkbookForSync(*joiner);
+    applyOperations(*joiner, host->getOpLog()->getAllOperations());
+
+    EXPECT_EQ(joiner->id, hostDocId);
+    EXPECT_EQ(joiner->name, "RoomDoc");
+    EXPECT_EQ(joiner->sheetCount(), 1u);
 }
 
 // ---------------------------------------------------------------------------

@@ -142,6 +142,7 @@ Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId);
 // =============================================================================
 
 // Generate a WORKBOOK_SET operation to update workbook properties.
+// target_id is the document UUID (Model B: shared across peers via apply).
 // Payload: {"name":"..."}
 Operation makeWorkbookSetOp(Workbook& workbook, const std::string& payload);
 
@@ -193,10 +194,13 @@ size_t bootstrapOpLog(Workbook& workbook);
 // Entering collaboration / join (shared by CLI SyncClient and WASM)
 // ---------------------------------------------------------------------------
 // Design:
-//  1) First join with empty local shell: publish NOTHING. Discard UI
-//     placeholders (empty Sheet1) and pull remote state via hello/sync.
+//  1) First join with empty local shell: publish no sheet placeholders.
+//     Discard empty Sheet1 and pull remote state via hello/sync. Document
+//     UUID is adopted from remote WORKBOOK_SET (Model B) or minted when
+//     alone online via ensureDefaultSheetViaCrdt.
 //  2) Local content already exists (edited offline, loaded file): bootstrap
-//     material state into the oplog so peers receive it.
+//     material state into the oplog (including WORKBOOK_SET for document
+//     UUID + name) so peers receive it and adopt the same document id.
 //  3) Already collaborating: leave state alone — ops are source of truth;
 //     reconnect only reconciles missing ops (compatible existing state).
 
@@ -227,9 +231,10 @@ size_t discardEmptyPlaceholderSheets(Workbook& workbook);
 [[nodiscard]] size_t resolveActiveSheetAfterRemoteChange(const Workbook& workbook,
                                                          size_t activeIndex);
 
-// Create default Sheet1 via CRDT when workbook has no sheets (alone in room).
+// Alone in room: ensure document identity (WORKBOOK_SET) exists in the oplog
+// and create default Sheet1 via CRDT when the workbook has no sheets.
 // Does not check peer connectivity — caller must ensure we are not mid-join
-// waiting for remote state. Returns true if a sheet was created.
+// waiting for remote state. Returns true if any op was applied.
 bool ensureDefaultSheetViaCrdt(Workbook& workbook);
 
 // True when a sheet has zero columns, rows, and cells (empty grid shell).

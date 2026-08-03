@@ -442,23 +442,56 @@ ApplyResult applySheetDelete(Workbook& workbook, const Operation& op) {
 }
 
 // =============================================================================
-// WORKBOOK_SET - Update workbook properties
+// WORKBOOK_SET - Update workbook properties (Model B: shared document UUID)
 // =============================================================================
 // Payload: {"name":"..."}
+//
+// Document UUID is a first-class CRDT entity (op.target_id). Peers may start
+// with different shell ids; applying an authoritative WORKBOOK_SET adopts
+// op.target_id as workbook.id so all peers converge to one document identity.
+//
+// LWW rules:
+//  1) Entity LWW on op.target_id among WORKBOOK_SET ops for that UUID.
+//  2) If local workbook.id already differs (shell or prior claim), only a
+//     higher-HLC WORKBOOK_SET may take over document identity; otherwise
+//     SUPERSEDED. Empty shells with no prior WORKBOOK_SET adopt freely.
+//  3) Winner adopts workbook.id = op.target_id and applies name.
 
 ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op) {
-    if (op.target_id != workbook.id) {
+    if (op.target_id.isNull()) {
         return ApplyResult::INVALID_TARGET;
     }
 
-    // Check for newer operations
     const OpLog* oplog = workbook.getOpLog();
-    auto ops = oplog->getOperationsForEntity(op.target_id);
-    for (const auto& existing : ops) {
+
+    // (1) Entity LWW for this document UUID
+    for (const auto& existing : oplog->getOperationsForEntity(op.target_id)) {
         if (existing.type == OpType::WORKBOOK_SET && existing.hlc > op.hlc) {
             return ApplyResult::SUPERSEDED;
         }
     }
+
+    // (2) Competing identity: different document UUID already claimed
+    if (workbook.id != op.target_id) {
+        HLC bestOther;
+        bool foundOther = false;
+        for (const auto& existing : oplog->getAllOperations()) {
+            if (existing.type == OpType::WORKBOOK_SET && existing.target_id != op.target_id) {
+                if (!foundOther || existing.hlc > bestOther) {
+                    foundOther = true;
+                    bestOther = existing.hlc;
+                }
+            }
+        }
+        if (foundOther && !(op.hlc > bestOther)) {
+            // Older or equal claim for a different document id — reject
+            return ApplyResult::SUPERSEDED;
+        }
+        // !foundOther: empty shell never wrote WORKBOOK_SET — adopt freely
+    }
+
+    // (3) Authoritative: adopt document UUID and properties
+    workbook.id = op.target_id;
 
     const std::string name = extractJSONString(op.payload, "name");
     if (!name.empty()) {
