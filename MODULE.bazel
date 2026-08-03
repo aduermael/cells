@@ -87,7 +87,9 @@ git_repository(
     build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
     recursive_init_submodules = True,
     remote = "https://github.com/paullouisageneau/libdatachannel.git",
-    tag = "v0.24.0",
+    # v0.24.5 (443f693): OpenSSL DTLS BIO race fix (PR #1584) — ice=connected
+    # then pc=failed vs Chrome; ClientHello queue before registerIncoming (PR #1554).
+    commit = "443f6934d9007eb7076ab7825ba330f355fcbead",  # v0.24.5
 )
 
 # Luau - Fast, safe, gradually typed scripting language from Roblox

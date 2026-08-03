@@ -48,10 +48,22 @@ _WIN_LINKOPTS = select({
     "//conditions:default": [],
 })
 
+# usrsctp / libdatachannel: BSD sockaddr has sa_len / sconn_len (macOS, *BSD).
+# Without HAVE_SCONN_LEN, usrsctp_bind(AF_CONN) leaves sconn_len=0 and fails with
+# EADDRNOTAVAIL (errno 49 on macOS) after DTLS succeeds — datachannel never opens.
+# CMake detects these via check_struct_has_member; pure-Bazel must set them.
+_BSD_SOCKADDR_LEN_DEFINES = [
+    "HAVE_SA_LEN",
+    "HAVE_SIN_LEN",
+    "HAVE_SIN6_LEN",
+    "HAVE_SCONN_LEN",
+]
+
 _USRSCTP_OS_DEFINES = select({
     "@platforms//os:linux": ["_GNU_SOURCE"],
-    "@platforms//os:macos": ["__APPLE_USE_RFC_2292"],
-    "@platforms//os:ios": ["__APPLE_USE_RFC_2292"],
+    "@platforms//os:macos": ["__APPLE_USE_RFC_2292"] + _BSD_SOCKADDR_LEN_DEFINES,
+    "@platforms//os:ios": ["__APPLE_USE_RFC_2292"] + _BSD_SOCKADDR_LEN_DEFINES,
+    # FreeBSD-class platforms also use sockaddr len (if we ever build there).
     "//conditions:default": [],
 })
 
@@ -284,7 +296,12 @@ cc_library(
         "USE_NICE=0",
         "RTC_SYSTEM_JUICE=0",
         "RTC_SYSTEM_SRTP=0",
-    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES,
+    ] + _POSIX_LOCAL_DEFINES + _WIN_LOCAL_DEFINES + select({
+        # SctpTransport::getSockAddrConn must set sconn_len on BSD/Apple.
+        "@platforms//os:macos": _BSD_SOCKADDR_LEN_DEFINES,
+        "@platforms//os:ios": _BSD_SOCKADDR_LEN_DEFINES,
+        "//conditions:default": [],
+    }),
     deps = [
         ":juice",
         ":plog",

@@ -10,6 +10,8 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -128,7 +130,12 @@ struct ConnectedPeer : public RTCPeerConnectionDelegate, public DataChannelDeleg
     std::unique_ptr<RTCDataChannel> operations_channel;  // For sync operations
     std::unique_ptr<RTCDataChannel> presence_channel;    // For presence data
     bool we_initiated{false};                            // True if we created the offer
-    int64_t last_ping_time_ms{0};                        // For latency calculation
+    // True after we have sent our offer/answer over signaling. Local ICE
+    // candidates gathered before that (libdatachannel starts on createDataChannel)
+    // are held so the remote does not receive them before it has a PeerConnection.
+    bool local_sdp_sent{false};
+    std::vector<ICECandidate> pending_local_candidates;
+    int64_t last_ping_time_ms{0};  // For latency calculation
     int latency_ms{-1};
 
     // Reference back to SyncClient for callbacks
@@ -154,7 +161,8 @@ struct ConnectedPeer : public RTCPeerConnectionDelegate, public DataChannelDeleg
 };
 
 // SyncClient - orchestrates P2P synchronization
-// Thread-safety: All methods must be called from main thread
+// Thread-safety: libdatachannel and platform WS invoke callbacks on worker
+// threads; all entry points take mu_ (recursive for re-entrant offer/answer).
 class SyncClient : public SignalingClientDelegate {
 public:
     // Create a SyncClient for a workbook
@@ -309,8 +317,21 @@ private:
     // Notify peer was ready (add to SyncManager)
     void notifyPeerReady(const std::string& peer_id);
 
+    // Mark an initial-join peer as resolved (left, RTC failed, or synced).
+    // had_rtc_attempt: true when an RTC peer existed and died without a channel.
+    void noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt);
+
+    // After sendOffer/sendAnswer: mark local SDP sent and flush held candidates.
+    void markLocalSdpSentAndFlushIce(const std::string& peer_id);
+
+    // Apply any ICE candidates that arrived before createPeerConnection.
+    void flushEarlyRemoteIce(const std::string& peer_id);
+
     // Config
     SyncClientConfig config_;
+
+    // Serializes peers_/state_ against libdc ICE/DC threads and signaling I/O.
+    mutable std::recursive_mutex mu_;
 
     // Workbook and SyncManager (from core/cells/)
     Workbook* workbook_;
@@ -325,6 +346,11 @@ private:
     // Connected peers
     std::map<std::string, std::unique_ptr<ConnectedPeer>> peers_;
 
+    // ICE candidates that arrived via signaling before we created a PC for that
+    // peer (common when initiator gathers before sending the offer). Flushed in
+    // createPeerConnection / after setRemoteDescription path.
+    std::map<std::string, std::vector<ICECandidate>> early_remote_ice_;
+
     // State
     SyncClientState state_ = SyncClientState::OFFLINE;
     std::string room_id_;
@@ -335,6 +361,41 @@ private:
     // the first offer). Minting a local Sheet1 in that window creates a second
     // document that never merges with the browser's sheet.
     bool expect_remote_peers_ = false;
+
+    // True once any peer data-channel has opened (real collab progress).
+    // Cleared on stopSync. Used so a failed join (all RTC peers die with no
+    // channel) does not clear expect_remote_peers_ and report empty ONLINE.
+    bool ever_had_ready_peer_ = false;
+
+    // True after we have reported a join-with-existing RTC failure once.
+    bool join_failure_reported_ = false;
+
+    // True if any RTC peer from the join set closed without a ready channel.
+    bool any_rtc_join_attempt_failed_ = false;
+
+    // Peer ids from the room at join time that we have not yet resolved
+    // (ready channel, or left/failed). While non-empty and never ready, stay
+    // SYNCING — do not ONLINE alone.
+    std::set<std::string> outstanding_join_peers_;
+
+    // Join-time WebRTC retries: ice=connected then pc=failed (DTLS/SCTP) is
+    // common on first attempt (browser mDNS / candidate races). Both peers used
+    // to drop the PC and never re-offer → permanent SYNCING. Impolite side
+    // re-offers after a short delay; polite side waits for that re-offer.
+    static constexpr int kMaxJoinRtcAttempts = 3;  // initial + 2 retries
+    std::map<std::string, int> join_rtc_attempts_;
+    struct PendingJoinRetry {
+        bool we_should_offer = false;
+        int64_t retry_after_ms = 0;
+    };
+    std::map<std::string, PendingJoinRetry> pending_join_retries_;
+
+    // Tear down RTC for peer without counting as final join failure.
+    // Returns true if a peer existed and was removed.
+    bool tearDownPeerForRetry(const std::string& peer_id);
+
+    // Schedule / flush join-time WebRTC retries (called from processOutgoing).
+    void flushPendingJoinRetries();
 
     // Result of prepareWorkbookForSync in the last startSync call
     size_t last_bootstrapped_ops_{0};

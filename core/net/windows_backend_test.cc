@@ -231,4 +231,9 @@ TEST(WindowsBackendTest, LibdatachannelIsPureBazelWithOpenSsl) {
     // Windows system libs remain select()-gated (not the only platform path).
     EXPECT_NE(build.find("@platforms//os:windows"), std::string::npos);
     EXPECT_NE(build.find("ws2_32.lib"), std::string::npos);
+    // macOS/BSD sockaddr len: without these, usrsctp_bind fails with
+    // EADDRNOTAVAIL (49) after DTLS — datachannel never opens vs browser.
+    EXPECT_NE(build.find("HAVE_SCONN_LEN"), std::string::npos);
+    EXPECT_NE(build.find("HAVE_SA_LEN"), std::string::npos);
+    EXPECT_NE(build.find("@platforms//os:macos"), std::string::npos);
 }

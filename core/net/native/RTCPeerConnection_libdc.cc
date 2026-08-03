@@ -3,18 +3,56 @@
 
 #if !defined(__EMSCRIPTEN__)
 
+#include <cctype>
+#include <cstdlib>
+
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <rtc/rtc.hpp>
 #include <string>
+#include <vector>
 
+#include "core/log/include/Logger.h"
 #include "core/net/include/RTCPeerConnection.h"
 
 namespace cells::net {
 
 // Forward declaration from RTCDataChannel_libdc.cc
 std::unique_ptr<RTCDataChannel> createLibdcDataChannel(std::shared_ptr<rtc::DataChannel> dc);
+
+// Route libdatachannel / libjuice / OpenSSL DTLS logs into our logger when
+// debugging collab. Essential for ice=connected → pc=failed diagnosis.
+static void ensureLibdcLoggingOnce() {
+    static const bool once = [] {
+        if (std::getenv("CELLS_SESSION_DEBUG") == nullptr &&
+            std::getenv("CELLS_RTC_DEBUG") == nullptr) {
+            return true;
+        }
+        try {
+            rtc::InitLogger(rtc::LogLevel::Debug, [](rtc::LogLevel level, std::string message) {
+                // Strip trailing newlines; libdc often includes them.
+                while (!message.empty() && (message.back() == '\n' || message.back() == '\r')) {
+                    message.pop_back();
+                }
+                if (level <= rtc::LogLevel::Error) {
+                    LOG_ERROR("[libdc] %s", message.c_str());
+                } else if (level <= rtc::LogLevel::Warning) {
+                    LOG_INFO("[libdc] %s", message.c_str());
+                } else {
+                    LOG_INFO("[libdc] %s", message.c_str());
+                }
+            });
+            LOG_INFO(
+                "[RTC] libdatachannel debug logging enabled "
+                "(CELLS_SESSION_DEBUG / CELLS_RTC_DEBUG)");
+        } catch (...) {
+            // Logger already initialized elsewhere — ignore.
+        }
+        return true;
+    }();
+    (void)once;
+}
 
 // Map libdatachannel states to our state enums
 static PeerConnectionState mapState(rtc::PeerConnection::State state) {
@@ -87,6 +125,60 @@ static SignalingState mapSignalingState(rtc::PeerConnection::SignalingState stat
     }
 }
 
+// Browser RTCIceCandidate.candidate is the attribute value ("candidate:...") without
+// the SDP "a=" line prefix. libdatachannel's operator string() adds "a="; use
+// Candidate::candidate() when exporting, and strip "a=" when importing.
+// Also lowercase the transport token (libdc emits "UDP"; browsers emit "udp").
+static std::string iceCandidateForSignaling(const rtc::Candidate& cand) {
+    std::string s = cand.candidate();
+    // candidate:<foundation> <component> <protocol> ...
+    const size_t sp1 = s.find(' ');
+    if (sp1 == std::string::npos) {
+        return s;
+    }
+    const size_t sp2 = s.find(' ', sp1 + 1);
+    if (sp2 == std::string::npos) {
+        return s;
+    }
+    // fields: [0]=candidate:f [1]=component [2]=protocol
+    // sp1 after field0, sp2 after field1, protocol is sp2+1 .. next space
+    const size_t proto_start = sp2 + 1;
+    const size_t proto_end = s.find(' ', proto_start);
+    if (proto_end == std::string::npos) {
+        return s;
+    }
+    for (size_t i = proto_start; i < proto_end; ++i) {
+        const unsigned char ch = static_cast<unsigned char>(s[i]);
+        s[i] = static_cast<char>(std::tolower(ch));
+    }
+    return s;
+}
+
+static std::string normalizeIncomingIceCandidate(std::string candidate) {
+    if (candidate.rfind("a=", 0) == 0) {
+        candidate.erase(0, 2);
+    }
+    // Lowercase transport protocol for consistent parsing.
+    const size_t sp1 = candidate.find(' ');
+    if (sp1 == std::string::npos) {
+        return candidate;
+    }
+    const size_t sp2 = candidate.find(' ', sp1 + 1);
+    if (sp2 == std::string::npos) {
+        return candidate;
+    }
+    const size_t proto_start = sp2 + 1;
+    const size_t proto_end = candidate.find(' ', proto_start);
+    if (proto_end == std::string::npos) {
+        return candidate;
+    }
+    for (size_t i = proto_start; i < proto_end; ++i) {
+        const unsigned char ch = static_cast<unsigned char>(candidate[i]);
+        candidate[i] = static_cast<char>(std::tolower(ch));
+    }
+    return candidate;
+}
+
 // Convert our ICE server config to libdatachannel format
 static rtc::Configuration toLibdcConfig(const RTCConfiguration& config) {
     rtc::Configuration rtcConfig;
@@ -94,14 +186,24 @@ static rtc::Configuration toLibdcConfig(const RTCConfiguration& config) {
     for (const auto& server : config.ice_servers) {
         for (const auto& url : server.urls) {
             if (!server.username.empty() && !server.credential.empty()) {
-                // TURN server with credentials
-                rtcConfig.iceServers.emplace_back(url + ":" + server.username + ":" +
-                                                  server.credential);
+                // libdatachannel URL form: turn:user:pass@host:port
+                // (NOT url:user:pass — that fails to parse).
+                std::string turn_url = url;
+                const auto scheme_end = turn_url.find(':');
+                if (scheme_end != std::string::npos && turn_url.find('@') == std::string::npos) {
+                    turn_url.insert(scheme_end + 1,
+                                    server.username + ":" + server.credential + "@");
+                }
+                rtcConfig.iceServers.emplace_back(turn_url);
             } else {
                 // STUN server (no credentials needed)
                 rtcConfig.iceServers.emplace_back(url);
             }
         }
+    }
+
+    if (config.ice_transport_policy == ICETransportPolicy::RELAY) {
+        rtcConfig.iceTransportPolicy = rtc::TransportPolicy::Relay;
     }
 
     return rtcConfig;
@@ -239,12 +341,37 @@ public:
                     type = rtc::Description::Type::Unspec;
             }
 
+            // Lightweight interop diagnostics (DTLS needs fingerprint + setup).
+            const bool has_fp = sdp.sdp.find("a=fingerprint:") != std::string::npos;
+            const bool has_setup = sdp.sdp.find("a=setup:") != std::string::npos;
+            const bool has_ufrag = sdp.sdp.find("a=ice-ufrag:") != std::string::npos;
+            const bool has_app = sdp.sdp.find("m=application") != std::string::npos;
+            LOG_INFO(
+                "[RTC] setRemoteDescription type=%s bytes=%zu fingerprint=%s setup=%s "
+                "ice_ufrag=%s m=application=%s",
+                sdp.type == SDPType::OFFER      ? "offer"
+                : sdp.type == SDPType::ANSWER   ? "answer"
+                : sdp.type == SDPType::PRANSWER ? "pranswer"
+                                                : "other",
+                sdp.sdp.size(), has_fp ? "yes" : "NO", has_setup ? "yes" : "NO",
+                has_ufrag ? "yes" : "NO", has_app ? "yes" : "NO");
+            if (!has_fp) {
+                LOG_INFO("[RTC] WARNING: remote SDP missing a=fingerprint — DTLS will fail");
+            }
+
             rtc::Description desc(sdp.sdp, type);
             pc_->setRemoteDescription(desc);
 
             remote_description_ = sdp;
+            remote_description_set_ = true;
+
+            // libdatachannel does not buffer candidates before remote description;
+            // browsers do. Flush any that arrived early (trickle ICE).
+            flushPendingRemoteCandidates();
+
             callback(true, "");
         } catch (const std::exception& e) {
+            LOG_INFO("[RTC] setRemoteDescription failed: %s", e.what());
             callback(false, e.what());
         }
     }
@@ -261,13 +388,15 @@ public:
             return;
         }
 
-        try {
-            rtc::Candidate cand(candidate.candidate, candidate.sdp_mid);
-            pc_->addRemoteCandidate(cand);
+        // Buffer until setRemoteDescription succeeds (browser-compatible trickle).
+        if (!remote_description_set_) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            pending_remote_candidates_.push_back(candidate);
             callback(true, "");
-        } catch (const std::exception& e) {
-            callback(false, e.what());
+            return;
         }
+
+        callback(applyRemoteCandidate(candidate), "");
     }
 
     std::unique_ptr<RTCDataChannel> createDataChannel(const std::string& label,
@@ -395,11 +524,12 @@ private:
 
         pc_->onLocalCandidate([this](rtc::Candidate cand) {
             ICECandidate candidate;
-            candidate.candidate = std::string(cand);
+            // Must NOT include "a=" — browsers reject that form in addIceCandidate.
+            candidate.candidate = iceCandidateForSignaling(cand);
             auto mid = cand.mid();
-            if (!mid.empty()) {
-                candidate.sdp_mid = mid;
-            }
+            // Datachannel-only offers use mid "0". Empty mid makes Chrome drop the
+            // candidate (addIceCandidate requires sdpMid or sdpMLineIndex).
+            candidate.sdp_mid = mid.empty() ? "0" : mid;
             candidate.sdp_mline_index = 0;  // libdatachannel doesn't expose this directly
             notifyICECandidate(candidate);
         });
@@ -408,6 +538,50 @@ private:
             auto channel = createLibdcDataChannel(dc);
             notifyDataChannel(std::move(channel));
         });
+    }
+
+    bool applyRemoteCandidate(const ICECandidate& candidate) {
+        if (!pc_) {
+            return false;
+        }
+        try {
+            const std::string normalized = normalizeIncomingIceCandidate(candidate.candidate);
+            // Prefer sdpMid; browsers always set it for the datachannel m-line ("0").
+            // Empty mid breaks association when only sdpMLineIndex was set.
+            std::string mid = candidate.sdp_mid;
+            if (mid.empty() && candidate.sdp_mline_index >= 0) {
+                mid = std::to_string(candidate.sdp_mline_index);
+            }
+            rtc::Candidate cand(normalized, mid);
+            // Do NOT call cand.resolve() here. libdatachannel's
+            // processRemoteCandidate already:
+            //   1) resolve(Simple) for numeric hosts
+            //   2) async resolve(Lookup) for mDNS *.local names
+            // Pre-resolving on the signaling thread raced with that path and
+            // could leave ice=connected with a broken DTLS association on some
+            // platforms (macOS + Chrome mDNS). Hand off the raw candidate.
+            if (normalized.find(".local") != std::string::npos) {
+                LOG_INFO("[RTC] ICE remote mDNS candidate mid=%s (libdc async resolve)",
+                         mid.c_str());
+            }
+            pc_->addRemoteCandidate(std::move(cand));
+            return true;
+        } catch (const std::exception& e) {
+            LOG_INFO("[RTC] addRemoteCandidate failed: %s (%s)", e.what(),
+                     candidate.candidate.c_str());
+            return false;
+        }
+    }
+
+    void flushPendingRemoteCandidates() {
+        std::vector<ICECandidate> pending;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            pending.swap(pending_remote_candidates_);
+        }
+        for (const auto& c : pending) {
+            applyRemoteCandidate(c);
+        }
     }
 
     std::unique_ptr<rtc::PeerConnection> pc_;
@@ -421,6 +595,8 @@ private:
 
     SessionDescription local_description_;
     SessionDescription remote_description_;
+    bool remote_description_set_ = false;
+    std::vector<ICECandidate> pending_remote_candidates_;
 
     // Pending callbacks
     CreateSDPCallback pending_create_callback_;
@@ -429,6 +605,7 @@ private:
 
 // Factory implementation for native platforms using libdatachannel
 std::unique_ptr<RTCPeerConnection> RTCPeerConnection::make(const RTCConfiguration& config) {
+    ensureLibdcLoggingOnce();
     return std::make_unique<LibdcPeerConnection>(config);
 }
 

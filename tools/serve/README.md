@@ -29,6 +29,26 @@ go run main.go [options]
 | `-enable-collab` | `false` | Enable collaboration WebSocket endpoint at `/ws` |
 | `-max-room-size` | `10` | Maximum number of peers per room |
 | `-room-timeout` | `1h` | Timeout for empty rooms before cleanup |
+| `-signaling-verbose` | `false` | Log full SDP/ICE JSON (default: compact summaries) |
+
+### Signaling log tags (always on when collab is enabled)
+
+| Prefix | What it shows |
+|--------|----------------|
+| `[JOIN]` / `[LEAVE]` | Peer enter/exit, room size, peer list, rejoin |
+| `[JOINED]` | Existing-peer list sent to the joiner |
+| `[NOTIFY]` | `peer-joined` / `peer-left` broadcasts |
+| `[MSG]` | offer/answer/ice with **summaries** (sdp type/size, ice typ, `a_prefix`) |
+| `[ORDER]` | **ice before offer** warnings (common CLI↔browser bug) |
+| `[RELAY]` | Relay ok/fail (missing target is an error, not silent) |
+| `[PING]` / `[WS]` / `[ERR]` | Connection health and protocol errors |
+
+Example compact ICE line:
+
+```text
+[MSG] type=ice-candidate from=CLI to=Browser room=abc bytes=180 ice_typ=host proto=udp mid=0 mline=0 a_prefix=false cand_bytes=64
+[ORDER] WARN ice_before_offer count=9 from=CLI to=Browser room=abc
+```
 
 ## Collaboration
 

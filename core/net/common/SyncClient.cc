@@ -102,8 +102,9 @@ void ConnectedPeer::peerConnectionStateDidChange(RTCPeerConnection& /*pc*/,
 }
 
 void ConnectedPeer::peerConnectionICEStateDidChange(RTCPeerConnection& /*pc*/,
-                                                    ICEConnectionState /*state*/) {
-    // Handled via connection state changes
+                                                    ICEConnectionState state) {
+    LOG_INFO("[Sync] ICE state peer=%s ice=%s", id.c_str(), iceConnectionStateToString(state));
+    // Connection-level FAILED/CLOSED still drives removePeer; ICE logs aid diagnosis.
 }
 
 void ConnectedPeer::peerConnectionDidGatherICECandidate(RTCPeerConnection& /*pc*/,
@@ -185,6 +186,7 @@ SyncClient::~SyncClient() {
 }
 
 void SyncClient::startSync(const std::string& room_id, const std::string& peer_id) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (state_ != SyncClientState::OFFLINE) {
         stopSync();
     }
@@ -217,28 +219,54 @@ void SyncClient::startSync(const std::string& room_id, const std::string& peer_i
 }
 
 void SyncClient::stopSync() {
-    // Close all peer connections
-    for (auto& pair : peers_) {
-        if (pair.second->connection) {
-            pair.second->connection->close();
+    std::vector<std::unique_ptr<ConnectedPeer>> closing;
+    {
+        const std::unique_lock<std::recursive_mutex> lock(mu_);
+        for (auto& pair : peers_) {
+            if (!pair.second) {
+                continue;
+            }
+            if (pair.second->operations_channel) {
+                pair.second->operations_channel->setDelegate(nullptr);
+            }
+            if (pair.second->presence_channel) {
+                pair.second->presence_channel->setDelegate(nullptr);
+            }
+            if (pair.second->connection) {
+                pair.second->connection->setDelegate(nullptr);
+            }
+            pair.second->sync_client = nullptr;
+            closing.push_back(std::move(pair.second));
+        }
+        peers_.clear();
+        early_remote_ice_.clear();
+        join_rtc_attempts_.clear();
+        pending_join_retries_.clear();
+
+        signaling_client_->disconnect();
+
+        delete sync_manager_;
+        sync_manager_ = nullptr;
+
+        room_id_.clear();
+        peer_id_.clear();
+        expect_remote_peers_ = false;
+        ever_had_ready_peer_ = false;
+        join_failure_reported_ = false;
+        any_rtc_join_attempt_failed_ = false;
+        outstanding_join_peers_.clear();
+        setState(SyncClientState::OFFLINE);
+    }
+    // Close outside mu_ so libdc ICE threads are not blocked on our lock.
+    for (auto& peer : closing) {
+        if (peer && peer->connection) {
+            peer->connection->close();
         }
     }
-    peers_.clear();
-
-    // Disconnect signaling
-    signaling_client_->disconnect();
-
-    // Clean up SyncManager
-    delete sync_manager_;
-    sync_manager_ = nullptr;
-
-    room_id_.clear();
-    peer_id_.clear();
-    expect_remote_peers_ = false;
-    setState(SyncClientState::OFFLINE);
 }
 
 void SyncClient::broadcastOperations() {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (!sync_manager_) {
         return;
     }
@@ -264,6 +292,11 @@ void SyncClient::broadcastOperations() {
 }
 
 void SyncClient::processOutgoing() {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
+    // Join-time RTC retries even if SyncManager is briefly null (should not
+    // happen after startSync); always try while SYNCING.
+    flushPendingJoinRetries();
+
     if (!sync_manager_) {
         return;
     }
@@ -292,10 +325,12 @@ void SyncClient::processOutgoing() {
 }
 
 bool SyncClient::isConnected() const {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     return state_ == SyncClientState::ONLINE || state_ == SyncClientState::SYNCING;
 }
 
 size_t SyncClient::getPeerCount() const {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     size_t count = 0;
     for (const auto& pair : peers_) {
         if (pair.second->isReady()) {
@@ -306,6 +341,7 @@ size_t SyncClient::getPeerCount() const {
 }
 
 std::vector<PeerInfo> SyncClient::getPeers() const {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     std::vector<PeerInfo> result;
     for (const auto& pair : peers_) {
         PeerInfo info;
@@ -330,6 +366,7 @@ std::vector<PeerInfo> SyncClient::getPeers() const {
 }
 
 PeerInfo SyncClient::getPeer(const std::string& peer_id) const {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     PeerInfo info;
     info.id = peer_id;
 
@@ -353,6 +390,7 @@ PeerInfo SyncClient::getPeer(const std::string& peer_id) const {
 }
 
 int SyncClient::getAverageLatency() const {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     int total = 0;
     int count = 0;
     for (const auto& pair : peers_) {
@@ -365,6 +403,7 @@ int SyncClient::getAverageLatency() const {
 }
 
 void SyncClient::reconnect() {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (room_id_.empty() || peer_id_.empty()) {
         return;
     }
@@ -456,6 +495,11 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
     // NOLINTNEXTLINE(misc-const-correctness)
     ConnectedPeer* ptr = peer.get();
     peers_[peer_id] = std::move(peer);
+
+    // Candidates that arrived before this PC existed (initiator gathered before
+    // offer reached us). Feed them into the PC (buffered until remote desc).
+    flushEarlyRemoteIce(peer_id);
+
     return ptr;
 }
 
@@ -474,6 +518,7 @@ void SyncClient::initiateConnectionToPeer(const std::string& peer_id) {
     peer->connection->createOffer(
         // NOLINTNEXTLINE(bugprone-exception-escape)
         [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
+            const std::unique_lock<std::recursive_mutex> lock(mu_);
             if (!success) {
                 LOG_INFO("[Sync] createOffer failed for %s", peer_id.c_str());
                 return;
@@ -486,64 +531,73 @@ void SyncClient::initiateConnectionToPeer(const std::string& peer_id) {
                 sdp,
                 // NOLINTNEXTLINE(bugprone-exception-escape)
                 [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
+                    const std::unique_lock<std::recursive_mutex> lock(mu_);
                     if (set_success) {
                         LOG_INFO("[Sync] Sending offer to %s", peer_id.c_str());
                         signaling_client_->sendOffer(peer_id, sdp);
+                        // Offer first, then any ICE that gathered during createDataChannel.
+                        markLocalSdpSentAndFlushIce(peer_id);
                     }
                 });
         });
 }
 
 void SyncClient::removePeer(const std::string& peer_id) {
+    // mu_ must be held. Extract peer, drop delegates, close outside lock.
     auto it = peers_.find(peer_id);
     if (it == peers_.end()) {
-        // Already removed (reentrancy guard)
         return;
     }
 
-    LOG_INFO("[Sync] Peer disconnected: %s", peer_id.c_str());
+    std::string disconnect_detail;
+    if (it->second->connection) {
+        disconnect_detail =
+            std::string(" pc=") +
+            peerConnectionStateToString(it->second->connection->getConnectionState()) +
+            " ice=" + iceConnectionStateToString(it->second->connection->getICEConnectionState());
+    }
+    LOG_INFO("[Sync] Peer disconnected: %s%s", peer_id.c_str(), disconnect_detail.c_str());
 
-    // Take ownership of the peer before erasing to prevent reentrancy issues
-    // (closing the connection triggers callbacks which might call removePeer again)
     auto peer = std::move(it->second);
     peers_.erase(it);
-    if (peers_.empty()) {
-        // Room may be empty now; allow ONLINE alone again
-        expect_remote_peers_ = false;
-    }
+    early_remote_ice_.erase(peer_id);
 
-    // Clear data channel delegates to prevent callbacks on destroyed objects
     if (peer->operations_channel) {
         peer->operations_channel->setDelegate(nullptr);
     }
     if (peer->presence_channel) {
         peer->presence_channel->setDelegate(nullptr);
     }
-
-    // Now safe to close - if callbacks fire, the peer is already removed from map
+    peer->sync_client = nullptr;
     if (peer->connection) {
-        peer->connection->setDelegate(nullptr);  // Prevent further callbacks
-        peer->connection->close();
+        peer->connection->setDelegate(nullptr);
     }
 
-    // Remove from SyncManager
     if (sync_manager_) {
         sync_manager_->removePeer(cells::ID(peer_id));
     }
-
-    // Remove presence and notify
     if (presence_manager_) {
         presence_manager_->removePeer(peer_id);
-        if (delegate_) {
-            delegate_->syncClientPresenceDidRemove(*this, peer_id);
-        }
     }
 
-    // Notify delegate
-    if (delegate_) {
-        delegate_->syncClientPeerDidDisconnect(*this, peer_id);
+    SyncClientDelegate* del = delegate_;
+
+    // Temporarily release mu_ so libdc ICE threads blocked on handlePeer* can
+    // complete while close() joins them. Callers must use unique_lock so this
+    // unlock is balanced (we re-lock before return).
+    mu_.unlock();
+    if (peer->connection) {
+        peer->connection->close();
+    }
+    peer.reset();
+    mu_.lock();
+
+    if (del) {
+        del->syncClientPresenceDidRemove(*this, peer_id);
+        del->syncClientPeerDidDisconnect(*this, peer_id);
     }
 
+    noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/true);
     updateSyncState();
 }
 
@@ -778,6 +832,7 @@ void SyncClient::handlePresenceMessage(const std::string& peer_id, const std::st
 }
 
 void SyncClient::processPresenceUpdates() {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (!presence_manager_) {
         return;
     }
@@ -812,9 +867,15 @@ void SyncClient::updateSyncState() {
         // No ready data channels. Stay SYNCING while:
         //  - WebRTC peers are mid-handshake (connecting > 0), or
         //  - we joined a room that already had peers (expect_remote_peers_)
-        //    and are still waiting for their offer (polite path).
+        //    and never completed a data-channel sync (failed join or still
+        //    waiting for offers). Join-failure error is reported from removePeer.
         // Going ONLINE alone here was minting a parallel Sheet1 on the CLI
-        // that never shared IDs with the browser document.
+        // that never shared IDs with the browser document — and after a failed
+        // join produced ONLINE+empty which agents misread as success.
+        if (state_ == SyncClientState::SYNCING && connecting == 0 &&
+            (expect_remote_peers_ && !ever_had_ready_peer_)) {
+            return;
+        }
         if (state_ == SyncClientState::SYNCING && connecting == 0 && !expect_remote_peers_) {
             setState(SyncClientState::ONLINE);
         }
@@ -866,12 +927,95 @@ void SyncClient::notifyPeerReady(const std::string& peer_id) {
     }
 }
 
+void SyncClient::markLocalSdpSentAndFlushIce(const std::string& peer_id) {
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return;
+    }
+    ConnectedPeer* peer = it->second.get();
+    peer->local_sdp_sent = true;
+    std::vector<ICECandidate> pending;
+    pending.swap(peer->pending_local_candidates);
+    if (!pending.empty()) {
+        LOG_INFO("[Sync] Flushing %zu held local ICE candidate(s) to %s", pending.size(),
+                 peer_id.c_str());
+    }
+    for (const auto& c : pending) {
+        signaling_client_->sendICECandidate(peer_id, c);
+    }
+}
+
+void SyncClient::flushEarlyRemoteIce(const std::string& peer_id) {
+    auto early = early_remote_ice_.find(peer_id);
+    if (early == early_remote_ice_.end() || early->second.empty()) {
+        return;
+    }
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end() || !it->second->connection) {
+        return;
+    }
+    std::vector<ICECandidate> pending;
+    pending.swap(early->second);
+    early_remote_ice_.erase(early);
+    LOG_INFO("[Sync] Applying %zu early remote ICE candidate(s) from %s", pending.size(),
+             peer_id.c_str());
+    for (const auto& c : pending) {
+        it->second->connection->addIceCandidate(
+            c, [peer_id](bool success, const std::string& error) {
+                if (!success) {
+                    LOG_INFO("[Sync] early addIceCandidate failed for %s: %s", peer_id.c_str(),
+                             error.c_str());
+                }
+            });
+    }
+}
+
+void SyncClient::noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt) {
+    outstanding_join_peers_.erase(peer_id);
+    if (had_rtc_attempt && !ever_had_ready_peer_) {
+        any_rtc_join_attempt_failed_ = true;
+    }
+
+    if (ever_had_ready_peer_) {
+        if (peers_.empty() && outstanding_join_peers_.empty()) {
+            expect_remote_peers_ = false;
+        }
+        return;
+    }
+
+    // Still no successful channel. Wait until every join-time peer is resolved.
+    if (!outstanding_join_peers_.empty()) {
+        return;
+    }
+
+    if (any_rtc_join_attempt_failed_ || join_failure_reported_) {
+        // RTC peers existed and died without a data channel. Keep
+        // expect_remote_peers_ so we do not ONLINE empty.
+        if (!join_failure_reported_) {
+            join_failure_reported_ = true;
+            LOG_INFO("[Sync] Join failed: existing peers reported but no DataChannel opened");
+            if (delegate_) {
+                delegate_->syncClientDidError(
+                    *this,
+                    "joined room with peers but all WebRTC connections failed before sync "
+                    "(check ICE/STUN; candidates must be browser-compatible)");
+            }
+        }
+        return;
+    }
+
+    // All initial peers left via signaling before any RTC attempt completed
+    // (e.g. polite waiters). Room is effectively empty for us.
+    expect_remote_peers_ = false;
+}
+
 // ============================================================================
 // SignalingClientDelegate implementation
 // ============================================================================
 
 void SyncClient::signalingClientStateDidChange(SignalingClient& /*client*/,
                                                SignalingClientState state) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     switch (state) {
         case SignalingClientState::DISCONNECTED:
             if (state_ != SyncClientState::OFFLINE) {
@@ -900,10 +1044,16 @@ void SyncClient::signalingClientStateDidChange(SignalingClient& /*client*/,
 void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
                                             const std::string& /*room_id*/,
                                             const std::vector<std::string>& existing_peers) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (existing_peers.empty()) {
         // We're the first/only peer - go online
         LOG_INFO("[Sync] Joined room alone → ONLINE");
         expect_remote_peers_ = false;
+        join_failure_reported_ = false;
+        any_rtc_join_attempt_failed_ = false;
+        outstanding_join_peers_.clear();
+        join_rtc_attempts_.clear();
+        pending_join_retries_.clear();
         setState(SyncClientState::ONLINE);
         return;
     }
@@ -918,6 +1068,14 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
     // and callers (CLI session) would mint a second empty Sheet1.
     LOG_INFO("[Sync] Joined room with %zu existing peer(s) → SYNCING", existing_peers.size());
     expect_remote_peers_ = true;
+    join_failure_reported_ = false;
+    any_rtc_join_attempt_failed_ = false;
+    outstanding_join_peers_.clear();
+    join_rtc_attempts_.clear();
+    pending_join_retries_.clear();
+    for (const auto& other : existing_peers) {
+        outstanding_join_peers_.insert(other);
+    }
     setState(SyncClientState::SYNCING);
     for (const auto& other : existing_peers) {
         if (shouldInitiateTo(other)) {
@@ -931,6 +1089,7 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
 
 void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
                                             const std::string& peer_id) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     // Perfect negotiation: only the higher id creates the offer
     if (!shouldInitiateTo(peer_id)) {
         LOG_INFO("[Sync] peer-joined %s — waiting for their offer (we are polite)",
@@ -943,12 +1102,22 @@ void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
 
 void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
                                              const std::string& peer_id) {
-    removePeer(peer_id);
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
+    // Resolve outstanding join wait even if we never created an RTC peer
+    // (polite path still waiting for their offer).
+    const bool had_rtc = peers_.find(peer_id) != peers_.end();
+    if (had_rtc) {
+        removePeer(peer_id);
+    } else {
+        noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/false);
+        updateSyncState();
+    }
 }
 
 void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                                                 const std::string& from_peer,
                                                 const SessionDescription& sdp) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     LOG_INFO("[Sync] Received offer from %s", from_peer.c_str());
     // Accept peer connection (createPeerConnection handles glare)
     ConnectedPeer* peer = createPeerConnection(from_peer, false);
@@ -961,7 +1130,9 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
         sdp,
         // NOLINTNEXTLINE(bugprone-exception-escape)
         [this, from_peer](bool success, const std::string& /*error*/) {
+            const std::unique_lock<std::recursive_mutex> lock(mu_);
             if (!success) {
+                LOG_INFO("[Sync] setRemoteDescription(offer) failed for %s", from_peer.c_str());
                 return;
             }
 
@@ -975,7 +1146,9 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                 // NOLINTNEXTLINE(bugprone-exception-escape)
                 [this, from_peer](bool answer_success, const SessionDescription& answer,
                                   const std::string& /*error*/) {
+                    const std::unique_lock<std::recursive_mutex> lock(mu_);
                     if (!answer_success) {
+                        LOG_INFO("[Sync] createAnswer failed for %s", from_peer.c_str());
                         return;
                     }
 
@@ -988,10 +1161,15 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                     it2->second->connection->setLocalDescription(
                         answer,
                         // NOLINTNEXTLINE(bugprone-exception-escape)
-                        [this, from_peer, answer](bool set_success, const std::string& /*err*/) {
+                        [this, from_peer, answer](bool set_success, const std::string& err) {
+                            const std::unique_lock<std::recursive_mutex> lock(mu_);
                             if (set_success) {
-                                // Send answer to peer
+                                LOG_INFO("[Sync] Sending answer to %s", from_peer.c_str());
                                 signaling_client_->sendAnswer(from_peer, answer);
+                                markLocalSdpSentAndFlushIce(from_peer);
+                            } else {
+                                LOG_INFO("[Sync] setLocalDescription(answer) failed for %s: %s",
+                                         from_peer.c_str(), err.c_str());
                             }
                         });
                 });
@@ -1001,29 +1179,46 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
 void SyncClient::signalingClientDidReceiveAnswer(SignalingClient& /*client*/,
                                                  const std::string& from_peer,
                                                  const SessionDescription& sdp) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
+        LOG_INFO("[Sync] Answer from unknown peer %s (ignored)", from_peer.c_str());
         return;
     }
 
+    LOG_INFO("[Sync] Received answer from %s", from_peer.c_str());
     it->second->connection->setRemoteDescription(
-        sdp, [](bool /*success*/, const std::string& /*error*/) {
-            // Answer set - ICE connectivity will proceed
+        sdp, [this, from_peer](bool success, const std::string& error) {
+            const std::unique_lock<std::recursive_mutex> lock(mu_);
+            if (!success) {
+                LOG_INFO("[Sync] setRemoteDescription(answer) failed for %s: %s", from_peer.c_str(),
+                         error.c_str());
+            }
         });
 }
 
 void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client*/,
                                                        const std::string& from_peer,
                                                        const ICECandidate& candidate) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
+        // Initiator often trickles host/srflx candidates before the offer arrives.
+        // Hold them until createPeerConnection (see flushEarlyRemoteIce).
+        if (!candidate.isEmpty()) {
+            early_remote_ice_[from_peer].push_back(candidate);
+            LOG_INFO("[Sync] Buffering early ICE candidate from %s (%zu held)", from_peer.c_str(),
+                     early_remote_ice_[from_peer].size());
+        }
         return;
     }
 
-    it->second->connection->addIceCandidate(candidate,
-                                            [](bool /*success*/, const std::string& /*error*/) {
-                                                // ICE candidate added
-                                            });
+    it->second->connection->addIceCandidate(candidate, [from_peer](bool success,
+                                                                   const std::string& error) {
+        if (!success) {
+            LOG_INFO("[Sync] addIceCandidate failed for %s: %s", from_peer.c_str(), error.c_str());
+        }
+    });
 }
 
 // ============================================================================
@@ -1032,15 +1227,138 @@ void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client
 
 void SyncClient::handlePeerConnectionStateChange(const std::string& peer_id,
                                                  PeerConnectionState state) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
+    LOG_INFO("[Sync] Peer connection state: %s -> %s", peer_id.c_str(),
+             peerConnectionStateToString(state));
     if (state == PeerConnectionState::FAILED || state == PeerConnectionState::CLOSED) {
-        removePeer(peer_id);
+        // Join-time retry: ice=connected then pc=failed (DTLS/SCTP) is recoverable
+        // if the impolite side re-offers. Without this both peers drop the PC and
+        // stay SYNCING forever with ops_sent=0.
+        const int attempts = ++join_rtc_attempts_[peer_id];
+        const bool joining =
+            expect_remote_peers_ && !ever_had_ready_peer_ && state_ == SyncClientState::SYNCING;
+        const bool can_retry =
+            joining && state == PeerConnectionState::FAILED && attempts < kMaxJoinRtcAttempts;
+
+        if (can_retry) {
+            const bool we_should_offer = shouldInitiateTo(peer_id);
+            // Delay grows slightly: 300ms, 600ms (attempt 1, 2 after initial).
+            const int64_t delay_ms = 300LL * attempts;
+            const int64_t retry_at = cells::current_time_ms() + delay_ms;
+            LOG_INFO(
+                "[Sync] Peer %s RTC FAILED during join (attempt %d/%d); "
+                "retry in %lldms (we_offer=%s)",
+                peer_id.c_str(), attempts, kMaxJoinRtcAttempts, static_cast<long long>(delay_ms),
+                we_should_offer ? "true" : "false");
+            tearDownPeerForRetry(peer_id);
+            outstanding_join_peers_.insert(peer_id);
+            pending_join_retries_[peer_id] = PendingJoinRetry{we_should_offer, retry_at};
+            return;
+        }
+
+        // Final failure (or CLOSED): drop peer and resolve join wait.
+        pending_join_retries_.erase(peer_id);
+        if (peers_.find(peer_id) != peers_.end()) {
+            removePeer(peer_id);
+        } else {
+            // Peer already torn down by a prior retry — still count as failed join.
+            noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/true);
+            updateSyncState();
+        }
     } else if (delegate_) {
         delegate_->syncClientPeerDidChange(*this, getPeer(peer_id));
     }
 }
 
+bool SyncClient::tearDownPeerForRetry(const std::string& peer_id) {
+    // mu_ must be held. Like removePeer but does not note join failure / ONLINE policy.
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return false;
+    }
+
+    std::string disconnect_detail;
+    if (it->second->connection) {
+        disconnect_detail =
+            std::string(" pc=") +
+            peerConnectionStateToString(it->second->connection->getConnectionState()) +
+            " ice=" + iceConnectionStateToString(it->second->connection->getICEConnectionState());
+    }
+    LOG_INFO("[Sync] Tearing down peer for join retry: %s%s", peer_id.c_str(),
+             disconnect_detail.c_str());
+
+    auto peer = std::move(it->second);
+    peers_.erase(it);
+    early_remote_ice_.erase(peer_id);
+
+    if (peer->operations_channel) {
+        peer->operations_channel->setDelegate(nullptr);
+    }
+    if (peer->presence_channel) {
+        peer->presence_channel->setDelegate(nullptr);
+    }
+    peer->sync_client = nullptr;
+    if (peer->connection) {
+        peer->connection->setDelegate(nullptr);
+    }
+
+    if (sync_manager_) {
+        sync_manager_->removePeer(cells::ID(peer_id));
+    }
+    if (presence_manager_) {
+        presence_manager_->removePeer(peer_id);
+    }
+
+    mu_.unlock();
+    if (peer->connection) {
+        peer->connection->close();
+    }
+    peer.reset();
+    mu_.lock();
+    return true;
+}
+
+void SyncClient::flushPendingJoinRetries() {
+    // mu_ must be held.
+    if (pending_join_retries_.empty() || ever_had_ready_peer_ ||
+        state_ == SyncClientState::OFFLINE) {
+        return;
+    }
+
+    const int64_t now = cells::current_time_ms();
+    std::vector<std::pair<std::string, bool>> due;
+    for (auto it = pending_join_retries_.begin(); it != pending_join_retries_.end();) {
+        if (now >= it->second.retry_after_ms) {
+            due.emplace_back(it->first, it->second.we_should_offer);
+            it = pending_join_retries_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (const auto& item : due) {
+        const std::string& peer_id = item.first;
+        const bool we_should_offer = item.second;
+        if (peers_.find(peer_id) != peers_.end()) {
+            continue;  // already reconnected (e.g. remote re-offered first)
+        }
+        if (!expect_remote_peers_ || ever_had_ready_peer_) {
+            continue;
+        }
+        outstanding_join_peers_.insert(peer_id);
+        if (we_should_offer) {
+            LOG_INFO("[Sync] Join retry: re-initiating offer to %s", peer_id.c_str());
+            initiateConnectionToPeer(peer_id);
+        } else {
+            LOG_INFO("[Sync] Join retry: waiting for re-offer from %s (we are polite)",
+                     peer_id.c_str());
+        }
+    }
+}
+
 void SyncClient::handlePeerDataChannelOpen(const std::string& peer_id,
                                            const std::string& channel_label) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     auto it = peers_.find(peer_id);
     if (it == peers_.end()) {
         return;
@@ -1049,6 +1367,14 @@ void SyncClient::handlePeerDataChannelOpen(const std::string& peer_id,
     // Check if operations channel is now ready
     if (channel_label == OPERATIONS_CHANNEL && it->second->isReady()) {
         // Peer is now ready for sync
+        ever_had_ready_peer_ = true;
+        expect_remote_peers_ = false;
+        outstanding_join_peers_.clear();
+        join_failure_reported_ = false;
+        join_rtc_attempts_.erase(peer_id);
+        pending_join_retries_.erase(peer_id);
+        LOG_INFO("[Sync] DataChannel open: peer=%s channel=%s", peer_id.c_str(),
+                 channel_label.c_str());
         setState(SyncClientState::SYNCING);
         notifyPeerReady(peer_id);
     }
@@ -1056,6 +1382,7 @@ void SyncClient::handlePeerDataChannelOpen(const std::string& peer_id,
 
 void SyncClient::handlePeerDataChannelClose(const std::string& peer_id,
                                             const std::string& /*channel_label*/) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     // Data channel closed - peer is no longer connected
     auto it = peers_.find(peer_id);
     if (it != peers_.end() && delegate_ != nullptr) {
@@ -1065,6 +1392,7 @@ void SyncClient::handlePeerDataChannelClose(const std::string& peer_id,
 
 void SyncClient::handlePeerMessage(const std::string& peer_id, const std::string& channel_label,
                                    const std::string& message) {
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
     if (channel_label == OPERATIONS_CHANNEL) {
         // Check for ping/pong first
         const std::string type = extractJSONString(message, "type");
@@ -1086,7 +1414,19 @@ void SyncClient::handlePeerMessage(const std::string& peer_id, const std::string
 }
 
 void SyncClient::handlePeerICECandidate(const std::string& peer_id, const ICECandidate& candidate) {
-    // Send ICE candidate to peer via signaling
+    const std::unique_lock<std::recursive_mutex> lock(mu_);
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return;
+    }
+    // Hold until offer/answer is on the wire so the remote has a PC (and
+    // preferably remote description) before applying our host candidates.
+    // Without this, libdatachannel emits candidates during createDataChannel
+    // before sendOffer — browsers drop them (no PC yet).
+    if (!it->second->local_sdp_sent) {
+        it->second->pending_local_candidates.push_back(candidate);
+        return;
+    }
     signaling_client_->sendICECandidate(peer_id, candidate);
 }
 

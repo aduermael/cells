@@ -218,6 +218,7 @@ cc_library(
         ":ice_config",
         ":rtc_data_channel_libdc",
         ":rtc_peer_connection_common",
+        "//core/log",
         "@libdatachannel",
         "@openssl//:ssl",  # libdatachannel links against OpenSSL
         "@openssl//:crypto",  # libdatachannel links against libcrypto
@@ -454,8 +455,19 @@ cc_test(
     name = "rtc_test",
     srcs = ["rtc_test.cc"],
     deps = [
+        ":ice_config",
         ":rtc_data_channel",
         ":rtc_peer_connection",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sync_client_test",
+    srcs = ["sync_client_test.cc"],
+    deps = [
+        ":sync_client",
+        "//core/cells:model",
         "@googletest//:gtest_main",
     ],
 )
