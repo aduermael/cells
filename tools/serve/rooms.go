@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -62,20 +63,41 @@ func NewRoom(id string, maxPeers int) *Room {
 	}
 }
 
+// AddPeerResult is returned from AddPeerDetailed for logging (rejoin vs new).
+type AddPeerResult struct {
+	Peer   *Peer
+	OK     bool
+	Rejoin bool // true if same peer_id replaced an existing connection
+}
+
 // AddPeer adds a peer to the room. Returns false if room is full.
 func (r *Room) AddPeer(peerID string, conn *websocket.Conn) (*Peer, bool) {
+	res := r.AddPeerDetailed(peerID, conn)
+	return res.Peer, res.OK
+}
+
+// AddPeerDetailed is like AddPeer but reports rejoin for logging.
+func (r *Room) AddPeerDetailed(peerID string, conn *websocket.Conn) AddPeerResult {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Check if room is full
-	if len(r.peers) >= r.MaxPeers {
-		return nil, false
+	// Rejoin same peer id: replace connection (allowed even when room is "full").
+	if existing, ok := r.peers[peerID]; ok {
+		existing.Close()
+		now := time.Now()
+		peer := &Peer{
+			ID:         peerID,
+			Conn:       conn,
+			JoinedAt:   now,
+			LastActive: now,
+		}
+		r.peers[peerID] = peer
+		r.LastActive = now
+		return AddPeerResult{Peer: peer, OK: true, Rejoin: true}
 	}
 
-	// Check if peer already exists (rejoin)
-	if existing, ok := r.peers[peerID]; ok {
-		// Close old connection
-		existing.Close()
+	if len(r.peers) >= r.MaxPeers {
+		return AddPeerResult{OK: false}
 	}
 
 	now := time.Now()
@@ -87,8 +109,7 @@ func (r *Room) AddPeer(peerID string, conn *websocket.Conn) (*Peer, bool) {
 	}
 	r.peers[peerID] = peer
 	r.LastActive = now
-
-	return peer, true
+	return AddPeerResult{Peer: peer, OK: true, Rejoin: false}
 }
 
 // RemovePeer removes a peer from the room.
@@ -157,7 +178,7 @@ func (r *Room) SendTo(targetPeerID string, message []byte) error {
 	r.mu.RUnlock()
 
 	if peer == nil {
-		return nil // Peer not found, silently ignore
+		return fmt.Errorf("peer %s not in room %s", targetPeerID, r.ID)
 	}
 	return peer.Send(message)
 }

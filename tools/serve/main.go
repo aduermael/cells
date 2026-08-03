@@ -53,13 +53,17 @@ var upgrader = websocket.Upgrader{
 }
 
 var roomManager *RoomManager
+var sigTimeline = newSignalTimeline()
+var signalingVerbose bool // full SDP/ICE payloads when -signaling-verbose
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	remote := r.RemoteAddr
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		log.Printf("[WS] upgrade error remote=%s: %v", remote, err)
 		return
 	}
+	log.Printf("[WS] upgraded remote=%s", remote)
 
 	// Read room and peer ID from query params or first message
 	roomID := r.URL.Query().Get("room")
@@ -70,7 +74,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		_, msgBytes, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Failed to read join message: %v", err)
+			log.Printf("[WS] join read failed remote=%s: %v", remote, err)
 			conn.Close()
 			return
 		}
@@ -78,13 +82,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		var msg SignalingMessage
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			log.Printf("Failed to parse join message: %v", err)
+			log.Printf("[WS] join parse failed remote=%s: %v", remote, err)
 			sendError(conn, "invalid_message", "Failed to parse message")
 			conn.Close()
 			return
 		}
 
 		if msg.Type != "join" {
+			log.Printf("[WS] first message not join remote=%s type=%s", remote, msg.Type)
 			sendError(conn, "expected_join", "First message must be 'join'")
 			conn.Close()
 			return
@@ -108,15 +113,22 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Join room
 	room := roomManager.GetOrCreateRoom(roomID)
-	peer, ok := room.AddPeer(peerID, conn)
-	if !ok {
+	addRes := room.AddPeerDetailed(peerID, conn)
+	if !addRes.OK {
+		log.Printf("[JOIN] room_full room=%s peer=%s max=%d remote=%s", roomID, peerID, room.MaxPeers, remote)
 		sendError(conn, "room_full", "Room is full")
 		conn.Close()
 		return
 	}
+	peer := addRes.Peer
 
 	peers := room.GetPeers()
-	log.Printf("[JOIN] Peer %s joined room %s (now %d peers: %v)", peerID, roomID, len(peers), peers)
+	rejoinTag := ""
+	if addRes.Rejoin {
+		rejoinTag = " rejoin=true"
+	}
+	log.Printf("[JOIN] peer=%s room=%s n=%d peers=%v remote=%s%s",
+		peerID, roomID, len(peers), peers, remote, rejoinTag)
 
 	// Notify existing peers about new peer
 	notifyPeerJoined(room, peerID)
@@ -146,8 +158,10 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Cleanup on disconnect
 	room.RemovePeer(peerID)
+	sigTimeline.clearPeer(roomID, peerID)
 	notifyPeerLeft(room, peerID)
-	log.Printf("Peer %s left room %s", peerID, roomID)
+	remaining := room.GetPeers()
+	log.Printf("[LEAVE] peer=%s room=%s n=%d remaining=%v", peerID, roomID, len(remaining), remaining)
 }
 
 func sendError(conn *websocket.Conn, code string, message string) {
@@ -156,7 +170,10 @@ func sendError(conn *websocket.Conn, code string, message string) {
 		Error: fmt.Sprintf("%s: %s", code, message),
 	}
 	msgBytes, _ := json.Marshal(msg)
-	conn.WriteMessage(websocket.TextMessage, msgBytes)
+	log.Printf("[ERR] code=%s message=%s", code, message)
+	if err := conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		log.Printf("[ERR] write failed code=%s: %v", code, err)
+	}
 }
 
 // pingRoutine sends periodic ping messages to keep the connection alive
@@ -179,8 +196,9 @@ func pingRoutine(peer *Peer, done <-chan struct{}) {
 
 			if err != nil {
 				failures++
-				log.Printf("Ping failed for peer %s (%d/%d): %v", peer.ID, failures, maxFailures, err)
+				log.Printf("[PING] fail peer=%s n=%d/%d: %v", peer.ID, failures, maxFailures, err)
 				if failures >= maxFailures {
+					log.Printf("[PING] closing peer=%s after %d failures", peer.ID, maxFailures)
 					peer.Conn.Close()
 					return
 				}
@@ -199,6 +217,8 @@ func notifyPeerJoined(room *Room, peerID string) {
 		PeerID: peerID,
 	}
 	msgBytes, _ := json.Marshal(msg)
+	others := room.GetOtherPeers(peerID)
+	log.Printf("[NOTIFY] peer-joined peer=%s room=%s notify_count=%d", peerID, room.ID, len(others))
 	room.Broadcast(peerID, msgBytes)
 }
 
@@ -208,6 +228,8 @@ func notifyPeerLeft(room *Room, peerID string) {
 		PeerID: peerID,
 	}
 	msgBytes, _ := json.Marshal(msg)
+	others := room.GetOtherPeers(peerID)
+	log.Printf("[NOTIFY] peer-left peer=%s room=%s notify_count=%d", peerID, room.ID, len(others))
 	room.Broadcast(peerID, msgBytes)
 }
 
@@ -228,7 +250,11 @@ func sendJoinedConfirmation(conn *websocket.Conn, room *Room, peerID string) {
 		Peers: otherPeers,
 	}
 	msgBytes, _ := json.Marshal(msg)
-	conn.WriteMessage(websocket.TextMessage, msgBytes)
+	if err := conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		log.Printf("[JOINED] send failed peer=%s room=%s: %v", peerID, room.ID, err)
+		return
+	}
+	log.Printf("[JOINED] peer=%s room=%s existing_peers=%v", peerID, room.ID, otherPeers)
 }
 
 func handlePeerMessages(room *Room, peer *Peer) {
@@ -236,7 +262,9 @@ func handlePeerMessages(room *Room, peer *Peer) {
 		_, msgBytes, err := peer.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("[MSG] WebSocket error for peer %s: %v", peer.ID, err)
+				log.Printf("[MSG] ws_error peer=%s room=%s: %v", peer.ID, room.ID, err)
+			} else {
+				log.Printf("[MSG] ws_close peer=%s room=%s: %v", peer.ID, room.ID, err)
 			}
 			return
 		}
@@ -245,42 +273,64 @@ func handlePeerMessages(room *Room, peer *Peer) {
 
 		var msg SignalingMessage
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			log.Printf("[MSG] Failed to parse message from peer %s: %v", peer.ID, err)
+			log.Printf("[MSG] parse_error peer=%s room=%s bytes=%d: %v", peer.ID, room.ID, len(msgBytes), err)
 			continue
 		}
 
-		log.Printf("[MSG] Received %s from peer %s (target: %s)", msg.Type, peer.ID, msg.Target)
+		summary := summarizeSignalPayload(msg.Type, msg.SDP, msg.Candidate)
+		if summary != "" {
+			log.Printf("[MSG] type=%s from=%s to=%s room=%s bytes=%d %s",
+				msg.Type, peer.ID, msg.Target, room.ID, len(msgBytes), summary)
+		} else {
+			log.Printf("[MSG] type=%s from=%s to=%s room=%s bytes=%d",
+				msg.Type, peer.ID, msg.Target, room.ID, len(msgBytes))
+		}
+		if signalingVerbose {
+			if len(msg.SDP) > 0 {
+				log.Printf("[MSG-VERBOSE] sdp raw=%s", string(msg.SDP))
+			}
+			if len(msg.Candidate) > 0 {
+				log.Printf("[MSG-VERBOSE] ice raw=%s", string(msg.Candidate))
+			}
+		}
+
+		// Timeline: ice-before-offer is a common CLI↔browser interop failure mode.
+		switch msg.Type {
+		case "offer":
+			if n := sigTimeline.noteOffer(room.ID, peer.ID, msg.Target); n > 0 {
+				log.Printf("[ORDER] WARN ice_before_offer count=%d from=%s to=%s room=%s "+
+					"(remote may drop early candidates if no PC yet)",
+					n, peer.ID, msg.Target, room.ID)
+			}
+		case "answer":
+			sigTimeline.noteAnswer(room.ID, peer.ID, msg.Target)
+		case "ice-candidate":
+			before, iceBefore, iceAfter := sigTimeline.noteIce(room.ID, peer.ID, msg.Target)
+			if before {
+				log.Printf("[ORDER] ice_before_offer n_before=%d from=%s to=%s room=%s",
+					iceBefore, peer.ID, msg.Target, room.ID)
+			} else if iceAfter == 1 {
+				log.Printf("[ORDER] first_ice_after_offer from=%s to=%s room=%s",
+					peer.ID, msg.Target, room.ID)
+			}
+		}
 
 		switch msg.Type {
 		case "offer", "answer", "ice-candidate":
-			// Relay signaling messages to target peer
 			relayMessage(room, peer.ID, msg)
 		case "leave":
-			// Peer is leaving
+			log.Printf("[MSG] leave peer=%s room=%s", peer.ID, room.ID)
 			return
 		default:
-			log.Printf("[MSG] Unknown message type from peer %s: %s", peer.ID, msg.Type)
+			log.Printf("[MSG] unknown_type peer=%s room=%s type=%s", peer.ID, room.ID, msg.Type)
 		}
 	}
 }
 
 func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
 	if msg.Target == "" {
-		log.Printf("[RELAY] Missing target in %s message from peer %s", msg.Type, fromPeerID)
+		log.Printf("[RELAY] missing_target type=%s from=%s room=%s", msg.Type, fromPeerID, room.ID)
 		return
-	}
-
-	log.Printf("[RELAY] Relaying %s from %s to %s", msg.Type, fromPeerID, msg.Target)
-
-	// Debug: Check if target peer exists in room
-	targetPeer := room.GetPeer(msg.Target)
-	if targetPeer == nil {
-		log.Printf("[RELAY] WARNING: Target peer %s not found in room!", msg.Target)
-		// List all peers in room
-		peers := room.GetPeers()
-		log.Printf("[RELAY] Peers in room: %v", peers)
-	} else {
-		log.Printf("[RELAY] Target peer %s found", msg.Target)
 	}
 
 	// Add sender info
@@ -290,11 +340,19 @@ func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
 		SDP:       msg.SDP,
 		Candidate: msg.Candidate,
 	}
-	msgBytes, _ := json.Marshal(relayedMsg)
+	msgBytes, err := json.Marshal(relayedMsg)
+	if err != nil {
+		log.Printf("[RELAY] marshal_error type=%s from=%s to=%s: %v", msg.Type, fromPeerID, msg.Target, err)
+		return
+	}
 
 	if err := room.SendTo(msg.Target, msgBytes); err != nil {
-		log.Printf("Failed to relay %s to peer %s: %v", msg.Type, msg.Target, err)
+		log.Printf("[RELAY] FAIL type=%s from=%s to=%s room=%s peers=%v: %v",
+			msg.Type, fromPeerID, msg.Target, room.ID, room.GetPeers(), err)
+		return
 	}
+	log.Printf("[RELAY] ok type=%s from=%s to=%s room=%s out_bytes=%d",
+		msg.Type, fromPeerID, msg.Target, room.ID, len(msgBytes))
 }
 
 func main() {
@@ -303,7 +361,10 @@ func main() {
 	enableCollab := flag.Bool("enable-collab", false, "Enable collaboration WebSocket endpoint")
 	maxRoomSize := flag.Int("max-room-size", 10, "Maximum peers per room")
 	roomTimeout := flag.Duration("room-timeout", time.Hour, "Timeout for empty rooms")
+	verbose := flag.Bool("signaling-verbose", false,
+		"Log full SDP/ICE JSON payloads (default: compact summaries only)")
 	flag.Parse()
+	signalingVerbose = *verbose
 
 	// Initialize room manager if collaboration is enabled
 	if *enableCollab {
@@ -312,6 +373,11 @@ func main() {
 		stop := make(chan struct{})
 		roomManager.StartCleanupRoutine(time.Minute, stop)
 		log.Println("Collaboration enabled with WebSocket signaling at /ws")
+		if signalingVerbose {
+			log.Println("Signaling verbose payload logging ON (-signaling-verbose)")
+		} else {
+			log.Println("Signaling logs: JOIN/LEAVE/MSG/RELAY/ORDER summaries (use -signaling-verbose for raw SDP/ICE)")
+		}
 	}
 
 
