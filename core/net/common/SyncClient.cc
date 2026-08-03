@@ -441,6 +441,9 @@ bool SyncClient::shouldInitiateTo(const std::string& remote_peer_id) const {
 }
 
 ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool we_initiate) {
+    if (peer_id.empty() || peer_id == peer_id_) {
+        return nullptr;
+    }
     auto existing = peers_.find(peer_id);
     if (existing != peers_.end()) {
         if (we_initiate) {
@@ -1090,6 +1093,10 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
 void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
                                             const std::string& peer_id) {
     const std::unique_lock<std::recursive_mutex> lock(mu_);
+    // Ignore self (signaling should not notify us of our own join; belt-and-suspenders).
+    if (peer_id.empty() || peer_id == peer_id_) {
+        return;
+    }
     // Perfect negotiation: only the higher id creates the offer
     if (!shouldInitiateTo(peer_id)) {
         LOG_INFO("[Sync] peer-joined %s — waiting for their offer (we are polite)",
@@ -1118,6 +1125,10 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                                                 const std::string& from_peer,
                                                 const SessionDescription& sdp) {
     const std::unique_lock<std::recursive_mutex> lock(mu_);
+    if (from_peer.empty() || from_peer == peer_id_) {
+        LOG_INFO("[Sync] Ignoring offer from self/empty peer");
+        return;
+    }
     LOG_INFO("[Sync] Received offer from %s", from_peer.c_str());
     // Accept peer connection (createPeerConnection handles glare)
     ConnectedPeer* peer = createPeerConnection(from_peer, false);
@@ -1180,6 +1191,9 @@ void SyncClient::signalingClientDidReceiveAnswer(SignalingClient& /*client*/,
                                                  const std::string& from_peer,
                                                  const SessionDescription& sdp) {
     const std::unique_lock<std::recursive_mutex> lock(mu_);
+    if (from_peer.empty() || from_peer == peer_id_) {
+        return;
+    }
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
         LOG_INFO("[Sync] Answer from unknown peer %s (ignored)", from_peer.c_str());
@@ -1201,6 +1215,9 @@ void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client
                                                        const std::string& from_peer,
                                                        const ICECandidate& candidate) {
     const std::unique_lock<std::recursive_mutex> lock(mu_);
+    if (from_peer.empty() || from_peer == peer_id_) {
+        return;
+    }
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
         // Initiator often trickles host/srflx candidates before the offer arrives.

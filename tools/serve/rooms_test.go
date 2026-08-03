@@ -187,6 +187,48 @@ func TestRoomGetOtherPeers(t *testing.T) {
 	}
 }
 
+// notifyPeerLeft runs after RemovePeer; empty room must not panic on make cap.
+func TestRoomGetOtherPeersEmptyAfterRemove(t *testing.T) {
+	room := NewRoom("test-room", 10)
+	conn, _, cleanup := createTestConnection(t)
+	defer cleanup()
+
+	room.AddPeer("solo", conn)
+	room.RemovePeer("solo")
+
+	// Mirrors leave path: peer already removed, room empty.
+	others := room.GetOtherPeers("solo")
+	if len(others) != 0 {
+		t.Errorf("Expected 0 peers, got %d", len(others))
+	}
+
+	// Empty room, unknown exclude — also used if leave races.
+	others = room.GetOtherPeers("nobody")
+	if len(others) != 0 {
+		t.Errorf("Expected 0 peers, got %d", len(others))
+	}
+}
+
+func TestRoomGetOtherPeersAfterRemoveStillOthers(t *testing.T) {
+	room := NewRoom("test-room", 10)
+	conn1, _, cleanup1 := createTestConnection(t)
+	defer cleanup1()
+	conn2, _, cleanup2 := createTestConnection(t)
+	defer cleanup2()
+
+	room.AddPeer("leaving", conn1)
+	room.AddPeer("staying", conn2)
+	room.RemovePeer("leaving")
+
+	others := room.GetOtherPeers("leaving")
+	if len(others) != 1 {
+		t.Fatalf("Expected 1 peer, got %d", len(others))
+	}
+	if others[0].ID != "staying" {
+		t.Errorf("Expected staying, got %s", others[0].ID)
+	}
+}
+
 func TestRoomReJoin(t *testing.T) {
 	room := NewRoom("test-room", 10)
 

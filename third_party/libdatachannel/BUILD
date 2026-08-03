@@ -4,4 +4,5 @@
 
 exports_files([
     "BUILD.libdatachannel",
+    "sctp-serialize-assoc.patch",
 ])

@@ -85,6 +85,10 @@ git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "g
 git_repository(
     name = "libdatachannel",
     build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
+    # Serialize usrsctp AF_CONN register/bind/connect across PeerConnections —
+    # concurrent multi-peer SCTP setup fails on macOS with errno=49 (EADDRNOTAVAIL).
+    patch_args = ["-p1"],
+    patches = ["//third_party/libdatachannel:sctp-serialize-assoc.patch"],
     recursive_init_submodules = True,
     remote = "https://github.com/paullouisageneau/libdatachannel.git",
     # v0.24.5 (443f693): OpenSSL DTLS BIO race fix (PR #1584) — ice=connected
