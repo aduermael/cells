@@ -102,8 +102,9 @@ void ConnectedPeer::peerConnectionStateDidChange(RTCPeerConnection& /*pc*/,
 }
 
 void ConnectedPeer::peerConnectionICEStateDidChange(RTCPeerConnection& /*pc*/,
-                                                    ICEConnectionState /*state*/) {
-    // Handled via connection state changes
+                                                    ICEConnectionState state) {
+    LOG_INFO("[Sync] ICE state peer=%s ice=%s", id.c_str(), iceConnectionStateToString(state));
+    // Connection-level FAILED/CLOSED still drives removePeer; ICE logs aid diagnosis.
 }
 
 void ConnectedPeer::peerConnectionDidGatherICECandidate(RTCPeerConnection& /*pc*/,
@@ -235,6 +236,10 @@ void SyncClient::stopSync() {
     room_id_.clear();
     peer_id_.clear();
     expect_remote_peers_ = false;
+    ever_had_ready_peer_ = false;
+    join_failure_reported_ = false;
+    any_rtc_join_attempt_failed_ = false;
+    outstanding_join_peers_.clear();
     setState(SyncClientState::OFFLINE);
 }
 
@@ -501,17 +506,20 @@ void SyncClient::removePeer(const std::string& peer_id) {
         return;
     }
 
-    LOG_INFO("[Sync] Peer disconnected: %s", peer_id.c_str());
+    // Capture disconnect diagnostics before tearing down the connection.
+    std::string disconnect_detail;
+    if (it->second->connection) {
+        disconnect_detail =
+            std::string(" pc=") +
+            peerConnectionStateToString(it->second->connection->getConnectionState()) +
+            " ice=" + iceConnectionStateToString(it->second->connection->getICEConnectionState());
+    }
+    LOG_INFO("[Sync] Peer disconnected: %s%s", peer_id.c_str(), disconnect_detail.c_str());
 
     // Take ownership of the peer before erasing to prevent reentrancy issues
     // (closing the connection triggers callbacks which might call removePeer again)
     auto peer = std::move(it->second);
     peers_.erase(it);
-    if (peers_.empty()) {
-        // Room may be empty now; allow ONLINE alone again
-        expect_remote_peers_ = false;
-    }
-
     // Clear data channel delegates to prevent callbacks on destroyed objects
     if (peer->operations_channel) {
         peer->operations_channel->setDelegate(nullptr);
@@ -544,6 +552,7 @@ void SyncClient::removePeer(const std::string& peer_id) {
         delegate_->syncClientPeerDidDisconnect(*this, peer_id);
     }
 
+    noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/true);
     updateSyncState();
 }
 
@@ -812,9 +821,15 @@ void SyncClient::updateSyncState() {
         // No ready data channels. Stay SYNCING while:
         //  - WebRTC peers are mid-handshake (connecting > 0), or
         //  - we joined a room that already had peers (expect_remote_peers_)
-        //    and are still waiting for their offer (polite path).
+        //    and never completed a data-channel sync (failed join or still
+        //    waiting for offers). Join-failure error is reported from removePeer.
         // Going ONLINE alone here was minting a parallel Sheet1 on the CLI
-        // that never shared IDs with the browser document.
+        // that never shared IDs with the browser document — and after a failed
+        // join produced ONLINE+empty which agents misread as success.
+        if (state_ == SyncClientState::SYNCING && connecting == 0 &&
+            (expect_remote_peers_ && !ever_had_ready_peer_)) {
+            return;
+        }
         if (state_ == SyncClientState::SYNCING && connecting == 0 && !expect_remote_peers_) {
             setState(SyncClientState::ONLINE);
         }
@@ -866,6 +881,45 @@ void SyncClient::notifyPeerReady(const std::string& peer_id) {
     }
 }
 
+void SyncClient::noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt) {
+    outstanding_join_peers_.erase(peer_id);
+    if (had_rtc_attempt && !ever_had_ready_peer_) {
+        any_rtc_join_attempt_failed_ = true;
+    }
+
+    if (ever_had_ready_peer_) {
+        if (peers_.empty() && outstanding_join_peers_.empty()) {
+            expect_remote_peers_ = false;
+        }
+        return;
+    }
+
+    // Still no successful channel. Wait until every join-time peer is resolved.
+    if (!outstanding_join_peers_.empty()) {
+        return;
+    }
+
+    if (any_rtc_join_attempt_failed_ || join_failure_reported_) {
+        // RTC peers existed and died without a data channel. Keep
+        // expect_remote_peers_ so we do not ONLINE empty.
+        if (!join_failure_reported_) {
+            join_failure_reported_ = true;
+            LOG_INFO("[Sync] Join failed: existing peers reported but no DataChannel opened");
+            if (delegate_) {
+                delegate_->syncClientDidError(
+                    *this,
+                    "joined room with peers but all WebRTC connections failed before sync "
+                    "(check ICE/STUN; candidates must be browser-compatible)");
+            }
+        }
+        return;
+    }
+
+    // All initial peers left via signaling before any RTC attempt completed
+    // (e.g. polite waiters). Room is effectively empty for us.
+    expect_remote_peers_ = false;
+}
+
 // ============================================================================
 // SignalingClientDelegate implementation
 // ============================================================================
@@ -904,6 +958,9 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
         // We're the first/only peer - go online
         LOG_INFO("[Sync] Joined room alone → ONLINE");
         expect_remote_peers_ = false;
+        join_failure_reported_ = false;
+        any_rtc_join_attempt_failed_ = false;
+        outstanding_join_peers_.clear();
         setState(SyncClientState::ONLINE);
         return;
     }
@@ -918,6 +975,12 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
     // and callers (CLI session) would mint a second empty Sheet1.
     LOG_INFO("[Sync] Joined room with %zu existing peer(s) → SYNCING", existing_peers.size());
     expect_remote_peers_ = true;
+    join_failure_reported_ = false;
+    any_rtc_join_attempt_failed_ = false;
+    outstanding_join_peers_.clear();
+    for (const auto& other : existing_peers) {
+        outstanding_join_peers_.insert(other);
+    }
     setState(SyncClientState::SYNCING);
     for (const auto& other : existing_peers) {
         if (shouldInitiateTo(other)) {
@@ -943,7 +1006,15 @@ void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
 
 void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
                                              const std::string& peer_id) {
-    removePeer(peer_id);
+    // Resolve outstanding join wait even if we never created an RTC peer
+    // (polite path still waiting for their offer).
+    const bool had_rtc = peers_.find(peer_id) != peers_.end();
+    if (had_rtc) {
+        removePeer(peer_id);
+    } else {
+        noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/false);
+        updateSyncState();
+    }
 }
 
 void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
@@ -988,10 +1059,13 @@ void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                     it2->second->connection->setLocalDescription(
                         answer,
                         // NOLINTNEXTLINE(bugprone-exception-escape)
-                        [this, from_peer, answer](bool set_success, const std::string& /*err*/) {
+                        [this, from_peer, answer](bool set_success, const std::string& err) {
                             if (set_success) {
-                                // Send answer to peer
+                                LOG_INFO("[Sync] Sending answer to %s", from_peer.c_str());
                                 signaling_client_->sendAnswer(from_peer, answer);
+                            } else {
+                                LOG_INFO("[Sync] setLocalDescription(answer) failed for %s: %s",
+                                         from_peer.c_str(), err.c_str());
                             }
                         });
                 });
@@ -1003,12 +1077,17 @@ void SyncClient::signalingClientDidReceiveAnswer(SignalingClient& /*client*/,
                                                  const SessionDescription& sdp) {
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
+        LOG_INFO("[Sync] Answer from unknown peer %s (ignored)", from_peer.c_str());
         return;
     }
 
+    LOG_INFO("[Sync] Received answer from %s", from_peer.c_str());
     it->second->connection->setRemoteDescription(
-        sdp, [](bool /*success*/, const std::string& /*error*/) {
-            // Answer set - ICE connectivity will proceed
+        sdp, [from_peer](bool success, const std::string& error) {
+            if (!success) {
+                LOG_INFO("[Sync] setRemoteDescription(answer) failed for %s: %s", from_peer.c_str(),
+                         error.c_str());
+            }
         });
 }
 
@@ -1017,13 +1096,17 @@ void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client
                                                        const ICECandidate& candidate) {
     auto it = peers_.find(from_peer);
     if (it == peers_.end()) {
+        // Candidate before createPeerConnection — drop (cannot buffer without PC).
+        LOG_INFO("[Sync] ICE candidate from unknown peer %s (ignored)", from_peer.c_str());
         return;
     }
 
-    it->second->connection->addIceCandidate(candidate,
-                                            [](bool /*success*/, const std::string& /*error*/) {
-                                                // ICE candidate added
-                                            });
+    it->second->connection->addIceCandidate(candidate, [from_peer](bool success,
+                                                                   const std::string& error) {
+        if (!success) {
+            LOG_INFO("[Sync] addIceCandidate failed for %s: %s", from_peer.c_str(), error.c_str());
+        }
+    });
 }
 
 // ============================================================================
@@ -1032,7 +1115,10 @@ void SyncClient::signalingClientDidReceiveICECandidate(SignalingClient& /*client
 
 void SyncClient::handlePeerConnectionStateChange(const std::string& peer_id,
                                                  PeerConnectionState state) {
+    LOG_INFO("[Sync] Peer connection state: %s -> %s", peer_id.c_str(),
+             peerConnectionStateToString(state));
     if (state == PeerConnectionState::FAILED || state == PeerConnectionState::CLOSED) {
+        // Include ICE state in logs via removePeer diagnostics
         removePeer(peer_id);
     } else if (delegate_) {
         delegate_->syncClientPeerDidChange(*this, getPeer(peer_id));
@@ -1049,6 +1135,12 @@ void SyncClient::handlePeerDataChannelOpen(const std::string& peer_id,
     // Check if operations channel is now ready
     if (channel_label == OPERATIONS_CHANNEL && it->second->isReady()) {
         // Peer is now ready for sync
+        ever_had_ready_peer_ = true;
+        expect_remote_peers_ = false;
+        outstanding_join_peers_.clear();
+        join_failure_reported_ = false;
+        LOG_INFO("[Sync] DataChannel open: peer=%s channel=%s", peer_id.c_str(),
+                 channel_label.c_str());
         setState(SyncClientState::SYNCING);
         notifyPeerReady(peer_id);
     }

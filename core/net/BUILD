@@ -454,8 +454,19 @@ cc_test(
     name = "rtc_test",
     srcs = ["rtc_test.cc"],
     deps = [
+        ":ice_config",
         ":rtc_data_channel",
         ":rtc_peer_connection",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sync_client_test",
+    srcs = ["sync_client_test.cc"],
+    deps = [
+        ":sync_client",
+        "//core/cells:model",
         "@googletest//:gtest_main",
     ],
 )

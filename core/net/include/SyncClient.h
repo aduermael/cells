@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -309,6 +310,10 @@ private:
     // Notify peer was ready (add to SyncManager)
     void notifyPeerReady(const std::string& peer_id);
 
+    // Mark an initial-join peer as resolved (left, RTC failed, or synced).
+    // had_rtc_attempt: true when an RTC peer existed and died without a channel.
+    void noteJoinPeerResolved(const std::string& peer_id, bool had_rtc_attempt);
+
     // Config
     SyncClientConfig config_;
 
@@ -335,6 +340,22 @@ private:
     // the first offer). Minting a local Sheet1 in that window creates a second
     // document that never merges with the browser's sheet.
     bool expect_remote_peers_ = false;
+
+    // True once any peer data-channel has opened (real collab progress).
+    // Cleared on stopSync. Used so a failed join (all RTC peers die with no
+    // channel) does not clear expect_remote_peers_ and report empty ONLINE.
+    bool ever_had_ready_peer_ = false;
+
+    // True after we have reported a join-with-existing RTC failure once.
+    bool join_failure_reported_ = false;
+
+    // True if any RTC peer from the join set closed without a ready channel.
+    bool any_rtc_join_attempt_failed_ = false;
+
+    // Peer ids from the room at join time that we have not yet resolved
+    // (ready channel, or left/failed). While non-empty and never ready, stay
+    // SYNCING — do not ONLINE alone.
+    std::set<std::string> outstanding_join_peers_;
 
     // Result of prepareWorkbookForSync in the last startSync call
     size_t last_bootstrapped_ops_{0};

@@ -8,6 +8,7 @@
 #include <optional>
 #include <rtc/rtc.hpp>
 #include <string>
+#include <vector>
 
 #include "core/net/include/RTCPeerConnection.h"
 
@@ -87,6 +88,20 @@ static SignalingState mapSignalingState(rtc::PeerConnection::SignalingState stat
     }
 }
 
+// Browser RTCIceCandidate.candidate is the attribute value ("candidate:...") without
+// the SDP "a=" line prefix. libdatachannel's operator string() adds "a="; use
+// Candidate::candidate() when exporting, and strip "a=" when importing.
+static std::string iceCandidateForSignaling(const rtc::Candidate& cand) {
+    return cand.candidate();
+}
+
+static std::string normalizeIncomingIceCandidate(std::string candidate) {
+    if (candidate.rfind("a=", 0) == 0) {
+        candidate.erase(0, 2);
+    }
+    return candidate;
+}
+
 // Convert our ICE server config to libdatachannel format
 static rtc::Configuration toLibdcConfig(const RTCConfiguration& config) {
     rtc::Configuration rtcConfig;
@@ -94,14 +109,24 @@ static rtc::Configuration toLibdcConfig(const RTCConfiguration& config) {
     for (const auto& server : config.ice_servers) {
         for (const auto& url : server.urls) {
             if (!server.username.empty() && !server.credential.empty()) {
-                // TURN server with credentials
-                rtcConfig.iceServers.emplace_back(url + ":" + server.username + ":" +
-                                                  server.credential);
+                // libdatachannel URL form: turn:user:pass@host:port
+                // (NOT url:user:pass — that fails to parse).
+                std::string turn_url = url;
+                const auto scheme_end = turn_url.find(':');
+                if (scheme_end != std::string::npos && turn_url.find('@') == std::string::npos) {
+                    turn_url.insert(scheme_end + 1,
+                                    server.username + ":" + server.credential + "@");
+                }
+                rtcConfig.iceServers.emplace_back(turn_url);
             } else {
                 // STUN server (no credentials needed)
                 rtcConfig.iceServers.emplace_back(url);
             }
         }
+    }
+
+    if (config.ice_transport_policy == ICETransportPolicy::RELAY) {
+        rtcConfig.iceTransportPolicy = rtc::TransportPolicy::Relay;
     }
 
     return rtcConfig;
@@ -243,6 +268,12 @@ public:
             pc_->setRemoteDescription(desc);
 
             remote_description_ = sdp;
+            remote_description_set_ = true;
+
+            // libdatachannel does not buffer candidates before remote description;
+            // browsers do. Flush any that arrived early (trickle ICE).
+            flushPendingRemoteCandidates();
+
             callback(true, "");
         } catch (const std::exception& e) {
             callback(false, e.what());
@@ -261,13 +292,15 @@ public:
             return;
         }
 
-        try {
-            rtc::Candidate cand(candidate.candidate, candidate.sdp_mid);
-            pc_->addRemoteCandidate(cand);
+        // Buffer until setRemoteDescription succeeds (browser-compatible trickle).
+        if (!remote_description_set_) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            pending_remote_candidates_.push_back(candidate);
             callback(true, "");
-        } catch (const std::exception& e) {
-            callback(false, e.what());
+            return;
         }
+
+        callback(applyRemoteCandidate(candidate), "");
     }
 
     std::unique_ptr<RTCDataChannel> createDataChannel(const std::string& label,
@@ -395,7 +428,8 @@ private:
 
         pc_->onLocalCandidate([this](rtc::Candidate cand) {
             ICECandidate candidate;
-            candidate.candidate = std::string(cand);
+            // Must NOT include "a=" — browsers reject that form in addIceCandidate.
+            candidate.candidate = iceCandidateForSignaling(cand);
             auto mid = cand.mid();
             if (!mid.empty()) {
                 candidate.sdp_mid = mid;
@@ -410,6 +444,31 @@ private:
         });
     }
 
+    bool applyRemoteCandidate(const ICECandidate& candidate) {
+        if (!pc_) {
+            return false;
+        }
+        try {
+            const std::string normalized = normalizeIncomingIceCandidate(candidate.candidate);
+            rtc::Candidate cand(normalized, candidate.sdp_mid);
+            pc_->addRemoteCandidate(cand);
+            return true;
+        } catch (const std::exception&) {
+            return false;
+        }
+    }
+
+    void flushPendingRemoteCandidates() {
+        std::vector<ICECandidate> pending;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            pending.swap(pending_remote_candidates_);
+        }
+        for (const auto& c : pending) {
+            applyRemoteCandidate(c);
+        }
+    }
+
     std::unique_ptr<rtc::PeerConnection> pc_;
     std::mutex mutex_;
 
@@ -421,6 +480,8 @@ private:
 
     SessionDescription local_description_;
     SessionDescription remote_description_;
+    bool remote_description_set_ = false;
+    std::vector<ICECandidate> pending_remote_candidates_;
 
     // Pending callbacks
     CreateSDPCallback pending_create_callback_;
