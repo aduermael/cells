@@ -32,8 +32,7 @@ static void ensureLibdcLoggingOnce() {
         try {
             rtc::InitLogger(rtc::LogLevel::Debug, [](rtc::LogLevel level, std::string message) {
                 // Strip trailing newlines; libdc often includes them.
-                while (!message.empty() &&
-                       (message.back() == '\n' || message.back() == '\r')) {
+                while (!message.empty() && (message.back() == '\n' || message.back() == '\r')) {
                     message.pop_back();
                 }
                 if (level <= rtc::LogLevel::Error) {
@@ -44,8 +43,9 @@ static void ensureLibdcLoggingOnce() {
                     LOG_INFO("[libdc] %s", message.c_str());
                 }
             });
-            LOG_INFO("[RTC] libdatachannel debug logging enabled "
-                     "(CELLS_SESSION_DEBUG / CELLS_RTC_DEBUG)");
+            LOG_INFO(
+                "[RTC] libdatachannel debug logging enabled "
+                "(CELLS_SESSION_DEBUG / CELLS_RTC_DEBUG)");
         } catch (...) {
             // Logger already initialized elsewhere — ignore.
         }
@@ -346,14 +346,15 @@ public:
             const bool has_setup = sdp.sdp.find("a=setup:") != std::string::npos;
             const bool has_ufrag = sdp.sdp.find("a=ice-ufrag:") != std::string::npos;
             const bool has_app = sdp.sdp.find("m=application") != std::string::npos;
-            LOG_INFO("[RTC] setRemoteDescription type=%s bytes=%zu fingerprint=%s setup=%s "
-                     "ice_ufrag=%s m=application=%s",
-                     sdp.type == SDPType::OFFER     ? "offer"
-                     : sdp.type == SDPType::ANSWER  ? "answer"
-                     : sdp.type == SDPType::PRANSWER ? "pranswer"
-                                                    : "other",
-                     sdp.sdp.size(), has_fp ? "yes" : "NO", has_setup ? "yes" : "NO",
-                     has_ufrag ? "yes" : "NO", has_app ? "yes" : "NO");
+            LOG_INFO(
+                "[RTC] setRemoteDescription type=%s bytes=%zu fingerprint=%s setup=%s "
+                "ice_ufrag=%s m=application=%s",
+                sdp.type == SDPType::OFFER      ? "offer"
+                : sdp.type == SDPType::ANSWER   ? "answer"
+                : sdp.type == SDPType::PRANSWER ? "pranswer"
+                                                : "other",
+                sdp.sdp.size(), has_fp ? "yes" : "NO", has_setup ? "yes" : "NO",
+                has_ufrag ? "yes" : "NO", has_app ? "yes" : "NO");
             if (!has_fp) {
                 LOG_INFO("[RTC] WARNING: remote SDP missing a=fingerprint — DTLS will fail");
             }

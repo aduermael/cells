@@ -81,9 +81,10 @@ TEST(SyncClientJoinTest, FailedRtcJoinDoesNotGoOnlineEmpty) {
 
     auto webrtc_join_errors = [&]() {
         std::lock_guard<std::mutex> lock(delegate.mu);
-        return std::count_if(delegate.errors.begin(), delegate.errors.end(), [](const std::string& e) {
-            return e.find("WebRTC connections failed") != std::string::npos;
-        });
+        return std::count_if(delegate.errors.begin(), delegate.errors.end(),
+                             [](const std::string& e) {
+                                 return e.find("WebRTC connections failed") != std::string::npos;
+                             });
     };
 
     // A real RTC peer was created for AAAA0000. Real libdc may also fire FAILED
