@@ -378,6 +378,25 @@ private:
     // SYNCING — do not ONLINE alone.
     std::set<std::string> outstanding_join_peers_;
 
+    // Join-time WebRTC retries: ice=connected then pc=failed (DTLS/SCTP) is
+    // common on first attempt (browser mDNS / candidate races). Both peers used
+    // to drop the PC and never re-offer → permanent SYNCING. Impolite side
+    // re-offers after a short delay; polite side waits for that re-offer.
+    static constexpr int kMaxJoinRtcAttempts = 3;  // initial + 2 retries
+    std::map<std::string, int> join_rtc_attempts_;
+    struct PendingJoinRetry {
+        bool we_should_offer = false;
+        int64_t retry_after_ms = 0;
+    };
+    std::map<std::string, PendingJoinRetry> pending_join_retries_;
+
+    // Tear down RTC for peer without counting as final join failure.
+    // Returns true if a peer existed and was removed.
+    bool tearDownPeerForRetry(const std::string& peer_id);
+
+    // Schedule / flush join-time WebRTC retries (called from processOutgoing).
+    void flushPendingJoinRetries();
+
     // Result of prepareWorkbookForSync in the last startSync call
     size_t last_bootstrapped_ops_{0};
 

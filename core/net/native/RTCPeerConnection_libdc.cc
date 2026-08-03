@@ -4,6 +4,7 @@
 #if !defined(__EMSCRIPTEN__)
 
 #include <cctype>
+#include <cstdlib>
 
 #include <memory>
 #include <mutex>
@@ -19,6 +20,39 @@ namespace cells::net {
 
 // Forward declaration from RTCDataChannel_libdc.cc
 std::unique_ptr<RTCDataChannel> createLibdcDataChannel(std::shared_ptr<rtc::DataChannel> dc);
+
+// Route libdatachannel / libjuice / OpenSSL DTLS logs into our logger when
+// debugging collab. Essential for ice=connected → pc=failed diagnosis.
+static void ensureLibdcLoggingOnce() {
+    static const bool once = [] {
+        if (std::getenv("CELLS_SESSION_DEBUG") == nullptr &&
+            std::getenv("CELLS_RTC_DEBUG") == nullptr) {
+            return true;
+        }
+        try {
+            rtc::InitLogger(rtc::LogLevel::Debug, [](rtc::LogLevel level, std::string message) {
+                // Strip trailing newlines; libdc often includes them.
+                while (!message.empty() &&
+                       (message.back() == '\n' || message.back() == '\r')) {
+                    message.pop_back();
+                }
+                if (level <= rtc::LogLevel::Error) {
+                    LOG_ERROR("[libdc] %s", message.c_str());
+                } else if (level <= rtc::LogLevel::Warning) {
+                    LOG_INFO("[libdc] %s", message.c_str());
+                } else {
+                    LOG_INFO("[libdc] %s", message.c_str());
+                }
+            });
+            LOG_INFO("[RTC] libdatachannel debug logging enabled "
+                     "(CELLS_SESSION_DEBUG / CELLS_RTC_DEBUG)");
+        } catch (...) {
+            // Logger already initialized elsewhere — ignore.
+        }
+        return true;
+    }();
+    (void)once;
+}
 
 // Map libdatachannel states to our state enums
 static PeerConnectionState mapState(rtc::PeerConnection::State state) {
@@ -106,8 +140,6 @@ static std::string iceCandidateForSignaling(const rtc::Candidate& cand) {
     if (sp2 == std::string::npos) {
         return s;
     }
-    const size_t proto_begin = sp1 + 1;
-    // protocol runs until next space after component — actually:
     // fields: [0]=candidate:f [1]=component [2]=protocol
     // sp1 after field0, sp2 after field1, protocol is sp2+1 .. next space
     const size_t proto_start = sp2 + 1;
@@ -309,6 +341,23 @@ public:
                     type = rtc::Description::Type::Unspec;
             }
 
+            // Lightweight interop diagnostics (DTLS needs fingerprint + setup).
+            const bool has_fp = sdp.sdp.find("a=fingerprint:") != std::string::npos;
+            const bool has_setup = sdp.sdp.find("a=setup:") != std::string::npos;
+            const bool has_ufrag = sdp.sdp.find("a=ice-ufrag:") != std::string::npos;
+            const bool has_app = sdp.sdp.find("m=application") != std::string::npos;
+            LOG_INFO("[RTC] setRemoteDescription type=%s bytes=%zu fingerprint=%s setup=%s "
+                     "ice_ufrag=%s m=application=%s",
+                     sdp.type == SDPType::OFFER     ? "offer"
+                     : sdp.type == SDPType::ANSWER  ? "answer"
+                     : sdp.type == SDPType::PRANSWER ? "pranswer"
+                                                    : "other",
+                     sdp.sdp.size(), has_fp ? "yes" : "NO", has_setup ? "yes" : "NO",
+                     has_ufrag ? "yes" : "NO", has_app ? "yes" : "NO");
+            if (!has_fp) {
+                LOG_INFO("[RTC] WARNING: remote SDP missing a=fingerprint — DTLS will fail");
+            }
+
             rtc::Description desc(sdp.sdp, type);
             pc_->setRemoteDescription(desc);
 
@@ -321,6 +370,7 @@ public:
 
             callback(true, "");
         } catch (const std::exception& e) {
+            LOG_INFO("[RTC] setRemoteDescription failed: %s", e.what());
             callback(false, e.what());
         }
     }
@@ -476,9 +526,9 @@ private:
             // Must NOT include "a=" — browsers reject that form in addIceCandidate.
             candidate.candidate = iceCandidateForSignaling(cand);
             auto mid = cand.mid();
-            if (!mid.empty()) {
-                candidate.sdp_mid = mid;
-            }
+            // Datachannel-only offers use mid "0". Empty mid makes Chrome drop the
+            // candidate (addIceCandidate requires sdpMid or sdpMLineIndex).
+            candidate.sdp_mid = mid.empty() ? "0" : mid;
             candidate.sdp_mline_index = 0;  // libdatachannel doesn't expose this directly
             notifyICECandidate(candidate);
         });
@@ -495,17 +545,23 @@ private:
         }
         try {
             const std::string normalized = normalizeIncomingIceCandidate(candidate.candidate);
-            rtc::Candidate cand(normalized, candidate.sdp_mid);
-            // Browser host candidates are often *.local (mDNS). Resolve before
-            // add so libjuice can form host pairs on the same LAN as the CLI.
-            if (!cand.isResolved()) {
-                if (!cand.resolve(rtc::Candidate::ResolveMode::Lookup)) {
-                    // Still hand off unresolved — libdc may retry async.
-                    LOG_INFO("[RTC] ICE resolve pending/failed: %s", normalized.c_str());
-                } else {
-                    LOG_INFO("[RTC] ICE resolved remote candidate mid=%s",
-                             candidate.sdp_mid.c_str());
-                }
+            // Prefer sdpMid; browsers always set it for the datachannel m-line ("0").
+            // Empty mid breaks association when only sdpMLineIndex was set.
+            std::string mid = candidate.sdp_mid;
+            if (mid.empty() && candidate.sdp_mline_index >= 0) {
+                mid = std::to_string(candidate.sdp_mline_index);
+            }
+            rtc::Candidate cand(normalized, mid);
+            // Do NOT call cand.resolve() here. libdatachannel's
+            // processRemoteCandidate already:
+            //   1) resolve(Simple) for numeric hosts
+            //   2) async resolve(Lookup) for mDNS *.local names
+            // Pre-resolving on the signaling thread raced with that path and
+            // could leave ice=connected with a broken DTLS association on some
+            // platforms (macOS + Chrome mDNS). Hand off the raw candidate.
+            if (normalized.find(".local") != std::string::npos) {
+                LOG_INFO("[RTC] ICE remote mDNS candidate mid=%s (libdc async resolve)",
+                         mid.c_str());
             }
             pc_->addRemoteCandidate(std::move(cand));
             return true;
@@ -548,6 +604,7 @@ private:
 
 // Factory implementation for native platforms using libdatachannel
 std::unique_ptr<RTCPeerConnection> RTCPeerConnection::make(const RTCConfiguration& config) {
+    ensureLibdcLoggingOnce();
     return std::make_unique<LibdcPeerConnection>(config);
 }
 

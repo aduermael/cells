@@ -79,19 +79,28 @@ TEST(SyncClientJoinTest, FailedRtcJoinDoesNotGoOnlineEmpty) {
     client.signalingClientDidJoinRoom(dummySignaling(), "room-join-fail", {"AAAA0000"});
     EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
 
-    // A real RTC peer was created for AAAA0000. Force FAILED (same path as
-    // ICE/DTLS failure) without ever opening a data channel.
-    client.handlePeerConnectionStateChange("AAAA0000", PeerConnectionState::FAILED);
+    auto webrtc_join_errors = [&]() {
+        std::lock_guard<std::mutex> lock(delegate.mu);
+        return std::count_if(delegate.errors.begin(), delegate.errors.end(), [](const std::string& e) {
+            return e.find("WebRTC connections failed") != std::string::npos;
+        });
+    };
+
+    // A real RTC peer was created for AAAA0000. Real libdc may also fire FAILED
+    // quickly (no remote). Join-time logic retries a few times before permanent
+    // error — keep forcing FAILED until the join-failure error is reported.
+    for (int i = 0; i < 8 && webrtc_join_errors() == 0; ++i) {
+        client.handlePeerConnectionStateChange("AAAA0000", PeerConnectionState::FAILED);
+        // Allow scheduled join retries to re-create the PC.
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        client.processOutgoing();
+    }
 
     // Must NOT settle ONLINE with an empty workbook (historical agent bug).
     EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
     EXPECT_EQ(client.getPeerCount(), 0u);
     EXPECT_TRUE(wb.sheets.empty());
-    {
-        std::lock_guard<std::mutex> lock(delegate.mu);
-        ASSERT_FALSE(delegate.errors.empty());
-        EXPECT_NE(delegate.errors.back().find("WebRTC connections failed"), std::string::npos);
-    }
+    EXPECT_GE(webrtc_join_errors(), 1);
 
     // processOutgoing must not flip ONLINE either.
     client.processOutgoing();

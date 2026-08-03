@@ -240,6 +240,8 @@ void SyncClient::stopSync() {
         }
         peers_.clear();
         early_remote_ice_.clear();
+        join_rtc_attempts_.clear();
+        pending_join_retries_.clear();
 
         signaling_client_->disconnect();
 
@@ -291,6 +293,10 @@ void SyncClient::broadcastOperations() {
 
 void SyncClient::processOutgoing() {
     std::unique_lock<std::recursive_mutex> lock(mu_);
+    // Join-time RTC retries even if SyncManager is briefly null (should not
+    // happen after startSync); always try while SYNCING.
+    flushPendingJoinRetries();
+
     if (!sync_manager_) {
         return;
     }
@@ -1046,6 +1052,8 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
         join_failure_reported_ = false;
         any_rtc_join_attempt_failed_ = false;
         outstanding_join_peers_.clear();
+        join_rtc_attempts_.clear();
+        pending_join_retries_.clear();
         setState(SyncClientState::ONLINE);
         return;
     }
@@ -1063,6 +1071,8 @@ void SyncClient::signalingClientDidJoinRoom(SignalingClient& /*client*/,
     join_failure_reported_ = false;
     any_rtc_join_attempt_failed_ = false;
     outstanding_join_peers_.clear();
+    join_rtc_attempts_.clear();
+    pending_join_retries_.clear();
     for (const auto& other : existing_peers) {
         outstanding_join_peers_.insert(other);
     }
@@ -1221,10 +1231,127 @@ void SyncClient::handlePeerConnectionStateChange(const std::string& peer_id,
     LOG_INFO("[Sync] Peer connection state: %s -> %s", peer_id.c_str(),
              peerConnectionStateToString(state));
     if (state == PeerConnectionState::FAILED || state == PeerConnectionState::CLOSED) {
-        // Include ICE state in logs via removePeer diagnostics
-        removePeer(peer_id);
+        // Join-time retry: ice=connected then pc=failed (DTLS/SCTP) is recoverable
+        // if the impolite side re-offers. Without this both peers drop the PC and
+        // stay SYNCING forever with ops_sent=0.
+        const int attempts = ++join_rtc_attempts_[peer_id];
+        const bool joining =
+            expect_remote_peers_ && !ever_had_ready_peer_ && state_ == SyncClientState::SYNCING;
+        const bool can_retry =
+            joining && state == PeerConnectionState::FAILED && attempts < kMaxJoinRtcAttempts;
+
+        if (can_retry) {
+            const bool we_should_offer = shouldInitiateTo(peer_id);
+            // Delay grows slightly: 300ms, 600ms (attempt 1, 2 after initial).
+            const int64_t delay_ms = 300LL * attempts;
+            const int64_t retry_at = cells::current_time_ms() + delay_ms;
+            LOG_INFO("[Sync] Peer %s RTC FAILED during join (attempt %d/%d); "
+                     "retry in %lldms (we_offer=%s)",
+                     peer_id.c_str(), attempts, kMaxJoinRtcAttempts,
+                     static_cast<long long>(delay_ms), we_should_offer ? "true" : "false");
+            tearDownPeerForRetry(peer_id);
+            outstanding_join_peers_.insert(peer_id);
+            pending_join_retries_[peer_id] = PendingJoinRetry{we_should_offer, retry_at};
+            return;
+        }
+
+        // Final failure (or CLOSED): drop peer and resolve join wait.
+        pending_join_retries_.erase(peer_id);
+        if (peers_.find(peer_id) != peers_.end()) {
+            removePeer(peer_id);
+        } else {
+            // Peer already torn down by a prior retry — still count as failed join.
+            noteJoinPeerResolved(peer_id, /*had_rtc_attempt=*/true);
+            updateSyncState();
+        }
     } else if (delegate_) {
         delegate_->syncClientPeerDidChange(*this, getPeer(peer_id));
+    }
+}
+
+bool SyncClient::tearDownPeerForRetry(const std::string& peer_id) {
+    // mu_ must be held. Like removePeer but does not note join failure / ONLINE policy.
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return false;
+    }
+
+    std::string disconnect_detail;
+    if (it->second->connection) {
+        disconnect_detail =
+            std::string(" pc=") +
+            peerConnectionStateToString(it->second->connection->getConnectionState()) +
+            " ice=" + iceConnectionStateToString(it->second->connection->getICEConnectionState());
+    }
+    LOG_INFO("[Sync] Tearing down peer for join retry: %s%s", peer_id.c_str(),
+             disconnect_detail.c_str());
+
+    auto peer = std::move(it->second);
+    peers_.erase(it);
+    early_remote_ice_.erase(peer_id);
+
+    if (peer->operations_channel) {
+        peer->operations_channel->setDelegate(nullptr);
+    }
+    if (peer->presence_channel) {
+        peer->presence_channel->setDelegate(nullptr);
+    }
+    peer->sync_client = nullptr;
+    if (peer->connection) {
+        peer->connection->setDelegate(nullptr);
+    }
+
+    if (sync_manager_) {
+        sync_manager_->removePeer(cells::ID(peer_id));
+    }
+    if (presence_manager_) {
+        presence_manager_->removePeer(peer_id);
+    }
+
+    mu_.unlock();
+    if (peer->connection) {
+        peer->connection->close();
+    }
+    peer.reset();
+    mu_.lock();
+    return true;
+}
+
+void SyncClient::flushPendingJoinRetries() {
+    // mu_ must be held.
+    if (pending_join_retries_.empty() || ever_had_ready_peer_ ||
+        state_ == SyncClientState::OFFLINE) {
+        return;
+    }
+
+    const int64_t now = cells::current_time_ms();
+    std::vector<std::pair<std::string, bool>> due;
+    for (auto it = pending_join_retries_.begin(); it != pending_join_retries_.end();) {
+        if (now >= it->second.retry_after_ms) {
+            due.emplace_back(it->first, it->second.we_should_offer);
+            it = pending_join_retries_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (const auto& item : due) {
+        const std::string& peer_id = item.first;
+        const bool we_should_offer = item.second;
+        if (peers_.find(peer_id) != peers_.end()) {
+            continue;  // already reconnected (e.g. remote re-offered first)
+        }
+        if (!expect_remote_peers_ || ever_had_ready_peer_) {
+            continue;
+        }
+        outstanding_join_peers_.insert(peer_id);
+        if (we_should_offer) {
+            LOG_INFO("[Sync] Join retry: re-initiating offer to %s", peer_id.c_str());
+            initiateConnectionToPeer(peer_id);
+        } else {
+            LOG_INFO("[Sync] Join retry: waiting for re-offer from %s (we are polite)",
+                     peer_id.c_str());
+        }
     }
 }
 
@@ -1243,6 +1370,8 @@ void SyncClient::handlePeerDataChannelOpen(const std::string& peer_id,
         expect_remote_peers_ = false;
         outstanding_join_peers_.clear();
         join_failure_reported_ = false;
+        join_rtc_attempts_.erase(peer_id);
+        pending_join_retries_.erase(peer_id);
         LOG_INFO("[Sync] DataChannel open: peer=%s channel=%s", peer_id.c_str(),
                  channel_label.c_str());
         setState(SyncClientState::SYNCING);
