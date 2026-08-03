@@ -218,6 +218,7 @@ cc_library(
         ":ice_config",
         ":rtc_data_channel_libdc",
         ":rtc_peer_connection_common",
+        "//core/log",
         "@libdatachannel",
         "@openssl//:ssl",  # libdatachannel links against OpenSSL
         "@openssl//:crypto",  # libdatachannel links against libcrypto

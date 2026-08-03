@@ -3,6 +3,8 @@
 
 #if !defined(__EMSCRIPTEN__)
 
+#include <cctype>
+
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -10,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "core/log/include/Logger.h"
 #include "core/net/include/RTCPeerConnection.h"
 
 namespace cells::net {
@@ -91,13 +94,55 @@ static SignalingState mapSignalingState(rtc::PeerConnection::SignalingState stat
 // Browser RTCIceCandidate.candidate is the attribute value ("candidate:...") without
 // the SDP "a=" line prefix. libdatachannel's operator string() adds "a="; use
 // Candidate::candidate() when exporting, and strip "a=" when importing.
+// Also lowercase the transport token (libdc emits "UDP"; browsers emit "udp").
 static std::string iceCandidateForSignaling(const rtc::Candidate& cand) {
-    return cand.candidate();
+    std::string s = cand.candidate();
+    // candidate:<foundation> <component> <protocol> ...
+    const size_t sp1 = s.find(' ');
+    if (sp1 == std::string::npos) {
+        return s;
+    }
+    const size_t sp2 = s.find(' ', sp1 + 1);
+    if (sp2 == std::string::npos) {
+        return s;
+    }
+    const size_t proto_begin = sp1 + 1;
+    // protocol runs until next space after component — actually:
+    // fields: [0]=candidate:f [1]=component [2]=protocol
+    // sp1 after field0, sp2 after field1, protocol is sp2+1 .. next space
+    const size_t proto_start = sp2 + 1;
+    const size_t proto_end = s.find(' ', proto_start);
+    if (proto_end == std::string::npos) {
+        return s;
+    }
+    for (size_t i = proto_start; i < proto_end; ++i) {
+        const unsigned char ch = static_cast<unsigned char>(s[i]);
+        s[i] = static_cast<char>(std::tolower(ch));
+    }
+    return s;
 }
 
 static std::string normalizeIncomingIceCandidate(std::string candidate) {
     if (candidate.rfind("a=", 0) == 0) {
         candidate.erase(0, 2);
+    }
+    // Lowercase transport protocol for consistent parsing.
+    const size_t sp1 = candidate.find(' ');
+    if (sp1 == std::string::npos) {
+        return candidate;
+    }
+    const size_t sp2 = candidate.find(' ', sp1 + 1);
+    if (sp2 == std::string::npos) {
+        return candidate;
+    }
+    const size_t proto_start = sp2 + 1;
+    const size_t proto_end = candidate.find(' ', proto_start);
+    if (proto_end == std::string::npos) {
+        return candidate;
+    }
+    for (size_t i = proto_start; i < proto_end; ++i) {
+        const unsigned char ch = static_cast<unsigned char>(candidate[i]);
+        candidate[i] = static_cast<char>(std::tolower(ch));
     }
     return candidate;
 }
@@ -451,9 +496,22 @@ private:
         try {
             const std::string normalized = normalizeIncomingIceCandidate(candidate.candidate);
             rtc::Candidate cand(normalized, candidate.sdp_mid);
-            pc_->addRemoteCandidate(cand);
+            // Browser host candidates are often *.local (mDNS). Resolve before
+            // add so libjuice can form host pairs on the same LAN as the CLI.
+            if (!cand.isResolved()) {
+                if (!cand.resolve(rtc::Candidate::ResolveMode::Lookup)) {
+                    // Still hand off unresolved — libdc may retry async.
+                    LOG_INFO("[RTC] ICE resolve pending/failed: %s", normalized.c_str());
+                } else {
+                    LOG_INFO("[RTC] ICE resolved remote candidate mid=%s",
+                             candidate.sdp_mid.c_str());
+                }
+            }
+            pc_->addRemoteCandidate(std::move(cand));
             return true;
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
+            LOG_INFO("[RTC] addRemoteCandidate failed: %s (%s)", e.what(),
+                     candidate.candidate.c_str());
             return false;
         }
     }

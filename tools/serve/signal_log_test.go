@@ -93,6 +93,18 @@ func TestSignalTimelineIceBeforeOffer(t *testing.T) {
 	}
 }
 
+func TestSignalTimelineAnswererIceNotBeforeOffer(t *testing.T) {
+	// Browser offers A→B; CLI answers B→A then trickles ICE B→A.
+	// Those ICE candidates must not be logged as ice_before_offer.
+	tl := newSignalTimeline()
+	tl.noteOffer("room1", "Browser", "CLI")
+	tl.noteAnswer("room1", "CLI", "Browser")
+	before, _, after := tl.noteIce("room1", "CLI", "Browser")
+	if before || after != 1 {
+		t.Fatalf("answerer ICE should be after SDP, before=%v after=%d", before, after)
+	}
+}
+
 func TestRoomSendToMissingPeer(t *testing.T) {
 	room := NewRoom("r", 10)
 	err := room.SendTo("nobody", []byte(`{}`))

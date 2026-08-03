@@ -2,6 +2,8 @@
 // Note: Full WebRTC tests require a browser environment or native WebRTC library.
 // These tests verify the interface and basic state management.
 
+#include <cctype>
+
 #include <atomic>
 #include <chrono>
 #include <gtest/gtest.h>
@@ -297,6 +299,19 @@ TEST(RTCPeerConnectionTest, LocalIceCandidatesHaveNoAPrefix) {
     for (const auto& c : delegate.candidates) {
         EXPECT_TRUE(c.rfind("a=", 0) != 0) << "browser-incompatible candidate: " << c;
         EXPECT_TRUE(c.rfind("candidate:", 0) == 0) << "expected candidate: prefix, got: " << c;
+        // Transport protocol must be lowercase for browser interop (libdc emits UDP).
+        // candidate:<f> <comp> <proto> ...
+        const size_t sp1 = c.find(' ');
+        const size_t sp2 = (sp1 == std::string::npos) ? std::string::npos : c.find(' ', sp1 + 1);
+        const size_t sp3 = (sp2 == std::string::npos) ? std::string::npos : c.find(' ', sp2 + 1);
+        ASSERT_NE(sp2, std::string::npos);
+        ASSERT_NE(sp3, std::string::npos);
+        const std::string proto = c.substr(sp2 + 1, sp3 - sp2 - 1);
+        for (char ch : proto) {
+            EXPECT_TRUE(std::islower(static_cast<unsigned char>(ch)) ||
+                        !std::isalpha(static_cast<unsigned char>(ch)))
+                << "protocol should be lowercase, got: " << proto << " in " << c;
+        }
     }
 
     pc->setDelegate(nullptr);

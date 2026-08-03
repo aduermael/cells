@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -160,7 +161,8 @@ struct ConnectedPeer : public RTCPeerConnectionDelegate, public DataChannelDeleg
 };
 
 // SyncClient - orchestrates P2P synchronization
-// Thread-safety: All methods must be called from main thread
+// Thread-safety: libdatachannel and platform WS invoke callbacks on worker
+// threads; all entry points take mu_ (recursive for re-entrant offer/answer).
 class SyncClient : public SignalingClientDelegate {
 public:
     // Create a SyncClient for a workbook
@@ -327,6 +329,9 @@ private:
 
     // Config
     SyncClientConfig config_;
+
+    // Serializes peers_/state_ against libdc ICE/DC threads and signaling I/O.
+    mutable std::recursive_mutex mu_;
 
     // Workbook and SyncManager (from core/cells/)
     Workbook* workbook_;

@@ -49,20 +49,26 @@ func (t *signalTimeline) noteOffer(roomID, from, to string) (iceBeforeOffer int)
 	return iceBeforeOffer
 }
 
-// noteAnswer records an answer on from→to.
+// noteAnswer records an answer on from→to. Also marks the reverse pair as
+// having completed SDP so answerer ICE is not logged as "before offer".
 func (t *signalTimeline) noteAnswer(roomID, from, to string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.get(pairKey(roomID, from, to))
 	st.answerSeen = true
+	// Reverse direction (original offerer ← answerer): SDP is established.
+	rev := t.get(pairKey(roomID, to, from))
+	rev.offerSeen = true
+	rev.answerSeen = true
 }
 
 // noteIce records an ice-candidate on from→to. Returns (beforeOffer, totalIce).
+// "before offer" means no SDP (offer or answer) seen yet on this directed pair.
 func (t *signalTimeline) noteIce(roomID, from, to string) (beforeOffer bool, iceBefore, iceAfter int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.get(pairKey(roomID, from, to))
-	if !st.offerSeen {
+	if !st.offerSeen && !st.answerSeen {
 		st.iceBefore++
 		return true, st.iceBefore, st.iceAfter
 	}
