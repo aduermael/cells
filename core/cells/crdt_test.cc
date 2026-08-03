@@ -1668,6 +1668,60 @@ TEST(CrdtJoinEmptyShell, PreferredActiveSheetIsContentSheet) {
               "foo");
 }
 
+// Remote fill/edit must not yank the user off Sheet2 to Sheet1 just because
+// preferredActiveSheetIndex always returns the first non-empty sheet.
+TEST(CrdtJoinEmptyShell, RemoteChangeKeepsActiveSheet) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+
+    // Sheet1 (index 0) with content — would be "preferred"
+    const ID sheet1Id = generate_id();
+    auto s1 = std::make_unique<Sheet>(sheet1Id, "Sheet1");
+    s1->setWorkbook(wb.get());
+    wb->addSheet(std::move(s1));
+    applyOperation(*wb, makeColSetOp(*wb, generate_id(), sheet1Id, R"({"pos":0})"));
+    applyOperation(*wb, makeRowSetOp(*wb, generate_id(), sheet1Id, R"({"pos":0})"));
+
+    // Sheet2 (index 1) with content — user is viewing this when peer fills
+    const ID sheet2Id = generate_id();
+    auto s2 = std::make_unique<Sheet>(sheet2Id, "Sheet2");
+    s2->setWorkbook(wb.get());
+    wb->addSheet(std::move(s2));
+    applyOperation(*wb, makeColSetOp(*wb, generate_id(), sheet2Id, R"({"pos":0})"));
+    applyOperation(*wb, makeRowSetOp(*wb, generate_id(), sheet2Id, R"({"pos":0})"));
+
+    // Empty Sheet3 — user may still be viewing it; do not auto-switch
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet3"));
+
+    EXPECT_EQ(preferredActiveSheetIndex(*wb), 0u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u), 1u);  // stay on Sheet2
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u), 0u);  // stay on Sheet1
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 2u), 2u);  // stay on empty Sheet3
+}
+
+// Only auto-switch when the active index is no longer valid (sheet deleted).
+TEST(CrdtJoinEmptyShell, RemoteChangeSwitchesWhenActiveDeleted) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
+    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet3"));
+
+    EXPECT_EQ(wb->sheetCount(), 3u);
+    // User on last sheet (index 2); peer deletes it → clamp to last remaining
+    wb->removeSheet(wb->sheets[2]->id);
+    EXPECT_EQ(wb->sheetCount(), 2u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 2u), 1u);
+    // Still-valid index is unchanged (peer deleted a different sheet)
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u), 0u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u), 1u);
+    // Far out-of-range still clamps to last
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 99u), 1u);
+}
+
 TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {
     // Host has content Sheet1
     auto host = std::make_unique<Workbook>(generate_id(), "Untitled");

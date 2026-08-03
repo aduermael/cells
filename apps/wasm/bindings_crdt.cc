@@ -362,9 +362,11 @@ std::string CellsEngine::handlePeerMessage(const std::string& peerIdStr,
 
     if (result.dataModified) {
         if (_workbook && _workbook->sheetCount() > 0) {
-            const size_t preferred = preferredActiveSheetIndex(*_workbook);
-            if (preferred != _activeSheetIndex) {
-                _activeSheetIndex = preferred;
+            // Only remap when active sheet was deleted / index invalid.
+            const size_t resolved =
+                resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex);
+            if (resolved != _activeSheetIndex) {
+                _activeSheetIndex = resolved;
             }
         }
         rebuildViewportIndex();
@@ -745,16 +747,18 @@ void CellsEngine::syncClientPeerDidDisconnect(cells::net::SyncClient& /*client*/
 }
 
 void CellsEngine::syncClientDataDidChange(cells::net::SyncClient& /*client*/) {
-    // After join, content often lands on a sheet that is not index 0 (or the
-    // active sheet was empty). Prefer a sheet that actually has grid content
-    // so the canvas shows the synced document instead of a blank Sheet1.
+    // Keep the user's active sheet. Only auto-switch when the active index is
+    // invalid (e.g. peer deleted that sheet). Remote fill/edit must not jump tabs.
     bool sheetChanged = false;
     if (_workbook && _workbook->sheetCount() > 0) {
-        const size_t preferred = preferredActiveSheetIndex(*_workbook);
-        if (preferred != _activeSheetIndex) {
-            _activeSheetIndex = preferred;
+        const size_t previous = _activeSheetIndex;
+        const size_t resolved =
+            resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex);
+        if (resolved != previous) {
+            _activeSheetIndex = resolved;
             sheetChanged = true;
-            LOG_INFO("[Sync] Switched active sheet to index %zu (content sheet)", preferred);
+            LOG_INFO("[Sync] Active sheet index %zu invalid after remote change; switched to %zu",
+                     previous, resolved);
         }
         // New sheets from peers always need tab refresh even if index unchanged
         sheetChanged = true;

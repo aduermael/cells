@@ -937,6 +937,18 @@ size_t preferredActiveSheetIndex(const Workbook& workbook) {
     return 0;
 }
 
+size_t resolveActiveSheetAfterRemoteChange(const Workbook& workbook, size_t activeIndex) {
+    if (workbook.sheets.empty()) {
+        return 0;
+    }
+    // Valid index: keep the user's selection (remote fill/edit must not steal focus).
+    if (activeIndex < workbook.sheets.size() && workbook.sheets[activeIndex] != nullptr) {
+        return activeIndex;
+    }
+    // Active sheet deleted / index past end — clamp like local deleteSheet.
+    return workbook.sheets.size() - 1;
+}
+
 PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook) {
     PrepareForSyncResult result;
 
