@@ -33,6 +33,8 @@ export interface DataListenersConfig {
   render: () => void;
   updateFormulaBar: () => void;
   updateScrollbars: () => void;
+  /** Refresh workbook title from engine (peer renames / bootstrap) */
+  refreshWorkbookTitle?: () => Promise<void>;
 }
 
 // =============================================================================
@@ -56,6 +58,7 @@ export function setupDataListeners(config: DataListenersConfig): {
     render,
     updateFormulaBar,
     updateScrollbars,
+    refreshWorkbookTitle,
   } = config;
 
   // =========================================================================
@@ -264,6 +267,10 @@ export function setupDataListeners(config: DataListenersConfig): {
       changeTypes.has("loaded")
     ) {
       await fetchSheetInfo();
+      // WORKBOOK_SET and bootstrap name travel as structure/sheet/loaded
+      if (refreshWorkbookTitle) {
+        await refreshWorkbookTitle();
+      }
     }
 
     if (changeTypes.has("sheet") || changeTypes.has("loaded")) {

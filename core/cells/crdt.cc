@@ -980,13 +980,35 @@ PrepareForSyncResult prepareWorkbookForSync(Workbook& workbook) {
 }
 
 bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
-    if (!workbook.sheets.empty()) {
-        return false;
+    bool changed = false;
+
+    // Model B: alone-online empty rooms still need a document UUID in the
+    // oplog so late joiners adopt a single shared identity (not only sheets).
+    bool hasDocIdentity = false;
+    const OpLog* oplog = workbook.getOpLog();
+    if (oplog != nullptr) {
+        for (const auto& existing : oplog->getAllOperations()) {
+            if (existing.type == OpType::WORKBOOK_SET) {
+                hasDocIdentity = true;
+                break;
+            }
+        }
     }
-    const ID sheetId = generate_id();
-    const Operation op = makeSheetSetOp(workbook, sheetId, R"({"name":"Sheet1"})");
-    applyOperation(workbook, op);
-    return true;
+    if (!hasDocIdentity) {
+        const std::string name = workbook.name.empty() ? "Untitled" : workbook.name;
+        const std::string payload =
+            "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
+        applyOperation(workbook, makeWorkbookSetOp(workbook, payload));
+        changed = true;
+    }
+
+    if (workbook.sheets.empty()) {
+        const ID sheetId = generate_id();
+        const Operation op = makeSheetSetOp(workbook, sheetId, R"({"name":"Sheet1"})");
+        applyOperation(workbook, op);
+        changed = true;
+    }
+    return changed;
 }
 
 bool isSheetContentEmpty(const Sheet& sheet) {
@@ -1317,6 +1339,16 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
     // Clear any existing operations (start fresh)
     oplog->clear();
+
+    // Document identity + name (Model B). target_id is the document UUID;
+    // remote peers adopt it via applyWorkbookSet.
+    {
+        const std::string name = workbook.name.empty() ? "Untitled" : workbook.name;
+        const std::string payload = "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
+        const Operation workbookOp = makeWorkbookSetOp(workbook, payload);
+        oplog->addOperation(workbookOp);
+        count++;
+    }
 
     // Iterate through all sheets
     for (const auto& sheet : workbook.sheets) {

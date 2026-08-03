@@ -46,6 +46,17 @@ export class WorkbookTitleEditor {
     this.originalValue = title;
   }
 
+  /**
+   * Apply a remote/peer title update. Skips while the user is actively editing
+   * so we don't clobber in-progress renames.
+   */
+  setTitleFromRemote(title: string): void {
+    if (document.activeElement === this.titleElement) {
+      return;
+    }
+    this.setTitle(title);
+  }
+
   /** Set up event listeners for the title element */
   private setupEventListeners(): void {
     // Focus event - save original value and place cursor at end

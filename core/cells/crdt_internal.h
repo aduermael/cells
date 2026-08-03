@@ -98,7 +98,9 @@ ApplyResult applySheetDelete(Workbook& workbook, const Operation& op);
 // Workbook operations (crdt_axis.cc)
 // =============================================================================
 
-// Apply WORKBOOK_SET operation - updates workbook properties
+// Apply WORKBOOK_SET — updates name and adopts op.target_id as document UUID
+// (Model B). Entity LWW on the document id; higher-HLC claims may take over
+// a different local shell id.
 ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op);
 
 // =============================================================================

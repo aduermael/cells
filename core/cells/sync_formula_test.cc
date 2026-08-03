@@ -1326,6 +1326,119 @@ TEST_F(SyncFormulaTest, DeletedSheetResurrectedByLaterRename) {
 }
 
 // ============================================================================
+// Workbook document identity + name (WORKBOOK_SET) — Model B
+// ============================================================================
+// Peers may start with different shell workbook UUIDs. Applying an authoritative
+// WORKBOOK_SET adopts op.target_id so both peers converge on one document UUID
+// and name (entity LWW on that id after convergence).
+
+TEST_F(SyncFormulaTest, WorkbookSetAdoptsRemoteDocumentUuid) {
+    // Empty-joiner style: B starts with a different shell id
+    ASSERT_NE(workbookA_->id, workbookB_->id);
+    const ID docIdA = workbookA_->id;
+
+    Operation renameA = makeWorkbookSetOp(*workbookA_, R"({"name":"Shared Budget"})");
+    EXPECT_EQ(renameA.target_id, docIdA);
+    EXPECT_EQ(applyOperation(*workbookA_, renameA), ApplyResult::SUCCESS);
+    EXPECT_EQ(workbookA_->id, docIdA);
+    EXPECT_EQ(workbookA_->name, "Shared Budget");
+
+    // B adopts A's document UUID and name via the shipped apply path
+    EXPECT_EQ(applyOperation(*workbookB_, renameA), ApplyResult::SUCCESS);
+    EXPECT_EQ(workbookB_->id, docIdA) << "joiner must adopt remote document UUID";
+    EXPECT_EQ(workbookB_->name, "Shared Budget");
+    EXPECT_EQ(workbookA_->id, workbookB_->id);
+}
+
+TEST_F(SyncFormulaTest, WorkbookRenameConflictResolutionLWW) {
+    // Concurrent renames with different shell target_ids converge name AND id
+    Operation renameA = makeWorkbookSetOp(*workbookA_, R"({"name":"NameFromA"})");
+    Operation renameB = makeWorkbookSetOp(*workbookB_, R"({"name":"NameFromB"})");
+    ASSERT_NE(renameA.target_id, renameB.target_id);
+
+    applyOperation(*workbookA_, renameA);
+    applyOperation(*workbookB_, renameA);
+    applyOperation(*workbookA_, renameB);
+    applyOperation(*workbookB_, renameB);
+
+    EXPECT_EQ(workbookA_->name, workbookB_->name);
+    EXPECT_EQ(workbookA_->id, workbookB_->id) << "document UUID must converge under LWW";
+
+    const bool bWins = renameB.hlc > renameA.hlc;
+    EXPECT_EQ(workbookA_->name, bWins ? "NameFromB" : "NameFromA");
+    EXPECT_EQ(workbookA_->id, bWins ? renameB.target_id : renameA.target_id);
+}
+
+TEST_F(SyncFormulaTest, BootstrapOpLogPublishesDocumentIdentity) {
+    const ID docIdA = workbookA_->id;
+    workbookA_->name = "Budget 2024";
+    const size_t n = bootstrapOpLog(*workbookA_);
+    EXPECT_GT(n, 0u);
+
+    const OpLog* oplog = workbookA_->getOpLog();
+    bool found = false;
+    for (const auto& op : oplog->getAllOperations()) {
+        if (op.type == OpType::WORKBOOK_SET) {
+            found = true;
+            EXPECT_EQ(op.target_id, docIdA) << "bootstrap WORKBOOK_SET targets document UUID";
+            EXPECT_NE(op.payload.find("Budget 2024"), std::string::npos)
+                << "Bootstrap WORKBOOK_SET should include workbook name: " << op.payload;
+            break;
+        }
+    }
+    EXPECT_TRUE(found) << "bootstrapOpLog must emit WORKBOOK_SET for document identity";
+
+    // Remote peer with different shell id applies bootstrapped ops
+    ASSERT_NE(workbookB_->id, docIdA);
+    applyOperations(*workbookB_, oplog->getAllOperations());
+    EXPECT_EQ(workbookB_->name, "Budget 2024");
+    EXPECT_EQ(workbookB_->id, docIdA) << "bootstrap must converge document UUID on joiner";
+}
+
+TEST_F(SyncFormulaTest, OlderWorkbookSetForDifferentIdIsSuperseded) {
+    // Winner claim first, then an older claim for a different document id
+    Operation renameA = makeWorkbookSetOp(*workbookA_, R"({"name":"FromA"})");
+    Operation renameB = makeWorkbookSetOp(*workbookB_, R"({"name":"FromB"})");
+    const Operation& winner = (renameB.hlc > renameA.hlc) ? renameB : renameA;
+    const Operation& loser = (renameB.hlc > renameA.hlc) ? renameA : renameB;
+    ASSERT_LT(loser.hlc, winner.hlc);
+
+    auto peerC = createWorkbook(ID("NodeCCCC"));
+    EXPECT_EQ(applyOperation(*peerC, winner), ApplyResult::SUCCESS);
+    EXPECT_EQ(peerC->id, winner.target_id);
+
+    // Stale claim for a different document UUID must not steal identity
+    EXPECT_EQ(applyOperation(*peerC, loser), ApplyResult::SUPERSEDED);
+    EXPECT_EQ(peerC->id, winner.target_id);
+    if (winner.target_id == renameA.target_id) {
+        EXPECT_EQ(peerC->name, "FromA");
+    } else {
+        EXPECT_EQ(peerC->name, "FromB");
+    }
+}
+
+TEST_F(SyncFormulaTest, TwoPeersDifferentShellIdsConvergeAfterMutualOps) {
+    ASSERT_NE(workbookA_->id, workbookB_->id);
+    const ID shellA = workbookA_->id;
+    const ID shellB = workbookB_->id;
+
+    Operation opA = makeWorkbookSetOp(*workbookA_, R"({"name":"DocA"})");
+    Operation opB = makeWorkbookSetOp(*workbookB_, R"({"name":"DocB"})");
+    EXPECT_EQ(opA.target_id, shellA);
+    EXPECT_EQ(opB.target_id, shellB);
+
+    // Each applies local then remote (shipped applyOperations path, HLC-sorted)
+    applyOperations(*workbookA_, {opA, opB});
+    applyOperations(*workbookB_, {opA, opB});
+
+    EXPECT_EQ(workbookA_->id, workbookB_->id);
+    EXPECT_EQ(workbookA_->name, workbookB_->name);
+    const bool bWins = opB.hlc > opA.hlc;
+    EXPECT_EQ(workbookA_->id, bWins ? shellB : shellA);
+    EXPECT_EQ(workbookA_->name, bWins ? "DocB" : "DocA");
+}
+
+// ============================================================================
 // CRDT-Compliant Two-Phase Resolution Tests
 // ============================================================================
 // These tests verify that the two-phase resolution approach (getRequiredEntities
