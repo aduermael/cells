@@ -996,8 +996,7 @@ bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
     }
     if (!hasDocIdentity) {
         const std::string name = workbook.name.empty() ? "Untitled" : workbook.name;
-        const std::string payload =
-            "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
+        const std::string payload = "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
         applyOperation(workbook, makeWorkbookSetOp(workbook, payload));
         changed = true;
     }
