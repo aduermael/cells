@@ -144,11 +144,22 @@ func (r *Room) GetPeers() []string {
 }
 
 // GetOtherPeers returns all peers except the one specified.
+// Safe when the room is empty or excludePeerID is already gone (notifyPeerLeft
+// runs after RemovePeer — len can be 0; never use len-1 as make capacity).
 func (r *Room) GetOtherPeers(excludePeerID string) []*Peer {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	peers := make([]*Peer, 0, len(r.peers)-1)
+	// Cap must be non-negative. len(r.peers)-1 panics with "makeslice: cap out
+	// of range" when the room is empty (common leave-last-peer path).
+	capHint := len(r.peers)
+	if capHint > 0 {
+		// Typical case: excludePeerID still present, or already removed but others remain.
+		if _, stillThere := r.peers[excludePeerID]; stillThere {
+			capHint--
+		}
+	}
+	peers := make([]*Peer, 0, capHint)
 	for id, peer := range r.peers {
 		if id != excludePeerID {
 			peers = append(peers, peer)

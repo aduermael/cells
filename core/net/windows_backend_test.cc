@@ -237,3 +237,16 @@ TEST(WindowsBackendTest, LibdatachannelIsPureBazelWithOpenSsl) {
     EXPECT_NE(build.find("HAVE_SA_LEN"), std::string::npos);
     EXPECT_NE(build.find("@platforms//os:macos"), std::string::npos);
 }
+
+// Multi-peer SCTP: concurrent usrsctp_bind races (errno 49) unless libdatachannel
+// SctpTransport serializes AF_CONN register/bind/connect via a global mutex patch.
+TEST(WindowsBackendTest, LibdatachannelSctpAssocSerialized) {
+    const std::string patch_path =
+        findFile("third_party/libdatachannel/sctp-serialize-assoc.patch");
+    const std::string patch = readAll(patch_path);
+    ASSERT_FALSE(patch.empty()) << "missing " << patch_path;
+    EXPECT_NE(patch.find("g_usrsctp_assoc_mutex"), std::string::npos);
+    EXPECT_NE(patch.find("usrsctp_bind"), std::string::npos);
+    EXPECT_NE(patch.find("sctptransport.cpp"), std::string::npos);
+    EXPECT_NE(patch.find("std::lock_guard"), std::string::npos);
+}

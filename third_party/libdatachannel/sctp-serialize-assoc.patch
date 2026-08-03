@@ -1,0 +1,59 @@
+--- a/src/impl/sctptransport.cpp
++++ b/src/impl/sctptransport.cpp
+@@ -19,6 +19,7 @@
+ #include <exception>
+ #include <iostream>
+ #include <limits>
++#include <mutex>
+ #include <shared_mutex>
+ #include <thread>
+ #include <unordered_set>
+@@ -84,6 +85,14 @@
+ 
+ SctpTransport::InstancesSet* SctpTransport::Instances = nullptr;
+ 
++// Serialize usrsctp AF_CONN register/bind/connect/close across PeerConnections.
++// Concurrent multi-PC SCTP setup races inside usrsctp (macOS errno=49
++// EADDRNOTAVAIL on usrsctp_bind after DTLS succeeds for the 2nd/3rd peer).
++namespace {
++std::mutex g_usrsctp_assoc_mutex;
++}
++
++
+ void SctpTransport::Init() {
+ 	usrsctp_init(0, SctpTransport::WriteCallback, SctpTransport::DebugCallback);
+ 	usrsctp_sysctl_set_sctp_pr_enable(1);  // Enable Partial Reliability Extension (RFC 3758)
+@@ -164,6 +173,9 @@
+       mBufferedAmountCallback(std::move(bufferedAmountCallback)) {
+ 	onRecv(std::move(recvCallback));
+ 
++	// Hold for whole socket setup + address registration (see g_usrsctp_assoc_mutex).
++	std::lock_guard<std::mutex> assocLock(g_usrsctp_assoc_mutex);
++
+ 	PLOG_DEBUG << "Initializing SCTP transport";
+ 
+ 	mSock = usrsctp_socket(AF_CONN, SOCK_STREAM, IPPROTO_SCTP, nullptr, nullptr, 0, nullptr);
+@@ -325,9 +337,11 @@
+ 
+ 	unregisterIncoming();
+ 
+-	usrsctp_close(mSock);
+-
+-	usrsctp_deregister_address(this);
++	{
++		std::lock_guard<std::mutex> assocLock(g_usrsctp_assoc_mutex);
++		usrsctp_close(mSock);
++		usrsctp_deregister_address(this);
++	}
+ 	Instances->erase(this);
+ }
+ 
+@@ -358,6 +372,8 @@
+ 	           << ", remote port=" << mPorts.remote << ")";
+ 	changeState(State::Connecting);
+ 
++	std::lock_guard<std::mutex> assocLock(g_usrsctp_assoc_mutex);
++
+ 	auto local = getSockAddrConn(mPorts.local);
+ 	if (usrsctp_bind(mSock, reinterpret_cast<struct sockaddr *>(&local), sizeof(local)))
+ 		throw std::runtime_error("Could not bind usrsctp socket, errno=" + std::to_string(errno));

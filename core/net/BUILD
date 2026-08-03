@@ -401,6 +401,7 @@ cc_test(
         "windows/HttpRequest_winhttp.cc",
         "windows/WSConnection_winhttp.cc",
         "//third_party/libdatachannel:BUILD.libdatachannel",
+        "//third_party/libdatachannel:sctp-serialize-assoc.patch",
     ],
     deps = [
         "@googletest//:gtest_main",
