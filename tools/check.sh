@@ -5,7 +5,8 @@
 #   bazel run :check          # Run all checks
 #   bazel run :check -- --fix # Run checks and fix what's possible
 #
-# Order: Unit tests -> XLSX roundtrip -> Linter -> Type checks -> Integration tests -> Formatter
+# Order: C++ units -> JS units -> Release/install -> XLSX roundtrip -> Lint ->
+#        Type checks -> E2E -> Formatter
 # Rationale: Faster checks run first for quick feedback
 
 set -euo pipefail
@@ -67,7 +68,39 @@ fi
 
 echo ""
 
-# 2. XLSX roundtrip tests
+# 2. Unit tests (JS/TS — collab version stamp, theme, display-name, etc.)
+echo -e "${BOLD}=== Unit Tests (JS/TS) ===${NC}"
+js_unit_test_cmd() {
+    if [ -f "$REPO_ROOT/apps/wasm/scripts/test-unit.mjs" ]; then
+        "$SCRIPT_DIR/test-js.sh"
+    else
+        echo -e "${YELLOW}apps/wasm JS unit runner not found, skipping${NC}"
+        return 0
+    fi
+}
+if ! time_cmd js_unit_test_cmd; then
+    FAILED=1
+fi
+
+echo ""
+
+# 3. Release / install packaging tests (version resolve, package, install)
+echo -e "${BOLD}=== Release / Install Tests ===${NC}"
+release_test_cmd() {
+    if [ -f "$REPO_ROOT/scripts/release/release_test.sh" ]; then
+        "$SCRIPT_DIR/release-test.sh"
+    else
+        echo -e "${YELLOW}release_test.sh not found, skipping${NC}"
+        return 0
+    fi
+}
+if ! time_cmd release_test_cmd; then
+    FAILED=1
+fi
+
+echo ""
+
+# 4. XLSX roundtrip tests
 echo -e "${BOLD}=== XLSX Roundtrip Tests ===${NC}"
 roundtrip_cmd() {
     "$SCRIPT_DIR/xlsx-roundtrip.sh"
@@ -78,7 +111,7 @@ fi
 
 echo ""
 
-# 3. Lint
+# 5. Lint
 echo -e "${BOLD}=== Lint Check ($JOBS parallel) ===${NC}"
 lint_cmd() {
     if $FIX_MODE; then
@@ -93,7 +126,7 @@ fi
 
 echo ""
 
-# 4. Type checks (TypeScript)
+# 6. Type checks (TypeScript)
 echo -e "${BOLD}=== Type Check (TypeScript) ===${NC}"
 typecheck_cmd() {
     if [ -f "$REPO_ROOT/apps/wasm/scripts/check-types.mjs" ]; then
@@ -110,7 +143,7 @@ fi
 
 echo ""
 
-# 5. Integration tests (E2E)
+# 7. Integration tests (E2E)
 echo -e "${BOLD}=== Integration Tests (E2E, $JOBS parallel) ===${NC}"
 e2e_cmd() {
     if [ -f "$REPO_ROOT/apps/wasm/scripts/test-parallel.mjs" ]; then
@@ -127,7 +160,7 @@ fi
 
 echo ""
 
-# 6. Format check (last, easiest to fix)
+# 8. Format check (last, easiest to fix)
 echo -e "${BOLD}=== Format Check ($JOBS parallel) ===${NC}"
 format_cmd() {
     if $FIX_MODE; then

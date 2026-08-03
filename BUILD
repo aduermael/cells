@@ -55,6 +55,18 @@ sh_binary(
 )
 
 sh_binary(
+    name = "test-js",
+    srcs = ["tools/test-js.sh"],
+    data = ["tools/guard.sh"],
+)
+
+sh_binary(
+    name = "release-test",
+    srcs = ["tools/release-test.sh"],
+    data = ["tools/guard.sh"],
+)
+
+sh_binary(
     name = "e2e",
     srcs = ["tools/e2e.sh"],
     data = ["tools/guard.sh"],

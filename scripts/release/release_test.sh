@@ -49,6 +49,80 @@ fi
 assert_eq "version from tag" "0.0.1" "$(cells_version_from_tag v0.0.1)"
 assert_eq "tag from version" "v0.0.1" "$(cells_tag_from_version 0.0.1)"
 assert_eq "asset name" "cells-linux-arm64.tar.gz" "$(cells_asset_name linux arm64)"
+
+echo "== resolve product version =="
+# Explicit env wins (v-prefix optional); must be valid semver
+assert_eq "resolve env bare" "9.8.7" "$(CELLS_VERSION=9.8.7 cells_resolve_product_version 2>/dev/null)"
+assert_eq "resolve env v-prefix" "9.8.7" "$(CELLS_VERSION=v9.8.7 cells_resolve_product_version 2>/dev/null)"
+assert_eq "resolve env pre-release" "1.2.3-rc.1" \
+  "$(CELLS_VERSION=1.2.3-rc.1 cells_resolve_product_version 2>/dev/null)"
+# Invalid env is ignored (no shell/esbuild-breaking characters accepted)
+unset CELLS_VERSION || true
+export REPO_ROOT="$REPO_ROOT"
+# Capture git/default path first so invalid-env test can compare against it
+good_resolved="$(cells_resolve_product_version 2>/dev/null)"
+bad_resolved="$(CELLS_VERSION='not a version"quotes' cells_resolve_product_version 2>/dev/null)"
+assert_eq "resolve ignores invalid env" "$good_resolved" "$bad_resolved"
+bad_resolved2="$(CELLS_VERSION=vaboogie cells_resolve_product_version 2>/dev/null)"
+assert_eq "resolve ignores garbage env" "$good_resolved" "$bad_resolved2"
+
+# Without env, prefer nearest git semver tag when available
+resolved="$(cells_resolve_product_version 2>/dev/null)"
+nearest="$(cells_nearest_semver_tag "$REPO_ROOT" 2>/dev/null || true)"
+if [ -n "$nearest" ]; then
+  expected="$(cells_version_from_tag "$nearest")"
+  assert_eq "resolve git semver tag" "$expected" "$resolved"
+else
+  assert_eq "resolve default (no semver tag)" "$CELLS_DEFAULT_VERSION" "$resolved"
+fi
+
+# Fixture: non-semver tag nearer HEAD must not mask older semver tag
+fix_repo="$SCRATCH/version-git"
+mkdir -p "$fix_repo"
+(
+  cd "$fix_repo"
+  git init -q
+  git config user.email "test@example.com"
+  git config user.name "test"
+  # Empty commits so tags can attach without a real tree
+  git commit --allow-empty -q -m "base"
+  git tag v0.0.5
+  git commit --allow-empty -q -m "mid"
+  git tag not-a-release
+  git commit --allow-empty -q -m "tip"
+)
+assert_eq "nearest skips non-semver" "v0.0.5" \
+  "$(cells_nearest_semver_tag "$fix_repo")"
+assert_eq "resolve fixture git" "0.0.5" \
+  "$(CELLS_VERSION_GIT_DIR="$fix_repo" CELLS_VERSION= cells_resolve_product_version 2>/dev/null)"
+
+# Env must not be polluted for later tests
+unset CELLS_VERSION || true
+
+echo "== default version sync (TS / shell / CLI) =="
+# Literals must match so unstamped builds stay consistent across products.
+# version.ts ternary fallback: ... ? __CELLS_VERSION__ : "X.Y.Z";
+ts_default="$(
+  grep -oE ': "[0-9][^"]*"' "$REPO_ROOT/apps/wasm/src/version.ts" \
+    | tail -1 | sed 's/^: "//;s/"$//'
+)"
+cli_default="$(
+  sed -n 's/^#define CELLS_VERSION "\([^"]*\)"/\1/p' \
+    "$REPO_ROOT/apps/cli/cli_version.h" | head -1
+)"
+# Shell default from the assignment literal (not env override)
+shell_default="$(
+  grep -E 'CELLS_DEFAULT_VERSION="\$\{CELLS_DEFAULT_VERSION:-' \
+    "$REPO_ROOT/scripts/release/common.sh" \
+    | head -1 \
+    | sed -n 's/.*:-\([^}]*\)}.*/\1/p'
+)"
+assert_eq "ts default non-empty" "1" "$([ -n "$ts_default" ] && echo 1 || echo 0)"
+assert_eq "cli default non-empty" "1" "$([ -n "$cli_default" ] && echo 1 || echo 0)"
+assert_eq "shell default non-empty" "1" "$([ -n "$shell_default" ] && echo 1 || echo 0)"
+assert_eq "ts default matches shell" "$shell_default" "$ts_default"
+assert_eq "cli default matches shell" "$shell_default" "$cli_default"
+
 assert_eq "release latest url" \
   "https://github.com/aduermael/cells/releases/latest/download" \
   "$(cells_release_base_url aduermael/cells latest)"

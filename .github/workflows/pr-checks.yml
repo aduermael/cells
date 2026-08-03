@@ -1,5 +1,6 @@
 # Minimum PR quality gates for open-source readiness.
-# Runs unit tests, C++ linter, format check, and gdevillele/vet.
+# Runs C++ unit tests, JS/TS unit tests, release/install tests, C++ linter,
+# format check, and gdevillele/vet.
 # Uses the same Bazel entry points documented in AGENTS.md where applicable.
 
 name: PR Checks
@@ -31,6 +32,45 @@ jobs:
 
       - name: Run unit tests
         run: bazel run :test
+
+  # Collab version stamp, theme, display-name, editing-session (no browser).
+  # Same suites as `bazel run :test-js` / `bazel run :check` (JS unit step).
+  js-unit-tests:
+    name: JS unit tests
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # actions/setup-node@v4.4.0 (same pin as deploy-fly)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/wasm/package-lock.json
+
+      - name: Install WASM npm dependencies
+        working-directory: apps/wasm
+        run: npm ci
+
+      # Direct runner (no Bazel): pure Node suites. BAZEL_RUN satisfies guard.mjs.
+      - name: Run JS/TS unit tests
+        working-directory: apps/wasm
+        env:
+          BAZEL_RUN: "1"
+        run: node scripts/test-unit.mjs
+
+  # Version resolve, package-cli, install.sh, install-skill.sh.
+  # Same suite as `bazel run :release-test` / `bazel run :check` (release step).
+  release-tests:
+    name: Release tests
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Run release/install tests
+        run: ./scripts/release/release_test.sh
 
   lint:
     name: Lint

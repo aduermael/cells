@@ -11,6 +11,13 @@ inputs:
     description: Disk cache key suffix for setup-bazel
     required: false
     default: fly-deploy
+  cells_version:
+    description: >
+      Product version to stamp into the WASM UI (bare semver or v-prefixed).
+      Passed as CELLS_VERSION to bazel run :wasm-dist; tools/wasm-ts-build.sh
+      resolves it (env → git tag → 0.0.1). Leave empty for git/default.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -35,6 +42,9 @@ runs:
 
     - name: Build production WASM (dist/wasm)
       shell: bash
+      env:
+        # Empty → wasm-ts-build resolves via git tag / default
+        CELLS_VERSION: ${{ inputs.cells_version }}
       run: bazel run :wasm-dist
 
     # superfly/flyctl-actions/setup-flyctl@v1.6

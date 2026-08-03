@@ -36,13 +36,30 @@ function platformId() {
   return map[key] || "linux-x64";
 }
 
+/** True if path is a native esbuild binary that runs on this machine. */
+function isUsableEsbuild(p) {
+  if (!p || !fs.existsSync(p)) return false;
+  try {
+    const fd = fs.openSync(p, "r");
+    const buf = Buffer.alloc(2);
+    fs.readSync(fd, buf, 0, 2, 0);
+    fs.closeSync(fd);
+    // JS/shell wrappers start with shebang; real Go binary does not.
+    if (buf.toString("utf8") === "#!") return false;
+  } catch {
+    return false;
+  }
+  const probe = spawnSync(p, ["--version"], { encoding: "utf8" });
+  return probe.status === 0;
+}
+
 function resolveEsbuild() {
-  if (process.env.ESBUILD && fs.existsSync(process.env.ESBUILD)) {
+  if (process.env.ESBUILD && isUsableEsbuild(process.env.ESBUILD)) {
     return process.env.ESBUILD;
   }
   const ver = esbuildVersion();
   const cacheBin = join(repoRoot, "tmp/esbuild", ver, "esbuild");
-  if (fs.existsSync(cacheBin)) return cacheBin;
+  if (isUsableEsbuild(cacheBin)) return cacheBin;
 
   const nmBin = join(
     __dirname,
@@ -50,7 +67,7 @@ function resolveEsbuild() {
     platformId(),
     "bin/esbuild",
   );
-  if (fs.existsSync(nmBin)) return nmBin;
+  if (isUsableEsbuild(nmBin)) return nmBin;
 
   // Auto-download once into tmp/esbuild (same layout as tools/wasm-ts-build.sh)
   const plat = platformId();
@@ -88,35 +105,51 @@ function resolveEsbuild() {
   fs.mkdirSync(dirname(cacheBin), { recursive: true });
   fs.copyFileSync(found, cacheBin);
   fs.chmodSync(cacheBin, 0o755);
+  if (!isUsableEsbuild(cacheBin)) {
+    throw new Error(`Downloaded esbuild is not runnable: ${cacheBin}`);
+  }
   return cacheBin;
 }
 
-function bundleModule(entry) {
+/**
+ * Bundle a real TS entry with the same esbuild path as production.
+ * @param {string} entry
+ * @param {{ defines?: Record<string, string> }} [opts]
+ *   defines: esbuild --define values (already JSON-encoded, e.g. '"1.2.3"')
+ */
+function bundleModule(entry, opts = {}) {
   const esbuild = resolveEsbuild();
   const outFile = join(
     fs.mkdtempSync(join(os.tmpdir(), "collab-menu-test-")),
     "out.mjs",
   );
-  const result = spawnSync(
-    esbuild,
-    [
-      entry,
-      "--bundle",
-      "--format=esm",
-      "--platform=neutral",
-      `--outfile=${outFile}`,
-    ],
-    { encoding: "utf8" },
-  );
+  const args = [
+    entry,
+    "--bundle",
+    "--format=esm",
+    "--platform=neutral",
+    `--outfile=${outFile}`,
+  ];
+  if (opts.defines) {
+    for (const [key, value] of Object.entries(opts.defines)) {
+      args.push(`--define:${key}=${value}`);
+    }
+  }
+  const result = spawnSync(esbuild, args, { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`esbuild failed: ${result.stderr || result.stdout}`);
   }
   return fs.readFileSync(outFile, "utf8");
 }
 
+async function importBundled(code) {
+  const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
+  return import(dataUrl);
+}
+
+// Unstamped bundle (default product version from version.ts fallback)
 const code = bundleModule(contentPath);
-const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
-const mod = await import(dataUrl);
+const mod = await importBundled(code);
 
 const {
   SKILL_INSTALL,
@@ -127,13 +160,34 @@ const {
   debugExtrasAreGated,
 } = mod;
 
-// Read version from the real source (single source of truth check)
+// Unstamped source fallback must remain a bare semver string (default 0.0.1)
 const versionSrc = fs.readFileSync(versionPath, "utf8");
-const versionMatch = versionSrc.match(
-  /export const CELLS_VERSION = "([^"]+)"/,
+assert.ok(
+  /export const CELLS_VERSION/.test(versionSrc),
+  "version.ts must export CELLS_VERSION",
 );
-assert.ok(versionMatch, "version.ts must export CELLS_VERSION");
-const CELLS_VERSION = versionMatch[1];
+assert.ok(
+  versionSrc.includes("__CELLS_VERSION__"),
+  "version.ts must support esbuild __CELLS_VERSION__ stamp",
+);
+assert.ok(
+  versionSrc.includes('"0.0.1"'),
+  "version.ts must keep unstamped default 0.0.1",
+);
+// Real unstamped export from the bundled shipped module
+const unstampedLabel = formatCellsVersionLabel();
+assert.equal(
+  unstampedLabel,
+  "v0.0.1",
+  "unstamped bundle must fall back to v0.0.1",
+);
+const CELLS_VERSION = "0.0.1";
+
+// Stamped bundle — same --define path as tools/wasm-ts-build.sh
+const stampedCode = bundleModule(contentPath, {
+  defines: { __CELLS_VERSION__: '"7.6.5"' },
+});
+const stampedMod = await importBundled(stampedCode);
 
 let passed = 0;
 let failed = 0;
@@ -255,6 +309,29 @@ test("buildCollabDetailsHtml omits removed clutter", () => {
 test("buildCollabDetailsHtml version override goes through real function", () => {
   const html = buildCollabDetailsHtml({ version: "9.9.9" });
   assert.ok(html.includes("v9.9.9"));
+});
+
+test("esbuild __CELLS_VERSION__ define stamps shipped collab version label", () => {
+  // Drive the real stamp path used by tools/wasm-ts-build.sh
+  assert.ok(
+    stampedCode.includes("7.6.5"),
+    "stamped bundle must contain injected version string",
+  );
+  assert.ok(
+    !stampedCode.includes("__CELLS_VERSION__"),
+    "define must replace the inject identifier",
+  );
+  assert.equal(
+    stampedMod.formatCellsVersionLabel(),
+    "v7.6.5",
+    "stamped formatCellsVersionLabel must use injected version",
+  );
+  const html = stampedMod.buildCollabDetailsHtml();
+  assert.ok(html.includes('id="collab-version"'));
+  assert.ok(
+    html.includes("v7.6.5"),
+    "collab menu HTML must show stamped version, not only default 0.0.1",
+  );
 });
 
 test("collab-ui.ts wires panel builder and debug extras", () => {

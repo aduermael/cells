@@ -424,4 +424,6 @@ jobs:
         with:
           fly_api_token: ${{ secrets.FLY_API_TOKEN }}
           bazel_disk_cache_key: release-fly-wasm
+          # Stamp WASM collab-menu version the same way CLI binaries are stamped
+          cells_version: ${{ needs.validate.outputs.version }}
 

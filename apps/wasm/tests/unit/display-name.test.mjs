@@ -2,51 +2,25 @@
 // Run: node apps/wasm/tests/unit/display-name.test.mjs
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { buildSync } from "esbuild";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import fs from "node:fs";
-import os from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(__dirname, "../../../..");
 const srcPath = join(__dirname, "../../src/display-name.ts");
-const pkgJsonPath = join(__dirname, "../../package.json");
 const adapterPath = join(__dirname, "../../src/cpp-sync-adapter.ts");
 const collabUiPath = join(__dirname, "../../src/collab-ui.ts");
 
-function esbuildVersion() {
-  const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-  return String(pkg.devDependencies.esbuild).replace(/^[\^~]/, "");
-}
-
-function resolveEsbuild() {
-  if (process.env.ESBUILD && fs.existsSync(process.env.ESBUILD)) {
-    return process.env.ESBUILD;
-  }
-  const ver = esbuildVersion();
-  const cacheBin = join(repoRoot, "tmp/esbuild", ver, "esbuild");
-  if (fs.existsSync(cacheBin)) return cacheBin;
-  throw new Error(`esbuild not found at ${cacheBin}`);
-}
-
-function bundleModule(entry) {
-  const outFile = join(
-    fs.mkdtempSync(join(os.tmpdir(), "display-name-test-")),
-    "out.mjs",
-  );
-  const result = spawnSync(
-    resolveEsbuild(),
-    [entry, "--bundle", "--format=esm", "--platform=neutral", `--outfile=${outFile}`],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) {
-    throw new Error(`esbuild failed: ${result.stderr || result.stdout}`);
-  }
-  return fs.readFileSync(outFile, "utf8");
-}
-
-const code = bundleModule(srcPath);
+// Bundle real TS source (same npm esbuild path as theme/editing-session unit tests)
+const result = buildSync({
+  entryPoints: [srcPath],
+  bundle: true,
+  format: "esm",
+  write: false,
+  platform: "neutral",
+});
+const code = result.outputFiles[0].text;
 const mod = await import(
   `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
 );

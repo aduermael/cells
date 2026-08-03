@@ -153,8 +153,16 @@ esbuild_bin="$(resolve_esbuild)"
 
 mkdir -p "$out_dir"
 
-# Same options as apps/wasm/scripts/build.mjs (single source of flags here for no-node path).
-# Keep in sync if you change the node-based script.
+# Product version stamp for collab menu / UI (env → git tag → default).
+# Same resolver as apps/wasm/scripts/build.mjs (shared common.sh helper).
+# shellcheck source=../scripts/release/common.sh
+. "$REPO_ROOT/scripts/release/common.sh"
+product_version="$(cells_resolve_product_version)"
+echo "Stamping frontend CELLS_VERSION=${product_version}"
+
+# Production TS bundle flags (bazel run :wasm / :wasm-dist / :wasm-debug).
+# esbuild --define expects a JSON value; quote so the replacement is a string literal.
+# product_version is validated semver (or default), so it is safe to interpolate.
 common_flags=(
   --bundle
   --format=esm
@@ -162,6 +170,7 @@ common_flags=(
   --sourcemap
   --minify
   --log-level=info
+  "--define:__CELLS_VERSION__=\"${product_version}\""
 )
 
 echo "Bundling TypeScript with esbuild ${esbuild_version} ($esbuild_bin)..."
