@@ -34,6 +34,7 @@
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/format_buffer.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
@@ -210,10 +211,12 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         if (cell->isFormula()) {
             const Formula* f = cell->getFormula();
             if (f != nullptr && f->ast != nullptr) {
-                RefConverter conv;
-                conv.setContext(*sheet);
-                const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
-                const std::string a1Formula = conv.formulaToA1(uuidFormula);
+                // Workbook-aware display so cross-sheet refs (e.g. Sheet1!E1) stay
+                // readable. Sheet-local RefConverter.formulaToA1 emits #REF! for
+                // cell UUIDs that live on other sheets.
+                const Workbook* workbook = getWorkbook(L);
+                FormulaDisplayConverter converter(*sheet, workbook);
+                const std::string a1Formula = converter.toDisplayString(f->ast);
                 lua_pushstring(L, a1Formula.c_str());
                 return 1;
             }

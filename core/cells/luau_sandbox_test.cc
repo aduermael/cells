@@ -699,6 +699,48 @@ TEST(LuauSandboxTest, SetCellFormulaWithArithmetic) {
     EXPECT_EQ(checkFormula.output, "=B1+C1");
 }
 
+// Cross-sheet formulas must surface as sheet-qualified A1 (e.g. =Sheet1!E1), not
+// #REF!. Agents/CLI read cell.formula; the same display path is used for in-cell edit.
+TEST(LuauSandboxTest, CrossSheetFormulaReadableNotRefError) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Sheet1!E1 = 42 (E is beyond the default A-C axes; setCell creates columns)
+    auto setupSource = sandbox.execute("setCell('E1', 42)");
+    ASSERT_TRUE(setupSource.success) << setupSource.error;
+
+    // Sheet2!A1 = =Sheet1!E1
+    auto add = sandbox.execute("addSheet('Sheet2')");
+    ASSERT_TRUE(add.success) << add.error;
+    auto select2 = sandbox.execute("selectSheet('Sheet2')");
+    ASSERT_TRUE(select2.success) << select2.error;
+    auto setFormula = sandbox.execute("setCell('A1', '=Sheet1!E1')");
+    ASSERT_TRUE(setFormula.success) << setFormula.error;
+
+    // Evaluated value is correct
+    auto checkValue = sandbox.execute("return getCell('A1').value");
+    ASSERT_TRUE(checkValue.success) << checkValue.error;
+    EXPECT_EQ(checkValue.output, "42");
+
+    // Formula text must be human-readable A1 with sheet name — not #REF!
+    auto checkFormula = sandbox.execute("return getCell('A1').formula");
+    ASSERT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "=Sheet1!E1");
+    EXPECT_EQ(checkFormula.output.find("#REF!"), std::string::npos);
+
+    // Same-sheet formula on Sheet2 still displays without a sheet prefix
+    auto setLocal = sandbox.execute(R"(
+        setCell('B1', 10)
+        setCell('C1', '=B1')
+        return getCell('C1').formula
+    )");
+    ASSERT_TRUE(setLocal.success) << setLocal.error;
+    EXPECT_EQ(setLocal.output, "=B1");
+}
+
 TEST(LuauSandboxTest, SetCellLiteralStringNotFormula) {
     auto workbook = createTestWorkbook();
     Sheet* sheet = workbook->getSheetByIndex(0);

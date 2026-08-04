@@ -346,6 +346,24 @@ TEST_F(CrossSheetOperationsTest, CrossSheetRef_DisplayCorrectlyFromSourceSheet) 
     EXPECT_EQ(display, "=Sheet2!A1");
 }
 
+// Same path as WASM getOrCreateCellAt / formula bar after the cross-sheet edit fix:
+// FormulaDisplayConverter with workbook context (not sheet-local RefConverter).
+TEST_F(CrossSheetOperationsTest, CrossSheetRef_DisplayE1FromOtherSheet_NotRefError) {
+    // Sheet1!E1 = 7  (matches the reported =Sheet1!E1 scenario viewed from Sheet2)
+    setSheet1Value(4, 0, 7.0);
+
+    Cell* a1 = setCellFormula(sheet2, sheet2ColIds, sheet2RowIds, 0, 0, "=Sheet1!E1");
+    ASSERT_NE(a1, nullptr);
+
+    std::string display = getFormulaDisplay(sheet2, a1);
+    EXPECT_EQ(display, "=Sheet1!E1");
+    EXPECT_EQ(display.find("#REF!"), std::string::npos);
+
+    EvalResult result = evaluateCell(sheet2, a1);
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 7.0);
+}
+
 TEST_F(CrossSheetOperationsTest, CrossSheetRef_RecalculatesWhenSourceChanges) {
     // Sheet2!A1 = 10
     Cell* source = setSheet2Value(0, 0, 10.0);
