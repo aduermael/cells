@@ -184,8 +184,8 @@ TEST(SyncClientJoinTest, EarlyRemoteIceBufferedWithoutPeer) {
     // Signaling TCP errors against the dummy URL are unrelated and may race in.
     {
         std::lock_guard<std::mutex> lock(delegate.mu);
-        const int webrtc_join_errors = static_cast<int>(std::count_if(
-            delegate.errors.begin(), delegate.errors.end(), [](const std::string& e) {
+        const int webrtc_join_errors = static_cast<int>(
+            std::count_if(delegate.errors.begin(), delegate.errors.end(), [](const std::string& e) {
                 return e.find("WebRTC connections failed") != std::string::npos;
             }));
         EXPECT_EQ(webrtc_join_errors, 0);
