@@ -12,6 +12,12 @@
   --link-hover: #087a06;
   --demo-bg: #ffffff;
   --code-bg: #f4f4f5;
+  --tok-comment: #6a737d;
+  --tok-string: #032f62;
+  --tok-cmd: #0a9208;
+  --tok-flag: #6f42c1;
+  --tok-path: #005cc5;
+  --tok-op: #d73a49;
   --frame-h: min(72vh, 720px);
   --max: 960px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -28,6 +34,12 @@
   --link-hover: #86efac;
   --demo-bg: #1a1a1a;
   --code-bg: #1a1a1a;
+  --tok-comment: #8b949e;
+  --tok-string: #a5d6ff;
+  --tok-cmd: #4ade80;
+  --tok-flag: #d2a8ff;
+  --tok-path: #79c0ff;
+  --tok-op: #ff7b72;
 }
 
 * {
@@ -37,6 +49,7 @@
 html {
   color-scheme: light dark;
   background: var(--bg);
+  scroll-behavior: smooth;
 }
 
 html, body {
@@ -206,43 +219,24 @@ main {
   margin: 0.65rem 0 0;
 }
 
-.features,
 .section {
-  margin-top: 2.25rem;
+  margin-top: 2.5rem;
+  scroll-margin-top: 1rem;
 }
 
-.features h2,
 .section h2 {
   margin: 0 0 0.75rem;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 650;
   letter-spacing: -0.015em;
   line-height: 1.3;
 }
 
-.features ul,
-.section ul {
-  margin: 0;
-  padding-left: 1.15rem;
-  color: var(--muted);
-}
-
-.features li,
-.section li {
-  margin: 0.45rem 0;
-}
-
-.features strong,
-.section strong {
-  color: var(--fg);
+.section h3 {
+  margin: 1.35rem 0 0.45rem;
+  font-size: 1.05rem;
   font-weight: 600;
-}
-
-.features .note,
-.section .more {
-  margin: 0.9rem 0 0;
-  color: var(--muted);
-  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .section p {
@@ -253,6 +247,21 @@ main {
 
 .section p:last-child {
   margin-bottom: 0;
+}
+
+.section strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.section em {
+  font-style: italic;
+}
+
+.section .more {
+  margin: 1.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .shot {
@@ -274,7 +283,6 @@ main {
   display: block;
   width: 100%;
   height: auto;
-  vertical-align: middle;
 }
 
 .shot video {
@@ -296,16 +304,8 @@ main {
   display: block;
 }
 
-.shot figcaption {
-  margin: 0;
-  padding: 0.55rem 0.85rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
 .code-block {
-  margin: 0.85rem 0 0;
+  margin: 0.85rem 0 1rem;
   padding: 0.85rem 1rem;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -319,23 +319,20 @@ main {
 
 .code-block code {
   font-size: inherit;
+  font-family: inherit;
   white-space: pre;
+  color: inherit;
+  background: none;
+  padding: 0;
 }
 
-.install-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: var(--muted);
-}
-
-.install-list li {
-  margin: 0.55rem 0;
-}
-
-.install-list code {
-  display: inline;
-  word-break: break-all;
-}
+/* Syntax tokens (applied by inline highlighter) */
+.tok-comment { color: var(--tok-comment); font-style: italic; }
+.tok-string  { color: var(--tok-string); }
+.tok-cmd     { color: var(--tok-cmd); font-weight: 600; }
+.tok-flag    { color: var(--tok-flag); }
+.tok-path    { color: var(--tok-path); }
+.tok-op      { color: var(--tok-op); }
 
 code {
   font-family: var(--mono);

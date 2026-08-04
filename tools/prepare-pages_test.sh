@@ -41,6 +41,7 @@ APP_URL="https://example.test/app" REPO_URL="https://github.com/example/cells" \
 assert_ok "index.html exists" test -f "$OUT/index.html"
 assert_ok "styles.css exists" test -f "$OUT/styles.css"
 assert_ok "favicon.svg exists" test -f "$OUT/favicon.svg"
+assert_ok "highlight-bash.js copied" test -f "$OUT/highlight-bash.js"
 assert_ok "APP_URL present for demo" grep -q 'https://example.test/app' "$OUT/index.html"
 assert_ok "data-app-url present" grep -q 'data-app-url="https://example.test/app"' "$OUT/index.html"
 assert_ok "GitHub link present" grep -q 'https://github.com/example/cells' "$OUT/index.html"
@@ -48,26 +49,31 @@ assert_ok "title is agent-focused" grep -q 'A spreadsheet engine for agents' "$O
 assert_ok "CTA is try it right here" grep -q 'Try it right here' "$OUT/index.html"
 assert_ok "CTA is plain text not a button" \
   bash -c "! grep -E 'class=\"btn[^\"]*\"[^>]*>Try it right here' '$OUT/index.html'"
-assert_ok "Made for agents feature copy" grep -q 'Made for agents' "$OUT/index.html"
-assert_ok "headless CLI (no pipelines)" \
-  bash -c "grep -q 'headless CLI' '$OUT/index.html' && ! grep -q 'pipelines' '$OUT/index.html'"
-assert_ok "Luau scripting section" grep -q 'Fully scriptable' "$OUT/index.html"
+assert_ok "no Why Cells section" bash -c "! grep -q 'Why Cells' '$OUT/index.html'"
+assert_ok "agents section matches README title" \
+  grep -q 'Made for AI agents to work with, not an agent itself' "$OUT/index.html"
+assert_ok "Scriptable section heading" grep -q '>Scriptable</h2>' "$OUT/index.html"
 assert_ok "Luau runtime mentioned" grep -q 'Luau' "$OUT/index.html"
-assert_ok ".zcd links to file-format docs" \
-  grep -q 'docs/file-format.md' "$OUT/index.html"
+assert_ok "no scripting image caption" \
+  bash -c "! grep -q 'In-browser Luau scripting' '$OUT/index.html'"
 assert_ok "scripting screenshot light" grep -q 'img/scripting.png' "$OUT/index.html"
 assert_ok "scripting screenshot dark" grep -q 'img/scripting-dark.png' "$OUT/index.html"
 assert_ok "scripting.png copied" test -f "$OUT/img/scripting.png"
 assert_ok "scripting-dark.png copied" test -f "$OUT/img/scripting-dark.png"
 assert_ok "collab demo video referenced" grep -q 'img/demo.mp4' "$OUT/index.html"
 assert_ok "demo.mp4 copied" test -f "$OUT/img/demo.mp4"
-assert_ok "collab demo section present" grep -q 'Humans + agents collab' "$OUT/index.html"
 assert_ok "collab video after interactive demo" \
   bash -c "demo=\$(grep -n 'id=\"demo\"' '$OUT/index.html' | head -1 | cut -d: -f1); vid=\$(grep -n 'img/demo.mp4' '$OUT/index.html' | head -1 | cut -d: -f1); test \"\$demo\" -lt \"\$vid\""
+assert_ok "skill install in agents section" \
+  bash -c "agents=\$(grep -n 'id=\"agents\"' '$OUT/index.html' | head -1 | cut -d: -f1); install=\$(grep -n 'id=\"install\"' '$OUT/index.html' | head -1 | cut -d: -f1); skill=\$(grep -n 'install-skill.sh' '$OUT/index.html' | head -1 | cut -d: -f1); test \"\$agents\" -lt \"\$skill\" && test \"\$skill\" -lt \"\$install\""
 assert_ok "CLI setCell example" grep -q 'setCell("A1"' "$OUT/index.html"
-assert_ok "install skill command" grep -q 'install-skill.sh' "$OUT/index.html"
-assert_ok "session collab example" grep -q 'session start' "$OUT/index.html"
-assert_ok "WebRTC collab detail" grep -q 'WebRTC' "$OUT/index.html"
+assert_ok "Install section id" grep -q 'id="install"' "$OUT/index.html"
+assert_ok "nav Install scrolls to section" grep -q 'href="#install"' "$OUT/index.html"
+assert_ok "Install heading" grep -q '>Install</h2>' "$OUT/index.html"
+assert_ok "Homebrew install" grep -q 'brew install aduermael/tap/cells' "$OUT/index.html"
+assert_ok "code blocks have data-lang" grep -q 'data-lang="bash"' "$OUT/index.html"
+assert_ok "page loads highlighter script" grep -q 'highlight-bash.js' "$OUT/index.html"
+assert_ok "syntax token styles" grep -q 'tok-cmd' "$OUT/styles.css"
 assert_ok "interactive demo still first" \
   bash -c "demo=\$(grep -n 'id=\"demo\"' '$OUT/index.html' | head -1 | cut -d: -f1); script=\$(grep -n 'scripting.png' '$OUT/index.html' | head -1 | cut -d: -f1); test \"\$demo\" -lt \"\$script\""
 assert_ok "no Open app nav" bash -c "! grep -q 'Open app' '$OUT/index.html'"
@@ -104,6 +110,25 @@ assert_ok "default APP_URL is cells-app.fly.dev" \
   grep -q 'https://cells-app.fly.dev' "$OUT3/index.html"
 assert_ok "default REPO_URL is aduermael/cells" \
   grep -q 'https://github.com/aduermael/cells' "$OUT3/index.html"
+
+# Unit-test the real shipped highlighter (assembled artifact path).
+assert_ok "shipped highlightBash colors bash tokens" \
+  node -e '
+    const hl = require(process.argv[1]);
+    const out = hl.highlightBash(
+      "# comment\ncells -i data.csv -e '\''setCell(\"A1\", 100)'\'' | sh"
+    );
+    if (!out.includes("tok-comment")) process.exit(2);
+    if (!out.includes("tok-cmd")) process.exit(3);
+    if (!out.includes("tok-flag")) process.exit(4);
+    if (!out.includes("tok-string")) process.exit(5);
+    if (!out.includes("tok-op")) process.exit(6);
+    if (out.includes("<script")) process.exit(7);
+    // Escape check
+    const esc = hl.highlightBash("echo <raw> & more");
+    if (esc.includes("<raw>") || !esc.includes("&lt;raw&gt;")) process.exit(8);
+    console.log("highlight ok");
+  ' "$OUT/highlight-bash.js"
 
 if [[ "$FAIL" -ne 0 ]]; then
   echo "prepare-pages tests FAILED" >&2

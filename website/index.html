@@ -52,6 +52,7 @@
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       </button>
+      <a href="#install">Install</a>
       <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
       <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
     </nav>
@@ -85,26 +86,16 @@
       <a class="btn" id="open-app" href="{{APP_URL}}" target="_blank" rel="noopener">Open in new page</a>
     </p>
 
-    <section class="features" aria-label="Highlights">
-      <h2>Why Cells</h2>
-      <ul>
-        <li><strong>Made for agents</strong> — headless CLI with context-window-conscious structured outputs; code as the main request interface. No harness, no system prompts.</li>
-        <li><strong>Scriptable</strong> — native <a href="https://luau.org" target="_blank" rel="noopener">Luau</a> runtime (Python, VBA, and TypeScript planned)</li>
-        <li><strong>Real-time collaboration</strong> — WebRTC peer-to-peer sync with CRDTs; humans and agents in the same room</li>
-        <li><strong>Excel compatible</strong> — import and export <code>.xlsx</code> and <code>.csv</code></li>
-        <li><strong>Git-friendly</strong> — text-based <a href="{{REPO_URL}}/blob/main/docs/file-format.md" target="_blank" rel="noopener"><code>.zcd</code></a> format (one entity per line, clean diffs)</li>
-      </ul>
-      <p class="note">
-        Early project — about 120 formulas today (vs ~500 in Excel); charts not yet supported.
-      </p>
-    </section>
-
-    <section class="section agents" aria-label="Built for AI agents">
-      <h2>Built for AI agents to work with</h2>
+    <section class="section agents" id="agents" aria-labelledby="agents-heading">
+      <h2 id="agents-heading">Made for AI agents to work with, not an agent itself</h2>
       <p>
-        Cells is not an agent itself. It defines no harness and no system prompts.
-        The CLI is designed so agents can convert, inspect, create, and transform
-        workbooks — and join collab rooms via long-running sessions.
+        Cells defines no harness, no system prompts. The CLI is designed for agents
+        though, delivering context-window-conscious structured outputs and using code
+        as the main request interface.
+      </p>
+      <p>
+        Here’s a quick demo where you can see humans (web clients) collaborating with
+        Grok Build and Codex agents (using the CLI):
       </p>
       <figure class="shot collab-demo">
         <video
@@ -120,22 +111,20 @@
         >
           Your browser does not support the video tag.
         </video>
-        <figcaption>
-          Humans + agents collab — web clients alongside CLI agents in the same room.
-        </figcaption>
       </figure>
       <p>
         Install the agent skill (recommended), then prompt for spreadsheet work like
         <code>"Open file.xlsx and fix formulas"</code>:
       </p>
-      <pre class="code-block"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code></pre>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code></pre>
     </section>
 
-    <section class="section scripting" aria-label="Scriptable">
-      <h2>Fully scriptable</h2>
+    <section class="section scripting" id="scriptable" aria-labelledby="scriptable-heading">
+      <h2 id="scriptable-heading">Scriptable</h2>
       <p>
-        Luau is built in from day one — in the web UI and on the CLI.
-        Run inline expressions or script files against any supported format.
+        Cells is built from the start as a fully scriptable Lua/Luau runtime.
+        (Python, VBA and TypeScript not yet supported but planned; they will under
+        the hood be transpiled <em>into Luau</em>)
       </p>
       <figure class="shot">
         <img
@@ -154,62 +143,47 @@
           alt="Cells web UI with Luau scripting panel (dark theme)"
           loading="lazy"
         >
-        <figcaption>In-browser Luau scripting — same engine as the CLI.</figcaption>
       </figure>
-      <pre class="code-block"><code># Run inline script
+      <pre class="code-block" data-lang="bash"><code># Run inline script
 cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
 
 # Run a script file
 cells -i data.xlsx output.csv --script transform.luau
 
-# Script-only mode (inspect without writing an output file)
+# Script-only mode (no output file)
 cells -i report.xlsx --script analyze.luau
 cells -i data.csv -e 'print(getCell("A1"))'</code></pre>
     </section>
 
-    <section class="section zcd" aria-label="Native format and collaboration">
-      <h2>Native <code>.zcd</code> format &amp; collaboration</h2>
-      <p>
-        <strong>.zcd</strong> (Zero Conflict Document) is plain text on purpose —
-        built for collab and clean git diffs:
-      </p>
-      <ul>
-        <li><strong>One entity per line</strong> — edit a cell, column, or row → exactly one line changes</li>
-        <li><strong>Content-addressed styles</strong> — same style encodes to the same blob (auto-deduped)</li>
-        <li><strong>CRDT operation log</strong> — full edit history for sync and conflict resolution</li>
-      </ul>
-      <p>
-        Realtime sync is <strong>WebRTC peer-to-peer</strong>. A small signaling server
-        only helps peers find each other; document ops travel between clients, not through
-        a central store. Concurrent edits merge automatically.
-      </p>
-      <pre class="code-block"><code># Join a collab room from the CLI (multi-step agent work)
-cells session start 'https://cells-app.fly.dev/?room=YOUR_ROOM'
-cells session exec SESSION_ID -e 'setCell("A1", 1)'</code></pre>
-    </section>
+    <section class="section install" id="install" aria-labelledby="install-heading">
+      <h2 id="install-heading">Install</h2>
+      <p>Install methods for the <strong>CLI</strong>, in order of preference:</p>
 
-    <section class="section install" aria-label="Install">
-      <h2>Install the CLI</h2>
-      <ol class="install-list">
-        <li>
-          <strong>Agent skill</strong> (recommended for agentic workflows) —
-          <code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code>
-        </li>
-        <li>
-          <strong>Homebrew</strong> —
-          <code>brew install aduermael/tap/cells</code>
-        </li>
-        <li>
-          <strong>Direct binary</strong> —
-          <code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh</code>
-        </li>
-        <li>
-          <strong>From source</strong> —
-          <code>bazel run :cli</code> → <code>dist/cli/cells</code>
-        </li>
-      </ol>
+      <h3>1. Agent skill (recommended)</h3>
+      <p>
+        Best default for agentic workflows. Installs a skill that knows how to install
+        and use <code>cells</code>:
+      </p>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code></pre>
+      <p>
+        The skill gets installed for Claude Code, Codex and Grok Build in your working
+        directory. After this, just prompt for spreadsheet work like
+        <code>"Open file.xlsx and fix formulas"</code>.
+      </p>
+
+      <h3>2. Homebrew</h3>
+      <pre class="code-block" data-lang="bash"><code>brew install aduermael/tap/cells</code></pre>
+
+      <h3>3. Direct install (<code>curl | sh</code>)</h3>
+      <p>Downloads the platform binary from the latest GitHub Release:</p>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh</code></pre>
+
+      <h3>4. Build from source</h3>
+      <pre class="code-block" data-lang="bash"><code>bazel run :cli          # → dist/cli/cells
+bazel run :cli-release  # optimized</code></pre>
+
       <p class="more">
-        Full docs, architecture, and build commands on
+        Architecture, collaboration server, and full docs on
         <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">GitHub</a>.
       </p>
     </section>
@@ -299,5 +273,6 @@ cells session exec SESSION_ID -e 'setCell("A1", 1)'</code></pre>
       }
     })();
   </script>
+  <script src="highlight-bash.js"></script>
 </body>
 </html>
