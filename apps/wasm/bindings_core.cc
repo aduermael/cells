@@ -23,6 +23,7 @@
 #include "core/cells/fill_range.h"
 #include "core/cells/format_buffer.h"
 #include "core/cells/format_code_formatter.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
@@ -992,8 +993,12 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         if (existingCell->isFormula()) {
             Formula* formula = existingCell->getFormula();
             if (formula != nullptr && formula->ast != nullptr) {
-                const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-                std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
+                // Use FormulaDisplayConverter (same path as formula bar / viewport) so
+                // cross-sheet refs display as Sheet1!E1 instead of #REF!.
+                // RefConverter.formulaToA1 only knows the active sheet's UUID maps and
+                // fails for cell UUIDs on other sheets (serializer omits sheet prefixes).
+                const FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+                const std::string a1Formula = displayConverter.toDisplayString(formula->ast);
                 json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
             }
             json << "\"value\":\"" << jsonEscape(existingCell->value.raw) << "\",";

@@ -1266,6 +1266,7 @@ cc_library(
     deps = [
         ":crdt",
         ":fill_range",
+        ":formula_display",
         ":formula_parser",
         ":formula_recalc",
         ":formula_resolver",

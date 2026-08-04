@@ -292,31 +292,32 @@ TEST(RTCPeerConnectionTest, LocalIceCandidatesHaveNoAPrefix) {
     ASSERT_NE(channel, nullptr);
 
     // createOffer may complete async via libdc onLocalDescription — wait for it.
+    std::atomic<bool> offer_done{false};
     std::atomic<bool> offer_ok{false};
     pc->createOffer([&](bool success, const SessionDescription& sdp, const std::string& /*err*/) {
-        if (success && !sdp.sdp.empty()) {
+        offer_ok.store(success);
+        if (success) {
             pc->setLocalDescription(sdp, [](bool /*s*/, const std::string& /*e*/) {});
-            offer_ok.store(true);
         }
+        offer_done.store(true);
     });
-    for (int i = 0; i < 100 && !offer_ok.load(); ++i) {
+    for (int i = 0; i < 200 && !offer_done.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (!offer_ok.load()) {
+    if (!offer_done.load() || !offer_ok.load()) {
         pc->setDelegate(nullptr);
         pc->close();
-        GTEST_SKIP() << "createOffer did not produce SDP in time (environment)";
+        GTEST_SKIP() << "createOffer did not complete (environment)";
     }
 
-    // Pump briefly for async ICE gathering (libjuice thread).
-    for (int i = 0; i < 50 && delegate.candidateCount() == 0; ++i) {
+    // Pump for async ICE gathering (libjuice thread). Allow more time under CI load.
+    for (int i = 0; i < 100 && delegate.candidateCount() == 0; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
     // Detach delegate before inspecting results so a late ICE callback cannot
     // race the vector (or free the stack delegate after close).
     pc->setDelegate(nullptr);
-    // Give in-flight callbacks a beat to finish before we close.
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     const auto gathered = delegate.snapshot();
@@ -353,6 +354,9 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
     // Two peer connections: offerer + answerer. Send answerer's trickle
     // candidates to offerer BEFORE setRemoteDescription(answer), then set
     // answer and ensure the connection can still complete (buffering works).
+    //
+    // createOffer/createAnswer may complete asynchronously (libdatachannel
+    // onLocalDescription). Wait for callbacks — do not assume sync completion.
     auto offerer = RTCPeerConnection::make(RTCConfiguration::defaultConfig());
     auto answerer = RTCPeerConnection::make(RTCConfiguration::defaultConfig());
     ASSERT_NE(offerer, nullptr);
@@ -361,9 +365,8 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
     struct PairDelegate : public RTCPeerConnectionDelegate {
         RTCPeerConnection* remote = nullptr;
         std::atomic<bool> buffer_before_remote{false};
-        mutable std::mutex mu;
+        mutable std::mutex early_mu;
         std::vector<ICECandidate> early;
-        std::atomic<bool> dc_open{false};
 
         void peerConnectionStateDidChange(RTCPeerConnection& /*pc*/,
                                           PeerConnectionState /*state*/) override {}
@@ -376,7 +379,7 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
             }
             if (buffer_before_remote.load()) {
                 {
-                    std::lock_guard<std::mutex> lock(mu);
+                    std::lock_guard<std::mutex> lock(early_mu);
                     early.push_back(candidate);
                 }
                 // Deliver early to remote (must be buffered there)
@@ -393,7 +396,7 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
         }
 
         size_t earlyCount() const {
-            std::lock_guard<std::mutex> lock(mu);
+            std::lock_guard<std::mutex> lock(early_mu);
             return early.size();
         }
     };
@@ -430,86 +433,104 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
     ASSERT_NE(dc, nullptr);
     dc->setDelegate(&open_del);
 
-    // createOffer/createAnswer may complete asynchronously (libdc onLocalDescription).
-    // Wait for non-empty SDP before applying it as a remote description.
-    std::atomic<bool> offer_ready{false};
     SessionDescription offer_sdp;
-    offerer->createOffer([&](bool ok, const SessionDescription& sdp, const std::string& /*e*/) {
-        if (ok && !sdp.sdp.empty()) {
+    std::atomic<bool> offer_done{false};
+    std::string offer_err;
+    offerer->createOffer([&](bool ok, const SessionDescription& sdp, const std::string& err) {
+        if (ok) {
             offer_sdp = sdp;
             offerer->setLocalDescription(sdp, [](bool /*s*/, const std::string& /*e*/) {});
-            offer_ready.store(true);
+        } else {
+            offer_err = err;
         }
+        offer_done.store(true);
     });
-    for (int i = 0; i < 100 && !offer_ready.load(); ++i) {
+    for (int i = 0; i < 200 && !offer_done.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (!offer_ready.load() || offer_sdp.sdp.empty()) {
+    if (!offer_done.load() || offer_sdp.sdp.empty()) {
         offerer->setDelegate(nullptr);
         answerer->setDelegate(nullptr);
         offerer->close();
         answerer->close();
-        GTEST_SKIP() << "createOffer did not produce SDP in time (environment)";
+        GTEST_SKIP() << "createOffer did not complete (environment): " << offer_err;
     }
 
     // Answerer: set remote offer (starts its ICE); candidates go to offerer early
-    std::atomic<bool> remote_offer_ok{false};
-    answerer->setRemoteDescription(
-        offer_sdp, [&](bool s, const std::string& /*e*/) { remote_offer_ok.store(s); });
-    for (int i = 0; i < 50 && !remote_offer_ok.load(); ++i) {
+    std::atomic<bool> remote_offer_set{false};
+    std::string remote_offer_err;
+    answerer->setRemoteDescription(offer_sdp, [&](bool ok, const std::string& err) {
+        if (!ok) {
+            remote_offer_err = err;
+        }
+        remote_offer_set.store(true);
+    });
+    for (int i = 0; i < 100 && !remote_offer_set.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (!remote_offer_ok.load()) {
+    if (!remote_offer_set.load() || !remote_offer_err.empty()) {
         offerer->setDelegate(nullptr);
         answerer->setDelegate(nullptr);
         offerer->close();
         answerer->close();
-        GTEST_SKIP() << "setRemoteDescription(offer) failed (environment)";
+        GTEST_SKIP() << "setRemoteDescription(offer) failed: " << remote_offer_err;
     }
 
-    std::atomic<bool> answer_ready{false};
+    // createAnswer may complete via async onLocalDescription after setRemoteDescription
     SessionDescription answer_sdp;
-    answerer->createAnswer([&](bool ok, const SessionDescription& sdp, const std::string& /*e*/) {
-        if (ok && !sdp.sdp.empty()) {
+    std::atomic<bool> answer_done{false};
+    std::string answer_err;
+    answerer->createAnswer([&](bool ok, const SessionDescription& sdp, const std::string& err) {
+        if (ok) {
             answer_sdp = sdp;
             answerer->setLocalDescription(sdp, [](bool /*s*/, const std::string& /*e*/) {});
-            answer_ready.store(true);
+        } else {
+            answer_err = err;
         }
+        answer_done.store(true);
     });
-    for (int i = 0; i < 100 && !answer_ready.load(); ++i) {
+    for (int i = 0; i < 200 && !answer_done.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (!answer_ready.load() || answer_sdp.sdp.empty()) {
+    if (!answer_done.load() || answer_sdp.sdp.empty()) {
         offerer->setDelegate(nullptr);
         answerer->setDelegate(nullptr);
         offerer->close();
         answerer->close();
-        GTEST_SKIP() << "createAnswer did not produce SDP in time (environment)";
+        GTEST_SKIP() << "createAnswer did not complete (environment): " << answer_err;
     }
 
     // Give answerer time to emit at least one candidate while offerer still
     // has no remote description.
-    for (int i = 0; i < 30 && ans_del.earlyCount() == 0; ++i) {
+    for (int i = 0; i < 100 && ans_del.earlyCount() == 0; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
     // Now apply answer on offerer — pending remote candidates must flush.
-    offerer->setRemoteDescription(answer_sdp, [](bool /*s*/, const std::string& /*e*/) {});
+    std::atomic<bool> remote_answer_set{false};
+    offerer->setRemoteDescription(answer_sdp, [&](bool /*ok*/, const std::string& /*err*/) {
+        remote_answer_set.store(true);
+    });
+    for (int i = 0; i < 100 && !remote_answer_set.load(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     // Continue trickle both ways after remote is set
     ans_del.buffer_before_remote = false;
     off_del.buffer_before_remote = false;
 
-    for (int i = 0; i < 100 && !local_open.load(); ++i) {
+    // DataChannel open can take longer under CI load / restricted networks.
+    for (int i = 0; i < 250 && !local_open.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
-    // Full P2P ICE can fail in restricted CI sandboxes; skip rather than flake.
     if (!local_open.load()) {
+        // ICE may be blocked (no host candidates, firewall). Buffering logic is
+        // still covered by SyncClient early-ICE unit tests; skip rather than flake CI.
         offerer->setDelegate(nullptr);
         answerer->setDelegate(nullptr);
         offerer->close();
         answerer->close();
-        GTEST_SKIP() << "DataChannel did not open in time (ICE/environment)";
+        GTEST_SKIP() << "DataChannel did not open in time (ICE environment)";
     }
 
     offerer->setDelegate(nullptr);
