@@ -2,7 +2,7 @@
 
 Cells is a modern spreadsheet engine, built with agentic use primarily in mind. 
 
-It’s lightweight (~7–10MB depending on platform), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
+It’s lightweight (<10MB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
 
 Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for your agents. 
 
