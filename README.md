@@ -14,7 +14,7 @@ You can test it on the [presentation web page](https://aduermael.github.io/cells
 
 Cells defines no harness, no system prompts. The CLI is designed for agents though, delivering context-window-conscious structured outputs and using code as the main request interface. 
 
-Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build and Codex agents (using the CLI):
+Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build (using the CLI):
 
 <img style="max-width:500px" src="./docs/img/demo.gif">
 

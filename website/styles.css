@@ -161,17 +161,31 @@ main {
 }
 
 .tagline {
-  margin: 0 0 1.25rem;
-  max-width: 38rem;
+  margin: 0 0 0.65rem;
+  max-width: 40rem;
   color: var(--muted);
   font-size: 1.05rem;
 }
 
+.tagline strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
 .cta {
+  margin: 1.15rem 0 0.35rem;
+  max-width: 38rem;
+  color: var(--fg);
+  font-size: 1.05rem;
+  font-weight: 550;
+}
+
+.cta-note {
   margin: 0 0 0.25rem;
   max-width: 38rem;
   color: var(--muted);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
+  opacity: 0.9;
 }
 
 .btn {

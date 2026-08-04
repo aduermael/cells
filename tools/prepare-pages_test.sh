@@ -46,12 +46,20 @@ assert_ok "APP_URL present for demo" grep -q 'https://example.test/app' "$OUT/in
 assert_ok "data-app-url present" grep -q 'data-app-url="https://example.test/app"' "$OUT/index.html"
 assert_ok "GitHub link present" grep -q 'https://github.com/example/cells' "$OUT/index.html"
 assert_ok "title is agent-focused" grep -q 'A spreadsheet engine for agents' "$OUT/index.html"
+assert_ok "intro matches README agentic framing" \
+  grep -q 'built with agentic use primarily in mind' "$OUT/index.html"
+assert_ok "intro headless CLI line" grep -q 'lightweight headless CLI' "$OUT/index.html"
 assert_ok "CTA is try it right here" grep -q 'Try it right here' "$OUT/index.html"
 assert_ok "CTA is plain text not a button" \
   bash -c "! grep -E 'class=\"btn[^\"]*\"[^>]*>Try it right here' '$OUT/index.html'"
+assert_ok "drag-drop note is separate dimmed line" grep -q 'class="cta-note"' "$OUT/index.html"
 assert_ok "no Why Cells section" bash -c "! grep -q 'Why Cells' '$OUT/index.html'"
 assert_ok "agents section matches README title" \
   grep -q 'Made for AI agents to work with, not an agent itself' "$OUT/index.html"
+assert_ok "collab demo credits Grok Build only" \
+  bash -c "grep -q 'Grok Build (using the CLI)' '$OUT/index.html' && ! grep -q 'Codex agents' '$OUT/index.html'"
+assert_ok "collab video autoplay loop muted" \
+  bash -c "grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q autoplay && grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q loop && grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q muted"
 assert_ok "Scriptable section heading" grep -q '>Scriptable</h2>' "$OUT/index.html"
 assert_ok "Luau runtime mentioned" grep -q 'Luau' "$OUT/index.html"
 assert_ok "no scripting image caption" \
