@@ -269,11 +269,18 @@ main {
   box-shadow: none;
 }
 
-.shot img {
+.shot img,
+.shot video {
   display: block;
   width: 100%;
   height: auto;
   vertical-align: middle;
+}
+
+.shot video {
+  background: #000;
+  max-height: min(70vh, 640px);
+  object-fit: contain;
 }
 
 /* Theme-aware scripting screenshots */

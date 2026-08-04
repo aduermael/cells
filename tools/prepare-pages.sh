@@ -60,10 +60,10 @@ else
   exit 1
 fi
 
-# Landing page screenshots (theme-aware scripting shots from docs/img).
+# Landing page media (theme-aware scripting shots + collab demo video from docs/img).
 IMG_SRC="$REPO_ROOT/docs/img"
 mkdir -p "$OUT_DIR/img"
-for f in scripting.png scripting-dark.png; do
+for f in scripting.png scripting-dark.png demo.mp4; do
   if [[ ! -f "$IMG_SRC/$f" ]]; then
     echo "error: missing website image $IMG_SRC/$f" >&2
     exit 1
@@ -100,8 +100,16 @@ if [[ ! -f "$OUT_DIR/img/scripting.png" || ! -f "$OUT_DIR/img/scripting-dark.png
   echo "error: assembled site is missing scripting screenshots under img/" >&2
   exit 1
 fi
+if [[ ! -f "$OUT_DIR/img/demo.mp4" ]]; then
+  echo "error: assembled site is missing collab demo video img/demo.mp4" >&2
+  exit 1
+fi
 if ! grep -q 'img/scripting.png' "$OUT_DIR/index.html"; then
   echo "error: index.html should reference img/scripting.png" >&2
+  exit 1
+fi
+if ! grep -q 'img/demo.mp4' "$OUT_DIR/index.html"; then
+  echo "error: index.html should reference img/demo.mp4" >&2
   exit 1
 fi
 

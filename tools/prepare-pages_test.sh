@@ -59,6 +59,11 @@ assert_ok "scripting screenshot light" grep -q 'img/scripting.png' "$OUT/index.h
 assert_ok "scripting screenshot dark" grep -q 'img/scripting-dark.png' "$OUT/index.html"
 assert_ok "scripting.png copied" test -f "$OUT/img/scripting.png"
 assert_ok "scripting-dark.png copied" test -f "$OUT/img/scripting-dark.png"
+assert_ok "collab demo video referenced" grep -q 'img/demo.mp4' "$OUT/index.html"
+assert_ok "demo.mp4 copied" test -f "$OUT/img/demo.mp4"
+assert_ok "collab demo section present" grep -q 'Humans + agents collab' "$OUT/index.html"
+assert_ok "collab video after interactive demo" \
+  bash -c "demo=\$(grep -n 'id=\"demo\"' '$OUT/index.html' | head -1 | cut -d: -f1); vid=\$(grep -n 'img/demo.mp4' '$OUT/index.html' | head -1 | cut -d: -f1); test \"\$demo\" -lt \"\$vid\""
 assert_ok "CLI setCell example" grep -q 'setCell("A1"' "$OUT/index.html"
 assert_ok "install skill command" grep -q 'install-skill.sh' "$OUT/index.html"
 assert_ok "session collab example" grep -q 'session start' "$OUT/index.html"
