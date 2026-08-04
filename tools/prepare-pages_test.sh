@@ -59,7 +59,9 @@ assert_ok "agents section matches README title" \
 assert_ok "collab demo credits Grok Build only" \
   bash -c "grep -q 'Grok Build (using the CLI)' '$OUT/index.html' && ! grep -q 'Codex agents' '$OUT/index.html'"
 assert_ok "collab video autoplay loop muted" \
-  bash -c "grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q autoplay && grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q loop && grep -A8 'img/demo.mp4' '$OUT/index.html' | grep -q muted"
+  bash -c "grep -A12 'img/demo.mp4' '$OUT/index.html' | grep -q autoplay && grep -A12 'img/demo.mp4' '$OUT/index.html' | grep -q loop && grep -A12 'img/demo.mp4' '$OUT/index.html' | grep -q muted"
+assert_ok "collab video has no controls" \
+  bash -c "! grep -A12 'img/demo.mp4' '$OUT/index.html' | grep -qw controls"
 assert_ok "Scriptable section heading" grep -q '>Scriptable</h2>' "$OUT/index.html"
 assert_ok "Luau runtime mentioned" grep -q 'Luau' "$OUT/index.html"
 assert_ok "no scripting image caption" \

@@ -101,19 +101,18 @@
         Grok Build (using the CLI):
       </p>
       <figure class="shot collab-demo">
-        <!-- No audio track: muted + CSS hides volume UI (native controls have no novolume flag). -->
+        <!-- Silent looping clip: no controls chrome (muted required for autoplay). -->
         <video
-          class="no-audio"
           src="img/demo.mp4"
           width="1344"
           height="540"
-          controls
-          controlslist="nodownload noplaybackrate"
           playsinline
           muted
           loop
           autoplay
           preload="metadata"
+          disablepictureinpicture
+          disableremoteplayback
         >
           Your browser does not support the video tag.
         </video>
