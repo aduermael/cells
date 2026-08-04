@@ -215,7 +215,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
                 // readable. Sheet-local RefConverter.formulaToA1 emits #REF! for
                 // cell UUIDs that live on other sheets.
                 const Workbook* workbook = getWorkbook(L);
-                FormulaDisplayConverter converter(*sheet, workbook);
+                const FormulaDisplayConverter converter(*sheet, workbook);
                 const std::string a1Formula = converter.toDisplayString(f->ast);
                 lua_pushstring(L, a1Formula.c_str());
                 return 1;

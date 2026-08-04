@@ -971,7 +971,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
                 // cross-sheet refs display as Sheet1!E1 instead of #REF!.
                 // RefConverter.formulaToA1 only knows the active sheet's UUID maps and
                 // fails for cell UUIDs on other sheets (serializer omits sheet prefixes).
-                FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+                const FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
                 const std::string a1Formula = displayConverter.toDisplayString(formula->ast);
                 json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
             }
