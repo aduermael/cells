@@ -1698,6 +1698,9 @@ TEST(CrdtJoinEmptyShell, RemoteChangeKeepsActiveSheet) {
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u), 1u);  // stay on Sheet2
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u), 0u);  // stay on Sheet1
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 2u), 2u);  // stay on empty Sheet3
+    // Sheet id wins over a stale/wrong index (e.g. mid-batch remote mutations).
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u, sheet2Id), 1u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 99u, sheet1Id), 0u);
 }
 
 // Only auto-switch when the active index is no longer valid (sheet deleted).
@@ -1706,20 +1709,52 @@ TEST(CrdtJoinEmptyShell, RemoteChangeSwitchesWhenActiveDeleted) {
     wb->setNodeId(generate_id());
     wb->startCollaboration();
 
-    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
-    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
-    wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet3"));
+    const ID sheet1Id = generate_id();
+    const ID sheet2Id = generate_id();
+    const ID sheet3Id = generate_id();
+    wb->addSheet(std::make_unique<Sheet>(sheet1Id, "Sheet1"));
+    wb->addSheet(std::make_unique<Sheet>(sheet2Id, "Sheet2"));
+    wb->addSheet(std::make_unique<Sheet>(sheet3Id, "Sheet3"));
 
     EXPECT_EQ(wb->sheetCount(), 3u);
     // User on last sheet (index 2); peer deletes it → clamp to last remaining
     wb->removeSheet(wb->sheets[2]->id);
     EXPECT_EQ(wb->sheetCount(), 2u);
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 2u), 1u);
+    // Deleted sheet id: fall back to index clamp
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 2u, sheet3Id), 1u);
     // Still-valid index is unchanged (peer deleted a different sheet)
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u), 0u);
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u), 1u);
+    // Surviving sheet id still wins after a peer deletes another sheet
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 0u, sheet2Id), 1u);
     // Far out-of-range still clamps to last
     EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 99u), 1u);
+}
+
+// Peer refresh / remote sheet insert must not move the user off their sheet
+// even if the active index becomes temporarily wrong relative to sheet order.
+TEST(CrdtJoinEmptyShell, RemoteSheetInsertKeepsSheetById) {
+    auto wb = std::make_unique<Workbook>(generate_id(), "Untitled");
+    wb->setNodeId(generate_id());
+    wb->startCollaboration();
+
+    const ID sheet1Id = generate_id();
+    const ID sheet2Id = generate_id();
+    wb->addSheet(std::make_unique<Sheet>(sheet1Id, "Sheet1"));
+    wb->addSheet(std::make_unique<Sheet>(sheet2Id, "Sheet2"));
+
+    // User is on Sheet2 (index 1). Peer inserts a new sheet at the end.
+    const ID sheet3Id = generate_id();
+    applyOperation(*wb, makeSheetSetOp(*wb, sheet3Id, R"({"name":"Sheet3"})"));
+    EXPECT_EQ(wb->sheetCount(), 3u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u, sheet2Id), 1u);
+
+    // Peer deletes Sheet1 → Sheet2 moves to index 0; id keeps the user on Sheet2.
+    wb->removeSheet(sheet1Id);
+    EXPECT_EQ(wb->sheetCount(), 2u);
+    EXPECT_EQ(resolveActiveSheetAfterRemoteChange(*wb, 1u, sheet2Id), 0u);
+    EXPECT_EQ(wb->getSheetByIndex(0)->id, sheet2Id);
 }
 
 TEST(CrdtJoinEmptyShell, LateJoinDoesNotPublishSecondSheet1) {

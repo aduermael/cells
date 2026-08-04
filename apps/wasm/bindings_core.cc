@@ -280,9 +280,33 @@ int CellsEngine::getActiveSheetIndex() {
     return static_cast<int>(_activeSheetIndex);
 }
 
+void CellsEngine::syncActiveSheetIdFromIndex() {
+    _activeSheetId = ID();
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return;
+    }
+    const Sheet* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (sheet != nullptr) {
+        _activeSheetId = sheet->id;
+    }
+}
+
+void CellsEngine::setActiveSheetIndex(size_t index) {
+    _activeSheetIndex = index;
+    syncActiveSheetIdFromIndex();
+}
+
+void CellsEngine::applyResolvedActiveSheet(size_t resolvedIndex) {
+    if (resolvedIndex != _activeSheetIndex) {
+        _activeSheetIndex = resolvedIndex;
+    }
+    // Always refresh id — sheet at this index may have been replaced/recreated.
+    syncActiveSheetIdFromIndex();
+}
+
 void CellsEngine::setActiveSheet(int index) {
     if (_workbook && index >= 0 && static_cast<size_t>(index) < _workbook->sheetCount()) {
-        _activeSheetIndex = static_cast<size_t>(index);
+        setActiveSheetIndex(static_cast<size_t>(index));
         rebuildViewportIndex();
         notifyListeners(ChangeType::SHEET_CHANGED);
     }
@@ -361,12 +385,14 @@ std::string CellsEngine::deleteSheet(int index) {
     broadcastPendingOperations();
 
     if (_activeSheetIndex >= _workbook->sheetCount()) {
-        _activeSheetIndex = _workbook->sheetCount() - 1;
+        setActiveSheetIndex(_workbook->sheetCount() - 1);
     } else if (static_cast<size_t>(index) < _activeSheetIndex) {
-        _activeSheetIndex--;
+        setActiveSheetIndex(_activeSheetIndex - 1);
     } else if (static_cast<size_t>(index) == _activeSheetIndex) {
         if (_activeSheetIndex >= _workbook->sheetCount()) {
-            _activeSheetIndex = _workbook->sheetCount() - 1;
+            setActiveSheetIndex(_workbook->sheetCount() - 1);
+        } else {
+            syncActiveSheetIdFromIndex();
         }
     }
 
@@ -434,16 +460,16 @@ std::string CellsEngine::moveSheet(int fromIndex, int toIndex) {
     _workbook->sheets.insert(_workbook->sheets.begin() + insertAt, std::move(sheet));
 
     if (static_cast<size_t>(fromIndex) == _activeSheetIndex) {
-        _activeSheetIndex = insertAt;
+        setActiveSheetIndex(static_cast<size_t>(insertAt));
     } else if (fromIndex < toIndex) {
         if (_activeSheetIndex > static_cast<size_t>(fromIndex) &&
             _activeSheetIndex <= static_cast<size_t>(insertAt)) {
-            _activeSheetIndex--;
+            setActiveSheetIndex(_activeSheetIndex - 1);
         }
     } else {
         if (_activeSheetIndex >= static_cast<size_t>(toIndex) &&
             _activeSheetIndex < static_cast<size_t>(fromIndex)) {
-            _activeSheetIndex++;
+            setActiveSheetIndex(_activeSheetIndex + 1);
         }
     }
 
@@ -2244,7 +2270,7 @@ void CellsEngine::createEmptyWorkbook() {
     _workbook = std::make_unique<Workbook>(generate_id(), "Untitled");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
     _workbook->addSheet(std::move(sheet));
-    _activeSheetIndex = 0;
+    setActiveSheetIndex(0);
     rebuildViewportIndex();
     notifyListeners(ChangeType::DATA_LOADED);
     LOG_INFO("Created empty workbook with id=%s", _workbook->id.toString().c_str());

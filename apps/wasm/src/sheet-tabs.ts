@@ -157,7 +157,8 @@ export class SheetTabsManager {
 
     this.sheets.forEach((sheet, idx) => {
       const tab = document.createElement("div");
-      tab.className = "sheet-tab" + (sheet.active ? " active" : "");
+      // Prefer manager index over sheet.active (network refreshes can desync flags).
+      tab.className = "sheet-tab" + (idx === this.activeSheetIndex ? " active" : "");
       tab.textContent = sheet.name;
       tab.dataset.index = idx.toString();
       tab.draggable = true;

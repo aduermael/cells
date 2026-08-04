@@ -81,6 +81,71 @@ async function runCollabRejoinTests() {
       }, { retries: 12, initialDelay: 500 });
     }));
 
+    // Peer refresh must not force the other peer onto the first sheet.
+    // No incoming network event should swap the active tab.
+    results.push(await runTest('Peer refresh does not force other peer to first sheet', async () => {
+      const roomId = generateRoomId();
+      console.log('[Test] Room:', roomId);
+
+      await joinRoom(ctx.page, ctx.baseUrl, roomId);
+      await joinRoom(page2, ctx.baseUrl, roomId);
+      await waitForPeerConnection(ctx.page, 15000);
+      await waitForPeerConnection(page2, 15000);
+
+      // Peer 1 adds a second sheet (synced via CRDT)
+      await ctx.page.click('#add-sheet-btn');
+      await sleep(500);
+
+      await assertWithRetry(async () => {
+        const count = await page2.evaluate(() =>
+          document.querySelectorAll('.sheet-tab').length
+        );
+        assertTrue(count >= 2, `Peer 2 should receive second sheet, got ${count}`);
+      }, { retries: 12, initialDelay: 400 });
+
+      // Peer 2 switches to the second sheet
+      await page2.evaluate(() => {
+        const tabs = document.querySelectorAll('.sheet-tab');
+        if (tabs[1]) tabs[1].click();
+      });
+      await sleep(400);
+
+      await assertWithRetry(async () => {
+        const active = await page2.evaluate(() => {
+          const tabs = document.querySelectorAll('.sheet-tab');
+          for (let i = 0; i < tabs.length; i++) {
+            if (tabs[i].classList.contains('active')) return i;
+          }
+          return -1;
+        });
+        assertEqual(active, 1, 'Peer 2 should be on second sheet before refresh');
+      }, { retries: 8, initialDelay: 300 });
+
+      // Peer 1 "refreshes" — full page reload into the same room
+      console.log('[Test] Peer 1 refreshing...');
+      await joinRoom(ctx.page, ctx.baseUrl, roomId);
+      await waitForPeerConnection(ctx.page, 15000);
+      await waitForPeerConnection(page2, 15000);
+      await sleep(2000);
+
+      // Peer 2 must still be on the second sheet
+      await assertWithRetry(async () => {
+        const active = await page2.evaluate(() => {
+          const tabs = document.querySelectorAll('.sheet-tab');
+          for (let i = 0; i < tabs.length; i++) {
+            if (tabs[i].classList.contains('active')) return i;
+          }
+          return -1;
+        });
+        assertEqual(active, 1, 'Peer 2 must stay on second sheet after peer 1 refreshes');
+      }, { retries: 10, initialDelay: 400 });
+
+      const tabs2 = await page2.evaluate(() =>
+        document.querySelectorAll('.sheet-tab').length
+      );
+      assertTrue(tabs2 >= 2, 'Peer 2 should still have multiple sheets after refresh');
+    }));
+
     // Leave + rejoin: B disconnects, A edits, B rejoins and converges
     results.push(await runTest('Leave and rejoin converges after offline edit', async () => {
       const roomId = generateRoomId();

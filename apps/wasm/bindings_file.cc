@@ -70,7 +70,7 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
         return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
     }
     _workbook = std::move(result.workbook);
-    _activeSheetIndex = 0;
+    setActiveSheetIndex(0);
     rebuildViewportIndex();
 
     // Parse and evaluate all formulas in all sheets after loading
@@ -145,7 +145,7 @@ std::string CellsEngine::loadFromCSV(const std::string& content, char delimiter,
         return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
     }
     _workbook = std::move(result.workbook);
-    _activeSheetIndex = 0;
+    setActiveSheetIndex(0);
     rebuildViewportIndex();
     notifyListeners(ChangeType::DATA_LOADED);
     return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
@@ -195,7 +195,7 @@ std::string CellsEngine::importSheetFromCSV(const std::string& content, char del
     if (!r.success) {
         return importResultJson(r);
     }
-    _activeSheetIndex = r.activeSheetIndex;
+    setActiveSheetIndex(r.activeSheetIndex);
     rebuildViewportIndex();
     broadcastPendingOperations();
     notifyListeners(ChangeType::SHEET_CHANGED);
@@ -237,7 +237,7 @@ std::string CellsEngine::importSheetFromXLSXDataPtr(uintptr_t ptr, size_t size,
     if (!r.success) {
         return importResultJson(r);
     }
-    _activeSheetIndex = r.activeSheetIndex;
+    setActiveSheetIndex(r.activeSheetIndex);
     rebuildViewportIndex();
     broadcastPendingOperations();
     notifyListeners(ChangeType::SHEET_CHANGED);
@@ -261,7 +261,7 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
         return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
     }
     _workbook = std::move(result.workbook);
-    _activeSheetIndex = 0;
+    setActiveSheetIndex(0);
     rebuildViewportIndex();
 
     // Resolve and evaluate all formulas in all sheets after loading

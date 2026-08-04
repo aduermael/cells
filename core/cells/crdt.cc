@@ -937,9 +937,21 @@ size_t preferredActiveSheetIndex(const Workbook& workbook) {
     return 0;
 }
 
-size_t resolveActiveSheetAfterRemoteChange(const Workbook& workbook, size_t activeIndex) {
+size_t resolveActiveSheetAfterRemoteChange(const Workbook& workbook, size_t activeIndex,
+                                           const ID& activeSheetId) {
     if (workbook.sheets.empty()) {
         return 0;
+    }
+    // Prefer stable sheet identity over index: remote add/delete/reorder must not
+    // yank the user to another tab when their sheet still exists.
+    if (!activeSheetId.isNull()) {
+        for (size_t i = 0; i < workbook.sheets.size(); ++i) {
+            const Sheet* sheet = workbook.sheets[i].get();
+            if (sheet != nullptr && sheet->id == activeSheetId) {
+                return i;
+            }
+        }
+        // Sheet was deleted — fall through to index clamp.
     }
     // Valid index: keep the user's selection (remote fill/edit must not steal focus).
     if (activeIndex < workbook.sheets.size() && workbook.sheets[activeIndex] != nullptr) {

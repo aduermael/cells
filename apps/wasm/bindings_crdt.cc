@@ -366,11 +366,10 @@ std::string CellsEngine::handlePeerMessage(const std::string& peerIdStr,
     if (result.dataModified) {
         if (_workbook && _workbook->sheetCount() > 0) {
             // Only remap when active sheet was deleted / index invalid.
-            const size_t resolved =
-                resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex);
-            if (resolved != _activeSheetIndex) {
-                _activeSheetIndex = resolved;
-            }
+            // Prefer sheet id so network events never force a tab swap.
+            const size_t resolved = resolveActiveSheetAfterRemoteChange(
+                *_workbook, _activeSheetIndex, _activeSheetId);
+            applyResolvedActiveSheet(resolved);
         }
         rebuildViewportIndex();
         // Sheet tabs need SHEET_CHANGED after join (new sheets / active switch)
@@ -464,8 +463,11 @@ std::string CellsEngine::startCollaboration() {
 
     // Shared policy with CLI (prepareWorkbookForSync): empty → no publish;
     // content → bootstrap; already collab → no-op.
+    // Keep the user's active sheet when still valid — joining collab must not
+    // force a tab swap (same rule as remote network events).
     const PrepareForSyncResult prep = prepareWorkbookForSync(*_workbook);
-    _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
+    applyResolvedActiveSheet(
+        resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex, _activeSheetId));
 
     std::ostringstream json;
     json << "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":" << prep.bootstrappedOps
@@ -513,8 +515,11 @@ std::string CellsEngine::enableSync(const std::string& url, const std::string& r
     // Empty peerId: SyncClient generates one. Non-empty: reuse (e.g. rejoin).
     // startSync runs prepareWorkbookForSync (shared with CLI): empty join
     // publishes nothing; local content is bootstrapped; rejoin leaves state.
+    // Keep the user's active sheet when still valid — enableSync must not force
+    // a tab swap (empty join → 0 sheets → resolve stays 0 until remote ops).
     _syncClient->startSync(roomId, peerId);
-    _activeSheetIndex = preferredActiveSheetIndex(*_workbook);
+    applyResolvedActiveSheet(
+        resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex, _activeSheetId));
 
     std::ostringstream json;
     json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId()
@@ -730,7 +735,7 @@ void CellsEngine::syncClientStateDidChange(cells::net::SyncClient& client,
         _workbook->sheetCount() == 0 && client.getPeerCount() == 0) {
         if (ensureDefaultSheetViaCrdt(*_workbook)) {
             client.broadcastOperations();
-            _activeSheetIndex = 0;
+            setActiveSheetIndex(0);
             rebuildViewportIndex();
             notifyListeners(ChangeType::SHEET_CHANGED);
             LOG_INFO("[Sync] Minted default Sheet1 (alone ONLINE, no sheets)");
@@ -750,15 +755,16 @@ void CellsEngine::syncClientPeerDidDisconnect(cells::net::SyncClient& /*client*/
 }
 
 void CellsEngine::syncClientDataDidChange(cells::net::SyncClient& /*client*/) {
-    // Keep the user's active sheet. Only auto-switch when the active index is
-    // invalid (e.g. peer deleted that sheet). Remote fill/edit must not jump tabs.
+    // Keep the user's active sheet. Prefer sheet id (stable across remote
+    // add/delete/reorder). Only auto-switch when that sheet is gone.
+    // No incoming network event may force a tab swap while the sheet exists.
     bool sheetChanged = false;
     if (_workbook && _workbook->sheetCount() > 0) {
         const size_t previous = _activeSheetIndex;
-        const size_t resolved =
-            resolveActiveSheetAfterRemoteChange(*_workbook, _activeSheetIndex);
+        const size_t resolved = resolveActiveSheetAfterRemoteChange(
+            *_workbook, _activeSheetIndex, _activeSheetId);
+        applyResolvedActiveSheet(resolved);
         if (resolved != previous) {
-            _activeSheetIndex = resolved;
             sheetChanged = true;
             LOG_INFO("[Sync] Active sheet index %zu invalid after remote change; switched to %zu",
                      previous, resolved);
