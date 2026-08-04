@@ -52,6 +52,7 @@
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       </button>
+      <a href="#install">Install</a>
       <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
       <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
     </nav>
@@ -61,11 +62,14 @@
     <section class="hero">
       <h1>A spreadsheet engine for agents</h1>
       <p class="tagline">
-        A lightweight and fully scriptable CLI primarily, with a web UI for
-        humans to see and collaborate.
+        Cells is a modern spreadsheet engine, built with agentic use primarily in mind.
       </p>
-      <p class="cta">
-        Try it right here 👇
+      <p class="tagline">
+        Use it as a <strong>browser-based alternative to Excel/Google Sheets</strong>,
+        or as a <strong>lightweight headless CLI</strong> for your agents.
+      </p>
+      <p class="cta">Try it right here 👇</p>
+      <p class="cta-note">
         You can drag&amp;drop <code>.csv</code> &amp; <code>.xlsx</code> files,
         everything stays in your browser.
       </p>
@@ -85,13 +89,103 @@
       <a class="btn" id="open-app" href="{{APP_URL}}" target="_blank" rel="noopener">Open in new page</a>
     </p>
 
-    <section class="features">
-      <ul>
-        <li><strong>Real-time collaboration</strong> — peer-to-peer sync with CRDTs</li>
-        <li><strong>Excel compatible</strong> — import and export <code>.xlsx</code></li>
-        <li><strong>Scriptable</strong> — Lua/Luau scripts, headless CLI</li>
-        <li><strong>Git-friendly</strong> — text-based <a href="{{REPO_URL}}/blob/main/docs/file-format.md" target="_blank" rel="noopener"><code>.zcd</code></a> format</li>
-      </ul>
+    <section class="section agents" id="agents" aria-labelledby="agents-heading">
+      <h2 id="agents-heading">Made for AI agents to work with, not an agent itself</h2>
+      <p>
+        Cells defines no harness, no system prompts. The CLI is designed for agents
+        though, delivering context-window-conscious structured outputs and using code
+        as the main request interface.
+      </p>
+      <p>
+        Here’s a quick demo where you can see humans (web clients) collaborating with
+        Grok Build (using the CLI):
+      </p>
+      <figure class="shot collab-demo">
+        <!-- No audio track: muted + CSS hides volume UI (native controls have no novolume flag). -->
+        <video
+          class="no-audio"
+          src="img/demo.mp4"
+          width="1344"
+          height="540"
+          controls
+          controlslist="nodownload noplaybackrate"
+          playsinline
+          muted
+          loop
+          autoplay
+          preload="metadata"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </figure>
+      <p>
+        Install the agent skill (recommended), then prompt for spreadsheet work like
+        <code>"Open file.xlsx and fix formulas"</code>:
+      </p>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code></pre>
+    </section>
+
+    <section class="section scripting" id="scriptable" aria-labelledby="scriptable-heading">
+      <h2 id="scriptable-heading">Scriptable</h2>
+      <p>
+        Cells is built from the start as a fully scriptable Lua/Luau runtime.
+        (Python, VBA and TypeScript not yet supported but planned.)
+      </p>
+      <figure class="shot">
+        <img
+          class="shot-light"
+          src="img/scripting.png"
+          width="900"
+          height="720"
+          alt="Cells web UI with Luau scripting panel filling a multiplication table"
+          loading="lazy"
+        >
+        <img
+          class="shot-dark"
+          src="img/scripting-dark.png"
+          width="900"
+          height="720"
+          alt="Cells web UI with Luau scripting panel (dark theme)"
+          loading="lazy"
+        >
+      </figure>
+      <pre class="code-block" data-lang="bash"><code># Run inline script
+cells -i data.csv output.xlsx -e 'setCell("A1", 100)'
+
+# Run a script file
+cells -i data.xlsx output.csv --script transform.luau
+
+# Script-only mode (no output file)
+cells -i report.xlsx --script analyze.luau
+cells -i data.csv -e 'print(getCell("A1"))'</code></pre>
+    </section>
+
+    <section class="section install" id="install" aria-labelledby="install-heading">
+      <h2 id="install-heading">Install</h2>
+      <p>Install methods for the <strong>CLI</strong>, in order of preference:</p>
+
+      <h3>1. Agent skill (recommended)</h3>
+      <p>
+        Best default for agentic workflows. Installs a skill that knows how to install
+        and use <code>cells</code>:
+      </p>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install-skill.sh | sh</code></pre>
+      <p>
+        The skill gets installed for Claude Code, Codex and Grok Build in your working
+        directory. After this, just prompt for spreadsheet work like
+        <code>"Open file.xlsx and fix formulas"</code>.
+      </p>
+
+      <h3>2. Homebrew</h3>
+      <pre class="code-block" data-lang="bash"><code>brew install aduermael/tap/cells</code></pre>
+
+      <h3>3. Direct install (<code>curl | sh</code>)</h3>
+      <p>Downloads the platform binary from the latest GitHub Release:</p>
+      <pre class="code-block" data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | sh</code></pre>
+
+      <h3>4. Build from source</h3>
+      <pre class="code-block" data-lang="bash"><code>bazel run :cli          # → dist/cli/cells
+bazel run :cli-release  # optimized</code></pre>
     </section>
   </main>
 
@@ -100,6 +194,8 @@
       <a href="{{REPO_URL}}" target="_blank" rel="noopener">GitHub</a>
       ·
       <a href="{{REPO_URL}}/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+      ·
+      MIT License
     </p>
   </footer>
 
@@ -177,5 +273,6 @@
       }
     })();
   </script>
+  <script src="highlight-bash.js"></script>
 </body>
 </html>

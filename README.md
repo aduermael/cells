@@ -2,7 +2,7 @@
 
 Cells is a modern spreadsheet engine, built with agentic use primarily in mind. 
 
-It’s lightweight (~XMB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
+It’s lightweight (<10MB), fully scriptable ([Luau](https://luau.org) native runtime with Python, VBA and TypeScript planned), and uses its own text-based spreadsheet file format (CRDT structured for collaboration + diffs cleanly for versioning).
 
 Use it as a **browser-based alternative to Excel/Google Sheets**, or as a **lightweight headless CLI** for your agents. 
 
@@ -14,7 +14,7 @@ You can test it on the [presentation web page](https://aduermael.github.io/cells
 
 Cells defines no harness, no system prompts. The CLI is designed for agents though, delivering context-window-conscious structured outputs and using code as the main request interface. 
 
-Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build and Codex agents (using the CLI):
+Here’s a quick demo where you can see humans (web clients) collaborating with Grok Build (using the CLI):
 
 <img style="max-width:500px" src="./docs/img/demo.gif">
 

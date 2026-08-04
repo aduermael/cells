@@ -33,6 +33,10 @@ if [[ ! -f "$SRC_DIR/index.html" || ! -f "$SRC_DIR/styles.css" ]]; then
   echo "error: expected website/index.html and website/styles.css" >&2
   exit 1
 fi
+if [[ ! -f "$SRC_DIR/highlight-bash.js" ]]; then
+  echo "error: expected website/highlight-bash.js" >&2
+  exit 1
+fi
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
@@ -49,6 +53,7 @@ subst() {
 
 subst "$SRC_DIR/index.html" >"$OUT_DIR/index.html"
 cp "$SRC_DIR/styles.css" "$OUT_DIR/styles.css"
+cp "$SRC_DIR/highlight-bash.js" "$OUT_DIR/highlight-bash.js"
 
 # Prefer the app favicon; fall back to shared icon.
 if [[ -f "$REPO_ROOT/apps/shared/favicons/favicon.svg" ]]; then
@@ -59,6 +64,17 @@ else
   echo "error: no favicon.svg source under apps/shared/" >&2
   exit 1
 fi
+
+# Landing page media (theme-aware scripting shots + collab demo video from docs/img).
+IMG_SRC="$REPO_ROOT/docs/img"
+mkdir -p "$OUT_DIR/img"
+for f in scripting.png scripting-dark.png demo.mp4; do
+  if [[ ! -f "$IMG_SRC/$f" ]]; then
+    echo "error: missing website image $IMG_SRC/$f" >&2
+    exit 1
+  fi
+  cp "$IMG_SRC/$f" "$OUT_DIR/img/$f"
+done
 
 # Fail closed on unresolved template tokens.
 if grep -R -n -E '\{\{[A-Z0-9_]+\}\}|__PLACEHOLDER__' "$OUT_DIR" >/dev/null; then
@@ -85,6 +101,31 @@ if ! grep -q "$REPO_URL" "$OUT_DIR/index.html"; then
   echo "error: assembled index.html is missing REPO_URL" >&2
   exit 1
 fi
+if [[ ! -f "$OUT_DIR/img/scripting.png" || ! -f "$OUT_DIR/img/scripting-dark.png" ]]; then
+  echo "error: assembled site is missing scripting screenshots under img/" >&2
+  exit 1
+fi
+if [[ ! -f "$OUT_DIR/img/demo.mp4" ]]; then
+  echo "error: assembled site is missing collab demo video img/demo.mp4" >&2
+  exit 1
+fi
+if ! grep -q 'img/scripting.png' "$OUT_DIR/index.html"; then
+  echo "error: index.html should reference img/scripting.png" >&2
+  exit 1
+fi
+if ! grep -q 'img/demo.mp4' "$OUT_DIR/index.html"; then
+  echo "error: index.html should reference img/demo.mp4" >&2
+  exit 1
+fi
+if [[ ! -f "$OUT_DIR/highlight-bash.js" ]]; then
+  echo "error: assembled site is missing highlight-bash.js" >&2
+  exit 1
+fi
+if ! grep -q 'highlight-bash.js' "$OUT_DIR/index.html"; then
+  echo "error: index.html should load highlight-bash.js" >&2
+  exit 1
+fi
 
 echo "Pages artifact ready: $OUT_DIR"
 ls -la "$OUT_DIR"
+ls -la "$OUT_DIR/img"
