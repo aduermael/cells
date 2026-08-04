@@ -446,9 +446,8 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
 
     // Answerer: set remote offer (starts its ICE); candidates go to offerer early
     std::atomic<bool> remote_offer_ok{false};
-    answerer->setRemoteDescription(offer_sdp, [&](bool s, const std::string& /*e*/) {
-        remote_offer_ok.store(s);
-    });
+    answerer->setRemoteDescription(
+        offer_sdp, [&](bool s, const std::string& /*e*/) { remote_offer_ok.store(s); });
     for (int i = 0; i < 50 && !remote_offer_ok.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
