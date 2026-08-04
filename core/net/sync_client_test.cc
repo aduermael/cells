@@ -154,6 +154,8 @@ TEST(SyncClientJoinTest, PeerLeftBeforeRtcAllowsOnlineAlone) {
 TEST(SyncClientJoinTest, EarlyRemoteIceBufferedWithoutPeer) {
     Workbook wb;
     SyncClientConfig config;
+    // Unreachable on purpose: we inject join/ICE via SignalingClientDelegate.
+    // Real WS may async-error ("Signaling disconnected"); that is expected.
     config.signaling_url = "ws://127.0.0.1:1/ws";
 
     SyncClient client(&wb, config);
@@ -178,7 +180,16 @@ TEST(SyncClientJoinTest, EarlyRemoteIceBufferedWithoutPeer) {
 
     EXPECT_EQ(client.getState(), SyncClientState::SYNCING);
     EXPECT_TRUE(client.getPeers().empty());
-    EXPECT_EQ(delegate.error_count.load(), 0);
+    // Early ICE with no peer must not report WebRTC join failure or peer leave.
+    // Signaling TCP errors against the dummy URL are unrelated and may race in.
+    {
+        std::lock_guard<std::mutex> lock(delegate.mu);
+        const int webrtc_join_errors = static_cast<int>(std::count_if(
+            delegate.errors.begin(), delegate.errors.end(), [](const std::string& e) {
+                return e.find("WebRTC connections failed") != std::string::npos;
+            }));
+        EXPECT_EQ(webrtc_join_errors, 0);
+    }
     EXPECT_EQ(delegate.disconnect_count.load(), 0);
 
     // Real flush of early ICE is covered by native two-PC rtc_test + two-CLI
