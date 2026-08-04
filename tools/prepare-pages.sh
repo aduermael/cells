@@ -60,6 +60,17 @@ else
   exit 1
 fi
 
+# Landing page screenshots (theme-aware scripting shots from docs/img).
+IMG_SRC="$REPO_ROOT/docs/img"
+mkdir -p "$OUT_DIR/img"
+for f in scripting.png scripting-dark.png; do
+  if [[ ! -f "$IMG_SRC/$f" ]]; then
+    echo "error: missing website image $IMG_SRC/$f" >&2
+    exit 1
+  fi
+  cp "$IMG_SRC/$f" "$OUT_DIR/img/$f"
+done
+
 # Fail closed on unresolved template tokens.
 if grep -R -n -E '\{\{[A-Z0-9_]+\}\}|__PLACEHOLDER__' "$OUT_DIR" >/dev/null; then
   echo "error: unresolved placeholders in $OUT_DIR:" >&2
@@ -85,6 +96,15 @@ if ! grep -q "$REPO_URL" "$OUT_DIR/index.html"; then
   echo "error: assembled index.html is missing REPO_URL" >&2
   exit 1
 fi
+if [[ ! -f "$OUT_DIR/img/scripting.png" || ! -f "$OUT_DIR/img/scripting-dark.png" ]]; then
+  echo "error: assembled site is missing scripting screenshots under img/" >&2
+  exit 1
+fi
+if ! grep -q 'img/scripting.png' "$OUT_DIR/index.html"; then
+  echo "error: index.html should reference img/scripting.png" >&2
+  exit 1
+fi
 
 echo "Pages artifact ready: $OUT_DIR"
 ls -la "$OUT_DIR"
+ls -la "$OUT_DIR/img"

@@ -48,11 +48,23 @@ assert_ok "title is agent-focused" grep -q 'A spreadsheet engine for agents' "$O
 assert_ok "CTA is try it right here" grep -q 'Try it right here' "$OUT/index.html"
 assert_ok "CTA is plain text not a button" \
   bash -c "! grep -E 'class=\"btn[^\"]*\"[^>]*>Try it right here' '$OUT/index.html'"
-assert_ok "Lua/Luau feature copy" grep -q 'Lua/Luau' "$OUT/index.html"
+assert_ok "Made for agents feature copy" grep -q 'Made for agents' "$OUT/index.html"
 assert_ok "headless CLI (no pipelines)" \
   bash -c "grep -q 'headless CLI' '$OUT/index.html' && ! grep -q 'pipelines' '$OUT/index.html'"
+assert_ok "Luau scripting section" grep -q 'Fully scriptable' "$OUT/index.html"
+assert_ok "Luau runtime mentioned" grep -q 'Luau' "$OUT/index.html"
 assert_ok ".zcd links to file-format docs" \
   grep -q 'docs/file-format.md' "$OUT/index.html"
+assert_ok "scripting screenshot light" grep -q 'img/scripting.png' "$OUT/index.html"
+assert_ok "scripting screenshot dark" grep -q 'img/scripting-dark.png' "$OUT/index.html"
+assert_ok "scripting.png copied" test -f "$OUT/img/scripting.png"
+assert_ok "scripting-dark.png copied" test -f "$OUT/img/scripting-dark.png"
+assert_ok "CLI setCell example" grep -q 'setCell("A1"' "$OUT/index.html"
+assert_ok "install skill command" grep -q 'install-skill.sh' "$OUT/index.html"
+assert_ok "session collab example" grep -q 'session start' "$OUT/index.html"
+assert_ok "WebRTC collab detail" grep -q 'WebRTC' "$OUT/index.html"
+assert_ok "interactive demo still first" \
+  bash -c "demo=\$(grep -n 'id=\"demo\"' '$OUT/index.html' | head -1 | cut -d: -f1); script=\$(grep -n 'scripting.png' '$OUT/index.html' | head -1 | cut -d: -f1); test \"\$demo\" -lt \"\$script\""
 assert_ok "no Open app nav" bash -c "! grep -q 'Open app' '$OUT/index.html'"
 assert_ok "Open in new page below demo" grep -q 'Open in new page' "$OUT/index.html"
 assert_ok "no dual-license footer" bash -c "! grep -qi 'dual-licensed' '$OUT/index.html'"
@@ -64,6 +76,7 @@ assert_ok "logo color uses brand token" grep -q 'color: var(--brand)' "$OUT/styl
 assert_ok "drag-drop privacy note" grep -q 'stays in your browser' "$OUT/index.html"
 assert_ok "data-theme dark tokens" grep -q 'data-theme="dark"' "$OUT/styles.css"
 assert_ok "demo uses theme-aware background" grep -q -- '--demo-bg' "$OUT/styles.css"
+assert_ok "theme-aware shot CSS" grep -q 'shot-dark' "$OUT/styles.css"
 assert_ok "no leftover {{tokens}}" \
   bash -c "! grep -E '\\{\\{[A-Z0-9_]+\\}\\}' '$OUT/index.html'"
 assert_ok "no __PLACEHOLDER__" \
