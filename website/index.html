@@ -101,11 +101,14 @@
         Grok Build (using the CLI):
       </p>
       <figure class="shot collab-demo">
+        <!-- No audio track: muted + CSS hides volume UI (native controls have no novolume flag). -->
         <video
+          class="no-audio"
           src="img/demo.mp4"
           width="1344"
           height="540"
           controls
+          controlslist="nodownload noplaybackrate"
           playsinline
           muted
           loop

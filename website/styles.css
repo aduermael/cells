@@ -301,6 +301,15 @@ main {
   object-fit: contain;
 }
 
+/* Silent demo: hide volume/mute chrome (file has no audio). */
+video.no-audio::-webkit-media-controls-mute-button,
+video.no-audio::-webkit-media-controls-toggle-closed-captions-button,
+video.no-audio::-webkit-media-controls-volume-slider,
+video.no-audio::-webkit-media-controls-volume-control-container,
+video.no-audio::-webkit-media-controls-volume-control-hover-background {
+  display: none !important;
+}
+
 /* Theme-aware scripting screenshots */
 .shot .shot-dark {
   display: none;
