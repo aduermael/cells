@@ -228,9 +228,40 @@ export function setupDataListeners(config: DataListenersConfig): {
     if (!app.dataSource) return;
     try {
       const result = await app.dataSource.getSheets();
+      // Network-driven sheet list refresh must not force a tab swap.
+      // Keep the sheet the user was viewing when it still exists (by name);
+      // only adopt the engine index when that sheet is gone (e.g. deleted).
+      const prevIndex = sheetTabsManager.getActiveSheetIndex();
+      const prevName = sheetTabsManager.getSheets()[prevIndex]?.name;
+      let activeIndex = result.activeIndex;
+      if (prevName) {
+        const byName = result.sheets.findIndex((s) => s.name === prevName);
+        if (byName >= 0) {
+          activeIndex = byName;
+        } else if (result.sheets.length > 0) {
+          activeIndex =
+            result.activeIndex < result.sheets.length
+              ? result.activeIndex
+              : result.sheets.length - 1;
+        }
+      }
+      if (
+        activeIndex !== result.activeIndex &&
+        activeIndex >= 0 &&
+        activeIndex < result.sheets.length
+      ) {
+        // Engine was moved by a remote event — restore the user's sheet.
+        await app.dataSource.setActiveSheet(activeIndex);
+      }
+      for (let i = 0; i < result.sheets.length; i++) {
+        const sheet = result.sheets[i];
+        if (sheet) {
+          sheet.active = i === activeIndex;
+        }
+      }
       sheetTabsManager.setSheets(result.sheets);
-      sheetTabsManager.setActiveSheetIndex(result.activeIndex);
-      app.activeSheetIndex = result.activeIndex;
+      sheetTabsManager.setActiveSheetIndex(activeIndex);
+      app.activeSheetIndex = activeIndex;
       sheetTabsManager.renderSheetTabs();
     } catch (e) {
       console.error("Error fetching sheets:", e);

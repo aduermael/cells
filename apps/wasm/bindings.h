@@ -428,7 +428,7 @@ public:
     const Workbook* workbook() const { return _workbook.get(); }
     Sheet* activeSheet();
     size_t activeSheetIndex() const { return _activeSheetIndex; }
-    void setActiveSheetIndex(size_t index) { _activeSheetIndex = index; }
+    void setActiveSheetIndex(size_t index);
     ViewportIndex& viewportIndex() { return _viewportIndex; }
     RefConverter& refConverter() { return _refConverter; }
     SyncManager* syncManager() { return _syncManager.get(); }
@@ -442,8 +442,14 @@ public:
     void setWorkbook(std::unique_ptr<Workbook> wb) { _workbook = std::move(wb); }
 
 private:
+    // Keep _activeSheetId in sync whenever _activeSheetIndex changes so remote
+    // ops can re-resolve by identity (never force a tab swap for network events).
+    void syncActiveSheetIdFromIndex();
+    void applyResolvedActiveSheet(size_t resolvedIndex);
+
     std::unique_ptr<Workbook> _workbook;
     size_t _activeSheetIndex;
+    ID _activeSheetId;
     ViewportIndex _viewportIndex;
     RefConverter _refConverter;
     val _listener;

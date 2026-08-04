@@ -256,6 +256,8 @@ public:
     void peerConnectionDidGatherICECandidate(RTCPeerConnection& /*pc*/,
                                              const ICECandidate& candidate) override {
         if (!candidate.isEmpty()) {
+            // ICE gathering runs on a libjuice/libdc thread — protect the vector.
+            std::lock_guard<std::mutex> lock(mu);
             candidates.push_back(candidate.candidate);
         }
     }
@@ -263,6 +265,18 @@ public:
                                              std::unique_ptr<RTCDataChannel> /*channel*/) override {
     }
 
+    size_t candidateCount() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return candidates.size();
+    }
+
+    std::vector<std::string> snapshot() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return candidates;
+    }
+
+private:
+    mutable std::mutex mu;
     std::vector<std::string> candidates;
 };
 
@@ -277,6 +291,7 @@ TEST(RTCPeerConnectionTest, LocalIceCandidatesHaveNoAPrefix) {
     auto channel = pc->createDataChannel("operations", DataChannelConfig::reliable());
     ASSERT_NE(channel, nullptr);
 
+    // createOffer may complete async via libdc onLocalDescription — wait for it.
     std::atomic<bool> offer_done{false};
     std::atomic<bool> offer_ok{false};
     pc->createOffer([&](bool success, const SessionDescription& sdp, const std::string& /*err*/) {
@@ -290,21 +305,31 @@ TEST(RTCPeerConnectionTest, LocalIceCandidatesHaveNoAPrefix) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!offer_done.load() || !offer_ok.load()) {
+        pc->setDelegate(nullptr);
+        pc->close();
         GTEST_SKIP() << "createOffer did not complete (environment)";
     }
 
     // Pump for async ICE gathering (libjuice thread). Allow more time under CI load.
-    for (int i = 0; i < 100 && delegate.candidates.empty(); ++i) {
+    for (int i = 0; i < 100 && delegate.candidateCount() == 0; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
+    // Detach delegate before inspecting results so a late ICE callback cannot
+    // race the vector (or free the stack delegate after close).
+    pc->setDelegate(nullptr);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    const auto gathered = delegate.snapshot();
+
     // On some restricted networks STUN may yield nothing; host candidates should
     // still appear. If none arrive, skip rather than fail the suite.
-    if (delegate.candidates.empty()) {
+    if (gathered.empty()) {
+        pc->close();
         GTEST_SKIP() << "No ICE candidates gathered in time (environment)";
     }
 
-    for (const auto& c : delegate.candidates) {
+    for (const auto& c : gathered) {
         EXPECT_TRUE(c.rfind("a=", 0) != 0) << "browser-incompatible candidate: " << c;
         EXPECT_TRUE(c.rfind("candidate:", 0) == 0) << "expected candidate: prefix, got: " << c;
         // Transport protocol must be lowercase for browser interop (libdc emits UDP).
@@ -322,7 +347,6 @@ TEST(RTCPeerConnectionTest, LocalIceCandidatesHaveNoAPrefix) {
         }
     }
 
-    pc->setDelegate(nullptr);
     pc->close();
 }
 
@@ -341,7 +365,7 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
     struct PairDelegate : public RTCPeerConnectionDelegate {
         RTCPeerConnection* remote = nullptr;
         std::atomic<bool> buffer_before_remote{false};
-        std::mutex early_mu;
+        mutable std::mutex early_mu;
         std::vector<ICECandidate> early;
 
         void peerConnectionStateDidChange(RTCPeerConnection& /*pc*/,
@@ -371,7 +395,7 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
             }
         }
 
-        size_t earlyCount() {
+        size_t earlyCount() const {
             std::lock_guard<std::mutex> lock(early_mu);
             return early.size();
         }
@@ -425,6 +449,10 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!offer_done.load() || offer_sdp.sdp.empty()) {
+        offerer->setDelegate(nullptr);
+        answerer->setDelegate(nullptr);
+        offerer->close();
+        answerer->close();
         GTEST_SKIP() << "createOffer did not complete (environment): " << offer_err;
     }
 
@@ -441,6 +469,10 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!remote_offer_set.load() || !remote_offer_err.empty()) {
+        offerer->setDelegate(nullptr);
+        answerer->setDelegate(nullptr);
+        offerer->close();
+        answerer->close();
         GTEST_SKIP() << "setRemoteDescription(offer) failed: " << remote_offer_err;
     }
 
@@ -461,6 +493,10 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!answer_done.load() || answer_sdp.sdp.empty()) {
+        offerer->setDelegate(nullptr);
+        answerer->setDelegate(nullptr);
+        offerer->close();
+        answerer->close();
         GTEST_SKIP() << "createAnswer did not complete (environment): " << answer_err;
     }
 
@@ -490,6 +526,10 @@ TEST(RTCPeerConnectionTest, BuffersIceCandidatesUntilRemoteDescription) {
     if (!local_open.load()) {
         // ICE may be blocked (no host candidates, firewall). Buffering logic is
         // still covered by SyncClient early-ICE unit tests; skip rather than flake CI.
+        offerer->setDelegate(nullptr);
+        answerer->setDelegate(nullptr);
+        offerer->close();
+        answerer->close();
         GTEST_SKIP() << "DataChannel did not open in time (ICE environment)";
     }
 
