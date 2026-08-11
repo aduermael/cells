@@ -54,7 +54,7 @@ cc_test(
 # Requires an Apple SDK/toolchain — not built on Linux; deferred to an Apple host.
 apple_static_library(
     name = "cells_xlsx_ios",
-    minimum_os_version = "15.0",
+    minimum_os_version = "26.5",
     platform_type = "ios",
     target_compatible_with = _APPLE_ONLY,
     deps = [":cells_xlsx"],
