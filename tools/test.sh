@@ -8,8 +8,10 @@ cd "$REPO_ROOT"
 # Include //apps/cli:sync_args_test (release arg parsing) and output_spill_test
 # (agent-friendly large stdout). Do not use //apps/cli/... yet — converter_test
 # still has pre-existing data-path failures.
+# Include //apps/ios:cells_xlsx_test (host C ABI over XLSX reader/writer).
 # foreign_cc_toolchain_args is a no-op (libdatachannel is pure Bazel).
 # shellcheck disable=SC2046
 bazel test //core/... //apps/cli:sync_args_test //apps/cli:output_spill_test \
+  //apps/ios:cells_xlsx_test \
   --test_output=errors \
   $(foreign_cc_toolchain_args)
