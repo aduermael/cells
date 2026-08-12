@@ -1,7 +1,7 @@
 # iOS / Swift-callable XLSX library
 #
-# Host-testable C ABI over core xlsx_reader/xlsx_writer, plus an Apple-gated
-# static library packaging target for native iOS apps.
+# Host-testable C ABI over core xlsx_reader/xlsx_writer, plus Apple-gated
+# static library packaging for native iOS/macOS apps.
 
 load("@rules_apple//apple:apple.bzl", "apple_static_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
@@ -18,7 +18,7 @@ config_setting(
     constraint_values = ["@platforms//os:ios"],
 )
 
-# iOS packaging is only analyzable/buildable on Apple platforms. On Linux CI,
+# Apple packaging is only analyzable/buildable on Apple platforms. On Linux CI,
 # target_compatible_with skips these targets so //... and :check still work.
 _APPLE_ONLY = select({
     ":is_macos": [],
@@ -26,7 +26,7 @@ _APPLE_ONLY = select({
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
-# Thin C ABI wrapper — same sources the iOS packaging target links.
+# Thin C ABI wrapper — same sources the Apple packaging targets link.
 cc_library(
     name = "cells_xlsx",
     srcs = ["cells_xlsx.cc"],
@@ -50,12 +50,22 @@ cc_test(
     ],
 )
 
-# Static library for linking into a native iOS (or macOS) app.
+# Static library for linking into a native iOS app.
 # Requires an Apple SDK/toolchain — not built on Linux; deferred to an Apple host.
 apple_static_library(
     name = "cells_xlsx_ios",
     minimum_os_version = "26.5",
     platform_type = "ios",
+    target_compatible_with = _APPLE_ONLY,
+    deps = [":cells_xlsx"],
+)
+
+# Static library for linking into a native macOS app.
+# Requires an Apple SDK/toolchain — not built on Linux; deferred to an Apple host.
+apple_static_library(
+    name = "cells_xlsx_macos",
+    minimum_os_version = "26.5",
+    platform_type = "macos",
     target_compatible_with = _APPLE_ONLY,
     deps = [":cells_xlsx"],
 )
