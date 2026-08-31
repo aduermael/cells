@@ -49,3 +49,31 @@ export SCRIPT_DIR="$REPO_ROOT/tools"
 foreign_cc_toolchain_args() {
   :
 }
+
+# Linux C++ links use GNU gold (see .bazelrc build:linux). Fail with install
+# instructions instead of gcc's "collect2: cannot find 'ld'".
+require_linux_linker() {
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+        Linux) ;;
+        *) return 0 ;;
+    esac
+    if command -v ld.gold >/dev/null 2>&1 || [ -x /usr/bin/ld.gold ]; then
+        return 0
+    fi
+    echo "" >&2
+    echo "Error: GNU gold linker (ld.gold) not found." >&2
+    echo "" >&2
+    echo "Linux C++ builds are pinned to GNU gold (-fuse-ld=gold) because:" >&2
+    echo "  - GNU ld.bfd does not support Bazel's -Wl,--start-lib" >&2
+    echo "  - LLVM lld is often picked from a non-sandbox PATH (e.g. Swift)," >&2
+    echo "    which then fails as: collect2: fatal error: cannot find 'ld'" >&2
+    echo "" >&2
+    echo "Install GNU gold, then retry:" >&2
+    echo "  Debian/Ubuntu:  sudo apt install binutils" >&2
+    echo "                  (if still missing: sudo apt install binutils-gold)" >&2
+    echo "  Fedora:         sudo dnf install binutils-gold" >&2
+    echo "  Arch:           sudo pacman -S binutils" >&2
+    echo "" >&2
+    exit 1
+}
+require_linux_linker
