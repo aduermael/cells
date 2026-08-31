@@ -48,8 +48,41 @@ TEST(SessionArgsTest, StartWithUrlAndIdle) {
     EXPECT_TRUE(r.ok);
 }
 
-TEST(SessionArgsTest, StartMissingUrlFailsValidation) {
+TEST(SessionArgsTest, StartWithoutUrlIsLocalSession) {
     Argv args({"cells", "session", "start"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_EQ(r.options.kind, SessionCommandKind::kStart);
+    EXPECT_TRUE(r.options.url.empty());
+    EXPECT_TRUE(r.options.input_file.empty());
+    validate_session_options(r);
+    EXPECT_TRUE(r.ok) << r.error;
+}
+
+TEST(SessionArgsTest, StartWithFileFlag) {
+    Argv args({"cells", "session", "start", "-i", "budget.xlsx"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.options.local);
+    EXPECT_EQ(r.options.input_file, "budget.xlsx");
+    validate_session_options(r);
+    EXPECT_TRUE(r.ok) << r.error;
+}
+
+TEST(SessionArgsTest, StartWithFilePositional) {
+    Argv args({"cells", "session", "start", "report.xlsx"});
+    auto r = parse_session_args(args.argc(), args.argv());
+    ASSERT_TRUE(r.is_session);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.options.local);
+    EXPECT_EQ(r.options.input_file, "report.xlsx");
+    EXPECT_TRUE(r.options.url.empty());
+}
+
+TEST(SessionArgsTest, StartRejectsUrlAndFileTogether) {
+    Argv args({"cells", "session", "start", "-i", "a.xlsx", "--url", "https://x/?room=1"});
     auto r = parse_session_args(args.argc(), args.argv());
     ASSERT_TRUE(r.is_session);
     validate_session_options(r);

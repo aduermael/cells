@@ -69,8 +69,32 @@ curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | s
 ### 4. Build from source
 
 ```bash
-bazel run :cli          # → dist/cli/cells
-bazel run :cli-release  # optimized
+bazel run :cli            # → dist/cli/cells  (full CLI, including collab)
+bazel run :cli-headless   # CLI only (no WASM/UI)
+bazel run :cli-no-collab  # production trim: no UI, no ledger, no network
+bazel run :cli-release    # optimized full CLI
+```
+
+`--config=headless` and `--config=no-collab` are the supported Bazel flags. Combine them for the production engine:
+
+```bash
+bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab
+```
+
+Local sessions (no collab URL) load a file once, run multiple scripts, then export/close:
+
+```bash
+cells session start -i data.xlsx
+cells session exec SID -e 'setCell("A1", 1)'
+cells session exec SID -e 'setCell("B1", 2)'
+cells session export SID out.xlsx
+cells session stop SID
+```
+
+Formula remaining-work (mog-derived TODO list; not part of `:check`):
+
+```bash
+bazel run :formula-todo
 ```
 
 ### Optional: run the collaboration server

@@ -38,20 +38,18 @@ public:
     // Returns ConversionResult with success/error status and warnings
     ConversionResult convert();
 
+    // Load input into a workbook (used by local sessions as well as convert).
+    std::unique_ptr<Workbook> readInput(std::string& error_out);
+
+    // Write workbook to options_.output_file.
+    bool writeOutput(const Workbook& workbook, std::string& error_out);
+
 private:
     const Options& options_;
     std::vector<ConversionWarning> warnings_;
 
-    // Read input file into a Workbook
-    // Returns nullptr on error (sets error_out)
-    std::unique_ptr<Workbook> readInput(std::string& error_out);
-
     // Create an empty workbook with one sheet
     std::unique_ptr<Workbook> createEmptyWorkbook();
-
-    // Write workbook to output file
-    // Returns false on error (sets error_out)
-    bool writeOutput(const Workbook& workbook, std::string& error_out);
 
     // Read file contents from disk
     std::string readFileContents(const std::string& path, std::string& error_out);
@@ -82,6 +80,15 @@ private:
     // Handle --all-sheets mode (export each sheet to separate CSV)
     ConversionResult convertAllSheets();
 };
+
+// Empty workbook with one Sheet1 (local sessions / create).
+std::unique_ptr<Workbook> createEmptyWorkbook();
+
+// Load a workbook from path (xlsx/csv/tsv/zcd). Empty path creates an empty workbook.
+std::unique_ptr<Workbook> loadWorkbookFromFile(const std::string& path, std::string& error_out);
+
+// Save a workbook to path. Format is taken from the extension.
+bool saveWorkbookToFile(const Workbook& workbook, const std::string& path, std::string& error_out);
 
 }  // namespace cells::cli
 

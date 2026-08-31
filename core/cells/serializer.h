@@ -33,7 +33,6 @@
 
 #include "core/cells/id.h"
 #include "core/cells/model.h"
-#include "core/cells/oplog.h"
 #include "core/cells/theme.h"
 #include "core/cells/types.h"
 
@@ -99,8 +98,10 @@ private:
     void serializeCellValue(const CellValue& value, const Cell& cell, const Sheet& sheet,
                             std::ostream& out) const;
 
+#if !defined(CELLS_NO_COLLAB)
     // Serialize operation log section
     void serializeOpLog(const OpLog& oplog, std::ostream& out) const;
+#endif
 
     // Serialize a single operation
     void serializeOperation(const Operation& op, std::ostream& out) const;

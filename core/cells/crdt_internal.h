@@ -26,6 +26,30 @@
 namespace cells {
 namespace internal {
 
+// Latest logged op for an entity. Null/empty when the ledger is compiled out.
+inline Operation latestLoggedOp(const Workbook& workbook, const ID& entityId) {
+#if defined(CELLS_NO_COLLAB)
+    (void)workbook;
+    (void)entityId;
+    return {};
+#else
+    const OpLog* oplog = workbook.getOpLog();
+    if (oplog == nullptr) {
+        return {};
+    }
+    return oplog->getLatestOperationForEntity(entityId);
+#endif
+}
+
+inline bool logHasNewerOp(const Workbook& workbook, const ID& entityId, const HLC& hlc,
+                          bool orEqual) {
+    const Operation latest = latestLoggedOp(workbook, entityId);
+    if (latest.isNull()) {
+        return false;
+    }
+    return orEqual ? (latest.hlc >= hlc) : (latest.hlc > hlc);
+}
+
 // =============================================================================
 // JSON utilities (used by all crdt_*.cc files)
 // =============================================================================

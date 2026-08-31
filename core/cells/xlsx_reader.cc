@@ -1,5 +1,6 @@
 #include "core/cells/xlsx_reader.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -1448,6 +1449,26 @@ public:
         return content;
     }
 
+    std::vector<std::string> listFiles() {
+        std::vector<std::string> names;
+        if (!opened_) {
+            return names;
+        }
+        const mz_uint n = mz_zip_reader_get_num_files(&archive_);
+        names.reserve(n);
+        for (mz_uint i = 0; i < n; ++i) {
+            mz_zip_archive_file_stat stat;
+            if (mz_zip_reader_file_stat(&archive_, i, &stat) == 0) {
+                continue;
+            }
+            if (stat.m_is_directory) {
+                continue;
+            }
+            names.emplace_back(stat.m_filename);
+        }
+        return names;
+    }
+
 private:
     mz_zip_archive archive_{};
     bool opened_{false};
@@ -1503,6 +1524,51 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
     // Helper lambda to add warnings
     auto addWarning = [&warnings](const std::string& msg) { warnings.push_back(msg); };
+
+    // Remaining-work inventory: surface currently-dropped XLSX domains so
+    // read→write cannot silently claim perfect preserve.
+    {
+        const auto names = zip.listFiles();
+        auto warnPart = [&](const char* domain, const std::string& part) {
+            addWarning(std::string("Skipping unsupported XLSX part (") + domain + "): " + part);
+        };
+        for (const auto& name : names) {
+            std::string lower = name;
+            for (char& c : lower) {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            if (lower.find("xl/charts/") != std::string::npos) {
+                warnPart("charts", name);
+            }
+            if (lower.find("xl/pivot") != std::string::npos) {
+                warnPart("pivots", name);
+            }
+            if (lower.find("xl/tables/") != std::string::npos) {
+                warnPart("tables", name);
+            }
+            if (lower.find("comment") != std::string::npos) {
+                warnPart("comments", name);
+            }
+            if (lower.find("xl/media/") != std::string::npos) {
+                warnPart("images", name);
+            }
+            if (lower.find("vba") != std::string::npos || lower.find(".bin") != std::string::npos) {
+                if (lower.find("vba") != std::string::npos) {
+                    warnPart("vba", name);
+                }
+            }
+            if (lower.find("printersettings") != std::string::npos ||
+                lower.find("printsettings") != std::string::npos) {
+                warnPart("print", name);
+            }
+            if (lower.find("externallink") != std::string::npos) {
+                warnPart("external-links", name);
+            }
+            if (lower.find("slicer") != std::string::npos) {
+                warnPart("slicers", name);
+            }
+        }
+    }
 
     // Parse workbook relationships to get sheet paths
     start = std::chrono::steady_clock::now();

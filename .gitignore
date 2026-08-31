@@ -31,3 +31,6 @@ plans/
 tmp/
 /tmp/
 debug/
+
+# External formula corpus (cloned, never vendored)
+/third_party/mog/

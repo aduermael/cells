@@ -61,8 +61,7 @@ ApplyResult applyColSet(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         return creating ? ApplyResult::SUCCESS : ApplyResult::SUPERSEDED;
     }
@@ -147,8 +146,7 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations that resurrect the column
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         if (latest.type == OpType::COL_SET) {
             return ApplyResult::RESURRECTED;
@@ -240,8 +238,7 @@ ApplyResult applyRowSet(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         return creating ? ApplyResult::SUCCESS : ApplyResult::SUPERSEDED;
     }
@@ -321,8 +318,7 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations that resurrect the row
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         if (latest.type == OpType::ROW_SET) {
             return ApplyResult::RESURRECTED;
@@ -403,8 +399,7 @@ ApplyResult applySheetSet(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc && !creating) {
         return ApplyResult::SUPERSEDED;
     }
@@ -429,8 +424,7 @@ ApplyResult applySheetDelete(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations that resurrect the sheet
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         if (latest.type == OpType::SHEET_SET) {
             return ApplyResult::RESURRECTED;
@@ -462,12 +456,15 @@ ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_TARGET;
     }
 
+#if !defined(CELLS_NO_COLLAB)
     const OpLog* oplog = workbook.getOpLog();
 
     // (1) Entity LWW for this document UUID
-    for (const auto& existing : oplog->getOperationsForEntity(op.target_id)) {
-        if (existing.type == OpType::WORKBOOK_SET && existing.hlc > op.hlc) {
-            return ApplyResult::SUPERSEDED;
+    if (oplog != nullptr) {
+        for (const auto& existing : oplog->getOperationsForEntity(op.target_id)) {
+            if (existing.type == OpType::WORKBOOK_SET && existing.hlc > op.hlc) {
+                return ApplyResult::SUPERSEDED;
+            }
         }
     }
 
@@ -475,11 +472,13 @@ ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op) {
     if (workbook.id != op.target_id) {
         HLC bestOther;
         bool foundOther = false;
-        for (const auto& existing : oplog->getAllOperations()) {
-            if (existing.type == OpType::WORKBOOK_SET && existing.target_id != op.target_id) {
-                if (!foundOther || existing.hlc > bestOther) {
-                    foundOther = true;
-                    bestOther = existing.hlc;
+        if (oplog != nullptr) {
+            for (const auto& existing : oplog->getAllOperations()) {
+                if (existing.type == OpType::WORKBOOK_SET && existing.target_id != op.target_id) {
+                    if (!foundOther || existing.hlc > bestOther) {
+                        foundOther = true;
+                        bestOther = existing.hlc;
+                    }
                 }
             }
         }
@@ -489,6 +488,7 @@ ApplyResult applyWorkbookSet(Workbook& workbook, const Operation& op) {
         }
         // !foundOther: empty shell never wrote WORKBOOK_SET — adopt freely
     }
+#endif
 
     // (3) Authoritative: adopt document UUID and properties
     workbook.id = op.target_id;
