@@ -8,6 +8,11 @@ build:macos --cxxopt=-std=c++17
 
 # Linux-specific settings
 build:linux --cxxopt=-std=c++17
+# Pin GNU gold. Bazel cc autoconfig can pick LLVM lld from a tool (e.g. Swift)
+# that is not on the sandbox PATH → collect2: cannot find 'ld'. GNU bfd does
+# not support Bazel's -Wl,--start-lib. ld.gold ships with binutils
+# (sudo apt install binutils).
+build:linux --linkopt=-fuse-ld=gold
 
 # Windows-specific settings (MSVC)
 build:windows --cxxopt=/std:c++17

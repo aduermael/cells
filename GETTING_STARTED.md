@@ -23,8 +23,8 @@ brew install bazelisk llvm
 npm install -g @bazel/bazelisk
 # or download from https://github.com/bazelbuild/bazelisk/releases
 
-# Clang
-sudo apt install clang clang-format clang-tidy
+# Clang + GNU gold (ld.gold). Linux C++ links require binutils.
+sudo apt install clang clang-format clang-tidy binutils
 ```
 
 ### Windows
