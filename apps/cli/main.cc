@@ -42,8 +42,12 @@ void print_usage(const char* program_name) {
         << "  Create:   " << program_name << " [options] <output>\n"
         << "  Info:     " << program_name << " -I <file>\n"
         << "  Script:   " << program_name << " -i <input> [--script <file> | -e '<code>'] [output]\n"
+#if !defined(CELLS_NO_COLLAB)
         << "  Sync:     " << program_name << " sync <url> | sync --server <url>\n"
-        << "  Session:  " << program_name << " session start|list|stop|exec|watch|status\n"
+        << "  Session:  " << program_name << " session start [-i file|--local|<url>] | list|stop|exec|watch|status\n"
+#else
+        << "  Session:  " << program_name << " session start [-i file|--local] | list|stop|exec|watch|status\n"
+#endif
         << "\n"
         << "Formats (auto-detected from extension; override with -f / -t):\n"
         << "  .zcd      Native format (full fidelity)\n"
@@ -93,7 +97,7 @@ void print_usage(const char* program_name) {
         << "  cells sync <url> --ops-only           Show only operations\n"
         << "\n"
         << "Session (long-running peer for agents; preferred multi-step path; pure JSON):\n"
-        << "  cells session start <url> [--wait-seconds N] [--idle-minutes N] [--name NAME]\n"
+        << "  cells session start [-i <file>|--local|<url>] [--wait-seconds N] [--idle-minutes N] [--name NAME]\n"
         << "  cells session list | status <id> | stop <id>\n"
         << "  cells session exec <id> -e '<code>' | --script <file> [--force]\n"
         << "  cells session export <id> <path.(zcd|xlsx|csv)>\n"
@@ -113,6 +117,8 @@ void print_usage(const char* program_name) {
         << "  cells -i data.xlsx output.csv --script transform.luau\n"
         << "  cells -i report.csv -e 'print(getCell(\"A1\").value)'\n"
         << "  cells -i input.xlsx output.csv -q -y\n"
+        << "  cells session start -i data.xlsx\n"
+        << "  cells session start --local\n"
         << "  cells session start 'https://cells.example.com/?room=abc123'\n"
         << "  cells session exec SID -e 'setCell(\"A1\", 42)'\n"
         << "  cells session export SID /tmp/room.xlsx\n"
@@ -123,7 +129,8 @@ void print_usage(const char* program_name) {
         << "Notes:\n"
         << "  CSV export keeps the first sheet and formula results as values; use -q to\n"
         << "  silence fidelity warnings. Exit 0 on success, 1 on error.\n"
-        << "  Agents: use session start/exec/watch for multi-command collab; sync is one-shot.\n";
+        << "  Agents: use session start/exec/export/stop for multi-command work "
+           "(local -i <file> or collab URL); sync is one-shot collab listen.\n";
 }
 
 void print_version() { std::cout << "cells " << cells::cli::cli_version() << "\n"; }

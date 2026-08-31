@@ -43,9 +43,14 @@
 #include <vector>
 
 #include "core/cells/axis_index.h"
+#include "core/cells/build_config.h"
 #include "core/cells/format_buffer.h"
 #include "core/cells/operation.h"
+#if defined(CELLS_NO_COLLAB)
+// OpLog is compiled out; Workbook::getOpLog() returns nullptr.
+#else
 #include "core/cells/oplog.h"
+#endif
 #include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
 #include "core/cells/theme.h"
@@ -1204,8 +1209,10 @@ private:
     // Workbook theme (color scheme + font scheme from Excel)
     std::unique_ptr<Theme> _theme;
 
-    // Operation log for CRDT synchronization
+    // Operation log for CRDT synchronization (absent when CELLS_NO_COLLAB)
+#if !defined(CELLS_NO_COLLAB)
     std::unique_ptr<OpLog> _oplog;
+#endif
 
     // Named range registry (workbook-owned for both workbook and sheet scopes)
     std::unique_ptr<NamedRangeRegistry> _namedRanges;

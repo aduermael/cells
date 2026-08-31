@@ -8,9 +8,13 @@
 #include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/operation.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/theme.h"
+#if !defined(CELLS_NO_COLLAB)
+#include "core/cells/oplog.h"
+#endif
 
 namespace cells {
 
@@ -157,7 +161,7 @@ bool Parser::parseLine(std::string_view line) {
         case 'V':  // Sheet view properties
             return parseSheetView(line.substr(firstNonSpace));
 
-        case 'O':  // OpLog entry
+        case 'O':  // OpLog entry (ignored when the ledger is compiled out)
             return parseOperation(line.substr(firstNonSpace));
 
         case 'P':  // Peer knowledge (frontier)
@@ -1465,12 +1469,16 @@ bool Parser::parseOperation(std::string_view line) {
     // Rest is payload (JSON)
     const std::string payload(line.substr(spacePos + 1));
 
-    // Create operation and add to OpLog
+    // Create operation and add to OpLog (no-op when the ledger is compiled out)
     const Operation op(hlc, opType, targetId, payload);
+#if !defined(CELLS_NO_COLLAB)
     OpLog* oplog = workbook_->getOpLog();
     if (oplog != nullptr) {
         oplog->addOperation(op);
     }
+#else
+    (void)op;
+#endif
 
     return true;
 }

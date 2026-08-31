@@ -32,3 +32,14 @@ build:wasm-debug --copt=-O0
 build:wasm-debug --cxxopt=-O0
 build:wasm-debug --linkopt=-O0
 build:wasm-debug --strip=never
+
+# Headless engine: CLI / converter only (do not build the WASM UI app).
+# Use: bazel run :cli-headless
+build:headless --define=CELLS_HEADLESS=1
+
+# Production trim: skip the operation ledger and connectivity stack.
+# Model does not construct an OpLog; CLI does not link CRDT sync, WebRTC, or
+# the signaling client. Local file-backed sessions still work.
+# Use: bazel run :cli-no-collab
+# Combine with headless: bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab
+build:no-collab --define=CELLS_NO_COLLAB=1

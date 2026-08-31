@@ -68,8 +68,7 @@ ApplyResult applyCellSet(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = result.sheet;
 
     // Check if there's a newer operation for this cell
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
 
     if (!latest.isNull() && latest.hlc >= op.hlc) {
         // This operation is older than or equal to existing, skip it
@@ -254,8 +253,7 @@ ApplyResult applyCellDelete(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
 
     if (!latest.isNull() && latest.hlc > op.hlc) {
         // A newer operation exists - if it's a set, it resurrects

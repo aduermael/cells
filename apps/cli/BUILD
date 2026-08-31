@@ -18,6 +18,7 @@ build_test(
     targets = [
         ":cells",
         ":cells-converter",
+        ":cells-no-collab",
     ],
 )
 
@@ -54,6 +55,45 @@ cc_library(
     srcs = ["session_protocol.cc"],
     hdrs = ["session_protocol.h"],
     deps = [":output_spill"],
+)
+
+# Shared converter (read/write xlsx/csv/zcd + scripts)
+cc_library(
+    name = "converter_lib",
+    srcs = ["converter.cc"],
+    hdrs = [
+        "converter.h",
+        "options.h",
+    ],
+    deps = [
+        ":output_spill",
+        "//core/cells:csv_reader",
+        "//core/cells:csv_writer",
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_recalc",
+        "//core/cells:formula_serializer",
+        "//core/cells:id",
+        "//core/cells:luau_sandbox",
+        "//core/cells:model",
+        "//core/cells:parser",
+        "//core/cells:ref_converter",
+        "//core/cells:serializer",
+        "//core/cells:xlsx_reader",
+        "//core/cells:xlsx_writer",
+    ],
+)
+
+# Local file-backed session workbook (load / exec / export; no collab)
+cc_library(
+    name = "session_workbook",
+    srcs = ["session_workbook.cc"],
+    hdrs = ["session_workbook.h"],
+    deps = [
+        ":converter_lib",
+        "//core/cells:luau_sandbox",
+        "//core/cells:model",
+    ],
 )
 
 # Session on-disk registry
@@ -108,10 +148,7 @@ cc_test(
 cc_binary(
     name = "cells",
     srcs = [
-        "converter.cc",
-        "converter.h",
         "main.cc",
-        "options.h",
         "session_command.cc",
         "session_command.h",
         "sync_command.cc",
@@ -130,84 +167,104 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
+        ":converter_lib",
         ":output_spill",
         ":session_args",
         ":session_protocol",
         ":session_store",
+        ":session_workbook",
         ":sync_args",
-        "//core/cells:csv_reader",
+        "//core/cells:crdt",
         "//core/cells:csv_writer",
-        "//core/cells:formula_eval",
-        "//core/cells:formula_recalc",
         "//core/cells:id",
         "//core/cells:luau_sandbox",
         "//core/cells:model",
-        "//core/cells:parser",
         "//core/cells:serializer",
         "//core/cells:sync_manager",
-        "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
         "//core/net:sync_client",
         "//core/net:url",
     ],
 )
 
-# Converter-only CLI binary (no sync/network support)
-# Useful for lightweight deployments that only need file conversion
+# Production-trimmed CLI: local sessions, no operation ledger (with --config=no-collab),
+# no connectivity. Sync is stubbed. Used by bazel run :cli-no-collab.
 cc_binary(
-    name = "cells-converter",
+    name = "cells-no-collab",
     srcs = [
-        "converter.cc",
-        "converter.h",
         "main.cc",
-        "options.h",
+        "session_command.cc",
         "session_command.h",
-        "session_command_stub.cc",
         "sync_command.h",
         "sync_command_stub.cc",
     ],
+    defines = ["CELLS_NO_COLLAB"],
+    linkopts = select({
+        ":is_windows": [
+            "ws2_32.lib",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
+        ":converter_lib",
         ":output_spill",
         ":session_args",
         ":session_protocol",
         ":session_store",
+        ":session_workbook",
         ":sync_args",
-        "//core/cells:csv_reader",
+        "//core/cells:crdt",
         "//core/cells:csv_writer",
-        "//core/cells:formula_eval",
-        "//core/cells:formula_recalc",
         "//core/cells:id",
         "//core/cells:luau_sandbox",
         "//core/cells:model",
-        "//core/cells:parser",
         "//core/cells:serializer",
-        "//core/cells:xlsx_reader",
+        "//core/cells:xlsx_writer",
+    ],
+)
+
+# Alias kept for existing CI / Alpine converter-only jobs.
+# Same trimmed binary as cells-no-collab (local sessions, no network).
+cc_binary(
+    name = "cells-converter",
+    srcs = [
+        "main.cc",
+        "session_command.cc",
+        "session_command.h",
+        "sync_command.h",
+        "sync_command_stub.cc",
+    ],
+    defines = ["CELLS_NO_COLLAB"],
+    linkopts = select({
+        ":is_windows": [
+            "ws2_32.lib",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":converter_lib",
+        ":output_spill",
+        ":session_args",
+        ":session_protocol",
+        ":session_store",
+        ":session_workbook",
+        ":sync_args",
+        "//core/cells:crdt",
+        "//core/cells:csv_writer",
+        "//core/cells:id",
+        "//core/cells:luau_sandbox",
+        "//core/cells:model",
+        "//core/cells:serializer",
         "//core/cells:xlsx_writer",
     ],
 )
 
 cc_test(
     name = "converter_test",
-    srcs = [
-        "converter.cc",
-        "converter.h",
-        "converter_test.cc",
-        "options.h",
-    ],
+    srcs = ["converter_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
-        ":output_spill",
-        "//core/cells:csv_reader",
-        "//core/cells:csv_writer",
-        "//core/cells:formula_eval",
-        "//core/cells:formula_recalc",
-        "//core/cells:luau_sandbox",
-        "//core/cells:model",
-        "//core/cells:parser",
-        "//core/cells:ref_converter",
-        "//core/cells:serializer",
-        "//core/cells:xlsx_reader",
-        "//core/cells:xlsx_writer",
+        ":converter_lib",
         "@googletest//:gtest_main",
     ],
 )
@@ -217,6 +274,16 @@ cc_test(
     srcs = ["sync_args_test.cc"],
     deps = [
         ":sync_args",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "session_workbook_test",
+    srcs = ["session_workbook_test.cc"],
+    deps = [
+        ":session_workbook",
+        "//core/cells:xlsx_reader",
         "@googletest//:gtest_main",
     ],
 )
