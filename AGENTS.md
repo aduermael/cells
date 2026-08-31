@@ -74,6 +74,7 @@ testdata/                   # Sample .zcd files for testing
 | Task | Command | Output |
 |------|---------|--------|
 | Build CLI (dev) | `bazel run :cli` | `dist/cli/cells` |
+| Build CLI (headless, no-collab) | `bazel run :cli-headless-no-collab` | `dist/cli/cells` |
 | Build CLI (release) | `bazel run :cli-release` | `dist/cli/cells` |
 | Build WASM (dev) | `bazel run :wasm` | `dist/wasm/` |
 | Build WASM (debug) | `bazel run :wasm-debug` | `dist/wasm/` (with DWARF) |
