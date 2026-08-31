@@ -82,7 +82,7 @@ Output: `dist/wasm/`
 
 ```bash
 bazel run :test
-bazel run :formula-todo   # mog-derived formula TODO list (opt-in; remaining cases fail)
+bazel run :formula-todo   # mog-derived formula report (PASS/TODO per case + summary)
 ```
 
 ### E2E Tests

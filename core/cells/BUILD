@@ -1106,10 +1106,11 @@ cc_library(
     ],
 )
 
-cc_test(
-    name = "formula_todo_test",
-    srcs = ["formula_todo_test.cc"],
-    data = ["//testdata/formulas:mog_formula_cases"],
+cc_library(
+    name = "formula_todo_lib",
+    srcs = ["formula_todo.cc"],
+    hdrs = ["formula_todo.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":formula_eval",
         ":formula_parser",
@@ -1117,6 +1118,16 @@ cc_test(
         ":formula_resolver",
         ":id",
         ":model",
+    ],
+)
+
+cc_test(
+    name = "formula_todo_test",
+    srcs = ["formula_todo_test.cc"],
+    data = ["//testdata/formulas:mog_formula_cases"],
+    deps = [
+        ":formula_eval",
+        ":formula_todo_lib",
         "@googletest//:gtest_main",
     ],
 )
@@ -1129,13 +1140,17 @@ cc_test(
     tags = ["manual"],
     deps = [
         ":formula_eval",
-        ":formula_parser",
-        ":formula_recalc",
-        ":formula_resolver",
-        ":id",
-        ":model",
+        ":formula_todo_lib",
         "@googletest//:gtest_main",
     ],
+)
+
+cc_binary(
+    name = "formula_todo_report",
+    srcs = ["formula_todo_report.cc"],
+    data = ["//testdata/formulas:mog_formula_cases"],
+    visibility = ["//visibility:public"],
+    deps = [":formula_todo_lib"],
 )
 
 cc_test(
