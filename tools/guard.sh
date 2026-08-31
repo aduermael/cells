@@ -33,6 +33,7 @@ if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     echo "  bazel run :cli-release  # Build CLI (release)" >&2
     echo "  bazel run :cli-headless # Build CLI only (no WASM/UI)" >&2
     echo "  bazel run :cli-no-collab # Headless, no ledger/connectivity" >&2
+    echo "  bazel run :cli-headless-no-collab # Same as :cli-no-collab" >&2
     echo "  bazel run :formula-todo # Mog-derived formula TODO suite" >&2
     echo "" >&2
     exit 1

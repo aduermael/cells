@@ -69,17 +69,14 @@ curl -fsSL https://raw.githubusercontent.com/aduermael/cells/main/install.sh | s
 ### 4. Build from source
 
 ```bash
-bazel run :cli            # → dist/cli/cells  (full CLI, including collab)
-bazel run :cli-headless   # CLI only (no WASM/UI)
-bazel run :cli-no-collab  # production trim: no UI, no ledger, no network
-bazel run :cli-release    # optimized full CLI
+bazel run :cli                        # → dist/cli/cells  (full CLI, including collab)
+bazel run :cli-headless               # CLI only (no WASM/UI)
+bazel run :cli-headless-no-collab     # both: no UI, no ledger, no network
+bazel run :cli-no-collab              # same as :cli-headless-no-collab
+bazel run :cli-release                # optimized full CLI
 ```
 
-`--config=headless` and `--config=no-collab` are the supported Bazel flags. Combine them for the production engine:
-
-```bash
-bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab
-```
+`--config=headless` and `--config=no-collab` are the supported Bazel flags. The easy combined command is `bazel run :cli-headless-no-collab` (same as `bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab`).
 
 Local sessions (no collab URL) load a file once, run multiple scripts, then export/close:
 

@@ -9,7 +9,7 @@ set -euo pipefail
 source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT"
 
-echo "Building no-collab CLI (headless, no ledger, no network)..."
+echo "Building headless no-collab CLI (no WASM/UI, no ledger, no network)..."
 # shellcheck disable=SC2046
 bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab \
   $(foreign_cc_toolchain_args)
@@ -17,4 +17,4 @@ bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab \
 mkdir -p dist/cli
 cp -f bazel-bin/apps/cli/cells-no-collab dist/cli/cells
 
-echo "Built: dist/cli/cells (no-collab)"
+echo "Built: dist/cli/cells (headless, no-collab)"

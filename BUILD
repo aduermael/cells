@@ -52,6 +52,13 @@ sh_binary(
     data = ["tools/guard.sh"],
 )
 
+# Same as :cli-no-collab — explicit name for combining both flags.
+sh_binary(
+    name = "cli-headless-no-collab",
+    srcs = ["tools/cli-no-collab.sh"],
+    data = ["tools/guard.sh"],
+)
+
 # Opt-in formula TODO list (mog-derived). Failing remaining cases; not in :check.
 sh_binary(
     name = "formula-todo",

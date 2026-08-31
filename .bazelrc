@@ -41,5 +41,6 @@ build:headless --define=CELLS_HEADLESS=1
 # Model does not construct an OpLog; CLI does not link CRDT sync, WebRTC, or
 # the signaling client. Local file-backed sessions still work.
 # Use: bazel run :cli-no-collab
-# Combine with headless: bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab
+# Combine both: bazel run :cli-headless-no-collab
+# (same as: bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab)
 build:no-collab --define=CELLS_NO_COLLAB=1
