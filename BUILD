@@ -59,11 +59,15 @@ sh_binary(
     data = ["tools/guard.sh"],
 )
 
-# Opt-in formula TODO list (mog-derived). Failing remaining cases; not in :check.
+# Opt-in formula TODO report (mog-derived). Not part of :check.
 sh_binary(
     name = "formula-todo",
     srcs = ["tools/formula-todo.sh"],
-    data = ["tools/guard.sh"],
+    data = [
+        "tools/guard.sh",
+        "//core/cells:formula_todo_report",
+        "//testdata/formulas:mog_formula_cases",
+    ],
 )
 
 # WASM build scripts

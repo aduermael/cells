@@ -88,7 +88,7 @@ cells session export SID out.xlsx
 cells session stop SID
 ```
 
-Formula remaining-work (mog-derived TODO list; not part of `:check`):
+Formula remaining-work (mog-derived report; not part of `:check`):
 
 ```bash
 bazel run :formula-todo
