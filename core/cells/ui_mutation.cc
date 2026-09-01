@@ -241,4 +241,34 @@ ApplyResult uiApplyOperation(LuauSandbox& sandbox, Workbook& workbook, Sheet& sh
     return sandbox.lastUiApplyResult();
 }
 
+ScriptResult uiFreezePanes(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet, int freezeCol,
+                           int freezeRow) {
+    if (freezeCol < 0) {
+        freezeCol = 0;
+    }
+    if (freezeRow < 0) {
+        freezeRow = 0;
+    }
+    return executeUiMutation(
+        sandbox, workbook, sheet,
+        "freezePanes(" + std::to_string(freezeCol) + ", " + std::to_string(freezeRow) + ")");
+}
+
+ScriptResult uiSetDocumentTitle(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
+                                const std::string& title) {
+    return executeUiMutation(sandbox, workbook, sheet, "setDocumentTitle(" + luaQuote(title) + ")");
+}
+
+ScriptResult uiMoveSheet(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet, int fromIndex,
+                         int toIndex) {
+    return executeUiMutation(
+        sandbox, workbook, sheet,
+        "moveSheet(" + std::to_string(fromIndex) + ", " + std::to_string(toIndex) + ")");
+}
+
+ScriptResult uiSetTheme(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
+                        const std::string& themeJson) {
+    return executeUiMutation(sandbox, workbook, sheet, "setTheme(" + luaQuote(themeJson) + ")");
+}
+
 }  // namespace cells

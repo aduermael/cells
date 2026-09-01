@@ -324,11 +324,13 @@ void CellsEngine::setActiveSheet(int index) {
 
 void CellsEngine::setFreezePanes(int freezeCol, int freezeRow) {
     Sheet* sheet = activeSheet();
-    if (!sheet)
+    if (!_workbook || sheet == nullptr) {
         return;
-
-    sheet->freezeCol = static_cast<uint16_t>(std::max(0, freezeCol));
-    sheet->freezeRow = static_cast<uint16_t>(std::max(0, freezeRow));
+    }
+    const ScriptResult sr = uiFreezePanes(_luauSandbox, *_workbook, *sheet, freezeCol, freezeRow);
+    if (!sr.success) {
+        return;
+    }
     notifyListeners(ChangeType::SHEET_CHANGED);
 }
 
@@ -463,11 +465,20 @@ std::string CellsEngine::moveSheet(int fromIndex, int toIndex) {
         return "{\"success\":true}";
     }
 
-    auto sheet = std::move(_workbook->sheets[fromIndex]);
-    _workbook->sheets.erase(_workbook->sheets.begin() + fromIndex);
+    Sheet* ctxSheet = activeSheet();
+    if (ctxSheet == nullptr) {
+        ctxSheet = _workbook->getSheetByIndex(0);
+    }
+    if (ctxSheet == nullptr) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+    const ScriptResult sr = uiMoveSheet(_luauSandbox, *_workbook, *ctxSheet, fromIndex, toIndex);
+    if (!sr.success) {
+        return "{\"error\":\"" + jsonEscape(sr.error.empty() ? "Luau execution failed" : sr.error) +
+               "\"}";
+    }
 
     int insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
-    _workbook->sheets.insert(_workbook->sheets.begin() + insertAt, std::move(sheet));
 
     if (static_cast<size_t>(fromIndex) == _activeSheetIndex) {
         setActiveSheetIndex(static_cast<size_t>(insertAt));
@@ -1563,17 +1574,14 @@ std::string CellsEngine::getWorkbookName() {
 }
 
 void CellsEngine::setWorkbookName(const std::string& name) {
-    if (!_workbook) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return;
     }
-
-    _workbook->name = name;
-
-    std::ostringstream payload;
-    payload << "{\"name\":\"" << jsonEscape(name) << "\"}";
-    Operation op = makeWorkbookSetOp(*_workbook, payload.str());
-    applyLocalUiOp(op);
-
+    const ScriptResult sr = uiSetDocumentTitle(_luauSandbox, *_workbook, *sheet, name);
+    if (!sr.success) {
+        return;
+    }
     broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 }
@@ -1629,63 +1637,16 @@ std::string CellsEngine::getBuiltinThemes() {
 }
 
 std::string CellsEngine::setTheme(const std::string& themeJson) {
-    if (!_workbook) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"success\":false,\"error\":\"No workbook\"}";
     }
-
-    // Parse the theme JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont,
-    // minorFont } } Simple JSON parsing — extract fields manually
-    auto extractString = [](const std::string& json, const std::string& key) -> std::string {
-        std::string needle = "\"" + key + "\":\"";
-        auto pos = json.find(needle);
-        if (pos == std::string::npos) {
-            return {};
-        }
-        pos += needle.length();
-        auto end = json.find('"', pos);
-        if (end == std::string::npos) {
-            return {};
-        }
-        return json.substr(pos, end - pos);
-    };
-
-    auto theme = std::make_unique<Theme>();
-    theme->name = extractString(themeJson, "name");
-
-    // Extract colors array
-    auto colorsStart = themeJson.find("\"colors\":[");
-    if (colorsStart != std::string::npos) {
-        colorsStart += 10;  // skip past "colors":[
-        auto colorsEnd = themeJson.find(']', colorsStart);
-        if (colorsEnd != std::string::npos) {
-            std::string colorsStr = themeJson.substr(colorsStart, colorsEnd - colorsStart);
-            int colorIndex = 0;
-            size_t searchPos = 0;
-            while (colorIndex < 12 && searchPos < colorsStr.length()) {
-                auto qStart = colorsStr.find('"', searchPos);
-                if (qStart == std::string::npos) {
-                    break;
-                }
-                auto qEnd = colorsStr.find('"', qStart + 1);
-                if (qEnd == std::string::npos) {
-                    break;
-                }
-                theme->colorScheme.setColor(colorIndex,
-                                            colorsStr.substr(qStart + 1, qEnd - qStart - 1));
-                colorIndex++;
-                searchPos = qEnd + 1;
-            }
-        }
+    const ScriptResult sr = uiSetTheme(_luauSandbox, *_workbook, *sheet, themeJson);
+    if (!sr.success) {
+        return "{\"success\":false,\"error\":\"" +
+               jsonEscape(sr.error.empty() ? "Luau execution failed" : sr.error) + "\"}";
     }
-
-    theme->fontScheme.majorFont = extractString(themeJson, "majorFont");
-    theme->fontScheme.minorFont = extractString(themeJson, "minorFont");
-
-    _workbook->setTheme(std::move(theme));
-
-    // Notify that cells need re-rendering (theme colors resolve differently now)
     notifyListeners(ChangeType::CELL_CHANGED);
-
     return "{\"success\":true}";
 }
 

@@ -63,6 +63,16 @@ struct UiCellWriteResult {
 [[nodiscard]] ApplyResult uiApplyOperation(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
                                            const Operation& op);
 
+// View / workbook-level UI writes (always Luau execute).
+[[nodiscard]] ScriptResult uiFreezePanes(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
+                                         int freezeCol, int freezeRow);
+[[nodiscard]] ScriptResult uiSetDocumentTitle(LuauSandbox& sandbox, Workbook& workbook,
+                                              Sheet& sheet, const std::string& title);
+[[nodiscard]] ScriptResult uiMoveSheet(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
+                                       int fromIndex, int toIndex);
+[[nodiscard]] ScriptResult uiSetTheme(LuauSandbox& sandbox, Workbook& workbook, Sheet& sheet,
+                                      const std::string& themeJson);
+
 }  // namespace cells
 
 #endif  // CELLS_UI_MUTATION_H_

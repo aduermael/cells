@@ -68,6 +68,7 @@ local s4 = getSheet({ index = 2 })
 
 selectSheet("Sheet1")   -- name, index, or Sheet object
 local news = addSheet("Summary")  -- optional name
+moveSheet(0, 2)         -- 0-based fromIndex, insert-before toIndex
 ```
 
 Sheet object: `name` (string).
@@ -127,6 +128,9 @@ Colors: `COLOR_RED`, `COLOR_GREEN`, `COLOR_BLUE`, `COLOR_YELLOW`, `COLOR_MAGENTA
 ```luau
 freezePanes(1, 1)  -- freeze first column and first row (0 = none)
 local fp = getFreezePanes()  -- { col = n, row = n }
+
+-- Theme JSON (same shape as the UI theme picker)
+setTheme('{"name":"Office","colorScheme":{"colors":["#FFFFFF"]},"fontScheme":{"majorFont":"Calibri Light","minorFont":"Calibri"}}')
 ```
 
 ## Output
