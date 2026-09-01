@@ -35,37 +35,6 @@ bool hasWildcardChars(const std::string& s) {
     return false;
 }
 
-bool wildcardMatch(const std::string& text, const std::string& pattern, size_t ti, size_t pi) {
-    if (pi == pattern.size()) {
-        return ti == text.size();
-    }
-    if (pattern[pi] == '~' && pi + 1 < pattern.size()) {
-        if (ti >= text.size() || text[ti] != pattern[pi + 1]) {
-            return false;
-        }
-        return wildcardMatch(text, pattern, ti + 1, pi + 2);
-    }
-    if (pattern[pi] == '*') {
-        if (wildcardMatch(text, pattern, ti, pi + 1)) {
-            return true;
-        }
-        if (ti < text.size() && wildcardMatch(text, pattern, ti + 1, pi)) {
-            return true;
-        }
-        return false;
-    }
-    if (pattern[pi] == '?') {
-        if (ti >= text.size()) {
-            return false;
-        }
-        return wildcardMatch(text, pattern, ti + 1, pi + 1);
-    }
-    if (ti >= text.size() || text[ti] != pattern[pi]) {
-        return false;
-    }
-    return wildcardMatch(text, pattern, ti + 1, pi + 1);
-}
-
 enum class Cmp : std::uint8_t { EQ, NE, GT, GTE, LT, LTE };
 
 struct Criteria {
@@ -185,7 +154,7 @@ bool equalValues(const EvalResult& cell, const Criteria& c) {
         if (!cell.isString()) {
             return false;
         }
-        return wildcardMatch(toLowerAscii(cell.getString()), c.textLower, 0, 0);
+        return excelWildcardMatch(cell.getString(), c.rhs.getString());
     }
     if (cell.isNumber()) {
         double n = 0.0;

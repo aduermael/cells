@@ -149,6 +149,11 @@ std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectAs2D(const Ev
 std::pair<std::vector<std::vector<EvalResult>>, EvalResult> evaluateAs2D(const ASTNode* arg,
                                                                          EvalContext& ctx);
 
+// Excel wildcard match used by COUNTIF/SUMIF and XLOOKUP/XMATCH match_mode 2.
+// `*` any sequence, `?` one character, `~` escapes the next character.
+// Comparison is case-insensitive.
+bool excelWildcardMatch(const std::string& text, const std::string& pattern);
+
 // Initialize all built-in functions (called automatically by FunctionRegistry)
 void initializeBuiltinFunctions(FunctionRegistry& registry);
 

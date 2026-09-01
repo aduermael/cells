@@ -270,6 +270,52 @@ EvalResult evaluateAsBoolean(const ASTNode* arg, EvalContext& ctx) {
 
 namespace {
 
+std::string asciiLowerCopy(std::string s) {
+    for (char& c : s) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return s;
+}
+
+bool wildcardMatchAt(const std::string& text, const std::string& pattern, size_t ti, size_t pi) {
+    if (pi == pattern.size()) {
+        return ti == text.size();
+    }
+    if (pattern[pi] == '~' && pi + 1 < pattern.size()) {
+        if (ti >= text.size() || text[ti] != pattern[pi + 1]) {
+            return false;
+        }
+        return wildcardMatchAt(text, pattern, ti + 1, pi + 2);
+    }
+    if (pattern[pi] == '*') {
+        if (wildcardMatchAt(text, pattern, ti, pi + 1)) {
+            return true;
+        }
+        if (ti < text.size() && wildcardMatchAt(text, pattern, ti + 1, pi)) {
+            return true;
+        }
+        return false;
+    }
+    if (pattern[pi] == '?') {
+        if (ti >= text.size()) {
+            return false;
+        }
+        return wildcardMatchAt(text, pattern, ti + 1, pi + 1);
+    }
+    if (ti >= text.size() || text[ti] != pattern[pi]) {
+        return false;
+    }
+    return wildcardMatchAt(text, pattern, ti + 1, pi + 1);
+}
+
+}  // namespace
+
+bool excelWildcardMatch(const std::string& text, const std::string& pattern) {
+    return wildcardMatchAt(asciiLowerCopy(text), asciiLowerCopy(pattern), 0, 0);
+}
+
+namespace {
+
 EvalResult cellValueToGridCell(const Cell* cell) {
     if (!cell) {
         return EvalResult::Empty();

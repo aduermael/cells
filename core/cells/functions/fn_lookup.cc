@@ -1044,45 +1044,33 @@ EvalResult vectorAt(const std::vector<std::vector<EvalResult>>& g, bool horizont
     return horizontal ? gridCell(g, 0, i) : gridCell(g, i, 0);
 }
 
-int findMatch(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
-              bool horizontal, size_t n, int matchMode, int searchMode) {
-    const bool reverse = searchMode < 0;
-    int best = -1;
-    if (reverse) {
-        for (int i = static_cast<int>(n) - 1; i >= 0; --i) {
-            const EvalResult cell = vectorAt(arr, horizontal, static_cast<size_t>(i));
-            if (cell.isError()) {
-                continue;
-            }
-            if (matchMode == 0) {
-                if (valuesMatch(lookup, cell)) {
-                    return i;
-                }
-                continue;
-            }
-            const int cmp = compareValues(lookup, cell);
-            if (matchMode == -1 && cmp >= 0) {
-                if (best < 0 ||
-                    compareValues(vectorAt(arr, horizontal, static_cast<size_t>(best)), cell) < 0) {
-                    best = i;
-                }
-            } else if (matchMode == 1 && cmp <= 0) {
-                if (best < 0 ||
-                    compareValues(cell, vectorAt(arr, horizontal, static_cast<size_t>(best))) < 0) {
-                    best = i;
-                }
-            }
-        }
-        return best;
+bool lookupEquals(const EvalResult& lookup, const EvalResult& cell, int matchMode) {
+    if (cell.isError()) {
+        return false;
     }
-    for (size_t i = 0; i < n; ++i) {
-        const EvalResult cell = vectorAt(arr, horizontal, i);
+    if (matchMode == 2) {
+        if (lookup.isString() && cell.isString()) {
+            return excelWildcardMatch(cell.getString(), lookup.getString());
+        }
+        return valuesMatch(lookup, cell);
+    }
+    return valuesMatch(lookup, cell);
+}
+
+int linearFind(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
+               bool horizontal, size_t n, int matchMode, bool reverse) {
+    int best = -1;
+    const int start = reverse ? static_cast<int>(n) - 1 : 0;
+    const int end = reverse ? -1 : static_cast<int>(n);
+    const int step = reverse ? -1 : 1;
+    for (int i = start; i != end; i += step) {
+        const EvalResult cell = vectorAt(arr, horizontal, static_cast<size_t>(i));
         if (cell.isError()) {
             continue;
         }
-        if (matchMode == 0) {
-            if (valuesMatch(lookup, cell)) {
-                return static_cast<int>(i);
+        if (matchMode == 0 || matchMode == 2) {
+            if (lookupEquals(lookup, cell, matchMode)) {
+                return i;
             }
             continue;
         }
@@ -1090,16 +1078,97 @@ int findMatch(const EvalResult& lookup, const std::vector<std::vector<EvalResult
         if (matchMode == -1 && cmp >= 0) {
             if (best < 0 ||
                 compareValues(vectorAt(arr, horizontal, static_cast<size_t>(best)), cell) < 0) {
-                best = static_cast<int>(i);
+                best = i;
             }
         } else if (matchMode == 1 && cmp <= 0) {
             if (best < 0 ||
                 compareValues(cell, vectorAt(arr, horizontal, static_cast<size_t>(best))) < 0) {
-                best = static_cast<int>(i);
+                best = i;
             }
         }
     }
     return best;
+}
+
+int binaryFind(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
+               bool horizontal, size_t n, int matchMode, bool descending) {
+    if (n == 0) {
+        return -1;
+    }
+    int lo = 0;
+    int hi = static_cast<int>(n) - 1;
+    if (matchMode == 0) {
+        while (lo <= hi) {
+            const int mid = lo + (hi - lo) / 2;
+            const EvalResult cell = vectorAt(arr, horizontal, static_cast<size_t>(mid));
+            if (cell.isError()) {
+                lo = mid + 1;
+                continue;
+            }
+            const int cmp = compareValues(lookup, cell);
+            if (cmp == 0) {
+                return mid;
+            }
+            if (descending) {
+                if (cmp > 0) {
+                    hi = mid - 1;
+                } else {
+                    lo = mid + 1;
+                }
+            } else if (cmp > 0) {
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return -1;
+    }
+
+    int best = -1;
+    while (lo <= hi) {
+        const int mid = lo + (hi - lo) / 2;
+        const EvalResult cell = vectorAt(arr, horizontal, static_cast<size_t>(mid));
+        if (cell.isError()) {
+            lo = mid + 1;
+            continue;
+        }
+        const int cmp = compareValues(lookup, cell);
+        if (matchMode == -1) {
+            if (cmp >= 0) {
+                best = mid;
+                if (descending) {
+                    hi = mid - 1;
+                } else {
+                    lo = mid + 1;
+                }
+            } else if (descending) {
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        } else if (cmp <= 0) {
+            best = mid;
+            if (descending) {
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        } else if (descending) {
+            hi = mid - 1;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return best;
+}
+
+int findMatch(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
+              bool horizontal, size_t n, int matchMode, int searchMode) {
+    // Wildcards cannot be binary-searched; ±2 only chooses scan direction.
+    if (matchMode == 2 || searchMode == 1 || searchMode == -1) {
+        return linearFind(lookup, arr, horizontal, n, matchMode, searchMode < 0);
+    }
+    return binaryFind(lookup, arr, horizontal, n, matchMode, searchMode == -2);
 }
 
 EvalResult returnFromArray(const std::vector<std::vector<EvalResult>>& ret, bool lookupHorizontal,
@@ -1181,18 +1250,11 @@ EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         }
         searchMode = static_cast<int>(s.getNumber());
     }
-    if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
-        // match_mode 2 (wildcard) is not implemented.
+    if (matchMode != 0 && matchMode != -1 && matchMode != 1 && matchMode != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
     if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
         return EvalResult::Error(CellError::VALUE);
-    }
-    // search_mode ±2 is Excel binary search; we only have a linear scan.
-    if (searchMode == 2) {
-        searchMode = 1;
-    } else if (searchMode == -2) {
-        searchMode = -1;
     }
 
     bool lookupHoriz = false;
@@ -1245,18 +1307,11 @@ EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         }
         searchMode = static_cast<int>(s.getNumber());
     }
-    if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
-        // match_mode 2 (wildcard) is not implemented.
+    if (matchMode != 0 && matchMode != -1 && matchMode != 1 && matchMode != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
     if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
         return EvalResult::Error(CellError::VALUE);
-    }
-    // search_mode ±2 is Excel binary search; we only have a linear scan.
-    if (searchMode == 2) {
-        searchMode = 1;
-    } else if (searchMode == -2) {
-        searchMode = -1;
     }
     bool horiz = false;
     size_t n = 0;

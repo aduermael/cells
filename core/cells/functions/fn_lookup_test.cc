@@ -783,14 +783,7 @@ TEST_F(FnLookupTest, XmatchAndLookup) {
     EXPECT_EQ(eval("=LOOKUP(5,A1:A3,B1:B3)").getError(), CellError::NA);
 }
 
-// XLOOKUP / XMATCH vs Excel — implemented:
-//   match_mode  0 exact, -1 next smaller, 1 next larger
-//   search_mode 1 first-to-last, -1 last-to-first (linear)
-// Not implemented:
-//   match_mode  2 wildcard (* and ?) — currently #VALUE!
-//   search_mode 2 / -2 binary search — currently remapped to linear 1 / -1
-// Extend these tests when those modes are added; do not delete them.
-TEST_F(FnLookupTest, XlookupXmatchIncompleteVersusExcel) {
+TEST_F(FnLookupTest, XlookupXmatchWildcardMatchMode) {
     setCellValue(0, 0, "apple");
     setCellValue(0, 1, "banana");
     setCellValue(0, 2, "apricot");
@@ -798,38 +791,83 @@ TEST_F(FnLookupTest, XlookupXmatchIncompleteVersusExcel) {
     setCellValue(1, 1, 2.0);
     setCellValue(1, 2, 3.0);
 
-    EXPECT_EQ(eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2)").getError(), CellError::VALUE)
-        << "XLOOKUP match_mode 2 (wildcard) is not implemented";
-    EXPECT_EQ(eval("=XMATCH(\"a*\",A1:A3,2)").getError(), CellError::VALUE)
-        << "XMATCH match_mode 2 (wildcard) is not implemented";
+    EvalResult star = eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2)");
+    ASSERT_TRUE(star.isNumber());
+    EXPECT_DOUBLE_EQ(star.getNumber(), 1.0);
+    EvalResult xm = eval("=XMATCH(\"a*\",A1:A3,2)");
+    ASSERT_TRUE(xm.isNumber());
+    EXPECT_DOUBLE_EQ(xm.getNumber(), 1.0);
 
-    // Binary search_mode is accepted but is a linear scan, not Excel binary search.
-    EvalResult bin = eval("=XLOOKUP(\"banana\",A1:A3,B1:B3,\"none\",0,2)");
-    ASSERT_TRUE(bin.isNumber()) << "search_mode 2 currently remaps to linear first-to-last";
-    EXPECT_DOUBLE_EQ(bin.getNumber(), 2.0);
-    EvalResult binRev = eval("=XLOOKUP(\"banana\",A1:A3,B1:B3,\"none\",0,-2)");
-    ASSERT_TRUE(binRev.isNumber()) << "search_mode -2 currently remaps to linear last-to-first";
-    EXPECT_DOUBLE_EQ(binRev.getNumber(), 2.0);
-    EvalResult xmBin = eval("=XMATCH(\"banana\",A1:A3,0,2)");
-    ASSERT_TRUE(xmBin.isNumber()) << "XMATCH search_mode 2 currently remaps to linear";
-    EXPECT_DOUBLE_EQ(xmBin.getNumber(), 2.0);
+    EvalResult last = eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2,-1)");
+    ASSERT_TRUE(last.isNumber());
+    EXPECT_DOUBLE_EQ(last.getNumber(), 3.0);
+    EvalResult xmLast = eval("=XMATCH(\"a*\",A1:A3,2,-1)");
+    ASSERT_TRUE(xmLast.isNumber());
+    EXPECT_DOUBLE_EQ(xmLast.getNumber(), 3.0);
+
+    EvalResult q = eval("=XLOOKUP(\"a??le\",A1:A3,B1:B3,\"none\",2)");
+    ASSERT_TRUE(q.isNumber());
+    EXPECT_DOUBLE_EQ(q.getNumber(), 1.0);
+
+    setCellValue(0, 3, "ap*");
+    setCellValue(1, 3, 4.0);
+    EvalResult escaped = eval("=XLOOKUP(\"ap~*\",A1:A4,B1:B4,\"none\",2)");
+    ASSERT_TRUE(escaped.isNumber());
+    EXPECT_DOUBLE_EQ(escaped.getNumber(), 4.0);
+
+    EvalResult missing = eval("=XLOOKUP(\"z*\",A1:A3,B1:B3,\"none\",2)");
+    ASSERT_TRUE(missing.isString());
+    EXPECT_EQ(missing.getString(), "none");
+    EvalResult na = eval("=XMATCH(\"z*\",A1:A3,2)");
+    ASSERT_TRUE(na.isError());
+    EXPECT_EQ(na.getError(), CellError::NA);
 }
 
-TEST_F(FnLookupTest, DISABLED_XlookupWildcardMatchMode) {
-    // Excel: match_mode 2 treats lookup as a wildcard (* and ?). Enable this
-    // test when that path is implemented; today match_mode 2 is #VALUE!.
-    setCellValue(0, 0, "apple");
-    setCellValue(0, 1, "banana");
-    setCellValue(0, 2, "apricot");
+TEST_F(FnLookupTest, XlookupXmatchBinarySearchMode) {
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(0, 2, 30.0);
     setCellValue(1, 0, 1.0);
     setCellValue(1, 1, 2.0);
     setCellValue(1, 2, 3.0);
-    EvalResult r = eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2)");
-    ASSERT_TRUE(r.isNumber());
-    EXPECT_DOUBLE_EQ(r.getNumber(), 1.0);
-    EvalResult m = eval("=XMATCH(\"a*\",A1:A3,2)");
-    ASSERT_TRUE(m.isNumber());
-    EXPECT_DOUBLE_EQ(m.getNumber(), 1.0);
+
+    EvalResult found = eval("=XLOOKUP(20,A1:A3,B1:B3,\"none\",0,2)");
+    ASSERT_TRUE(found.isNumber());
+    EXPECT_DOUBLE_EQ(found.getNumber(), 2.0);
+    EvalResult xm = eval("=XMATCH(20,A1:A3,0,2)");
+    ASSERT_TRUE(xm.isNumber());
+    EXPECT_DOUBLE_EQ(xm.getNumber(), 2.0);
+
+    EvalResult nextSmaller = eval("=XLOOKUP(25,A1:A3,B1:B3,\"none\",-1,2)");
+    ASSERT_TRUE(nextSmaller.isNumber());
+    EXPECT_DOUBLE_EQ(nextSmaller.getNumber(), 2.0);
+    EvalResult nextLarger = eval("=XLOOKUP(25,A1:A3,B1:B3,\"none\",1,2)");
+    ASSERT_TRUE(nextLarger.isNumber());
+    EXPECT_DOUBLE_EQ(nextLarger.getNumber(), 3.0);
+
+    setCellValue(0, 0, 30.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(0, 2, 10.0);
+    EvalResult desc = eval("=XLOOKUP(20,A1:A3,B1:B3,\"none\",0,-2)");
+    ASSERT_TRUE(desc.isNumber());
+    EXPECT_DOUBLE_EQ(desc.getNumber(), 2.0);
+    EvalResult descSmaller = eval("=XLOOKUP(25,A1:A3,B1:B3,\"none\",-1,-2)");
+    ASSERT_TRUE(descSmaller.isNumber());
+    EXPECT_DOUBLE_EQ(descSmaller.getNumber(), 2.0);
+
+    // Unsorted: linear finds 20; binary search_mode 2 does not (not a linear remap).
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 30.0);
+    setCellValue(0, 2, 20.0);
+    EvalResult linear = eval("=XLOOKUP(20,A1:A3,B1:B3,\"none\",0,1)");
+    ASSERT_TRUE(linear.isNumber());
+    EXPECT_DOUBLE_EQ(linear.getNumber(), 3.0);
+    EvalResult binary = eval("=XLOOKUP(20,A1:A3,B1:B3,NA(),0,2)");
+    ASSERT_TRUE(binary.isError());
+    EXPECT_EQ(binary.getError(), CellError::NA);
+    EvalResult xmUnsorted = eval("=XMATCH(20,A1:A3,0,2)");
+    ASSERT_TRUE(xmUnsorted.isError());
+    EXPECT_EQ(xmUnsorted.getError(), CellError::NA);
 }
 
 }  // namespace
