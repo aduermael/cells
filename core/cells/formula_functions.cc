@@ -1,6 +1,7 @@
 #include "core/cells/formula_functions.h"
 
 #include <cctype>
+#include <cstdlib>
 
 #include <algorithm>
 #include <string>
@@ -20,6 +21,7 @@
 #include "core/cells/functions/fn_rand.h"
 #include "core/cells/functions/fn_stats.h"
 #include "core/cells/functions/fn_text.h"
+#include "core/cells/model.h"
 
 namespace cells {
 
@@ -264,6 +266,90 @@ EvalResult evaluateAsBoolean(const ASTNode* arg, EvalContext& ctx) {
         return result;
     }
     return result.toBoolean();
+}
+
+namespace {
+
+EvalResult cellValueToGridCell(const Cell* cell) {
+    if (!cell) {
+        return EvalResult::Empty();
+    }
+    const CellValue& val = cell->value;
+    switch (val.type) {
+        case CellValueType::NUMBER:
+            return EvalResult::Number(val.asNumber());
+        case CellValueType::STRING:
+            if (val.raw.empty()) {
+                return EvalResult::Empty();
+            }
+            return EvalResult::String(val.asString());
+        case CellValueType::BOOLEAN:
+            return EvalResult::Boolean(val.asBoolean());
+        case CellValueType::ERROR:
+            return EvalResult::Error(val.error);
+        default:
+            return EvalResult::Empty();
+    }
+}
+
+}  // namespace
+
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectAs2D(const EvalResult& value,
+                                                                        EvalContext& ctx) {
+    if (value.isError()) {
+        return {{}, value};
+    }
+    if (value.isArray()) {
+        return {value.getArray(), EvalResult::Empty()};
+    }
+    if (!value.isRange()) {
+        return {{{value}}, EvalResult::Empty()};
+    }
+
+    Sheet* sheet = value.targetSheet != nullptr ? value.targetSheet : ctx.sheet;
+    if (sheet == nullptr) {
+        return {{}, EvalResult::Error(CellError::VALUE)};
+    }
+
+    const RangeBounds& bounds = value.getRangeBounds();
+    if (bounds.type != RangeType::CELL_RANGE) {
+        return {{}, EvalResult::Error(CellError::VALUE)};
+    }
+
+    const Axis* startCol = sheet->getColumn(bounds.startColId);
+    const Axis* endCol = sheet->getColumn(bounds.endColId);
+    if (startCol == nullptr || endCol == nullptr) {
+        return {{}, EvalResult::Error(CellError::REF)};
+    }
+
+    const uint32_t startColPos =
+        startCol->position <= endCol->position ? startCol->position : endCol->position;
+    const uint32_t cols = static_cast<uint32_t>(
+        std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
+    const uint32_t rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
+
+    std::vector<std::vector<EvalResult>> result;
+    result.reserve(rows);
+    for (uint32_t r = 0; r < rows; ++r) {
+        std::vector<EvalResult> row;
+        row.reserve(cols);
+        for (uint32_t c = 0; c < cols; ++c) {
+            const Axis* targetCol = sheet->getColumnByPosition(startColPos + c);
+            const Axis* targetRow = sheet->getRowByPosition(bounds.startRowPos + r);
+            if (targetCol == nullptr || targetRow == nullptr) {
+                row.push_back(EvalResult::Error(CellError::REF));
+                continue;
+            }
+            row.push_back(cellValueToGridCell(sheet->getCellAt(targetCol->id, targetRow->id)));
+        }
+        result.push_back(std::move(row));
+    }
+    return {std::move(result), EvalResult::Empty()};
+}
+
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> evaluateAs2D(const ASTNode* arg,
+                                                                         EvalContext& ctx) {
+    return collectAs2D(evaluate(arg, ctx), ctx);
 }
 
 // =============================================================================

@@ -136,5 +136,38 @@ TEST_F(FnDateTimeExtraTest, TextJoinAndCleanViaRegistry) {
     EXPECT_TRUE(FunctionRegistry::instance().exists("EDATE"));
 }
 
+TEST_F(FnDateTimeExtraTest, NetworkdaysWorkdayIntl) {
+    // 2024-01-01 Monday through 2024-01-07 Sunday.
+    EvalResult satSun = eval("=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),1)");
+    ASSERT_TRUE(satSun.isNumber());
+    EXPECT_DOUBLE_EQ(satSun.getNumber(), 5.0);
+    EvalResult sunOnly = eval("=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),11)");
+    ASSERT_TRUE(sunOnly.isNumber());
+    EXPECT_DOUBLE_EQ(sunOnly.getNumber(), 6.0);
+    EvalResult mask = eval("=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),\"0000011\")");
+    ASSERT_TRUE(mask.isNumber());
+    EXPECT_DOUBLE_EQ(mask.getNumber(), 5.0);
+    EvalResult reverse = eval("=NETWORKDAYS.INTL(DATE(2024,1,7),DATE(2024,1,1),1)");
+    ASSERT_TRUE(reverse.isNumber());
+    EXPECT_DOUBLE_EQ(reverse.getNumber(), -5.0);
+
+    EvalResult next = eval("=WORKDAY.INTL(DATE(2024,1,5),1,1)");
+    EvalResult monday = eval("=DATE(2024,1,8)");
+    ASSERT_TRUE(next.isNumber());
+    ASSERT_TRUE(monday.isNumber());
+    EXPECT_DOUBLE_EQ(next.getNumber(), monday.getNumber());
+    EvalResult sunWeekend = eval("=WORKDAY.INTL(DATE(2024,1,5),1,11)");
+    EvalResult saturday = eval("=DATE(2024,1,6)");
+    ASSERT_TRUE(sunWeekend.isNumber());
+    ASSERT_TRUE(saturday.isNumber());
+    EXPECT_DOUBLE_EQ(sunWeekend.getNumber(), saturday.getNumber());
+
+    EXPECT_EQ(eval("=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),99)").getError(),
+              CellError::NUM);
+    EXPECT_EQ(eval("=WORKDAY.INTL(DATE(2024,1,1),1,\"xx\")").getError(), CellError::NUM);
+    EXPECT_TRUE(FunctionRegistry::instance().exists("NETWORKDAYS.INTL"));
+    EXPECT_TRUE(FunctionRegistry::instance().exists("WORKDAY.INTL"));
+}
+
 }  // namespace
 }  // namespace cells

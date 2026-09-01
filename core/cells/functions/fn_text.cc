@@ -1100,6 +1100,277 @@ EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& 
     return EvalResult::Number(excelNormalize(percent ? val / 100.0 : val));
 }
 
+namespace {
+
+std::string toLowerCopy(std::string s) {
+    for (char& c : s) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return s;
+}
+
+size_t findDelim(const std::string& text, const std::string& delim, size_t from, bool insensitive) {
+    if (delim.empty()) {
+        return from <= text.size() ? from : std::string::npos;
+    }
+    if (!insensitive) {
+        return text.find(delim, from);
+    }
+    const std::string hay = toLowerCopy(text);
+    const std::string needle = toLowerCopy(delim);
+    return hay.find(needle, from);
+}
+
+std::vector<size_t> delimPositions(const std::string& text, const std::string& delim,
+                                   bool insensitive) {
+    std::vector<size_t> pos;
+    if (delim.empty()) {
+        pos.push_back(0);
+        return pos;
+    }
+    size_t from = 0;
+    while (from <= text.size()) {
+        const size_t at = findDelim(text, delim, from, insensitive);
+        if (at == std::string::npos) {
+            break;
+        }
+        pos.push_back(at);
+        from = at + delim.size();
+        if (delim.empty()) {
+            break;
+        }
+    }
+    return pos;
+}
+
+EvalResult textBeforeAfter(const std::vector<const ASTNode*>& args, EvalContext& ctx, bool after) {
+    if (args.size() < 2 || args.size() > 6) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    const EvalResult delimRes = evaluateAsString(args[1], ctx);
+    if (delimRes.isError()) {
+        return delimRes;
+    }
+    int instance = 1;
+    if (args.size() >= 3) {
+        const EvalResult inst = evaluateAsNumber(args[2], ctx);
+        if (inst.isError()) {
+            return inst;
+        }
+        instance = static_cast<int>(inst.getNumber());
+        if (instance == 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    bool insensitive = false;
+    if (args.size() >= 4) {
+        const EvalResult mode = evaluateAsNumber(args[3], ctx);
+        if (mode.isError()) {
+            return mode;
+        }
+        const int m = static_cast<int>(mode.getNumber());
+        if (m != 0 && m != 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        insensitive = m == 1;
+    }
+    bool matchEnd = false;
+    if (args.size() >= 5) {
+        const EvalResult me = evaluateAsBoolean(args[4], ctx);
+        if (me.isError()) {
+            return me;
+        }
+        matchEnd = me.getBoolean();
+    }
+    EvalResult ifNotFound = EvalResult::Error(CellError::NA);
+    if (args.size() >= 6) {
+        ifNotFound = evaluate(args[5], ctx);
+    }
+
+    const std::string& text = textRes.getString();
+    const std::string& delim = delimRes.getString();
+    std::vector<size_t> pos = delimPositions(text, delim, insensitive);
+    if (pos.empty()) {
+        if (matchEnd) {
+            return EvalResult::String(after ? std::string() : text);
+        }
+        return ifNotFound;
+    }
+    int idx = instance > 0 ? instance - 1 : static_cast<int>(pos.size()) + instance;
+    if (idx < 0 || idx >= static_cast<int>(pos.size())) {
+        if (matchEnd) {
+            return EvalResult::String(after ? std::string() : text);
+        }
+        return ifNotFound;
+    }
+    const size_t at = pos[static_cast<size_t>(idx)];
+    if (after) {
+        return EvalResult::String(text.substr(at + delim.size()));
+    }
+    return EvalResult::String(text.substr(0, at));
+}
+
+std::vector<std::string> splitKeep(const std::string& text, const std::string& delim,
+                                   bool insensitive, bool ignoreEmpty) {
+    std::vector<std::string> parts;
+    if (delim.empty()) {
+        parts.push_back(text);
+        return parts;
+    }
+    size_t from = 0;
+    while (true) {
+        const size_t at = findDelim(text, delim, from, insensitive);
+        if (at == std::string::npos) {
+            const std::string last = text.substr(from);
+            if (!ignoreEmpty || !last.empty()) {
+                parts.push_back(last);
+            }
+            break;
+        }
+        const std::string part = text.substr(from, at - from);
+        if (!ignoreEmpty || !part.empty()) {
+            parts.push_back(part);
+        }
+        from = at + delim.size();
+    }
+    return parts;
+}
+
+}  // namespace
+
+EvalResult fn_TEXTAFTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return textBeforeAfter(args, ctx, true);
+}
+
+EvalResult fn_TEXTBEFORE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return textBeforeAfter(args, ctx, false);
+}
+
+EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 6) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    const EvalResult colDelimRes = evaluateAsString(args[1], ctx);
+    if (colDelimRes.isError()) {
+        return colDelimRes;
+    }
+    if (colDelimRes.getString().empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::string rowDelim;
+    bool hasRowDelim = false;
+    if (args.size() >= 3) {
+        const EvalResult rowRes = evaluateAsString(args[2], ctx);
+        if (rowRes.isError()) {
+            return rowRes;
+        }
+        rowDelim = rowRes.getString();
+        hasRowDelim = !rowDelim.empty();
+    }
+    bool ignoreEmpty = false;
+    if (args.size() >= 4) {
+        const EvalResult ign = evaluateAsBoolean(args[3], ctx);
+        if (ign.isError()) {
+            return ign;
+        }
+        ignoreEmpty = ign.getBoolean();
+    }
+    bool insensitive = false;
+    if (args.size() >= 5) {
+        const EvalResult mode = evaluateAsNumber(args[4], ctx);
+        if (mode.isError()) {
+            return mode;
+        }
+        const int m = static_cast<int>(mode.getNumber());
+        if (m != 0 && m != 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        insensitive = m == 1;
+    }
+    EvalResult pad = EvalResult::Error(CellError::NA);
+    if (args.size() >= 6) {
+        pad = evaluate(args[5], ctx);
+    }
+
+    std::vector<std::string> rows;
+    if (hasRowDelim) {
+        rows = splitKeep(textRes.getString(), rowDelim, insensitive, ignoreEmpty);
+    } else {
+        rows.push_back(textRes.getString());
+    }
+    std::vector<std::vector<std::string>> cells;
+    size_t maxCols = 0;
+    for (const std::string& row : rows) {
+        std::vector<std::string> cols =
+            splitKeep(row, colDelimRes.getString(), insensitive, ignoreEmpty);
+        maxCols = std::max(maxCols, cols.size());
+        cells.push_back(std::move(cols));
+    }
+    if (cells.empty()) {
+        return EvalResult::Error(CellError::CALC);
+    }
+    std::vector<std::vector<EvalResult>> out;
+    out.reserve(cells.size());
+    for (auto& cols : cells) {
+        std::vector<EvalResult> row;
+        row.reserve(maxCols);
+        for (size_t c = 0; c < maxCols; ++c) {
+            if (c < cols.size()) {
+                row.push_back(EvalResult::String(std::move(cols[c])));
+            } else {
+                row.push_back(pad);
+            }
+        }
+        out.push_back(std::move(row));
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult value = evaluate(args[0], ctx);
+    if (value.isError()) {
+        return value;
+    }
+    int format = 0;
+    if (args.size() == 2) {
+        const EvalResult f = evaluateAsNumber(args[1], ctx);
+        if (f.isError()) {
+            return f;
+        }
+        format = static_cast<int>(f.getNumber());
+        if (format != 0 && format != 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    if (value.isEmpty()) {
+        return EvalResult::String("");
+    }
+    if (format == 1 && value.isString()) {
+        std::string out = "\"";
+        for (char c : value.getString()) {
+            if (c == '"') {
+                out += "\"\"";
+            } else {
+                out.push_back(c);
+            }
+        }
+        out.push_back('"');
+        return EvalResult::String(std::move(out));
+    }
+    return value.toString();
+}
+
 void registerTextFunctions(FunctionRegistry& registry) {
     // Basic text functions
     registry.registerFunction("LEN", fn_LEN, "(text)", "Returns the number of characters", "Text");
@@ -1159,6 +1430,20 @@ void registerTextFunctions(FunctionRegistry& registry) {
     registry.registerFunction("NUMBERVALUE", fn_NUMBERVALUE,
                               "(text, [decimal_separator], [group_separator])",
                               "Converts locale-formatted text to a number", "Text");
+    registry.registerFunction("TEXTAFTER", fn_TEXTAFTER,
+                              "(text, delimiter, [instance_num], [match_mode], [match_end], "
+                              "[if_not_found])",
+                              "Returns text after a delimiter", "Text");
+    registry.registerFunction("TEXTBEFORE", fn_TEXTBEFORE,
+                              "(text, delimiter, [instance_num], [match_mode], [match_end], "
+                              "[if_not_found])",
+                              "Returns text before a delimiter", "Text");
+    registry.registerFunction("TEXTSPLIT", fn_TEXTSPLIT,
+                              "(text, col_delimiter, [row_delimiter], [ignore_empty], "
+                              "[match_mode], [pad_with])",
+                              "Splits text into rows or columns", "Text");
+    registry.registerFunction("VALUETOTEXT", fn_VALUETOTEXT, "(value, [format])",
+                              "Returns text from any value", "Text");
     // Unicode Excel treats DBCS byte variants as the character implementations.
     registry.registerAlias("LENB", "LEN");
     registry.registerAlias("LEFTB", "LEFT");

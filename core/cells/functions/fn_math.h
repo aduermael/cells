@@ -252,6 +252,7 @@ EvalResult fn_SUMXMY2(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 EvalResult fn_GAMMA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_GAMMALN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_GAMMALN_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERCENTOF(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Registration

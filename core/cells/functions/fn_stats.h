@@ -107,6 +107,17 @@ EvalResult fn_NORMSDIST(const std::vector<const ASTNode*>& args, EvalContext& ct
 EvalResult fn_NORM_S_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORMSINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORM_S_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORMINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TRIMMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_POISSON(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_POISSON_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_EXPONDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_EXPON_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CONFIDENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CONFIDENCE_NORM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

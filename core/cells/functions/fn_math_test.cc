@@ -574,5 +574,16 @@ TEST_F(FnMathTest, GammaGammaln) {
     EXPECT_EQ(eval("=GAMMA(\"x\")").getError(), CellError::VALUE);
 }
 
+TEST_F(FnMathTest, PercentOf) {
+    EvalResult p = eval("=PERCENTOF(1,4)");
+    ASSERT_TRUE(p.isNumber());
+    EXPECT_DOUBLE_EQ(p.getNumber(), 0.25);
+    EvalResult whole = eval("=PERCENTOF(10,10)");
+    ASSERT_TRUE(whole.isNumber());
+    EXPECT_DOUBLE_EQ(whole.getNumber(), 1.0);
+    EXPECT_EQ(eval("=PERCENTOF(1,0)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=PERCENTOF(1)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

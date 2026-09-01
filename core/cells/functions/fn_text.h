@@ -115,6 +115,10 @@ EvalResult fn_UNICODE(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_FIXED(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTAFTER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTBEFORE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Registration

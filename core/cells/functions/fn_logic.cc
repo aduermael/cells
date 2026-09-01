@@ -757,6 +757,44 @@ EvalResult fn_FALSE(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*
     return EvalResult::Boolean(false);
 }
 
+EvalResult fn_ISBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 3 || args.size() > 5) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult value = evaluateAsNumber(args[0], ctx);
+    if (value.isError()) {
+        return value;
+    }
+    const EvalResult lower = evaluateAsNumber(args[1], ctx);
+    if (lower.isError()) {
+        return lower;
+    }
+    const EvalResult upper = evaluateAsNumber(args[2], ctx);
+    if (upper.isError()) {
+        return upper;
+    }
+    bool lowerInc = true;
+    if (args.size() >= 4) {
+        const EvalResult inc = evaluateAsBoolean(args[3], ctx);
+        if (inc.isError()) {
+            return inc;
+        }
+        lowerInc = inc.getBoolean();
+    }
+    bool upperInc = true;
+    if (args.size() >= 5) {
+        const EvalResult inc = evaluateAsBoolean(args[4], ctx);
+        if (inc.isError()) {
+            return inc;
+        }
+        upperInc = inc.getBoolean();
+    }
+    const double v = value.getNumber();
+    const bool ge = lowerInc ? v >= lower.getNumber() : v > lower.getNumber();
+    const bool le = upperInc ? v <= upper.getNumber() : v < upper.getNumber();
+    return EvalResult::Boolean(ge && le);
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -820,6 +858,9 @@ void registerLogicFunctions(FunctionRegistry& registry) {
     registry.registerAlias("ERROR_TYPE", "ERROR.TYPE");
     registry.registerFunction("ISREF", fn_ISREF, "(value)", "Returns TRUE if value is a reference",
                               "Logic");
+    registry.registerFunction("ISBETWEEN", fn_ISBETWEEN,
+                              "(value, lower, upper, [lower_inclusive], [upper_inclusive])",
+                              "Returns TRUE if a value is between two numbers", "Logic");
 
     // Boolean constants
     registry.registerFunction("TRUE", fn_TRUE, "()", "Returns the logical value TRUE", "Logic");

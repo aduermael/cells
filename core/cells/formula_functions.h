@@ -138,6 +138,17 @@ EvalResult evaluateAsString(const ASTNode* arg, EvalContext& ctx);
 // Evaluate a single argument and coerce to boolean
 EvalResult evaluateAsBoolean(const ASTNode* arg, EvalContext& ctx);
 
+// Collect a value as a dense 2D grid (row-major).
+// ARRAY is copied; CELL_RANGE includes empty cells; scalars become 1x1.
+// Unbounded column/row ranges return #VALUE! (do not materialize a million rows).
+// If the error result is set, the grid should be ignored.
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectAs2D(const EvalResult& value,
+                                                                        EvalContext& ctx);
+
+// Evaluate an argument and collect it as a 2D grid.
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> evaluateAs2D(const ASTNode* arg,
+                                                                         EvalContext& ctx);
+
 // Initialize all built-in functions (called automatically by FunctionRegistry)
 void initializeBuiltinFunctions(FunctionRegistry& registry);
 

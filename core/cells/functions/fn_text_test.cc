@@ -137,5 +137,69 @@ TEST_F(FnTextExtraTest, ByteAliasesShareUnicodeImpl) {
     EXPECT_TRUE(reg.exists("REPLACEB"));
 }
 
+TEST_F(FnTextExtraTest, TextAfterBeforeSplitValueToText) {
+    EvalResult after = eval("=TEXTAFTER(\"abc-def-ghi\",\"-\")");
+    ASSERT_TRUE(after.isString());
+    EXPECT_EQ(after.getString(), "def-ghi");
+    EvalResult after2 = eval("=TEXTAFTER(\"abc-def-ghi\",\"-\",2)");
+    ASSERT_TRUE(after2.isString());
+    EXPECT_EQ(after2.getString(), "ghi");
+    EvalResult afterLast = eval("=TEXTAFTER(\"abc-def-ghi\",\"-\",-1)");
+    ASSERT_TRUE(afterLast.isString());
+    EXPECT_EQ(afterLast.getString(), "ghi");
+    EvalResult afterCI = eval("=TEXTAFTER(\"abcXdef\",\"x\",1,1)");
+    ASSERT_TRUE(afterCI.isString());
+    EXPECT_EQ(afterCI.getString(), "def");
+    EvalResult missing = eval("=TEXTAFTER(\"abc\",\"-\")");
+    ASSERT_TRUE(missing.isError());
+    EXPECT_EQ(missing.getError(), CellError::NA);
+    EvalResult fallback = eval("=TEXTAFTER(\"abc\",\"-\",1,0,0,\"none\")");
+    ASSERT_TRUE(fallback.isString());
+    EXPECT_EQ(fallback.getString(), "none");
+
+    EvalResult before = eval("=TEXTBEFORE(\"abc-def-ghi\",\"-\")");
+    ASSERT_TRUE(before.isString());
+    EXPECT_EQ(before.getString(), "abc");
+    EvalResult before2 = eval("=TEXTBEFORE(\"abc-def-ghi\",\"-\",2)");
+    ASSERT_TRUE(before2.isString());
+    EXPECT_EQ(before2.getString(), "abc-def");
+    EvalResult beforeEnd = eval("=TEXTBEFORE(\"abc\",\"-\",1,0,TRUE)");
+    ASSERT_TRUE(beforeEnd.isString());
+    EXPECT_EQ(beforeEnd.getString(), "abc");
+    EXPECT_EQ(eval("=TEXTBEFORE(\"abc\",\"-\",0)").getError(), CellError::VALUE);
+
+    EvalResult split = eval("=TEXTSPLIT(\"a,b,c\",\",\")");
+    ASSERT_TRUE(split.isArray());
+    EXPECT_EQ(split.getArrayRows(), 1u);
+    EXPECT_EQ(split.getArrayCols(), 3u);
+    EXPECT_EQ(split.getArrayAt(0, 0).getString(), "a");
+    EXPECT_EQ(split.getArrayAt(0, 2).getString(), "c");
+
+    EvalResult grid = eval("=TEXTSPLIT(\"a,b;c\",\",\",\";\")");
+    ASSERT_TRUE(grid.isArray());
+    EXPECT_EQ(grid.getArrayRows(), 2u);
+    EXPECT_EQ(grid.getArrayCols(), 2u);
+    EXPECT_EQ(grid.getArrayAt(0, 1).getString(), "b");
+    EXPECT_EQ(grid.getArrayAt(1, 0).getString(), "c");
+    ASSERT_TRUE(grid.getArrayAt(1, 1).isError());
+    EXPECT_EQ(grid.getArrayAt(1, 1).getError(), CellError::NA);
+
+    EvalResult pad = eval("=TEXTSPLIT(\"a,b;c\",\",\",\";\",FALSE,0,\"x\")");
+    ASSERT_TRUE(pad.isArray());
+    EXPECT_EQ(pad.getArrayAt(1, 1).getString(), "x");
+    EXPECT_EQ(eval("=TEXTSPLIT(\"a\",\"\")").getError(), CellError::VALUE);
+
+    EvalResult v0 = eval("=VALUETOTEXT(12)");
+    ASSERT_TRUE(v0.isString());
+    EXPECT_EQ(v0.getString(), "12");
+    EvalResult v1 = eval("=VALUETOTEXT(\"hi\",1)");
+    ASSERT_TRUE(v1.isString());
+    EXPECT_EQ(v1.getString(), "\"hi\"");
+    EvalResult vq = eval("=VALUETOTEXT(\"a\"\"b\",1)");
+    ASSERT_TRUE(vq.isString());
+    EXPECT_EQ(vq.getString(), "\"a\"\"b\"");
+    EXPECT_EQ(eval("=VALUETOTEXT(1,2)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

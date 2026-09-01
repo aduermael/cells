@@ -1,11 +1,12 @@
 #include "core/cells/functions/fn_array.h"
 
+#include <cstdlib>
+
 #include <algorithm>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
-#include "core/cells/model.h"
 
 namespace cells {
 
@@ -125,129 +126,32 @@ bool rowsEqual(const std::vector<EvalResult>& a, const std::vector<EvalResult>& 
     return true;
 }
 
-// Helper to get range dimensions
-struct RangeDimensions {
-    uint32_t rows = 0;
-    uint32_t cols = 0;
-    uint32_t startColPos = 0;
-    uint32_t startRowPos = 0;
-    bool valid = false;
-};
-
-// Helper to get range dimensions from RangeBounds
-RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
-    RangeDimensions dims;
-    dims.valid = false;
-
-    if (!sheet || bounds.type != RangeType::CELL_RANGE) {
-        return dims;  // Only support cell ranges for now
+size_t gridCols(const std::vector<std::vector<EvalResult>>& grid) {
+    size_t cols = 0;
+    for (const auto& row : grid) {
+        cols = std::max(cols, row.size());
     }
-
-    // Get start and end columns
-    const Axis* startCol = sheet->getColumn(bounds.startColId);
-    const Axis* endCol = sheet->getColumn(bounds.endColId);
-
-    if (!startCol || !endCol) {
-        return dims;
-    }
-
-    dims.startColPos = startCol->position;
-    dims.startRowPos = bounds.startRowPos;  // Use position bounds directly
-    dims.cols = static_cast<uint32_t>(
-        std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
-    dims.rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
-    dims.valid = true;
-
-    return dims;
+    return cols;
 }
 
-// Helper to get cell value at position in range (0-indexed offsets from range start)
-EvalResult getCellAtPosition(EvalContext& ctx, const RangeBounds& bounds, uint32_t rowOffset,
-                             uint32_t colOffset) {
-    if (!ctx.sheet || bounds.type != RangeType::CELL_RANGE) {
-        return EvalResult::Error(CellError::REF);
-    }
-
-    // Get start column
-    const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
-
-    if (!startCol) {
-        return EvalResult::Error(CellError::REF);
-    }
-
-    // Calculate target position (use position bounds for rows)
-    const uint32_t targetColPos = startCol->position + colOffset;
-    const uint32_t targetRowPos = bounds.startRowPos + rowOffset;
-
-    // Find the column and row at those positions
-    const Axis* targetCol = ctx.sheet->getColumnByPosition(targetColPos);
-    const Axis* targetRow = ctx.sheet->getRowByPosition(targetRowPos);
-
-    if (!targetCol || !targetRow) {
-        return EvalResult::Error(CellError::REF);
-    }
-
-    // Get the cell
-    const Cell* cell = ctx.sheet->getCellAt(targetCol->id, targetRow->id);
-    if (!cell) {
+EvalResult gridAt(const std::vector<std::vector<EvalResult>>& grid, size_t r, size_t c) {
+    if (r >= grid.size() || c >= grid[r].size()) {
         return EvalResult::Empty();
     }
-
-    // Convert cell value to EvalResult
-    const CellValue& val = cell->value;
-    switch (val.type) {
-        case CellValueType::NUMBER:
-            return EvalResult::Number(val.asNumber());
-        case CellValueType::STRING:
-            // Empty string is treated as empty cell
-            if (val.raw.empty()) {
-                return EvalResult::Empty();
-            }
-            return EvalResult::String(val.asString());
-        case CellValueType::BOOLEAN:
-            return EvalResult::Boolean(val.asBoolean());
-        case CellValueType::ERROR:
-            return EvalResult::Error(val.error);
-        default:
-            return EvalResult::Empty();
-    }
+    return grid[r][c];
 }
 
-// Collect range values as a 2D array (row-major)
-// Returns: pair<2D array, error>. If error is set, array should be ignored.
-std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectRangeAs2D(
-    const EvalResult& rangeResult, EvalContext& ctx) {
-    std::vector<std::vector<EvalResult>> result;
-
-    if (!rangeResult.isRange()) {
-        // Single value - return as 1x1 array
-        result.push_back({rangeResult});
-        return {result, EvalResult::Empty()};
+int resolveIndex(int index, int count) {
+    if (index == 0 || count < 1) {
+        return -1;
     }
-
-    if (!ctx.sheet) {
-        return {{}, EvalResult::Error(CellError::VALUE)};
+    if (index < 0) {
+        index = count + index + 1;
     }
-
-    const RangeBounds& bounds = rangeResult.getRangeBounds();
-    const RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
-
-    if (!dims.valid) {
-        return {{}, EvalResult::Error(CellError::REF)};
+    if (index < 1 || index > count) {
+        return -1;
     }
-
-    // Build 2D array
-    result.reserve(dims.rows);
-    for (uint32_t r = 0; r < dims.rows; ++r) {
-        std::vector<EvalResult> row;
-        row.reserve(dims.cols);
-        for (uint32_t c = 0; c < dims.cols; ++c) {
-            row.push_back(getCellAtPosition(ctx, bounds, r, c));
-        }
-        result.push_back(std::move(row));
-    }
-
-    return {result, EvalResult::Empty()};
+    return index - 1;
 }
 
 }  // namespace
@@ -284,17 +188,9 @@ EvalResult fn_UNIQUE(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         exactlyOnce = exactlyOnceResult.getBoolean();
     }
 
-    // Handle array result type (from another spill function)
-    std::vector<std::vector<EvalResult>> data;
-    if (rangeResult.isArray()) {
-        data = rangeResult.getArray();
-    } else {
-        // Collect range as 2D array
-        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
-        if (error.isError()) {
-            return error;
-        }
-        data = std::move(rangeData);
+    auto [data, error] = collectAs2D(rangeResult, ctx);
+    if (error.isError()) {
+        return error;
     }
 
     // Handle empty input
@@ -434,17 +330,9 @@ EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         byCol = byColResult.getBoolean();
     }
 
-    // Handle array result type (from another spill function)
-    std::vector<std::vector<EvalResult>> data;
-    if (rangeResult.isArray()) {
-        data = rangeResult.getArray();
-    } else {
-        // Collect range as 2D array
-        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
-        if (error.isError()) {
-            return error;
-        }
-        data = std::move(rangeData);
+    auto [data, error] = collectAs2D(rangeResult, ctx);
+    if (error.isError()) {
+        return error;
     }
 
     // Handle empty input
@@ -559,16 +447,9 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         hasIfEmpty = true;
     }
 
-    // Collect array data
-    std::vector<std::vector<EvalResult>> data;
-    if (rangeResult.isArray()) {
-        data = rangeResult.getArray();
-    } else {
-        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
-        if (error.isError()) {
-            return error;
-        }
-        data = std::move(rangeData);
+    auto [data, error] = collectAs2D(rangeResult, ctx);
+    if (error.isError()) {
+        return error;
     }
 
     // Handle empty input
@@ -582,16 +463,9 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         return EvalResult::Error(CellError::CALC);
     }
 
-    // Collect include criteria
-    std::vector<std::vector<EvalResult>> includeData;
-    if (includeResult.isArray()) {
-        includeData = includeResult.getArray();
-    } else {
-        auto [incData, error] = collectRangeAs2D(includeResult, ctx);
-        if (error.isError()) {
-            return error;
-        }
-        includeData = std::move(incData);
+    auto [includeData, incError] = collectAs2D(includeResult, ctx);
+    if (incError.isError()) {
+        return incError;
     }
 
     // Determine filter direction based on include array dimensions
@@ -755,16 +629,9 @@ EvalResult fn_TRANSPOSE(const std::vector<const ASTNode*>& args, EvalContext& ct
         return rangeResult;
     }
 
-    // Collect array data
-    std::vector<std::vector<EvalResult>> data;
-    if (rangeResult.isArray()) {
-        data = rangeResult.getArray();
-    } else {
-        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
-        if (error.isError()) {
-            return error;
-        }
-        data = std::move(rangeData);
+    auto [data, error] = collectAs2D(rangeResult, ctx);
+    if (error.isError()) {
+        return error;
     }
 
     // Handle empty input
@@ -809,6 +676,455 @@ EvalResult fn_TRANSPOSE(const std::vector<const ASTNode*>& args, EvalContext& ct
     return EvalResult::Array(std::move(result));
 }
 
+EvalResult fn_VSTACK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<std::vector<std::vector<EvalResult>>> arrays;
+    arrays.reserve(args.size());
+    size_t maxCols = 0;
+    for (const ASTNode* arg : args) {
+        auto [grid, error] = evaluateAs2D(arg, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        maxCols = std::max(maxCols, gridCols(grid));
+        arrays.push_back(std::move(grid));
+    }
+    std::vector<std::vector<EvalResult>> out;
+    for (auto& grid : arrays) {
+        for (auto& row : grid) {
+            while (row.size() < maxCols) {
+                row.push_back(EvalResult::Error(CellError::NA));
+            }
+            out.push_back(std::move(row));
+        }
+    }
+    if (out.empty()) {
+        return EvalResult::EmptyArray();
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_HSTACK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<std::vector<std::vector<EvalResult>>> arrays;
+    arrays.reserve(args.size());
+    size_t maxRows = 0;
+    for (const ASTNode* arg : args) {
+        auto [grid, error] = evaluateAs2D(arg, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        maxRows = std::max(maxRows, grid.size());
+        arrays.push_back(std::move(grid));
+    }
+    std::vector<std::vector<EvalResult>> out(maxRows);
+    for (auto& grid : arrays) {
+        const size_t cols = gridCols(grid);
+        for (size_t r = 0; r < maxRows; ++r) {
+            for (size_t c = 0; c < cols; ++c) {
+                if (r < grid.size() && c < grid[r].size()) {
+                    out[r].push_back(grid[r][c]);
+                } else {
+                    out[r].push_back(EvalResult::Error(CellError::NA));
+                }
+            }
+        }
+    }
+    if (out.empty()) {
+        return EvalResult::EmptyArray();
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+static std::pair<std::vector<EvalResult>, EvalResult> flattenGrid(
+    const std::vector<std::vector<EvalResult>>& data, int ignore, bool byColumn) {
+    if (ignore < 0 || ignore > 3) {
+        return {{}, EvalResult::Error(CellError::VALUE)};
+    }
+    const bool dropBlanks = ignore == 1 || ignore == 3;
+    const bool dropErrors = ignore == 2 || ignore == 3;
+    std::vector<EvalResult> flat;
+    if (byColumn) {
+        const size_t cols = gridCols(data);
+        for (size_t c = 0; c < cols; ++c) {
+            for (size_t r = 0; r < data.size(); ++r) {
+                const EvalResult v = gridAt(data, r, c);
+                if ((dropBlanks && v.isEmpty()) || (dropErrors && v.isError())) {
+                    continue;
+                }
+                flat.push_back(v);
+            }
+        }
+    } else {
+        for (const auto& row : data) {
+            for (const EvalResult& v : row) {
+                if ((dropBlanks && v.isEmpty()) || (dropErrors && v.isError())) {
+                    continue;
+                }
+                flat.push_back(v);
+            }
+        }
+    }
+    if (flat.empty()) {
+        return {{}, EvalResult::Error(CellError::CALC)};
+    }
+    return {std::move(flat), EvalResult::Empty()};
+}
+
+static EvalResult parseFlattenArgs(const std::vector<const ASTNode*>& args, EvalContext& ctx,
+                                   std::vector<std::vector<EvalResult>>* data, int* ignore,
+                                   bool* byColumn) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [grid, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    *data = std::move(grid);
+    *ignore = 0;
+    *byColumn = false;
+    if (args.size() >= 2) {
+        const EvalResult ign = evaluateAsNumber(args[1], ctx);
+        if (ign.isError()) {
+            return ign;
+        }
+        *ignore = static_cast<int>(ign.getNumber());
+    }
+    if (args.size() >= 3) {
+        const EvalResult scan = evaluateAsBoolean(args[2], ctx);
+        if (scan.isError()) {
+            return scan;
+        }
+        *byColumn = scan.getBoolean();
+    }
+    return EvalResult::Empty();
+}
+
+EvalResult fn_TOCOL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    std::vector<std::vector<EvalResult>> data;
+    int ignore = 0;
+    bool byColumn = false;
+    const EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
+    if (parsed.isError()) {
+        return parsed;
+    }
+    auto [flat, err] = flattenGrid(data, ignore, byColumn);
+    if (err.isError()) {
+        return err;
+    }
+    return EvalResult::ColumnArray(std::move(flat));
+}
+
+EvalResult fn_TOROW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    std::vector<std::vector<EvalResult>> data;
+    int ignore = 0;
+    bool byColumn = false;
+    const EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
+    if (parsed.isError()) {
+        return parsed;
+    }
+    auto [flat, err] = flattenGrid(data, ignore, byColumn);
+    if (err.isError()) {
+        return err;
+    }
+    return EvalResult::RowArray(std::move(flat));
+}
+
+static EvalResult takeOrDrop(const std::vector<std::vector<EvalResult>>& data, const int* rows,
+                             const int* cols, bool dropping) {
+    const int height = static_cast<int>(data.size());
+    const int width = static_cast<int>(gridCols(data));
+    int rowStart = 0;
+    int rowCount = height;
+    if (rows != nullptr) {
+        if (!dropping && *rows == 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        if (dropping) {
+            const int n = *rows;
+            if (n == 0) {
+                // keep all rows
+            } else if (n > 0) {
+                if (n >= height) {
+                    return EvalResult::Error(CellError::CALC);
+                }
+                rowStart = n;
+                rowCount = height - n;
+            } else {
+                const int drop = -n;
+                if (drop >= height) {
+                    return EvalResult::Error(CellError::CALC);
+                }
+                rowCount = height - drop;
+            }
+        } else {
+            const int n = *rows;
+            if (n > 0) {
+                rowCount = std::min(n, height);
+            } else {
+                rowCount = std::min(-n, height);
+                rowStart = height - rowCount;
+            }
+        }
+    }
+    int colStart = 0;
+    int colCount = width;
+    if (cols != nullptr) {
+        if (!dropping && *cols == 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        if (dropping) {
+            const int n = *cols;
+            if (n == 0) {
+                // keep all cols
+            } else if (n > 0) {
+                if (n >= width) {
+                    return EvalResult::Error(CellError::CALC);
+                }
+                colStart = n;
+                colCount = width - n;
+            } else {
+                const int drop = -n;
+                if (drop >= width) {
+                    return EvalResult::Error(CellError::CALC);
+                }
+                colCount = width - drop;
+            }
+        } else {
+            const int n = *cols;
+            if (n > 0) {
+                colCount = std::min(n, width);
+            } else {
+                colCount = std::min(-n, width);
+                colStart = width - colCount;
+            }
+        }
+    }
+    if (rowCount <= 0 || colCount <= 0) {
+        return EvalResult::Error(CellError::CALC);
+    }
+    std::vector<std::vector<EvalResult>> out;
+    out.reserve(static_cast<size_t>(rowCount));
+    for (int r = 0; r < rowCount; ++r) {
+        std::vector<EvalResult> row;
+        row.reserve(static_cast<size_t>(colCount));
+        for (int c = 0; c < colCount; ++c) {
+            row.push_back(
+                gridAt(data, static_cast<size_t>(rowStart + r), static_cast<size_t>(colStart + c)));
+        }
+        out.push_back(std::move(row));
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_TAKE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    const EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
+    if (rowsRes.isError()) {
+        return rowsRes;
+    }
+    const int rows = static_cast<int>(rowsRes.getNumber());
+    if (args.size() == 3) {
+        const EvalResult colsRes = evaluateAsNumber(args[2], ctx);
+        if (colsRes.isError()) {
+            return colsRes;
+        }
+        const int cols = static_cast<int>(colsRes.getNumber());
+        return takeOrDrop(data, &rows, &cols, false);
+    }
+    return takeOrDrop(data, &rows, nullptr, false);
+}
+
+EvalResult fn_DROP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    const EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
+    if (rowsRes.isError()) {
+        return rowsRes;
+    }
+    const int rows = static_cast<int>(rowsRes.getNumber());
+    if (args.size() == 3) {
+        const EvalResult colsRes = evaluateAsNumber(args[2], ctx);
+        if (colsRes.isError()) {
+            return colsRes;
+        }
+        const int cols = static_cast<int>(colsRes.getNumber());
+        return takeOrDrop(data, &rows, &cols, true);
+    }
+    return takeOrDrop(data, &rows, nullptr, true);
+}
+
+static EvalResult chooseAxes(const std::vector<std::vector<EvalResult>>& data,
+                             const std::vector<int>& indices, bool byColumn) {
+    const int count = byColumn ? static_cast<int>(gridCols(data)) : static_cast<int>(data.size());
+    std::vector<int> resolved;
+    resolved.reserve(indices.size());
+    for (int idx : indices) {
+        const int zero = resolveIndex(idx, count);
+        if (zero < 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        resolved.push_back(zero);
+    }
+    std::vector<std::vector<EvalResult>> out;
+    if (byColumn) {
+        out.resize(data.size());
+        for (size_t r = 0; r < data.size(); ++r) {
+            for (int c : resolved) {
+                out[r].push_back(gridAt(data, r, static_cast<size_t>(c)));
+            }
+        }
+    } else {
+        for (int r : resolved) {
+            const size_t cols = gridCols(data);
+            std::vector<EvalResult> row;
+            row.reserve(cols);
+            for (size_t c = 0; c < cols; ++c) {
+                row.push_back(gridAt(data, static_cast<size_t>(r), c));
+            }
+            out.push_back(std::move(row));
+        }
+    }
+    if (out.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_CHOOSECOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    std::vector<int> indices;
+    for (size_t i = 1; i < args.size(); ++i) {
+        const EvalResult n = evaluateAsNumber(args[i], ctx);
+        if (n.isError()) {
+            return n;
+        }
+        indices.push_back(static_cast<int>(n.getNumber()));
+    }
+    return chooseAxes(data, indices, true);
+}
+
+EvalResult fn_CHOOSEROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    std::vector<int> indices;
+    for (size_t i = 1; i < args.size(); ++i) {
+        const EvalResult n = evaluateAsNumber(args[i], ctx);
+        if (n.isError()) {
+            return n;
+        }
+        indices.push_back(static_cast<int>(n.getNumber()));
+    }
+    return chooseAxes(data, indices, false);
+}
+
+EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (data.empty()) {
+        return EvalResult::EmptyArray();
+    }
+
+    struct SortKey {
+        std::vector<EvalResult> values;
+        int order = 1;
+    };
+    std::vector<SortKey> keys;
+    size_t i = 1;
+    while (i < args.size()) {
+        auto [by, byErr] = evaluateAs2D(args[i], ctx);
+        if (byErr.isError()) {
+            return byErr;
+        }
+        ++i;
+        int order = 1;
+        if (i < args.size()) {
+            const EvalResult maybeOrder = evaluate(args[i], ctx);
+            if (maybeOrder.isError()) {
+                return maybeOrder;
+            }
+            if (!maybeOrder.isRange() && !maybeOrder.isArray()) {
+                const EvalResult n = maybeOrder.toNumber();
+                if (n.isError()) {
+                    return n;
+                }
+                order = static_cast<int>(n.getNumber());
+                if (order != 1 && order != -1) {
+                    return EvalResult::Error(CellError::VALUE);
+                }
+                ++i;
+            }
+        }
+        std::vector<EvalResult> values;
+        if (by.size() == data.size()) {
+            values.reserve(data.size());
+            for (size_t r = 0; r < data.size(); ++r) {
+                values.push_back(gridAt(by, r, 0));
+            }
+        } else if (by.size() == 1 && gridCols(by) == data.size()) {
+            values = by[0];
+        } else {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        keys.push_back(SortKey{std::move(values), order});
+    }
+    if (keys.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    std::vector<size_t> order(data.size());
+    for (size_t r = 0; r < data.size(); ++r) {
+        order[r] = r;
+    }
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+        for (const SortKey& key : keys) {
+            const int cmp = compareEvalResults(key.values[a], key.values[b]);
+            if (cmp != 0) {
+                return key.order > 0 ? cmp < 0 : cmp > 0;
+            }
+        }
+        return false;
+    });
+    std::vector<std::vector<EvalResult>> out;
+    out.reserve(data.size());
+    for (size_t r : order) {
+        out.push_back(data[r]);
+    }
+    return EvalResult::Array(std::move(out));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
@@ -820,6 +1136,24 @@ void registerArrayFunctions(FunctionRegistry& registry) {
                               "Generates a sequence of numbers", "Array");
     registry.registerFunction("TRANSPOSE", fn_TRANSPOSE, "(array)", "Transposes rows and columns",
                               "Array");
+    registry.registerFunction("VSTACK", fn_VSTACK, "(array1, [array2], ...)",
+                              "Appends arrays vertically", "Array");
+    registry.registerFunction("HSTACK", fn_HSTACK, "(array1, [array2], ...)",
+                              "Appends arrays horizontally", "Array");
+    registry.registerFunction("TOCOL", fn_TOCOL, "(array, [ignore], [scan_by_column])",
+                              "Returns the array as a single column", "Array");
+    registry.registerFunction("TOROW", fn_TOROW, "(array, [ignore], [scan_by_column])",
+                              "Returns the array as a single row", "Array");
+    registry.registerFunction("TAKE", fn_TAKE, "(array, rows, [cols])",
+                              "Returns the first or last rows/columns of an array", "Array");
+    registry.registerFunction("DROP", fn_DROP, "(array, rows, [cols])",
+                              "Excludes the first or last rows/columns of an array", "Array");
+    registry.registerFunction("CHOOSECOLS", fn_CHOOSECOLS, "(array, col_num1, [col_num2], ...)",
+                              "Returns the specified columns from an array", "Array");
+    registry.registerFunction("CHOOSEROWS", fn_CHOOSEROWS, "(array, row_num1, [row_num2], ...)",
+                              "Returns the specified rows from an array", "Array");
+    registry.registerFunction("SORTBY", fn_SORTBY, "(array, by_array1, [sort_order1], ...)",
+                              "Sorts an array by the values in another array", "Array");
 }
 
 }  // namespace cells

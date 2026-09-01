@@ -219,9 +219,124 @@ int days360Count(int y1, int m1, int d1, int y2, int m2, int d2, bool european) 
     return (y2 - y1) * 360 + (m2 - m1) * 30 + (d2 - d1);
 }
 
-bool isWeekendSunSat(int serialInt) {
-    const int wd = weekdaySun1(serialInt);
-    return wd == 1 || wd == 7;
+// Bit 0 = Sunday ... bit 6 = Saturday.
+int weekendMaskFromCode(int code) {
+    switch (code) {
+        case 1:
+            return (1 << 0) | (1 << 6);  // Sun Sat
+        case 2:
+            return (1 << 0) | (1 << 1);  // Sun Mon
+        case 3:
+            return (1 << 1) | (1 << 2);
+        case 4:
+            return (1 << 2) | (1 << 3);
+        case 5:
+            return (1 << 3) | (1 << 4);
+        case 6:
+            return (1 << 4) | (1 << 5);
+        case 7:
+            return (1 << 5) | (1 << 6);
+        case 11:
+            return 1 << 0;
+        case 12:
+            return 1 << 1;
+        case 13:
+            return 1 << 2;
+        case 14:
+            return 1 << 3;
+        case 15:
+            return 1 << 4;
+        case 16:
+            return 1 << 5;
+        case 17:
+            return 1 << 6;
+        default:
+            return -1;
+    }
+}
+
+int weekendMaskFromString(const std::string& s) {
+    if (s.size() != 7) {
+        return -1;
+    }
+    int mask = 0;
+    for (size_t i = 0; i < 7; ++i) {
+        const char c = s[i];
+        if (c != '0' && c != '1') {
+            return -1;
+        }
+        if (c == '1') {
+            // String starts Monday; bit 0 is Sunday.
+            const int sunBased = static_cast<int>((i + 1) % 7);
+            mask |= 1 << sunBased;
+        }
+    }
+    return mask;
+}
+
+bool isWeekendMask(int serialInt, int mask) {
+    const int wd = weekdaySun1(serialInt);  // 1=Sun
+    return (mask & (1 << (wd - 1))) != 0;
+}
+
+bool isHoliday(int serialInt, const std::vector<int>& holidays);
+
+EvalResult weekendMaskFromArg(const ASTNode* arg, EvalContext& ctx, int* mask) {
+    const EvalResult w = evaluate(arg, ctx);
+    if (w.isError()) {
+        return w;
+    }
+    if (w.isNumber() || w.isBoolean() || w.isEmpty()) {
+        const EvalResult n = w.toNumber();
+        if (n.isError()) {
+            return n;
+        }
+        *mask = weekendMaskFromCode(static_cast<int>(n.getNumber()));
+        if (*mask < 0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        return EvalResult::Empty();
+    }
+    const EvalResult s = w.toString();
+    if (s.isError()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    *mask = weekendMaskFromString(s.getString());
+    if (*mask < 0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Empty();
+}
+
+int countNetworkDays(int start, int end, int mask, const std::vector<int>& holidays) {
+    int sign = 1;
+    if (end < start) {
+        std::swap(start, end);
+        sign = -1;
+    }
+    int count = 0;
+    for (int d = start; d <= end; ++d) {
+        if (!isWeekendMask(d, mask) && !isHoliday(d, holidays)) {
+            ++count;
+        }
+    }
+    return sign * count;
+}
+
+int shiftWorkday(int start, int days, int mask, const std::vector<int>& holidays) {
+    if (days == 0) {
+        return start;
+    }
+    const int step = days > 0 ? 1 : -1;
+    int remaining = days > 0 ? days : -days;
+    int d = start;
+    while (remaining > 0) {
+        d += step;
+        if (!isWeekendMask(d, mask) && !isHoliday(d, holidays)) {
+            --remaining;
+        }
+    }
+    return d;
 }
 
 std::vector<int> holidaySerials(const ASTNode* arg, EvalContext& ctx, EvalResult* error) {
@@ -954,20 +1069,10 @@ EvalResult fn_NETWORKDAYS(const std::vector<const ASTNode*>& args, EvalContext& 
             return err;
         }
     }
-    int start = static_cast<int>(startRes.getNumber());
-    int end = static_cast<int>(endRes.getNumber());
-    int sign = 1;
-    if (end < start) {
-        std::swap(start, end);
-        sign = -1;
-    }
-    int count = 0;
-    for (int d = start; d <= end; ++d) {
-        if (!isWeekendSunSat(d) && !isHoliday(d, holidays)) {
-            ++count;
-        }
-    }
-    return EvalResult::Number(static_cast<double>(sign * count));
+    const int start = static_cast<int>(startRes.getNumber());
+    const int end = static_cast<int>(endRes.getNumber());
+    const int mask = weekendMaskFromCode(1);
+    return EvalResult::Number(static_cast<double>(countNetworkDays(start, end, mask, holidays)));
 }
 
 EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -991,19 +1096,73 @@ EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         }
     }
     const int days = static_cast<int>(daysRes.getNumber());
-    int d = static_cast<int>(startRes.getNumber());
-    if (days == 0) {
-        return EvalResult::Number(static_cast<double>(d));
+    const int start = static_cast<int>(startRes.getNumber());
+    const int mask = weekendMaskFromCode(1);
+    return EvalResult::Number(static_cast<double>(shiftWorkday(start, days, mask, holidays)));
+}
+
+EvalResult fn_NETWORKDAYS_INTL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
     }
-    const int step = days > 0 ? 1 : -1;
-    int remaining = days > 0 ? days : -days;
-    while (remaining > 0) {
-        d += step;
-        if (!isWeekendSunSat(d) && !isHoliday(d, holidays)) {
-            --remaining;
+    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    if (startRes.isError()) {
+        return startRes;
+    }
+    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    if (endRes.isError()) {
+        return endRes;
+    }
+    int mask = weekendMaskFromCode(1);
+    if (args.size() >= 3) {
+        const EvalResult parsed = weekendMaskFromArg(args[2], ctx, &mask);
+        if (parsed.isError()) {
+            return parsed;
         }
     }
-    return EvalResult::Number(static_cast<double>(d));
+    std::vector<int> holidays;
+    if (args.size() == 4) {
+        EvalResult err = EvalResult::Empty();
+        holidays = holidaySerials(args[3], ctx, &err);
+        if (err.isError()) {
+            return err;
+        }
+    }
+    return EvalResult::Number(static_cast<double>(
+        countNetworkDays(static_cast<int>(startRes.getNumber()),
+                         static_cast<int>(endRes.getNumber()), mask, holidays)));
+}
+
+EvalResult fn_WORKDAY_INTL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    if (startRes.isError()) {
+        return startRes;
+    }
+    const EvalResult daysRes = evaluateAsNumber(args[1], ctx);
+    if (daysRes.isError()) {
+        return daysRes;
+    }
+    int mask = weekendMaskFromCode(1);
+    if (args.size() >= 3) {
+        const EvalResult parsed = weekendMaskFromArg(args[2], ctx, &mask);
+        if (parsed.isError()) {
+            return parsed;
+        }
+    }
+    std::vector<int> holidays;
+    if (args.size() == 4) {
+        EvalResult err = EvalResult::Empty();
+        holidays = holidaySerials(args[3], ctx, &err);
+        if (err.isError()) {
+            return err;
+        }
+    }
+    return EvalResult::Number(
+        static_cast<double>(shiftWorkday(static_cast<int>(startRes.getNumber()),
+                                         static_cast<int>(daysRes.getNumber()), mask, holidays)));
 }
 
 EvalResult fn_DAYS360(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -1158,6 +1317,14 @@ void registerDateTimeFunctions(FunctionRegistry& registry) {
                               "Working days between two dates", "Date");
     registry.registerFunction("WORKDAY", fn_WORKDAY, "(start_date, days, [holidays])",
                               "Date a given number of working days from start_date", "Date");
+    registry.registerFunction("NETWORKDAYS.INTL", fn_NETWORKDAYS_INTL,
+                              "(start_date, end_date, [weekend], [holidays])",
+                              "Working days with a custom weekend", "Date");
+    registry.registerAlias("NETWORKDAYS_INTL", "NETWORKDAYS.INTL");
+    registry.registerFunction("WORKDAY.INTL", fn_WORKDAY_INTL,
+                              "(start_date, days, [weekend], [holidays])",
+                              "Workday with a custom weekend", "Date");
+    registry.registerAlias("WORKDAY_INTL", "WORKDAY.INTL");
     registry.registerFunction("DAYS360", fn_DAYS360, "(start_date, end_date, [method])",
                               "Days between dates on a 360-day year", "Date");
     registry.registerFunction("YEARFRAC", fn_YEARFRAC, "(start_date, end_date, [basis])",

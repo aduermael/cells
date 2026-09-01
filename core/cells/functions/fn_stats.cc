@@ -65,6 +65,64 @@ double standardNormalCdf(double x) {
     return 0.5 * (1.0 + std::erf(x / kSqrt2));
 }
 
+double standardNormalInv(double p) {
+    // Acklam's rational approximation, then Newton using our erf CDF.
+    static const double a1 = -3.969683028665376e+01;
+    static const double a2 = 2.209460984245205e+02;
+    static const double a3 = -2.759285104469687e+02;
+    static const double a4 = 1.383577509590705e+02;
+    static const double a5 = -3.066479806614716e+01;
+    static const double a6 = 2.506628277459239e+00;
+    static const double b1 = -5.447609879822406e+01;
+    static const double b2 = 1.615858368580409e+02;
+    static const double b3 = -1.556989798598866e+02;
+    static const double b4 = 6.680131188771972e+01;
+    static const double b5 = -1.328068155288572e+01;
+    static const double c1 = -7.784894002430293e-03;
+    static const double c2 = -3.223964580411365e-01;
+    static const double c3 = -2.400758277161838e+00;
+    static const double c4 = -2.549732539343734e+00;
+    static const double c5 = 4.374664141464968e+00;
+    static const double c6 = 2.938163982698783e+00;
+    static const double d1 = 7.784695709041462e-03;
+    static const double d2 = 3.224671290700398e-01;
+    static const double d3 = 2.445134137142996e+00;
+    static const double d4 = 3.754408661907416e+00;
+    const double pLow = 0.02425;
+    const double pHigh = 1.0 - pLow;
+    double x = 0.0;
+    if (p < pLow) {
+        const double q = std::sqrt(-2.0 * std::log(p));
+        x = (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+            ((((d1 * q + d2) * q + d3) * q + d4) * q + 1.0);
+    } else if (p <= pHigh) {
+        const double q = p - 0.5;
+        const double r = q * q;
+        x = (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+            (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1.0);
+    } else {
+        const double q = std::sqrt(-2.0 * std::log(1.0 - p));
+        x = -(((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+            ((((d1 * q + d2) * q + d3) * q + d4) * q + 1.0);
+    }
+    for (int i = 0; i < 3; ++i) {
+        const double pdf = standardNormalPdf(x);
+        if (pdf == 0.0) {
+            break;
+        }
+        x -= (standardNormalCdf(x) - p) / pdf;
+    }
+    return x;
+}
+
+double poissonPmf(int k, double lambda) {
+    double p = std::exp(-lambda);
+    for (int i = 1; i <= k; ++i) {
+        p *= lambda / static_cast<double>(i);
+    }
+    return p;
+}
+
 std::pair<double, double> meanAndDev(const std::vector<double>& values, bool population) {
     double sum = 0.0;
     for (const double v : values) {
@@ -1188,6 +1246,176 @@ EvalResult fn_NORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ct
     return fn_NORMDIST(args, ctx);
 }
 
+EvalResult fn_NORMSINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult p = evaluateAsNumber(args[0], ctx);
+    if (p.isError()) {
+        return p;
+    }
+    if (p.getNumber() <= 0.0 || p.getNumber() >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(standardNormalInv(p.getNumber())));
+}
+
+EvalResult fn_NORM_S_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_NORMSINV(args, ctx);
+}
+
+EvalResult fn_NORMINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult p = evaluateAsNumber(args[0], ctx);
+    if (p.isError()) {
+        return p;
+    }
+    const EvalResult mean = evaluateAsNumber(args[1], ctx);
+    if (mean.isError()) {
+        return mean;
+    }
+    const EvalResult stdev = evaluateAsNumber(args[2], ctx);
+    if (stdev.isError()) {
+        return stdev;
+    }
+    if (p.getNumber() <= 0.0 || p.getNumber() >= 1.0 || stdev.getNumber() <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(
+        excelNormalize(mean.getNumber() + stdev.getNumber() * standardNormalInv(p.getNumber())));
+}
+
+EvalResult fn_NORM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_NORMINV(args, ctx);
+}
+
+EvalResult fn_TRIMMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, error] = collectNumericValues({args[0]}, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    const EvalResult percentRes = evaluateAsNumber(args[1], ctx);
+    if (percentRes.isError()) {
+        return percentRes;
+    }
+    const double percent = percentRes.getNumber();
+    if (percent < 0.0 || percent >= 1.0 || values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    std::sort(values.begin(), values.end());
+    const int drop =
+        static_cast<int>(std::floor(static_cast<double>(values.size()) * percent / 2.0));
+    if (drop * 2 >= static_cast<int>(values.size())) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double sum = 0.0;
+    const int end = static_cast<int>(values.size()) - drop;
+    for (int i = drop; i < end; ++i) {
+        sum += values[static_cast<size_t>(i)];
+    }
+    return EvalResult::Number(
+        excelNormalize(sum / static_cast<double>(values.size() - static_cast<size_t>(drop) * 2)));
+}
+
+EvalResult fn_POISSON(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    if (meanRes.isError()) {
+        return meanRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    if (xRes.getNumber() < 0.0 || meanRes.getNumber() < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const int k = static_cast<int>(xRes.getNumber());
+    const double lambda = meanRes.getNumber();
+    if (cumRes.getBoolean()) {
+        double cdf = 0.0;
+        for (int i = 0; i <= k; ++i) {
+            cdf += poissonPmf(i, lambda);
+        }
+        return EvalResult::Number(excelNormalize(cdf));
+    }
+    return EvalResult::Number(excelNormalize(poissonPmf(k, lambda)));
+}
+
+EvalResult fn_POISSON_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_POISSON(args, ctx);
+}
+
+EvalResult fn_EXPONDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult lambdaRes = evaluateAsNumber(args[1], ctx);
+    if (lambdaRes.isError()) {
+        return lambdaRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    const double lambda = lambdaRes.getNumber();
+    if (x < 0.0 || lambda <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (cumRes.getBoolean()) {
+        return EvalResult::Number(excelNormalize(1.0 - std::exp(-lambda * x)));
+    }
+    return EvalResult::Number(excelNormalize(lambda * std::exp(-lambda * x)));
+}
+
+EvalResult fn_EXPON_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_EXPONDIST(args, ctx);
+}
+
+EvalResult fn_CONFIDENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult alpha = evaluateAsNumber(args[0], ctx);
+    if (alpha.isError()) {
+        return alpha;
+    }
+    const EvalResult stdev = evaluateAsNumber(args[1], ctx);
+    if (stdev.isError()) {
+        return stdev;
+    }
+    const EvalResult size = evaluateAsNumber(args[2], ctx);
+    if (size.isError()) {
+        return size;
+    }
+    if (alpha.getNumber() <= 0.0 || alpha.getNumber() >= 1.0 || stdev.getNumber() <= 0.0 ||
+        size.getNumber() < 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double z = standardNormalInv(1.0 - alpha.getNumber() / 2.0);
+    return EvalResult::Number(excelNormalize(z * stdev.getNumber() / std::sqrt(size.getNumber())));
+}
+
+EvalResult fn_CONFIDENCE_NORM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_CONFIDENCE(args, ctx);
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -1342,6 +1570,35 @@ void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("NORM.DIST", fn_NORM_DIST, "(x, mean, standard_dev, cumulative)",
                               "Normal distribution", "Statistics");
     registry.registerAlias("NORM_DIST", "NORM.DIST");
+    registry.registerFunction("NORMSINV", fn_NORMSINV, "(probability)",
+                              "Inverse of the standard normal cumulative distribution",
+                              "Statistics");
+    registry.registerFunction("NORM.S.INV", fn_NORM_S_INV, "(probability)",
+                              "Inverse of the standard normal cumulative distribution",
+                              "Statistics");
+    registry.registerAlias("NORM_S_INV", "NORM.S.INV");
+    registry.registerFunction("NORMINV", fn_NORMINV, "(probability, mean, standard_dev)",
+                              "Inverse of the normal cumulative distribution", "Statistics");
+    registry.registerFunction("NORM.INV", fn_NORM_INV, "(probability, mean, standard_dev)",
+                              "Inverse of the normal cumulative distribution", "Statistics");
+    registry.registerAlias("NORM_INV", "NORM.INV");
+    registry.registerFunction("TRIMMEAN", fn_TRIMMEAN, "(array, percent)",
+                              "Mean excluding a fraction of data from the tails", "Statistics");
+    registry.registerFunction("POISSON", fn_POISSON, "(x, mean, cumulative)",
+                              "Poisson distribution", "Statistics");
+    registry.registerFunction("POISSON.DIST", fn_POISSON_DIST, "(x, mean, cumulative)",
+                              "Poisson distribution", "Statistics");
+    registry.registerAlias("POISSON_DIST", "POISSON.DIST");
+    registry.registerFunction("EXPONDIST", fn_EXPONDIST, "(x, lambda, cumulative)",
+                              "Exponential distribution", "Statistics");
+    registry.registerFunction("EXPON.DIST", fn_EXPON_DIST, "(x, lambda, cumulative)",
+                              "Exponential distribution", "Statistics");
+    registry.registerAlias("EXPON_DIST", "EXPON.DIST");
+    registry.registerFunction("CONFIDENCE", fn_CONFIDENCE, "(alpha, standard_dev, size)",
+                              "Confidence interval for a normal population", "Statistics");
+    registry.registerFunction("CONFIDENCE.NORM", fn_CONFIDENCE_NORM, "(alpha, standard_dev, size)",
+                              "Confidence interval for a normal population", "Statistics");
+    registry.registerAlias("CONFIDENCE_NORM", "CONFIDENCE.NORM");
 }
 
 }  // namespace cells

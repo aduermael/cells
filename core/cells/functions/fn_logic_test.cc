@@ -159,5 +159,25 @@ TEST_F(FnLogicTest, IsRef) {
     EXPECT_FALSE(txt.getBoolean());
 }
 
+TEST_F(FnLogicTest, IsBetween) {
+    EvalResult yes = eval("=ISBETWEEN(5,1,10)");
+    ASSERT_TRUE(yes.isBoolean());
+    EXPECT_TRUE(yes.getBoolean());
+    EvalResult lo = eval("=ISBETWEEN(1,1,10)");
+    ASSERT_TRUE(lo.isBoolean());
+    EXPECT_TRUE(lo.getBoolean());
+    EvalResult exclusive = eval("=ISBETWEEN(1,1,10,FALSE,TRUE)");
+    ASSERT_TRUE(exclusive.isBoolean());
+    EXPECT_FALSE(exclusive.getBoolean());
+    EvalResult hiEx = eval("=ISBETWEEN(10,1,10,TRUE,FALSE)");
+    ASSERT_TRUE(hiEx.isBoolean());
+    EXPECT_FALSE(hiEx.getBoolean());
+    EvalResult outside = eval("=ISBETWEEN(11,1,10)");
+    ASSERT_TRUE(outside.isBoolean());
+    EXPECT_FALSE(outside.getBoolean());
+    EXPECT_EQ(eval("=ISBETWEEN(1,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=ISBETWEEN(\"x\",1,2)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

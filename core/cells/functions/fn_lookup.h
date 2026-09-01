@@ -68,6 +68,9 @@ EvalResult fn_AREAS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_SHEET(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_SHEETS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_HYPERLINK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

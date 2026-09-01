@@ -2061,6 +2061,24 @@ EvalResult fn_GAMMALN_PRECISE(const std::vector<const ASTNode*>& args, EvalConte
     return fn_GAMMALN(args, ctx);
 }
 
+EvalResult fn_PERCENTOF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+    const EvalResult den = evaluateAsNumber(args[1], ctx);
+    if (den.isError()) {
+        return den;
+    }
+    if (den.getNumber() == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(num.getNumber() / den.getNumber()));
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -2204,6 +2222,8 @@ void registerMathFunctions(FunctionRegistry& registry) {
     registry.registerFunction("GAMMALN.PRECISE", fn_GAMMALN_PRECISE, "(number)",
                               "Natural log of the gamma function", "Math");
     registry.registerAlias("GAMMALN_PRECISE", "GAMMALN.PRECISE");
+    registry.registerFunction("PERCENTOF", fn_PERCENTOF, "(numerator, denominator)",
+                              "Returns a value as a percentage of another", "Math");
 
     // Excel dotted names (XLSX import also stores underscore forms).
     registry.registerAlias("CEILING.MATH", "CEILING_MATH");

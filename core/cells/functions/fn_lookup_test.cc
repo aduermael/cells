@@ -711,5 +711,77 @@ TEST_F(FnLookupTest, AreasSheetSheetsHyperlink) {
     EXPECT_EQ(eval("=HYPERLINK(1/0,\"x\")").getError(), CellError::DIV);
 }
 
+TEST_F(FnLookupTest, XlookupExactIfNotFoundAndArrayReturn) {
+    setCellValue(0, 0, "a");
+    setCellValue(1, 0, 10.0);
+    setCellValue(2, 0, 100.0);
+    setCellValue(0, 1, "b");
+    setCellValue(1, 1, 20.0);
+    setCellValue(2, 1, 200.0);
+    setCellValue(0, 2, "c");
+    setCellValue(1, 2, 30.0);
+    setCellValue(2, 2, 300.0);
+
+    EvalResult found = eval("=XLOOKUP(\"b\",A1:A3,B1:B3)");
+    ASSERT_TRUE(found.isNumber());
+    EXPECT_DOUBLE_EQ(found.getNumber(), 20.0);
+
+    EvalResult missing = eval("=XLOOKUP(\"z\",A1:A3,B1:B3)");
+    ASSERT_TRUE(missing.isError());
+    EXPECT_EQ(missing.getError(), CellError::NA);
+
+    EvalResult fallback = eval("=XLOOKUP(\"z\",A1:A3,B1:B3,\"none\")");
+    ASSERT_TRUE(fallback.isString());
+    EXPECT_EQ(fallback.getString(), "none");
+
+    EvalResult row = eval("=XLOOKUP(\"b\",A1:A3,B1:C3)");
+    ASSERT_TRUE(row.isArray());
+    EXPECT_EQ(row.getArrayRows(), 1u);
+    EXPECT_EQ(row.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(row.getArrayAt(0, 0).getNumber(), 20.0);
+    EXPECT_DOUBLE_EQ(row.getArrayAt(0, 1).getNumber(), 200.0);
+
+    EvalResult last = eval("=XLOOKUP(\"c\",A1:A3,B1:B3,\"x\",0,-1)");
+    ASSERT_TRUE(last.isNumber());
+    EXPECT_DOUBLE_EQ(last.getNumber(), 30.0);
+
+    EXPECT_EQ(eval("=XLOOKUP(\"b\",A1:C3,B1:B3)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=XLOOKUP(\"b\",A1:A3,B1:B2)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnLookupTest, XmatchAndLookup) {
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(0, 2, 30.0);
+    setCellValue(1, 0, "ten");
+    setCellValue(1, 1, "twenty");
+    setCellValue(1, 2, "thirty");
+
+    EvalResult xm = eval("=XMATCH(20,A1:A3)");
+    ASSERT_TRUE(xm.isNumber());
+    EXPECT_DOUBLE_EQ(xm.getNumber(), 2.0);
+    EvalResult missing = eval("=XMATCH(99,A1:A3)");
+    ASSERT_TRUE(missing.isError());
+    EXPECT_EQ(missing.getError(), CellError::NA);
+    EvalResult nextSmaller = eval("=XMATCH(25,A1:A3,-1)");
+    ASSERT_TRUE(nextSmaller.isNumber());
+    EXPECT_DOUBLE_EQ(nextSmaller.getNumber(), 2.0);
+    EvalResult nextLarger = eval("=XMATCH(25,A1:A3,1)");
+    ASSERT_TRUE(nextLarger.isNumber());
+    EXPECT_DOUBLE_EQ(nextLarger.getNumber(), 3.0);
+    EXPECT_EQ(eval("=XMATCH(20,A1:B3)").getError(), CellError::VALUE);
+
+    EvalResult lk = eval("=LOOKUP(25,A1:A3,B1:B3)");
+    ASSERT_TRUE(lk.isString());
+    EXPECT_EQ(lk.getString(), "twenty");
+    EvalResult exact = eval("=LOOKUP(30,A1:A3,B1:B3)");
+    ASSERT_TRUE(exact.isString());
+    EXPECT_EQ(exact.getString(), "thirty");
+    EvalResult arr = eval("=LOOKUP(25,A1:B3)");
+    ASSERT_TRUE(arr.isString());
+    EXPECT_EQ(arr.getString(), "twenty");
+    EXPECT_EQ(eval("=LOOKUP(5,A1:A3,B1:B3)").getError(), CellError::NA);
+}
+
 }  // namespace
 }  // namespace cells

@@ -7,6 +7,19 @@ IF.true	=IF(TRUE,1,2)		n:1
 ABS.neg	=ABS(-7)		n:7
 SQRT.16	=SQRT(16)		n:4
 LEN.hello	=LEN("hello")		n:5
+TEXTAFTER.basic	=TEXTAFTER("abc-def","-")		s:def
+TEXTBEFORE.basic	=TEXTBEFORE("abc-def","-")		s:abc
+VALUETOTEXT.num	=VALUETOTEXT(12)		s:12
+PERCENTOF.basic	=PERCENTOF(1,4)		n:0.25
+ISBETWEEN.yes	=ISBETWEEN(5,1,10)		b:true
+NORMSINV.half	=NORMSINV(0.5)		n:0
+NORMINV.half	=NORMINV(0.5,10,2)		n:10
+TRIMMEAN.simple	=TRIMMEAN(A1:A4,0.5)	A1=n:1;A2=n:2;A3=n:3;A4=n:4	n:2.5
+POISSON.pmf	=POISSON(2,5,FALSE)		n:0.084224337488568
+EXPONDIST.cdf	=EXPONDIST(0.5,1,TRUE)		n:0.393469340287367
+NETWORKDAYS.INTL.sun	=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),11)		n:6
+XLOOKUP.exact	=XLOOKUP("b",A1:A3,B1:B3)	A1=s:a;A2=s:b;A3=s:c;B1=n:10;B2=n:20;B3=n:30	n:20
+LOOKUP.approx	=LOOKUP(25,A1:A3,B1:B3)	A1=n:10;A2=n:20;A3=n:30;B1=s:ten;B2=s:twenty;B3=s:thirty	s:twenty
 MOG.smoke.ACCRINT	=ACCRINT()		implemented
 MOG.smoke.ACCRINTM	=ACCRINTM()		implemented
 MOG.smoke.ACOS	=ACOS()		implemented

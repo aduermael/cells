@@ -775,5 +775,64 @@ TEST_F(FnStatsTest, Steyx) {
     EXPECT_EQ(eval("=STEYX(C1:C2,D1:D2)").getError(), CellError::DIV);
 }
 
+TEST_F(FnStatsTest, NormInvPoissonExponConfidenceTrimmean) {
+    EvalResult half = eval("=NORMSINV(0.5)");
+    ASSERT_TRUE(half.isNumber());
+    EXPECT_NEAR(half.getNumber(), 0.0, 1e-12);
+    EvalResult alias = eval("=NORM.S.INV(0.5)");
+    ASSERT_TRUE(alias.isNumber());
+    EXPECT_NEAR(alias.getNumber(), 0.0, 1e-12);
+    EvalResult loc = eval("=NORMINV(0.5,10,2)");
+    ASSERT_TRUE(loc.isNumber());
+    EXPECT_NEAR(loc.getNumber(), 10.0, 1e-12);
+    EvalResult loc2 = eval("=NORM.INV(0.5,10,2)");
+    ASSERT_TRUE(loc2.isNumber());
+    EXPECT_NEAR(loc2.getNumber(), 10.0, 1e-12);
+    EvalResult roundtrip = eval("=NORMSINV(NORMSDIST(1))");
+    ASSERT_TRUE(roundtrip.isNumber());
+    EXPECT_NEAR(roundtrip.getNumber(), 1.0, 1e-9);
+    EXPECT_EQ(eval("=NORMSINV(0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=NORMINV(0.5,0,0)").getError(), CellError::NUM);
+
+    EvalResult pmf = eval("=POISSON(2,5,FALSE)");
+    ASSERT_TRUE(pmf.isNumber());
+    EXPECT_NEAR(pmf.getNumber(), 0.084224337488568, 1e-12);
+    EvalResult pmf2 = eval("=POISSON.DIST(2,5,FALSE)");
+    ASSERT_TRUE(pmf2.isNumber());
+    EXPECT_NEAR(pmf2.getNumber(), pmf.getNumber(), 1e-15);
+    EvalResult cdf = eval("=POISSON(0,1,TRUE)");
+    ASSERT_TRUE(cdf.isNumber());
+    EXPECT_NEAR(cdf.getNumber(), std::exp(-1.0), 1e-12);
+    EXPECT_EQ(eval("=POISSON(-1,1,TRUE)").getError(), CellError::NUM);
+
+    EvalResult expCdf = eval("=EXPONDIST(0.5,1,TRUE)");
+    ASSERT_TRUE(expCdf.isNumber());
+    EXPECT_NEAR(expCdf.getNumber(), 1.0 - std::exp(-0.5), 1e-12);
+    EvalResult expPdf = eval("=EXPON.DIST(0,2,FALSE)");
+    ASSERT_TRUE(expPdf.isNumber());
+    EXPECT_NEAR(expPdf.getNumber(), 2.0, 1e-12);
+    EXPECT_EQ(eval("=EXPONDIST(-0.1,1,TRUE)").getError(), CellError::NUM);
+
+    EvalResult z = eval("=NORMSINV(0.975)");
+    ASSERT_TRUE(z.isNumber());
+    EvalResult conf = eval("=CONFIDENCE(0.05,2.5,50)");
+    ASSERT_TRUE(conf.isNumber());
+    EXPECT_NEAR(conf.getNumber(), z.getNumber() * 2.5 / std::sqrt(50.0), 1e-12);
+    EvalResult conf2 = eval("=CONFIDENCE.NORM(0.05,2.5,50)");
+    ASSERT_TRUE(conf2.isNumber());
+    EXPECT_NEAR(conf2.getNumber(), conf.getNumber(), 1e-15);
+    EXPECT_EQ(eval("=CONFIDENCE(0,1,10)").getError(), CellError::NUM);
+
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(0, 3, 4.0);
+    EvalResult trim = eval("=TRIMMEAN(A1:A4,0.5)");
+    ASSERT_TRUE(trim.isNumber());
+    EXPECT_DOUBLE_EQ(trim.getNumber(), 2.5);
+    EXPECT_EQ(eval("=TRIMMEAN(A1:A4,1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=TRIMMEAN(A1:A4)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

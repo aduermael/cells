@@ -115,6 +115,8 @@ EvalResult fn_ERROR_TYPE(const std::vector<const ASTNode*>& args, EvalContext& c
 // ISREF(value) - TRUE if argument is a reference
 EvalResult fn_ISREF(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_ISBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Boolean Constants
 // =============================================================================

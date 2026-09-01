@@ -93,6 +93,8 @@ EvalResult fn_DATEDIF(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NETWORKDAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NETWORKDAYS_INTL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WORKDAY_INTL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_DAYS360(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_YEARFRAC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_ISOWEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);

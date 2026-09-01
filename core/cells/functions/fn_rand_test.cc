@@ -244,5 +244,34 @@ TEST_F(FnRandTest, RANDBETWEENIncludesEndpoints) {
     EXPECT_TRUE(values.count(3.0) > 0) << "Should include upper bound";
 }
 
+TEST_F(FnRandTest, RandarrayShapeAndBounds) {
+    EvalResult a = eval("=RANDARRAY(2,3)");
+    ASSERT_TRUE(a.isArray());
+    EXPECT_EQ(a.getArrayRows(), 2u);
+    EXPECT_EQ(a.getArrayCols(), 3u);
+    for (size_t r = 0; r < 2; ++r) {
+        for (size_t c = 0; c < 3; ++c) {
+            ASSERT_TRUE(a.getArrayAt(r, c).isNumber());
+            EXPECT_GE(a.getArrayAt(r, c).getNumber(), 0.0);
+            EXPECT_LE(a.getArrayAt(r, c).getNumber(), 1.0);
+        }
+    }
+
+    EvalResult ints = eval("=RANDARRAY(1,8,2,4,TRUE)");
+    ASSERT_TRUE(ints.isArray());
+    EXPECT_EQ(ints.getArrayRows(), 1u);
+    EXPECT_EQ(ints.getArrayCols(), 8u);
+    for (size_t c = 0; c < 8; ++c) {
+        const double v = ints.getArrayAt(0, c).getNumber();
+        EXPECT_GE(v, 2.0);
+        EXPECT_LE(v, 4.0);
+        EXPECT_EQ(v, std::floor(v));
+    }
+
+    EXPECT_EQ(eval("=RANDARRAY(0)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=RANDARRAY(1,1,5,1)").getError(), CellError::VALUE);
+    EXPECT_TRUE(FunctionRegistry::instance().isVolatile("RANDARRAY"));
+}
+
 }  // namespace
 }  // namespace cells

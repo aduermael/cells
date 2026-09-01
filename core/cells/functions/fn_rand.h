@@ -32,6 +32,8 @@ EvalResult fn_RAND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // This is a volatile function - recalculates on every sheet change
 EvalResult fn_RANDBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_RANDARRAY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

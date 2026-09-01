@@ -1004,6 +1004,316 @@ EvalResult fn_HYPERLINK(const std::vector<const ASTNode*>& args, EvalContext& ct
     return loc;
 }
 
+namespace {
+
+size_t gridWidth(const std::vector<std::vector<EvalResult>>& g) {
+    size_t cols = 0;
+    for (const auto& row : g) {
+        cols = std::max(cols, row.size());
+    }
+    return cols;
+}
+
+EvalResult gridCell(const std::vector<std::vector<EvalResult>>& g, size_t r, size_t c) {
+    if (r >= g.size() || c >= g[r].size()) {
+        return EvalResult::Empty();
+    }
+    return g[r][c];
+}
+
+bool asVector(const std::vector<std::vector<EvalResult>>& g, bool* horizontal, size_t* n) {
+    if (g.empty()) {
+        return false;
+    }
+    const size_t rows = g.size();
+    const size_t cols = gridWidth(g);
+    if (rows == 1) {
+        *horizontal = true;
+        *n = cols;
+        return true;
+    }
+    if (cols == 1) {
+        *horizontal = false;
+        *n = rows;
+        return true;
+    }
+    return false;
+}
+
+EvalResult vectorAt(const std::vector<std::vector<EvalResult>>& g, bool horizontal, size_t i) {
+    return horizontal ? gridCell(g, 0, i) : gridCell(g, i, 0);
+}
+
+int findMatch(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
+              bool horizontal, size_t n, int matchMode, int searchMode) {
+    const bool reverse = searchMode < 0;
+    int best = -1;
+    if (reverse) {
+        for (int i = static_cast<int>(n) - 1; i >= 0; --i) {
+            const EvalResult cell = vectorAt(arr, horizontal, static_cast<size_t>(i));
+            if (cell.isError()) {
+                continue;
+            }
+            if (matchMode == 0) {
+                if (valuesMatch(lookup, cell)) {
+                    return i;
+                }
+                continue;
+            }
+            const int cmp = compareValues(lookup, cell);
+            if (matchMode == -1 && cmp >= 0) {
+                if (best < 0 ||
+                    compareValues(vectorAt(arr, horizontal, static_cast<size_t>(best)), cell) < 0) {
+                    best = i;
+                }
+            } else if (matchMode == 1 && cmp <= 0) {
+                if (best < 0 ||
+                    compareValues(cell, vectorAt(arr, horizontal, static_cast<size_t>(best))) < 0) {
+                    best = i;
+                }
+            }
+        }
+        return best;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        const EvalResult cell = vectorAt(arr, horizontal, i);
+        if (cell.isError()) {
+            continue;
+        }
+        if (matchMode == 0) {
+            if (valuesMatch(lookup, cell)) {
+                return static_cast<int>(i);
+            }
+            continue;
+        }
+        const int cmp = compareValues(lookup, cell);
+        if (matchMode == -1 && cmp >= 0) {
+            if (best < 0 ||
+                compareValues(vectorAt(arr, horizontal, static_cast<size_t>(best)), cell) < 0) {
+                best = static_cast<int>(i);
+            }
+        } else if (matchMode == 1 && cmp <= 0) {
+            if (best < 0 ||
+                compareValues(cell, vectorAt(arr, horizontal, static_cast<size_t>(best))) < 0) {
+                best = static_cast<int>(i);
+            }
+        }
+    }
+    return best;
+}
+
+EvalResult returnFromArray(const std::vector<std::vector<EvalResult>>& ret, bool lookupHorizontal,
+                           size_t matchIndex) {
+    if (lookupHorizontal) {
+        std::vector<EvalResult> col;
+        col.reserve(ret.size());
+        for (size_t r = 0; r < ret.size(); ++r) {
+            col.push_back(gridCell(ret, r, matchIndex));
+        }
+        if (col.size() == 1) {
+            return col[0];
+        }
+        return EvalResult::ColumnArray(std::move(col));
+    }
+    if (matchIndex >= ret.size()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    std::vector<EvalResult> row = ret[matchIndex];
+    if (row.size() == 1) {
+        return row[0];
+    }
+    return EvalResult::RowArray(std::move(row));
+}
+
+int approximateLookup(const EvalResult& lookup, const std::vector<std::vector<EvalResult>>& arr,
+                      bool horizontal, size_t n) {
+    int best = -1;
+    for (size_t i = 0; i < n; ++i) {
+        const EvalResult cell = vectorAt(arr, horizontal, i);
+        if (cell.isError()) {
+            continue;
+        }
+        const int cmp = compareValues(lookup, cell);
+        if (cmp >= 0) {
+            best = static_cast<int>(i);
+        } else {
+            break;
+        }
+    }
+    return best;
+}
+
+}  // namespace
+
+EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 3 || args.size() > 6) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult lookup = evaluate(args[0], ctx);
+    if (lookup.isError()) {
+        return lookup;
+    }
+    auto [lookupArr, lookupErr] = evaluateAs2D(args[1], ctx);
+    if (lookupErr.isError()) {
+        return lookupErr;
+    }
+    auto [returnArr, returnErr] = evaluateAs2D(args[2], ctx);
+    if (returnErr.isError()) {
+        return returnErr;
+    }
+    EvalResult ifNotFound = EvalResult::Error(CellError::NA);
+    if (args.size() >= 4) {
+        ifNotFound = evaluate(args[3], ctx);
+    }
+    int matchMode = 0;
+    if (args.size() >= 5) {
+        const EvalResult m = evaluateAsNumber(args[4], ctx);
+        if (m.isError()) {
+            return m;
+        }
+        matchMode = static_cast<int>(m.getNumber());
+    }
+    int searchMode = 1;
+    if (args.size() >= 6) {
+        const EvalResult s = evaluateAsNumber(args[5], ctx);
+        if (s.isError()) {
+            return s;
+        }
+        searchMode = static_cast<int>(s.getNumber());
+    }
+    if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (searchMode == 2) {
+        searchMode = 1;
+    } else if (searchMode == -2) {
+        searchMode = -1;
+    }
+
+    bool lookupHoriz = false;
+    size_t lookupN = 0;
+    if (!asVector(lookupArr, &lookupHoriz, &lookupN)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const size_t retRows = returnArr.size();
+    const size_t retCols = gridWidth(returnArr);
+    if (lookupHoriz) {
+        if (retCols != lookupN) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    } else if (retRows != lookupN) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const int match = findMatch(lookup, lookupArr, lookupHoriz, lookupN, matchMode, searchMode);
+    if (match < 0) {
+        return ifNotFound;
+    }
+    return returnFromArray(returnArr, lookupHoriz, static_cast<size_t>(match));
+}
+
+EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult lookup = evaluate(args[0], ctx);
+    if (lookup.isError()) {
+        return lookup;
+    }
+    auto [arr, err] = evaluateAs2D(args[1], ctx);
+    if (err.isError()) {
+        return err;
+    }
+    int matchMode = 0;
+    if (args.size() >= 3) {
+        const EvalResult m = evaluateAsNumber(args[2], ctx);
+        if (m.isError()) {
+            return m;
+        }
+        matchMode = static_cast<int>(m.getNumber());
+    }
+    int searchMode = 1;
+    if (args.size() >= 4) {
+        const EvalResult s = evaluateAsNumber(args[3], ctx);
+        if (s.isError()) {
+            return s;
+        }
+        searchMode = static_cast<int>(s.getNumber());
+    }
+    if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (searchMode == 2) {
+        searchMode = 1;
+    } else if (searchMode == -2) {
+        searchMode = -1;
+    }
+    bool horiz = false;
+    size_t n = 0;
+    if (!asVector(arr, &horiz, &n)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const int match = findMatch(lookup, arr, horiz, n, matchMode, searchMode);
+    if (match < 0) {
+        return EvalResult::Error(CellError::NA);
+    }
+    return EvalResult::Number(static_cast<double>(match + 1));
+}
+
+EvalResult fn_LOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult lookup = evaluate(args[0], ctx);
+    if (lookup.isError()) {
+        return lookup;
+    }
+    auto [arr, err] = evaluateAs2D(args[1], ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (args.size() == 2) {
+        const size_t rows = arr.size();
+        const size_t cols = gridWidth(arr);
+        const bool byRow = cols > rows;
+        bool horiz = byRow;
+        size_t n = byRow ? cols : rows;
+        const int match = approximateLookup(lookup, arr, horiz, n);
+        if (match < 0) {
+            return EvalResult::Error(CellError::NA);
+        }
+        if (byRow) {
+            return gridCell(arr, rows - 1, static_cast<size_t>(match));
+        }
+        return gridCell(arr, static_cast<size_t>(match), cols - 1);
+    }
+    auto [resultArr, resultErr] = evaluateAs2D(args[2], ctx);
+    if (resultErr.isError()) {
+        return resultErr;
+    }
+    bool lookupHoriz = false;
+    size_t lookupN = 0;
+    if (!asVector(arr, &lookupHoriz, &lookupN)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    bool resultHoriz = false;
+    size_t resultN = 0;
+    if (!asVector(resultArr, &resultHoriz, &resultN) || resultN != lookupN) {
+        return EvalResult::Error(CellError::NA);
+    }
+    const int match = approximateLookup(lookup, arr, lookupHoriz, lookupN);
+    if (match < 0) {
+        return EvalResult::Error(CellError::NA);
+    }
+    return vectorAt(resultArr, resultHoriz, static_cast<size_t>(match));
+}
+
 void registerLookupFunctions(FunctionRegistry& registry) {
     registry.registerFunction("INDEX", fn_INDEX, "(array, row_num, [col_num])",
                               "Returns a value at a position in a range", "Lookup");
@@ -1034,6 +1344,15 @@ void registerLookupFunctions(FunctionRegistry& registry) {
     registry.registerFunction("SHEETS", fn_SHEETS, "([reference])", "Number of sheets", "Lookup");
     registry.registerFunction("HYPERLINK", fn_HYPERLINK, "(link_location, [friendly_name])",
                               "Creates a hyperlink value", "Lookup");
+    registry.registerFunction("XLOOKUP", fn_XLOOKUP,
+                              "(lookup_value, lookup_array, return_array, [if_not_found], "
+                              "[match_mode], [search_mode])",
+                              "Looks up a value and returns a corresponding result", "Lookup");
+    registry.registerFunction("XMATCH", fn_XMATCH,
+                              "(lookup_value, lookup_array, [match_mode], [search_mode])",
+                              "Returns the relative position of a lookup value", "Lookup");
+    registry.registerFunction("LOOKUP", fn_LOOKUP, "(lookup_value, lookup_vector, [result_vector])",
+                              "Approximate lookup in a vector or array", "Lookup");
 }
 
 }  // namespace cells
