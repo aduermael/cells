@@ -68,6 +68,16 @@ EvalResult fn_DROP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CHOOSECOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CHOOSEROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WRAPCOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WRAPROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_EXPAND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FLATTEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ARRAYTOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MUNIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MMULT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MDETERM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MINVERSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

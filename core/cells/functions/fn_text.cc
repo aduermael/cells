@@ -741,6 +741,11 @@ EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(static_cast<double>(static_cast<unsigned char>(text[0])));
 }
 
+namespace {
+EvalResult joinTexts(const std::vector<const ASTNode*>& args, EvalContext& ctx, size_t start,
+                     const std::string& delim, bool ignoreEmpty);
+}
+
 EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 3) {
         return EvalResult::Error(CellError::VALUE);
@@ -753,53 +758,7 @@ EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (ignoreRes.isError()) {
         return ignoreRes;
     }
-    const std::string& delim = delimRes.getString();
-    const bool ignoreEmpty = ignoreRes.getBoolean();
-
-    std::vector<std::string> parts;
-    for (size_t i = 2; i < args.size(); ++i) {
-        const EvalResult val = evaluate(args[i], ctx);
-        if (val.isError()) {
-            return val;
-        }
-        std::vector<EvalResult> items;
-        if (val.isRange()) {
-            items = collectRangeValues(val, ctx);
-        } else if (val.isArray()) {
-            for (const auto& row : val.getArray()) {
-                items.insert(items.end(), row.begin(), row.end());
-            }
-        } else {
-            items.push_back(val);
-        }
-        for (const EvalResult& item : items) {
-            if (item.isError()) {
-                return item;
-            }
-            if (item.isEmpty()) {
-                if (!ignoreEmpty) {
-                    parts.emplace_back("");
-                }
-                continue;
-            }
-            const EvalResult s = item.toString();
-            if (s.isError()) {
-                return s;
-            }
-            if (ignoreEmpty && s.getString().empty()) {
-                continue;
-            }
-            parts.push_back(s.getString());
-        }
-    }
-    std::string result;
-    for (size_t i = 0; i < parts.size(); ++i) {
-        if (i > 0) {
-            result += delim;
-        }
-        result += parts[i];
-    }
-    return EvalResult::String(result);
+    return joinTexts(args, ctx, 2, delimRes.getString(), ignoreRes.getBoolean());
 }
 
 EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -937,6 +896,167 @@ std::string formatWithDecimals(double value, int decimals, bool thousands) {
         return "-" + out;
     }
     return out;
+}
+
+size_t utf8Next(const std::string& s, size_t i, std::uint32_t* cp) {
+    if (i >= s.size()) {
+        *cp = 0;
+        return i;
+    }
+    const auto b0 = static_cast<unsigned char>(s[i]);
+    if (b0 < 0x80) {
+        *cp = b0;
+        return i + 1;
+    }
+    if ((b0 & 0xE0) == 0xC0 && i + 1 < s.size()) {
+        const auto b1 = static_cast<unsigned char>(s[i + 1]);
+        if ((b1 & 0xC0) == 0x80) {
+            *cp = (static_cast<std::uint32_t>(b0 & 0x1F) << 6) | (b1 & 0x3F);
+            return i + 2;
+        }
+    } else if ((b0 & 0xF0) == 0xE0 && i + 2 < s.size()) {
+        const auto b1 = static_cast<unsigned char>(s[i + 1]);
+        const auto b2 = static_cast<unsigned char>(s[i + 2]);
+        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
+            *cp = (static_cast<std::uint32_t>(b0 & 0x0F) << 12) |
+                  (static_cast<std::uint32_t>(b1 & 0x3F) << 6) | (b2 & 0x3F);
+            return i + 3;
+        }
+    } else if ((b0 & 0xF8) == 0xF0 && i + 3 < s.size()) {
+        const auto b1 = static_cast<unsigned char>(s[i + 1]);
+        const auto b2 = static_cast<unsigned char>(s[i + 2]);
+        const auto b3 = static_cast<unsigned char>(s[i + 3]);
+        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80) {
+            *cp = (static_cast<std::uint32_t>(b0 & 0x07) << 18) |
+                  (static_cast<std::uint32_t>(b1 & 0x3F) << 12) |
+                  (static_cast<std::uint32_t>(b2 & 0x3F) << 6) | (b3 & 0x3F);
+            return i + 4;
+        }
+    }
+    *cp = b0;
+    return i + 1;
+}
+
+void ascMap(std::uint32_t cp, std::uint32_t out[2], int* n) {
+    *n = 1;
+    out[1] = 0;
+    if (cp == 0x3000) {
+        out[0] = 0x20;
+        return;
+    }
+    if (cp >= 0xFF01 && cp <= 0xFF5E) {
+        out[0] = cp - 0xFEE0;
+        return;
+    }
+    if (cp == 0x3001) {
+        out[0] = 0xFF64;
+        return;
+    }
+    if (cp == 0x3002) {
+        out[0] = 0xFF61;
+        return;
+    }
+    if (cp == 0x300C) {
+        out[0] = 0xFF62;
+        return;
+    }
+    if (cp == 0x300D) {
+        out[0] = 0xFF63;
+        return;
+    }
+    if (cp == 0x30FB) {
+        out[0] = 0xFF65;
+        return;
+    }
+    if (cp == 0x30FC) {
+        out[0] = 0xFF70;
+        return;
+    }
+    // Full-width katakana → half-width (base + optional voiced/semi-voiced mark).
+    static const std::uint16_t kKana[][2] = {
+        {0xFF67, 0},      {0xFF71, 0},      {0xFF68, 0},      {0xFF72, 0},      {0xFF69, 0},
+        {0xFF73, 0},      {0xFF6A, 0},      {0xFF74, 0},      {0xFF6B, 0},      {0xFF75, 0},
+        {0xFF76, 0},      {0xFF76, 0xFF9E}, {0xFF77, 0},      {0xFF77, 0xFF9E}, {0xFF78, 0},
+        {0xFF78, 0xFF9E}, {0xFF79, 0},      {0xFF79, 0xFF9E}, {0xFF7A, 0},      {0xFF7A, 0xFF9E},
+        {0xFF7B, 0},      {0xFF7B, 0xFF9E}, {0xFF7C, 0},      {0xFF7C, 0xFF9E}, {0xFF7D, 0},
+        {0xFF7D, 0xFF9E}, {0xFF7E, 0},      {0xFF7E, 0xFF9E}, {0xFF7F, 0},      {0xFF7F, 0xFF9E},
+        {0xFF80, 0},      {0xFF80, 0xFF9E}, {0xFF81, 0},      {0xFF81, 0xFF9E}, {0xFF6F, 0},
+        {0xFF82, 0},      {0xFF82, 0xFF9E}, {0xFF83, 0},      {0xFF83, 0xFF9E}, {0xFF84, 0},
+        {0xFF84, 0xFF9E}, {0xFF85, 0},      {0xFF86, 0},      {0xFF87, 0},      {0xFF88, 0},
+        {0xFF89, 0},      {0xFF8A, 0},      {0xFF8A, 0xFF9E}, {0xFF8A, 0xFF9F}, {0xFF8B, 0},
+        {0xFF8B, 0xFF9E}, {0xFF8B, 0xFF9F}, {0xFF8C, 0},      {0xFF8C, 0xFF9E}, {0xFF8C, 0xFF9F},
+        {0xFF8D, 0},      {0xFF8D, 0xFF9E}, {0xFF8D, 0xFF9F}, {0xFF8E, 0},      {0xFF8E, 0xFF9E},
+        {0xFF8E, 0xFF9F}, {0xFF8F, 0},      {0xFF90, 0},      {0xFF91, 0},      {0xFF92, 0},
+        {0xFF93, 0},      {0xFF6C, 0},      {0xFF94, 0},      {0xFF6D, 0},      {0xFF95, 0},
+        {0xFF6E, 0},      {0xFF96, 0},      {0xFF97, 0},      {0xFF98, 0},      {0xFF99, 0},
+        {0xFF9A, 0},      {0xFF9B, 0},      {0, 0},           {0xFF9C, 0},      {0, 0},
+        {0, 0},           {0xFF66, 0},      {0xFF9D, 0},      {0xFF73, 0xFF9E},
+    };
+    if (cp >= 0x30A1 && cp <= 0x30F4) {
+        const auto& row = kKana[cp - 0x30A1];
+        if (row[0] != 0) {
+            out[0] = row[0];
+            if (row[1] != 0) {
+                out[1] = row[1];
+                *n = 2;
+            }
+            return;
+        }
+    }
+    out[0] = cp;
+}
+
+bool urlUnreserved(unsigned char c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' ||
+           c == '.' || c == '_' || c == '~';
+}
+
+EvalResult joinTexts(const std::vector<const ASTNode*>& args, EvalContext& ctx, size_t start,
+                     const std::string& delim, bool ignoreEmpty) {
+    std::vector<std::string> parts;
+    for (size_t i = start; i < args.size(); ++i) {
+        const EvalResult val = evaluate(args[i], ctx);
+        if (val.isError()) {
+            return val;
+        }
+        std::vector<EvalResult> items;
+        if (val.isRange()) {
+            items = collectRangeValues(val, ctx);
+        } else if (val.isArray()) {
+            for (const auto& row : val.getArray()) {
+                items.insert(items.end(), row.begin(), row.end());
+            }
+        } else {
+            items.push_back(val);
+        }
+        for (const EvalResult& item : items) {
+            if (item.isError()) {
+                return item;
+            }
+            if (item.isEmpty()) {
+                if (!ignoreEmpty) {
+                    parts.emplace_back("");
+                }
+                continue;
+            }
+            const EvalResult s = item.toString();
+            if (s.isError()) {
+                return s;
+            }
+            if (ignoreEmpty && s.getString().empty()) {
+                continue;
+            }
+            parts.push_back(s.getString());
+        }
+    }
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            result += delim;
+        }
+        result += parts[i];
+    }
+    return EvalResult::String(result);
 }
 
 }  // namespace
@@ -1371,6 +1491,141 @@ EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& 
     return value.toString();
 }
 
+EvalResult fn_ASC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult text = evaluateAsString(args[0], ctx);
+    if (text.isError()) {
+        return text;
+    }
+    const std::string& in = text.getString();
+    std::string out;
+    out.reserve(in.size());
+    size_t i = 0;
+    while (i < in.size()) {
+        std::uint32_t cp = 0;
+        i = utf8Next(in, i, &cp);
+        std::uint32_t mapped[2] = {0, 0};
+        int n = 1;
+        ascMap(cp, mapped, &n);
+        for (int k = 0; k < n; ++k) {
+            out += utf8Encode(mapped[k]);
+        }
+    }
+    return EvalResult::String(std::move(out));
+}
+
+EvalResult fn_ENCODEURL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult text = evaluateAsString(args[0], ctx);
+    if (text.isError()) {
+        return text;
+    }
+    static const char* kHex = "0123456789ABCDEF";
+    std::string out;
+    for (unsigned char c : text.getString()) {
+        if (urlUnreserved(c)) {
+            out.push_back(static_cast<char>(c));
+        } else {
+            out.push_back('%');
+            out.push_back(kHex[c >> 4]);
+            out.push_back(kHex[c & 0x0F]);
+        }
+    }
+    return EvalResult::String(std::move(out));
+}
+
+EvalResult fn_JOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult delimRes = evaluateAsString(args[0], ctx);
+    if (delimRes.isError()) {
+        return delimRes;
+    }
+    return joinTexts(args, ctx, 1, delimRes.getString(), false);
+}
+
+EvalResult fn_SPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    const EvalResult delimRes = evaluateAsString(args[1], ctx);
+    if (delimRes.isError()) {
+        return delimRes;
+    }
+    bool splitByEach = true;
+    if (args.size() >= 3) {
+        const EvalResult each = evaluateAsBoolean(args[2], ctx);
+        if (each.isError()) {
+            return each;
+        }
+        splitByEach = each.getBoolean();
+    }
+    bool removeEmpty = false;
+    if (args.size() >= 4) {
+        const EvalResult rem = evaluateAsBoolean(args[3], ctx);
+        if (rem.isError()) {
+            return rem;
+        }
+        removeEmpty = rem.getBoolean();
+    }
+    const std::string& text = textRes.getString();
+    const std::string& delim = delimRes.getString();
+    if (delim.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<std::string> parts;
+    if (!splitByEach) {
+        parts = splitKeep(text, delim, false, removeEmpty);
+    } else {
+        size_t from = 0;
+        size_t i = 0;
+        while (i < text.size()) {
+            std::uint32_t cp = 0;
+            const size_t next = utf8Next(text, i, &cp);
+            bool isDelim = false;
+            size_t d = 0;
+            while (d < delim.size()) {
+                std::uint32_t dc = 0;
+                d = utf8Next(delim, d, &dc);
+                if (dc == cp) {
+                    isDelim = true;
+                    break;
+                }
+            }
+            if (isDelim) {
+                const std::string part = text.substr(from, i - from);
+                if (!removeEmpty || !part.empty()) {
+                    parts.push_back(part);
+                }
+                from = next;
+            }
+            i = next;
+        }
+        const std::string last = text.substr(from);
+        if (!removeEmpty || !last.empty()) {
+            parts.push_back(last);
+        }
+    }
+    if (parts.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<EvalResult> row;
+    row.reserve(parts.size());
+    for (auto& p : parts) {
+        row.push_back(EvalResult::String(std::move(p)));
+    }
+    return EvalResult::RowArray(std::move(row));
+}
+
 void registerTextFunctions(FunctionRegistry& registry) {
     // Basic text functions
     registry.registerFunction("LEN", fn_LEN, "(text)", "Returns the number of characters", "Text");
@@ -1444,6 +1699,14 @@ void registerTextFunctions(FunctionRegistry& registry) {
                               "Splits text into rows or columns", "Text");
     registry.registerFunction("VALUETOTEXT", fn_VALUETOTEXT, "(value, [format])",
                               "Returns text from any value", "Text");
+    registry.registerFunction("ASC", fn_ASC, "(text)",
+                              "Converts full-width characters to half-width", "Text");
+    registry.registerFunction("ENCODEURL", fn_ENCODEURL, "(text)", "URL-encodes text", "Text");
+    registry.registerFunction("JOIN", fn_JOIN, "(delimiter, text1, [text2], ...)",
+                              "Joins text with a delimiter", "Text");
+    registry.registerFunction("SPLIT", fn_SPLIT,
+                              "(text, delimiter, [split_by_each], [remove_empty_text])",
+                              "Splits text into a row array", "Text");
     // Unicode Excel treats DBCS byte variants as the character implementations.
     registry.registerAlias("LENB", "LEN");
     registry.registerAlias("LEFTB", "LEFT");

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -121,6 +122,237 @@ double poissonPmf(int k, double lambda) {
         p *= lambda / static_cast<double>(i);
     }
     return p;
+}
+
+int truncNonNeg(double x) {
+    return static_cast<int>(x);
+}
+
+double logCombin(int n, int k) {
+    if (k < 0 || k > n) {
+        return -std::numeric_limits<double>::infinity();
+    }
+    return std::lgamma(n + 1.0) - std::lgamma(k + 1.0) - std::lgamma(n - k + 1.0);
+}
+
+double binomPmf(int k, int n, double p) {
+    if (k < 0 || k > n) {
+        return 0.0;
+    }
+    if (p == 0.0) {
+        return k == 0 ? 1.0 : 0.0;
+    }
+    if (p == 1.0) {
+        return k == n ? 1.0 : 0.0;
+    }
+    const double logp = logCombin(n, k) + static_cast<double>(k) * std::log(p) +
+                        static_cast<double>(n - k) * std::log(1.0 - p);
+    return std::exp(logp);
+}
+
+double binomCdf(int k, int n, double p) {
+    if (k < 0) {
+        return 0.0;
+    }
+    if (k >= n) {
+        return 1.0;
+    }
+    double pmf = binomPmf(0, n, p);
+    double cdf = pmf;
+    const double odds = (p == 1.0) ? 0.0 : p / (1.0 - p);
+    for (int i = 0; i < k; ++i) {
+        pmf *= static_cast<double>(n - i) / static_cast<double>(i + 1) * odds;
+        cdf += pmf;
+    }
+    if (cdf > 1.0) {
+        return 1.0;
+    }
+    return cdf;
+}
+
+int binomInv(int n, double p, double alpha) {
+    double cdf = 0.0;
+    for (int k = 0; k <= n; ++k) {
+        cdf += binomPmf(k, n, p);
+        if (cdf >= alpha) {
+            return k;
+        }
+    }
+    return n;
+}
+
+double hypgeomPmf(int k, int n, int K, int N) {
+    const int lo = std::max(0, n - (N - K));
+    const int hi = std::min(n, K);
+    if (k < lo || k > hi) {
+        return 0.0;
+    }
+    return std::exp(logCombin(K, k) + logCombin(N - K, n - k) - logCombin(N, n));
+}
+
+double hypgeomCdf(int k, int n, int K, int N) {
+    const int lo = std::max(0, n - (N - K));
+    const int hi = std::min(n, K);
+    if (k < lo) {
+        return 0.0;
+    }
+    if (k >= hi) {
+        return 1.0;
+    }
+    double sum = 0.0;
+    for (int i = lo; i <= k; ++i) {
+        sum += hypgeomPmf(i, n, K, N);
+    }
+    if (sum > 1.0) {
+        return 1.0;
+    }
+    return sum;
+}
+
+double negbinomPmf(int k, int r, double p) {
+    if (k < 0 || r < 1) {
+        return 0.0;
+    }
+    if (p == 0.0) {
+        return 0.0;
+    }
+    if (p == 1.0) {
+        return k == 0 ? 1.0 : 0.0;
+    }
+    const double logp = logCombin(k + r - 1, k) + static_cast<double>(r) * std::log(p) +
+                        static_cast<double>(k) * std::log(1.0 - p);
+    return std::exp(logp);
+}
+
+double negbinomCdf(int k, int r, double p) {
+    double sum = 0.0;
+    for (int i = 0; i <= k; ++i) {
+        sum += negbinomPmf(i, r, p);
+    }
+    if (sum > 1.0) {
+        return 1.0;
+    }
+    return sum;
+}
+
+double gammaSeries(double a, double x) {
+    double ap = a;
+    double sum = 1.0 / a;
+    double del = sum;
+    for (int n = 0; n < 200; ++n) {
+        ap += 1.0;
+        del *= x / ap;
+        sum += del;
+        if (std::fabs(del) < std::fabs(sum) * 1e-15) {
+            break;
+        }
+    }
+    return sum * std::exp(-x + a * std::log(x) - std::lgamma(a));
+}
+
+double gammaContinued(double a, double x) {
+    constexpr double kFpmin = 1e-300;
+    double b = x + 1.0 - a;
+    double c = 1.0 / kFpmin;
+    double d = 1.0 / b;
+    double h = d;
+    for (int i = 1; i <= 200; ++i) {
+        const double an = -static_cast<double>(i) * (static_cast<double>(i) - a);
+        b += 2.0;
+        d = an * d + b;
+        if (std::fabs(d) < kFpmin) {
+            d = kFpmin;
+        }
+        c = b + an / c;
+        if (std::fabs(c) < kFpmin) {
+            c = kFpmin;
+        }
+        d = 1.0 / d;
+        const double del = d * c;
+        h *= del;
+        if (std::fabs(del - 1.0) < 1e-15) {
+            break;
+        }
+    }
+    return std::exp(-x + a * std::log(x) - std::lgamma(a)) * h;
+}
+
+// Regularized lower incomplete gamma P(a, x) = γ(a,x)/Γ(a).
+double regularizedGammaP(double a, double x) {
+    if (x <= 0.0) {
+        return 0.0;
+    }
+    if (a <= 0.0) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double p = x < a + 1.0 ? gammaSeries(a, x) : 1.0 - gammaContinued(a, x);
+    if (p < 0.0) {
+        return 0.0;
+    }
+    if (p > 1.0) {
+        return 1.0;
+    }
+    return p;
+}
+
+double gammaPdf(double x, double alpha, double beta) {
+    if (x < 0.0) {
+        return 0.0;
+    }
+    if (x == 0.0) {
+        if (alpha < 1.0) {
+            return std::numeric_limits<double>::infinity();
+        }
+        if (alpha == 1.0) {
+            return 1.0 / beta;
+        }
+        return 0.0;
+    }
+    return std::exp((alpha - 1.0) * std::log(x) - x / beta - alpha * std::log(beta) -
+                    std::lgamma(alpha));
+}
+
+double gammaInv(double p, double alpha, double beta) {
+    if (p <= 0.0) {
+        return 0.0;
+    }
+    // Wilson-Hilferty approximation, then Newton with bisection bounds.
+    const double z = standardNormalInv(p);
+    const double a3 = 1.0 / (9.0 * alpha);
+    double x = alpha * beta * std::pow(1.0 - a3 + z * std::sqrt(a3), 3.0);
+    if (!(x > 0.0) || !std::isfinite(x)) {
+        x = alpha * beta;
+    }
+    double lo = 0.0;
+    double hi = std::max(x * 2.0, alpha * beta * 4.0);
+    while (regularizedGammaP(alpha, hi / beta) < p) {
+        hi *= 2.0;
+        if (hi > 1e300) {
+            break;
+        }
+    }
+    for (int i = 0; i < 40; ++i) {
+        const double cdf = regularizedGammaP(alpha, x / beta);
+        const double pdf = gammaPdf(x, alpha, beta);
+        double next = x;
+        if (pdf > 0.0 && std::isfinite(pdf)) {
+            next = x - (cdf - p) / pdf;
+        }
+        if (!(next > lo && next < hi) || !std::isfinite(next)) {
+            next = 0.5 * (lo + hi);
+        }
+        if (regularizedGammaP(alpha, next / beta) > p) {
+            hi = next;
+        } else {
+            lo = next;
+        }
+        if (std::fabs(next - x) <= 1e-14 * std::max(1.0, std::fabs(x))) {
+            x = next;
+            break;
+        }
+        x = next;
+    }
+    return x;
 }
 
 std::pair<double, double> meanAndDev(const std::vector<double>& values, bool population) {
@@ -1416,6 +1648,507 @@ EvalResult fn_CONFIDENCE_NORM(const std::vector<const ASTNode*>& args, EvalConte
     return fn_CONFIDENCE(args, ctx);
 }
 
+EvalResult fn_MODE_MULT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    std::vector<double> seen;
+    std::vector<size_t> counts;
+    for (const double v : values) {
+        size_t idx = seen.size();
+        for (size_t i = 0; i < seen.size(); ++i) {
+            if (seen[i] == v) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx == seen.size()) {
+            seen.push_back(v);
+            counts.push_back(1);
+        } else {
+            ++counts[idx];
+        }
+    }
+    size_t best = 0;
+    for (size_t i = 1; i < counts.size(); ++i) {
+        if (counts[i] > counts[best]) {
+            best = i;
+        }
+    }
+    if (counts[best] < 2) {
+        return EvalResult::Error(CellError::NA);
+    }
+    std::vector<EvalResult> modes;
+    for (size_t i = 0; i < seen.size(); ++i) {
+        if (counts[i] == counts[best]) {
+            modes.push_back(EvalResult::Number(seen[i]));
+        }
+    }
+    return EvalResult::ColumnArray(std::move(modes));
+}
+
+namespace {
+
+EvalResult requireTruncInt(const ASTNode* arg, EvalContext& ctx, int* out, bool allowNeg) {
+    const EvalResult n = evaluateAsNumber(arg, ctx);
+    if (n.isError()) {
+        return n;
+    }
+    if (!allowNeg && n.getNumber() < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    *out = truncNonNeg(n.getNumber());
+    return EvalResult::Empty();
+}
+
+}  // namespace
+
+EvalResult fn_BINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int ks = 0;
+    int trials = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &ks, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[1], ctx, &trials, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double p = pRes.getNumber();
+    if (p < 0.0 || p > 1.0 || ks > trials) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v = cumRes.getBoolean() ? binomCdf(ks, trials, p) : binomPmf(ks, trials, p);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
+EvalResult fn_BINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_BINOMDIST(args, ctx);
+}
+
+EvalResult fn_BINOM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int trials = 0;
+    const EvalResult e = requireTruncInt(args[0], ctx, &trials, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult pRes = evaluateAsNumber(args[1], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const EvalResult aRes = evaluateAsNumber(args[2], ctx);
+    if (aRes.isError()) {
+        return aRes;
+    }
+    const double p = pRes.getNumber();
+    const double alpha = aRes.getNumber();
+    if (p < 0.0 || p > 1.0 || alpha <= 0.0 || alpha >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(static_cast<double>(binomInv(trials, p, alpha)));
+}
+
+EvalResult fn_CRITBINOM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_BINOM_INV(args, ctx);
+}
+
+EvalResult fn_BINOM_DIST_RANGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 3 || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int trials = 0;
+    int s1 = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &trials, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult pRes = evaluateAsNumber(args[1], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    e = requireTruncInt(args[2], ctx, &s1, false);
+    if (e.isError()) {
+        return e;
+    }
+    int s2 = s1;
+    if (args.size() == 4) {
+        e = requireTruncInt(args[3], ctx, &s2, false);
+        if (e.isError()) {
+            return e;
+        }
+    }
+    const double p = pRes.getNumber();
+    if (p < 0.0 || p > 1.0 || s1 > trials || s2 > trials || s2 < s1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v = args.size() == 4
+                         ? binomCdf(s2, trials, p) - (s1 > 0 ? binomCdf(s1 - 1, trials, p) : 0.0)
+                         : binomPmf(s1, trials, p);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
+EvalResult fn_WEIBULL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    if (aRes.isError()) {
+        return aRes;
+    }
+    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    if (bRes.isError()) {
+        return bRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    const double alpha = aRes.getNumber();
+    const double beta = bRes.getNumber();
+    if (x < 0.0 || alpha <= 0.0 || beta <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double xb = x / beta;
+    if (cumRes.getBoolean()) {
+        return EvalResult::Number(excelNormalize(1.0 - std::exp(-std::pow(xb, alpha))));
+    }
+    const double pdf = (alpha / beta) * std::pow(xb, alpha - 1.0) * std::exp(-std::pow(xb, alpha));
+    if (!std::isfinite(pdf)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(pdf));
+}
+
+EvalResult fn_WEIBULL_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_WEIBULL(args, ctx);
+}
+
+EvalResult fn_LOGNORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    if (meanRes.isError()) {
+        return meanRes;
+    }
+    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    if (sdRes.isError()) {
+        return sdRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    const double sd = sdRes.getNumber();
+    if (x <= 0.0 || sd <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double z = (std::log(x) - meanRes.getNumber()) / sd;
+    if (cumRes.getBoolean()) {
+        return EvalResult::Number(excelNormalize(standardNormalCdf(z)));
+    }
+    return EvalResult::Number(excelNormalize(standardNormalPdf(z) / (x * sd)));
+}
+
+EvalResult fn_LOGNORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    if (meanRes.isError()) {
+        return meanRes;
+    }
+    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    if (sdRes.isError()) {
+        return sdRes;
+    }
+    const double x = xRes.getNumber();
+    const double sd = sdRes.getNumber();
+    if (x <= 0.0 || sd <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double z = (std::log(x) - meanRes.getNumber()) / sd;
+    return EvalResult::Number(excelNormalize(standardNormalCdf(z)));
+}
+
+EvalResult fn_LOGNORM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    if (meanRes.isError()) {
+        return meanRes;
+    }
+    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    if (sdRes.isError()) {
+        return sdRes;
+    }
+    if (pRes.getNumber() <= 0.0 || pRes.getNumber() >= 1.0 || sdRes.getNumber() <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double z = standardNormalInv(pRes.getNumber());
+    return EvalResult::Number(
+        excelNormalize(std::exp(meanRes.getNumber() + sdRes.getNumber() * z)));
+}
+
+EvalResult fn_LOGINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_LOGNORM_INV(args, ctx);
+}
+
+EvalResult fn_GAMMA_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    if (aRes.isError()) {
+        return aRes;
+    }
+    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    if (bRes.isError()) {
+        return bRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    const double alpha = aRes.getNumber();
+    const double beta = bRes.getNumber();
+    if (x < 0.0 || alpha <= 0.0 || beta <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (cumRes.getBoolean()) {
+        return EvalResult::Number(excelNormalize(regularizedGammaP(alpha, x / beta)));
+    }
+    const double pdf = gammaPdf(x, alpha, beta);
+    if (!std::isfinite(pdf)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(pdf));
+}
+
+EvalResult fn_GAMMADIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_GAMMA_DIST(args, ctx);
+}
+
+EvalResult fn_GAMMA_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    if (aRes.isError()) {
+        return aRes;
+    }
+    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    if (bRes.isError()) {
+        return bRes;
+    }
+    const double p = pRes.getNumber();
+    const double alpha = aRes.getNumber();
+    const double beta = bRes.getNumber();
+    if (p < 0.0 || p >= 1.0 || alpha <= 0.0 || beta <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double x = gammaInv(p, alpha, beta);
+    if (!std::isfinite(x) || x < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(x));
+}
+
+EvalResult fn_GAMMAINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_GAMMA_INV(args, ctx);
+}
+
+EvalResult fn_HYPGEOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 5) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int sampleS = 0;
+    int numberSample = 0;
+    int popS = 0;
+    int popN = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &sampleS, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[1], ctx, &numberSample, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[2], ctx, &popS, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[3], ctx, &popN, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[4], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    if (numberSample > popN || popS > popN || sampleS > numberSample || sampleS > popS) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v = cumRes.getBoolean() ? hypgeomCdf(sampleS, numberSample, popS, popN)
+                                         : hypgeomPmf(sampleS, numberSample, popS, popN);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
+EvalResult fn_HYPGEOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int sampleS = 0;
+    int numberSample = 0;
+    int popS = 0;
+    int popN = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &sampleS, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[1], ctx, &numberSample, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[2], ctx, &popS, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[3], ctx, &popN, false);
+    if (e.isError()) {
+        return e;
+    }
+    if (numberSample > popN || popS > popN || sampleS > numberSample || sampleS > popS) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v = hypgeomPmf(sampleS, numberSample, popS, popN);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
+EvalResult fn_NEGBINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int fails = 0;
+    int success = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &fails, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[1], ctx, &success, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double p = pRes.getNumber();
+    if (p <= 0.0 || p > 1.0 || success < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v =
+        cumRes.getBoolean() ? negbinomCdf(fails, success, p) : negbinomPmf(fails, success, p);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
+EvalResult fn_NEGBINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int fails = 0;
+    int success = 0;
+    EvalResult e = requireTruncInt(args[0], ctx, &fails, false);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncInt(args[1], ctx, &success, false);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    const double p = pRes.getNumber();
+    if (p <= 0.0 || p > 1.0 || success < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double v = negbinomPmf(fails, success, p);
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -1599,6 +2332,67 @@ void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("CONFIDENCE.NORM", fn_CONFIDENCE_NORM, "(alpha, standard_dev, size)",
                               "Confidence interval for a normal population", "Statistics");
     registry.registerAlias("CONFIDENCE_NORM", "CONFIDENCE.NORM");
+    registry.registerFunction("MODE.MULT", fn_MODE_MULT, "(number1, [number2], ...)",
+                              "Vertical array of all modes", "Statistics");
+    registry.registerAlias("MODE_MULT", "MODE.MULT");
+    registry.registerFunction("BINOMDIST", fn_BINOMDIST,
+                              "(number_s, trials, probability_s, cumulative)",
+                              "Binomial distribution", "Statistics");
+    registry.registerFunction("BINOM.DIST", fn_BINOM_DIST,
+                              "(number_s, trials, probability_s, cumulative)",
+                              "Binomial distribution", "Statistics");
+    registry.registerAlias("BINOM_DIST", "BINOM.DIST");
+    registry.registerFunction("BINOM.INV", fn_BINOM_INV, "(trials, probability_s, alpha)",
+                              "Smallest value for which the binomial CDF is at least alpha",
+                              "Statistics");
+    registry.registerAlias("BINOM_INV", "BINOM.INV");
+    registry.registerFunction("CRITBINOM", fn_CRITBINOM, "(trials, probability_s, alpha)",
+                              "Smallest value for which the binomial CDF is at least alpha",
+                              "Statistics");
+    registry.registerFunction("BINOM.DIST.RANGE", fn_BINOM_DIST_RANGE,
+                              "(trials, probability_s, number_s, [number_s2])",
+                              "Probability of a binomial trial result in a range", "Statistics");
+    registry.registerAlias("BINOM_DIST_RANGE", "BINOM.DIST.RANGE");
+    registry.registerFunction("WEIBULL", fn_WEIBULL, "(x, alpha, beta, cumulative)",
+                              "Weibull distribution", "Statistics");
+    registry.registerFunction("WEIBULL.DIST", fn_WEIBULL_DIST, "(x, alpha, beta, cumulative)",
+                              "Weibull distribution", "Statistics");
+    registry.registerAlias("WEIBULL_DIST", "WEIBULL.DIST");
+    registry.registerFunction("LOGNORMDIST", fn_LOGNORMDIST, "(x, mean, standard_dev)",
+                              "Lognormal cumulative distribution", "Statistics");
+    registry.registerFunction("LOGNORM.DIST", fn_LOGNORM_DIST,
+                              "(x, mean, standard_dev, cumulative)", "Lognormal distribution",
+                              "Statistics");
+    registry.registerAlias("LOGNORM_DIST", "LOGNORM.DIST");
+    registry.registerFunction("LOGINV", fn_LOGINV, "(probability, mean, standard_dev)",
+                              "Inverse lognormal cumulative distribution", "Statistics");
+    registry.registerFunction("LOGNORM.INV", fn_LOGNORM_INV, "(probability, mean, standard_dev)",
+                              "Inverse lognormal cumulative distribution", "Statistics");
+    registry.registerAlias("LOGNORM_INV", "LOGNORM.INV");
+    registry.registerFunction("GAMMADIST", fn_GAMMADIST, "(x, alpha, beta, cumulative)",
+                              "Gamma distribution", "Statistics");
+    registry.registerFunction("GAMMA.DIST", fn_GAMMA_DIST, "(x, alpha, beta, cumulative)",
+                              "Gamma distribution", "Statistics");
+    registry.registerAlias("GAMMA_DIST", "GAMMA.DIST");
+    registry.registerFunction("GAMMAINV", fn_GAMMAINV, "(probability, alpha, beta)",
+                              "Inverse gamma cumulative distribution", "Statistics");
+    registry.registerFunction("GAMMA.INV", fn_GAMMA_INV, "(probability, alpha, beta)",
+                              "Inverse gamma cumulative distribution", "Statistics");
+    registry.registerAlias("GAMMA_INV", "GAMMA.INV");
+    registry.registerFunction("HYPGEOMDIST", fn_HYPGEOMDIST,
+                              "(sample_s, number_sample, population_s, number_pop)",
+                              "Hypergeometric probability", "Statistics");
+    registry.registerFunction("HYPGEOM.DIST", fn_HYPGEOM_DIST,
+                              "(sample_s, number_sample, population_s, number_pop, cumulative)",
+                              "Hypergeometric distribution", "Statistics");
+    registry.registerAlias("HYPGEOM_DIST", "HYPGEOM.DIST");
+    registry.registerFunction("NEGBINOMDIST", fn_NEGBINOMDIST,
+                              "(number_f, number_s, probability_s)",
+                              "Negative binomial probability", "Statistics");
+    registry.registerFunction("NEGBINOM.DIST", fn_NEGBINOM_DIST,
+                              "(number_f, number_s, probability_s, cumulative)",
+                              "Negative binomial distribution", "Statistics");
+    registry.registerAlias("NEGBINOM_DIST", "NEGBINOM.DIST");
 }
 
 }  // namespace cells

@@ -553,3 +553,20 @@ SHEET.current	=SHEET()		n:1
 AREAS.a1	=AREAS(A1)		n:1
 HYPERLINK.friendly	=HYPERLINK("http://x","click")		s:click
 LENB.hello	=LENB("hello")		n:5
+WRAPCOLS.rows	=ROWS(WRAPCOLS(A1:A4,2))	A1=n:1;A2=n:2;A3=n:3;A4=n:4	n:2
+EXPAND.rows	=ROWS(EXPAND(A1,3))	A1=n:1	n:3
+TRIMRANGE.rows	=ROWS(TRIMRANGE(A1:A5))	A2=n:1;A3=n:2	n:2
+FLATTEN.rows	=ROWS(FLATTEN(A1:B2))	A1=n:1;B1=n:2;A2=n:3;B2=n:4	n:4
+ARRAYTOTEXT.concise	=ARRAYTOTEXT(A1:B1)	A1=n:1;B1=n:2	s:1, 2
+MDETERM.2x2	=MDETERM(A1:B2)	A1=n:1;B1=n:2;A2=n:3;B2=n:4	n:-2
+MUNIT.rows	=ROWS(MUNIT(3))		n:3
+DSUM.height	=DSUM(A1:C4,"Height",A6:A7)	A1=s:Tree;B1=s:Height;C1=s:Age;A2=s:Apple;B2=n:18;C2=n:20;A3=s:Pear;B3=n:12;C3=n:12;A4=s:Cherry;B4=n:13;C4=n:14;A6=s:Tree;A7=s:Apple	n:18
+BINOM.DIST.pmf	=BINOM.DIST(2,5,0.5,FALSE)		n:0.3125
+GAMMA.DIST.cdf	=GAMMA.DIST(1,1,1,TRUE)		n:0.6321205588285577
+WEIBULL.DIST.cdf	=WEIBULL.DIST(1,1,1,TRUE)		n:0.6321205588285577
+LOGNORM.INV.median	=LOGNORM.INV(0.5,0,1)		n:1
+MODE.MULT.rows	=ROWS(MODE.MULT(1,2,2,3,3))		n:2
+JOIN.dash	=JOIN("-","a","b","c")		s:a-b-c
+ENCODEURL.space	=ENCODEURL("a b")		s:a%20b
+ASC.fullwidth	=ASC(UNICHAR(65313))		s:A
+SPLIT.pair	=ARRAYTOTEXT(SPLIT("a-b","-"))		s:a, b

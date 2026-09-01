@@ -3,7 +3,7 @@
 Living status of Cells vs Microsoft Excel: formulas, spreadsheet features, file I/O, and UI.
 
 **Last reviewed:** 2026-09-01  
-**Function count:** **387** registered (Excel has ~484 worksheet functions ≈ **80%**; dotted/underscore aliases share one implementation)  
+**Function count:** **444** registered (Excel has ~484 worksheet functions ≈ **92%**; dotted/underscore aliases share one implementation)  
 **Source of truth for implementations:** `core/cells/functions/fn_*.cc`
 
 Update this document when adding functions, shipping features, or changing XLSX fidelity. Cross-check the function list against the registry if counts drift.
@@ -15,7 +15,7 @@ Update this document when adding functions, shipping features, or changing XLSX 
 | Area | Status | Notes |
 |------|--------|-------|
 | Formula engine (parse / eval / deps / spill) | ✅ Solid | AST-native C++; UUID-stable refs |
-| Function library breadth | 🟡 Partial | 387 / ~484 Excel functions (aliases included) |
+| Function library breadth | 🟡 Partial | 444 / ~484 Excel functions (aliases included) |
 | Grid editing & selection | ✅ Solid | Fill handle, multi-range, formula bar |
 | Cell / range formatting | ✅ Solid | Fonts, fills, borders, number formats, themes |
 | XLSX import / export | 🟡 Partial | Values, formulas, styles, merges; fidelity still improving |
@@ -58,18 +58,18 @@ Details: [Formula Engine](./formula-engine.md).
 
 | Category | Implemented | Excel (approx.) | Coverage (rough) |
 |----------|------------:|----------------:|------------------:|
-| Math & trig | 90 | ~80 | Core + trig + combinatorics + SUMX* + GAMMA + PERCENTOF |
+| Math & trig | 94 | ~80 | Core + trig + combinatorics + SUMX* + GAMMA + PERCENTOF + matrix (`MMULT`/`MDETERM`/`MINVERSE`/`MUNIT`) |
 | Logic / information (subset) | 30 | ~40 | Strong modern set (`LET`, `LAMBDA`, `IFS`, …) plus ISERR/TYPE/N/ISBETWEEN |
-| Text | 37 | ~50 | Core string ops + UNICHAR/DOLLAR/FIXED + TEXTAFTER/TEXTBEFORE/TEXTSPLIT |
+| Text | 41 | ~50 | Core string ops + UNICHAR/DOLLAR/FIXED + TEXTAFTER/TEXTBEFORE/TEXTSPLIT + ASC/ENCODEURL/JOIN/SPLIT |
 | Date / time | 25 | ~40 | Core extractors + DAYS360/YEARFRAC/ISOWEEKNUM + INTL workdays |
-| Statistics | 67 | ~100 | Basic + regression/correlation + percentrank + skew/kurt/normal + inverse/Poisson/exponential |
-| Array / dynamic | 15 | ~25 | Spill set + reshape (`VSTACK`/`TAKE`/`TOCOL`/…) + `SORTBY`/`RANDARRAY` |
+| Statistics | 98 | ~100 | Basic + regression + percentrank + skew/kurt/normal + binomial/gamma/weibull/lognormal/hypergeometric |
+| Array / dynamic | 21 | ~25 | Spill set + reshape (`VSTACK`/`TAKE`/`TOCOL`/`WRAPCOLS`/`EXPAND`/`TRIMRANGE`/…) |
 | Lookup & reference | 17 | ~40 | Classic + `XLOOKUP`/`XMATCH`/`LOOKUP` + ROW/COLUMN/ADDRESS/CHOOSE |
 | Financial | 24 | ~55 | Closed-form annuity, depreciation, T-bill (no RATE/IRR) |
 | Engineering | 34 | ~50 | Bitwise, base conversion, ERF, COMPLEX, IM* |
-| Database | 0 | ~12 | Entire category missing |
+| Database | 12 | ~12 | DSUM/DCOUNT/DGET and the rest of the D* set |
 | Cube / web / other | 0 | many | Out of scope for now |
-| **Total registered** | **387** | **~484** | **~80%** (includes dotted/underscore aliases) |
+| **Total registered** | **444** | **~484** | **~92%** (includes dotted/underscore aliases) |
 
 Excel totals vary by version (Microsoft 365 adds functions over time). Counts above are directional, not exact product marketing numbers.
 
@@ -87,11 +87,11 @@ Categories currently green in that harness: **logical**, **math-basic**, **math-
 
 ---
 
-### Implemented functions (387 registered names)
+### Implemented functions (444 registered names)
 
 Both Excel dotted names and underscore/concat aliases resolve to one implementation. Registered names historically used underscores where Excel uses dots (e.g. `CEILING.MATH` → `CEILING_MATH` on XLSX import via `_xlfn.` stripping). Some aliases omit the underscore (`STDEVS` for `STDEV.S`, `PERCENTILEINC` for `PERCENTILE.INC`).
 
-#### Math (90 unique + dotted rounding aliases)
+#### Math (94 unique + dotted rounding aliases)
 
 | Function | Description |
 |----------|-------------|
@@ -134,6 +134,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `SUMX2MY2` / `SUMX2PY2` / `SUMXMY2` | Paired-array square sums |
 | `GAMMA` / `GAMMALN` / `GAMMALN.PRECISE` | Gamma function and ln(Γ) |
 | `PERCENTOF` | Numerator as a fraction of denominator |
+| `MUNIT` / `MMULT` / `MDETERM` / `MINVERSE` | Identity matrix, product, determinant, inverse |
 
 #### Logic (30)
 
@@ -149,7 +150,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `ISERR` / `ISNONTEXT` / `ISEVEN` / `ISODD` / `ISREF` / `ISBETWEEN` | Additional predicates |
 | `TYPE` / `N` / `ERROR.TYPE` | Type code, numeric coerce, error code |
 
-#### Text (37 registered, including LENB/LEFTB/… Unicode aliases)
+#### Text (41 registered, including LENB/LEFTB/… Unicode aliases)
 
 | Function | Description |
 |----------|-------------|
@@ -167,6 +168,9 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `LENB` / `LEFTB` / `RIGHTB` / `MIDB` / `FINDB` / `SEARCHB` / `REPLACEB` | Byte-count aliases of the Unicode implementations |
 | `TEXTAFTER` / `TEXTBEFORE` / `TEXTSPLIT` | Delimiter split / extract |
 | `VALUETOTEXT` | Value as text (concise or strict) |
+| `ASC` | Full-width characters to half-width |
+| `ENCODEURL` | Percent-encode text for a URL |
+| `JOIN` / `SPLIT` | Sheets-style join and split |
 
 #### Lookup (17)
 
@@ -208,7 +212,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `YEARFRAC` | | Fraction of a year between dates |
 | `ISOWEEKNUM` | | ISO 8601 week number |
 
-#### Statistics (67)
+#### Statistics (98)
 
 | Function | Description |
 |----------|-------------|
@@ -218,7 +222,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `PERCENTILE` / `PERCENTILEINC` / `PERCENTILEEXC` | Percentiles |
 | `LARGE` / `SMALL` | k-th largest / smallest |
 | `RANK` / `RANK.EQ` | Rank in a list |
-| `MODE` / `MODE.SNGL` | Most frequent number |
+| `MODE` / `MODE.SNGL` / `MODE.MULT` | Most frequent number / all modes |
 | `QUARTILE` / `QUARTILE.INC` | Inclusive quartile |
 | `COUNTBLANK` | Empty cells |
 | `AVEDEV` / `DEVSQ` / `GEOMEAN` / `HARMEAN` | Deviation and mean variants |
@@ -236,6 +240,12 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `SKEW` / `SKEW.P` / `KURT` | Skewness and excess kurtosis |
 | `STDEVA` / `STDEVPA` / `VARA` / `VARPA` | Stdev/variance treating text/logicals |
 | `STEYX` | Standard error of linear regression |
+| `BINOMDIST` / `BINOM.DIST` / `BINOM.INV` / `CRITBINOM` / `BINOM.DIST.RANGE` | Binomial PMF/CDF/inverse/range |
+| `WEIBULL` / `WEIBULL.DIST` | Weibull PDF/CDF |
+| `LOGNORMDIST` / `LOGNORM.DIST` / `LOGINV` / `LOGNORM.INV` | Lognormal PDF/CDF/inverse |
+| `GAMMADIST` / `GAMMA.DIST` / `GAMMAINV` / `GAMMA.INV` | Gamma PDF/CDF/inverse |
+| `HYPGEOMDIST` / `HYPGEOM.DIST` | Hypergeometric PMF/CDF |
+| `NEGBINOMDIST` / `NEGBINOM.DIST` | Negative binomial PMF/CDF |
 
 #### Engineering (34)
 
@@ -263,7 +273,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `FVSCHEDULE` / `PDURATION` / `RRI` | Compounding helpers |
 | `TBILLEQ` / `TBILLPRICE` / `TBILLYIELD` | Treasury bills |
 
-#### Array / dynamic (15)
+#### Array / dynamic (21)
 
 | Function | Description |
 |----------|-------------|
@@ -277,6 +287,21 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `TAKE` / `DROP` | Keep or exclude leading/trailing rows and columns |
 | `CHOOSECOLS` / `CHOOSEROWS` | Pick columns or rows by index |
 | `RANDARRAY` | Random number array (volatile) |
+| `WRAPCOLS` / `WRAPROWS` | Wrap a vector into columns or rows |
+| `EXPAND` | Expand an array to a target size |
+| `TRIMRANGE` | Trim empty edge rows and columns |
+| `FLATTEN` | Flatten ranges into a column |
+| `ARRAYTOTEXT` | Array as concise or strict `{...}` text |
+
+#### Database (12)
+
+| Function | Description |
+|----------|-------------|
+| `DSUM` / `DPRODUCT` / `DAVERAGE` | Conditional database sum / product / mean |
+| `DCOUNT` / `DCOUNTA` | Count numeric / nonblank matching field cells |
+| `DMAX` / `DMIN` | Max / min of matching records |
+| `DGET` | Single matching value (`#N/A` / `#NUM!` cardinality) |
+| `DSTDEV` / `DSTDEVP` / `DVAR` / `DVARP` | Sample/population stdev and variance |
 
 ---
 
@@ -305,19 +330,12 @@ Closed-form annuity, depreciation, dollar-fraction, and T-bill functions are imp
 | Function | Notes |
 |----------|-------|
 | `MAP` / `REDUCE` / `SCAN` | LAMBDA helpers |
-| `WRAPCOLS` / `WRAPROWS` / `EXPAND` | Additional reshape |
 
 #### Information
 
 | Function | Notes |
 |----------|-------|
 | `ISFORMULA` / `CELL` / `INFO` | Need extra cell/workbook metadata |
-
-#### Database
-
-| Function | Notes |
-|----------|-------|
-| `DSUM` / `DCOUNT` / `DCOUNTA` / `DAVERAGE` / `DMAX` / `DMIN` / `DGET` | |
 
 #### Engineering
 

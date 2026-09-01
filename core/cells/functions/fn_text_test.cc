@@ -201,5 +201,56 @@ TEST_F(FnTextExtraTest, TextAfterBeforeSplitValueToText) {
     EXPECT_EQ(eval("=VALUETOTEXT(1,2)").getError(), CellError::VALUE);
 }
 
+TEST_F(FnTextExtraTest, AscEncodeurlJoinSplit) {
+    EvalResult ascii = eval("=ASC(UNICHAR(65313)&UNICHAR(65314))");
+    ASSERT_TRUE(ascii.isString());
+    EXPECT_EQ(ascii.getString(), "AB");
+    EvalResult space = eval("=ASC(UNICHAR(12288)&\"x\")");
+    ASSERT_TRUE(space.isString());
+    EXPECT_EQ(space.getString(), " x");
+    EvalResult kana = eval("=ASC(UNICHAR(12450))");  // ア → ｱ
+    ASSERT_TRUE(kana.isString());
+    EXPECT_EQ(kana.getString(), eval("=UNICHAR(65393)").getString());
+    EXPECT_EQ(eval("=ASC()").getError(), CellError::VALUE);
+
+    EvalResult url = eval("=ENCODEURL(\"a b\")");
+    ASSERT_TRUE(url.isString());
+    EXPECT_EQ(url.getString(), "a%20b");
+    EvalResult tilde = eval("=ENCODEURL(\"A-._~\")");
+    ASSERT_TRUE(tilde.isString());
+    EXPECT_EQ(tilde.getString(), "A-._~");
+    EvalResult utf = eval("=ENCODEURL(UNICHAR(233))");  // é
+    ASSERT_TRUE(utf.isString());
+    EXPECT_EQ(utf.getString(), "%C3%A9");
+    EXPECT_EQ(eval("=ENCODEURL()").getError(), CellError::VALUE);
+
+    EvalResult join = eval("=JOIN(\"-\",\"a\",\"b\",\"c\")");
+    ASSERT_TRUE(join.isString());
+    EXPECT_EQ(join.getString(), "a-b-c");
+    EvalResult joinRange = eval("=JOIN(\",\",SEQUENCE(3))");
+    ASSERT_TRUE(joinRange.isString());
+    EXPECT_EQ(joinRange.getString(), "1,2,3");
+    EXPECT_EQ(eval("=JOIN(\",\")").getError(), CellError::VALUE);
+
+    EvalResult split = eval("=SPLIT(\"a-b-c\",\"-\")");
+    ASSERT_TRUE(split.isArray());
+    EXPECT_EQ(split.getArrayRows(), 1u);
+    EXPECT_EQ(split.getArrayCols(), 3u);
+    EXPECT_EQ(split.getArrayAt(0, 0).getString(), "a");
+    EXPECT_EQ(split.getArrayAt(0, 2).getString(), "c");
+    EvalResult each = eval("=SPLIT(\"a,b;c\",\",;\",TRUE)");
+    ASSERT_TRUE(each.isArray());
+    EXPECT_EQ(each.getArrayCols(), 3u);
+    EXPECT_EQ(each.getArrayAt(0, 1).getString(), "b");
+    EvalResult whole = eval("=SPLIT(\"a::b::c\",\"::\",FALSE)");
+    ASSERT_TRUE(whole.isArray());
+    EXPECT_EQ(whole.getArrayCols(), 3u);
+    EXPECT_EQ(whole.getArrayAt(0, 1).getString(), "b");
+    EvalResult dropEmpty = eval("=SPLIT(\"a--b\",\"-\",TRUE,TRUE)");
+    ASSERT_TRUE(dropEmpty.isArray());
+    EXPECT_EQ(dropEmpty.getArrayCols(), 2u);
+    EXPECT_EQ(eval("=SPLIT(\"abc\",\"\")").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

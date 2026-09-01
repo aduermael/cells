@@ -119,6 +119,10 @@ EvalResult fn_TEXTAFTER(const std::vector<const ASTNode*>& args, EvalContext& ct
 EvalResult fn_TEXTBEFORE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ASC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ENCODEURL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_JOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Registration

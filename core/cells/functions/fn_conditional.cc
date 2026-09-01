@@ -396,6 +396,268 @@ EvalResult aggregateIfs(const std::vector<const ASTNode*>& args, EvalContext& ct
     return EvalResult::Error(CellError::VALUE);
 }
 
+enum class DbAgg : std::uint8_t {
+    Sum,
+    Count,
+    CountA,
+    Average,
+    Max,
+    Min,
+    Get,
+    Product,
+    Stdev,
+    StdevP,
+    Var,
+    VarP
+};
+
+size_t gridColsForDb(const std::vector<std::vector<EvalResult>>& grid) {
+    size_t cols = 0;
+    for (const auto& row : grid) {
+        cols = std::max(cols, row.size());
+    }
+    return cols;
+}
+
+EvalResult gridAtDb(const std::vector<std::vector<EvalResult>>& grid, size_t r, size_t c) {
+    if (r >= grid.size() || c >= grid[r].size()) {
+        return EvalResult::Empty();
+    }
+    return grid[r][c];
+}
+
+bool cellIsBlankForDb(const EvalResult& v) {
+    return v.isEmpty() || (v.isString() && v.getString().empty());
+}
+
+std::string headerKey(const EvalResult& v) {
+    const EvalResult s = v.toString();
+    if (s.isError()) {
+        return {};
+    }
+    return toLowerAscii(s.getString());
+}
+
+int resolveDbField(const EvalResult& field, const std::vector<std::string>& headers) {
+    if (field.isNumber() || field.isBoolean()) {
+        const EvalResult n = field.toNumber();
+        if (n.isError()) {
+            return -1;
+        }
+        const int idx = static_cast<int>(n.getNumber());
+        if (idx < 1 || idx > static_cast<int>(headers.size())) {
+            return -1;
+        }
+        return idx - 1;
+    }
+    const EvalResult s = field.toString();
+    if (s.isError()) {
+        return -1;
+    }
+    const std::string want = toLowerAscii(s.getString());
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (headers[i] == want) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+bool databaseRowMatches(const std::vector<EvalResult>& row, const std::vector<int>& critToDb,
+                        const std::vector<EvalResult>& critRow) {
+    for (size_t c = 0; c < critToDb.size(); ++c) {
+        if (c >= critRow.size() || cellIsBlankForDb(critRow[c])) {
+            continue;
+        }
+        const int dbCol = critToDb[c];
+        if (dbCol < 0) {
+            continue;
+        }
+        const EvalResult cell = static_cast<size_t>(dbCol) < row.size()
+                                    ? row[static_cast<size_t>(dbCol)]
+                                    : EvalResult::Empty();
+        if (!matchesCriteria(cell, parseCriteria(critRow[c]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+EvalResult databaseAggregate(const std::vector<const ASTNode*>& args, EvalContext& ctx,
+                             DbAgg kind) {
+    const bool fieldOptional = kind == DbAgg::Count || kind == DbAgg::CountA;
+    if (args.size() < 2 || args.size() > 3 || (args.size() == 2 && !fieldOptional)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [db, dbErr] = evaluateAs2D(args[0], ctx);
+    if (dbErr.isError()) {
+        return dbErr;
+    }
+    if (db.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const ASTNode* criteriaArg = args.size() == 3 ? args[2] : args[1];
+    auto [crit, critErr] = evaluateAs2D(criteriaArg, ctx);
+    if (critErr.isError()) {
+        return critErr;
+    }
+    if (crit.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const size_t dbCols = gridColsForDb(db);
+    std::vector<std::string> headers;
+    headers.reserve(dbCols);
+    for (size_t c = 0; c < dbCols; ++c) {
+        headers.push_back(headerKey(gridAtDb(db, 0, c)));
+    }
+
+    const bool haveField = args.size() == 3;
+    int fieldCol = -1;
+    if (haveField) {
+        const EvalResult field = evaluate(args[1], ctx);
+        if (field.isError()) {
+            return field;
+        }
+        fieldCol = resolveDbField(field, headers);
+        if (fieldCol < 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+
+    const size_t critCols = gridColsForDb(crit);
+    std::vector<int> critToDb(critCols, -1);
+    for (size_t c = 0; c < critCols; ++c) {
+        const std::string key = headerKey(gridAtDb(crit, 0, c));
+        for (size_t d = 0; d < headers.size(); ++d) {
+            if (headers[d] == key) {
+                critToDb[c] = static_cast<int>(d);
+                break;
+            }
+        }
+    }
+
+    std::vector<EvalResult> matched;
+    for (size_t r = 1; r < db.size(); ++r) {
+        bool any = crit.size() <= 1;
+        for (size_t cr = 1; cr < crit.size(); ++cr) {
+            if (databaseRowMatches(db[r], critToDb, crit[cr])) {
+                any = true;
+                break;
+            }
+        }
+        if (!any) {
+            continue;
+        }
+        if (!haveField) {
+            matched.push_back(EvalResult::Number(1.0));
+            continue;
+        }
+        matched.push_back(gridAtDb(db, r, static_cast<size_t>(fieldCol)));
+    }
+
+    if (kind == DbAgg::Get) {
+        if (matched.empty()) {
+            return EvalResult::Error(CellError::NA);
+        }
+        if (matched.size() > 1) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        return matched[0];
+    }
+
+    double sum = 0.0;
+    double sumSq = 0.0;
+    double minV = 0.0;
+    double maxV = 0.0;
+    double product = 1.0;
+    size_t n = 0;
+    size_t countA = 0;
+    bool haveMinMax = false;
+    for (const EvalResult& v : matched) {
+        if (kind == DbAgg::CountA) {
+            if (!v.isEmpty()) {
+                ++countA;
+            }
+            continue;
+        }
+        if (kind == DbAgg::Count) {
+            if (v.isNumber()) {
+                ++n;
+            }
+            continue;
+        }
+        if (v.isError()) {
+            return v;
+        }
+        if (!v.isNumber()) {
+            continue;
+        }
+        const double num = v.getNumber();
+        ++n;
+        sum += num;
+        sumSq += num * num;
+        product *= num;
+        if (!haveMinMax) {
+            minV = num;
+            maxV = num;
+            haveMinMax = true;
+        } else {
+            minV = std::min(minV, num);
+            maxV = std::max(maxV, num);
+        }
+    }
+
+    switch (kind) {
+        case DbAgg::Count:
+            return EvalResult::Number(static_cast<double>(n));
+        case DbAgg::CountA:
+            return EvalResult::Number(static_cast<double>(countA));
+        case DbAgg::Sum:
+            return EvalResult::Number(excelNormalize(sum));
+        case DbAgg::Product:
+            return EvalResult::Number(n == 0 ? 0.0 : excelNormalize(product));
+        case DbAgg::Average:
+            if (n == 0) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            return EvalResult::Number(excelNormalize(sum / static_cast<double>(n)));
+        case DbAgg::Max:
+            return EvalResult::Number(haveMinMax ? excelNormalize(maxV) : 0.0);
+        case DbAgg::Min:
+            return EvalResult::Number(haveMinMax ? excelNormalize(minV) : 0.0);
+        case DbAgg::Stdev:
+        case DbAgg::Var: {
+            if (n < 2) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            const double mean = sum / static_cast<double>(n);
+            const double ss = sumSq - static_cast<double>(n) * mean * mean;
+            const double var = ss / static_cast<double>(n - 1);
+            if (kind == DbAgg::Var) {
+                return EvalResult::Number(excelNormalize(var));
+            }
+            return EvalResult::Number(excelNormalize(std::sqrt(std::max(0.0, var))));
+        }
+        case DbAgg::StdevP:
+        case DbAgg::VarP: {
+            if (n < 1) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            const double mean = sum / static_cast<double>(n);
+            const double ss = sumSq - static_cast<double>(n) * mean * mean;
+            const double var = ss / static_cast<double>(n);
+            if (kind == DbAgg::VarP) {
+                return EvalResult::Number(excelNormalize(var));
+            }
+            return EvalResult::Number(excelNormalize(std::sqrt(std::max(0.0, var))));
+        }
+        case DbAgg::Get:
+            break;
+    }
+    return EvalResult::Error(CellError::VALUE);
+}
+
 }  // namespace
 
 EvalResult fn_SUMIF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -492,6 +754,43 @@ EvalResult fn_SUMPRODUCT(const std::vector<const ASTNode*>& args, EvalContext& c
     return EvalResult::Number(excelNormalize(sum));
 }
 
+EvalResult fn_DSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Sum);
+}
+EvalResult fn_DCOUNT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Count);
+}
+EvalResult fn_DCOUNTA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::CountA);
+}
+EvalResult fn_DAVERAGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Average);
+}
+EvalResult fn_DMAX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Max);
+}
+EvalResult fn_DMIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Min);
+}
+EvalResult fn_DGET(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Get);
+}
+EvalResult fn_DPRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Product);
+}
+EvalResult fn_DSTDEV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Stdev);
+}
+EvalResult fn_DSTDEVP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::StdevP);
+}
+EvalResult fn_DVAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::Var);
+}
+EvalResult fn_DVARP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return databaseAggregate(args, ctx, DbAgg::VarP);
+}
+
 void registerConditionalFunctions(FunctionRegistry& registry) {
     registry.registerFunction("SUMIF", fn_SUMIF, "(range, criteria, [sum_range])",
                               "Sums cells that meet a criterion", "Math");
@@ -512,6 +811,30 @@ void registerConditionalFunctions(FunctionRegistry& registry) {
                               "Maximum of cells that meet all criteria", "Math");
     registry.registerFunction("SUMPRODUCT", fn_SUMPRODUCT, "(array1, [array2], ...)",
                               "Sum of products of corresponding arrays", "Math");
+    registry.registerFunction("DSUM", fn_DSUM, "(database, field, criteria)",
+                              "Sums matching database records", "Database");
+    registry.registerFunction("DCOUNT", fn_DCOUNT, "(database, [field], criteria)",
+                              "Counts numeric matching database records", "Database");
+    registry.registerFunction("DCOUNTA", fn_DCOUNTA, "(database, [field], criteria)",
+                              "Counts nonblank matching database records", "Database");
+    registry.registerFunction("DAVERAGE", fn_DAVERAGE, "(database, field, criteria)",
+                              "Averages matching database records", "Database");
+    registry.registerFunction("DMAX", fn_DMAX, "(database, field, criteria)",
+                              "Maximum of matching database records", "Database");
+    registry.registerFunction("DMIN", fn_DMIN, "(database, field, criteria)",
+                              "Minimum of matching database records", "Database");
+    registry.registerFunction("DGET", fn_DGET, "(database, field, criteria)",
+                              "Extracts a single matching database value", "Database");
+    registry.registerFunction("DPRODUCT", fn_DPRODUCT, "(database, field, criteria)",
+                              "Product of matching database records", "Database");
+    registry.registerFunction("DSTDEV", fn_DSTDEV, "(database, field, criteria)",
+                              "Sample standard deviation of matching records", "Database");
+    registry.registerFunction("DSTDEVP", fn_DSTDEVP, "(database, field, criteria)",
+                              "Population standard deviation of matching records", "Database");
+    registry.registerFunction("DVAR", fn_DVAR, "(database, field, criteria)",
+                              "Sample variance of matching records", "Database");
+    registry.registerFunction("DVARP", fn_DVARP, "(database, field, criteria)",
+                              "Population variance of matching records", "Database");
 }
 
 }  // namespace cells

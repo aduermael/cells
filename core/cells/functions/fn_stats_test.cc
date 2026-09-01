@@ -834,5 +834,109 @@ TEST_F(FnStatsTest, NormInvPoissonExponConfidenceTrimmean) {
     EXPECT_EQ(eval("=TRIMMEAN(A1:A4)").getError(), CellError::VALUE);
 }
 
+TEST_F(FnStatsTest, ModeMult) {
+    EvalResult r = eval("=MODE.MULT(1,2,2,3,3,4)");
+    ASSERT_TRUE(r.isArray());
+    EXPECT_EQ(r.getArrayRows(), 2u);
+    EXPECT_EQ(r.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(r.getArrayAt(0, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(r.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_EQ(eval("=MODE.MULT(1,2,3)").getError(), CellError::NA);
+    EvalResult one = eval("=MODE.MULT(1,1,1,2,2)");
+    ASSERT_TRUE(one.isArray());
+    EXPECT_EQ(one.getArrayRows(), 1u);
+    EXPECT_DOUBLE_EQ(one.getArrayAt(0, 0).getNumber(), 1.0);
+}
+
+TEST_F(FnStatsTest, BinomWeibullLognormGammaHypgeomNegbinom) {
+    EvalResult pmf = eval("=BINOM.DIST(2,5,0.5,FALSE)");
+    ASSERT_TRUE(pmf.isNumber());
+    EXPECT_DOUBLE_EQ(pmf.getNumber(), 0.3125);
+    EvalResult cdf = eval("=BINOMDIST(2,5,0.5,TRUE)");
+    ASSERT_TRUE(cdf.isNumber());
+    EXPECT_DOUBLE_EQ(cdf.getNumber(), 0.5);
+    EvalResult inv = eval("=BINOM.INV(6,0.5,0.75)");
+    ASSERT_TRUE(inv.isNumber());
+    EXPECT_DOUBLE_EQ(inv.getNumber(), 4.0);
+    EvalResult crit = eval("=CRITBINOM(6,0.5,0.75)");
+    ASSERT_TRUE(crit.isNumber());
+    EXPECT_DOUBLE_EQ(crit.getNumber(), 4.0);
+    EvalResult rng = eval("=BINOM.DIST.RANGE(5,0.5,1,2)");
+    ASSERT_TRUE(rng.isNumber());
+    EXPECT_DOUBLE_EQ(rng.getNumber(), 0.46875);
+    EvalResult one = eval("=BINOM.DIST.RANGE(5,0.5,2)");
+    ASSERT_TRUE(one.isNumber());
+    EXPECT_DOUBLE_EQ(one.getNumber(), 0.3125);
+    EXPECT_EQ(eval("=BINOM.DIST(3,2,0.5,FALSE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=BINOM.DIST(1,5,1.5,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=BINOM.INV(5,0.5,0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=BINOM.DIST.RANGE(5,0.5,2,1)").getError(), CellError::NUM);
+
+    EvalResult wCdf = eval("=WEIBULL.DIST(1,1,1,TRUE)");
+    ASSERT_TRUE(wCdf.isNumber());
+    EXPECT_NEAR(wCdf.getNumber(), 1.0 - std::exp(-1.0), 1e-12);
+    EvalResult wPdf = eval("=WEIBULL(1,1,1,FALSE)");
+    ASSERT_TRUE(wPdf.isNumber());
+    EXPECT_NEAR(wPdf.getNumber(), std::exp(-1.0), 1e-12);
+    EXPECT_EQ(eval("=WEIBULL.DIST(-1,1,1,TRUE)").getError(), CellError::NUM);
+
+    EvalResult lnCdf = eval("=LOGNORM.DIST(1,0,1,TRUE)");
+    ASSERT_TRUE(lnCdf.isNumber());
+    EXPECT_NEAR(lnCdf.getNumber(), 0.5, 1e-12);
+    EvalResult lnPdf = eval("=LOGNORM.DIST(1,0,1,FALSE)");
+    ASSERT_TRUE(lnPdf.isNumber());
+    EXPECT_NEAR(lnPdf.getNumber(), eval("=PHI(0)").getNumber(), 1e-12);
+    EvalResult lnLegacy = eval("=LOGNORMDIST(1,0,1)");
+    ASSERT_TRUE(lnLegacy.isNumber());
+    EXPECT_NEAR(lnLegacy.getNumber(), 0.5, 1e-12);
+    EvalResult lnInv = eval("=LOGNORM.INV(0.5,0,1)");
+    ASSERT_TRUE(lnInv.isNumber());
+    EXPECT_NEAR(lnInv.getNumber(), 1.0, 1e-12);
+    EvalResult loginv = eval("=LOGINV(0.5,0,1)");
+    ASSERT_TRUE(loginv.isNumber());
+    EXPECT_NEAR(loginv.getNumber(), 1.0, 1e-12);
+    EXPECT_EQ(eval("=LOGNORM.DIST(0,0,1,TRUE)").getError(), CellError::NUM);
+
+    EvalResult gCdf = eval("=GAMMA.DIST(1,1,1,TRUE)");
+    ASSERT_TRUE(gCdf.isNumber());
+    EXPECT_NEAR(gCdf.getNumber(), 1.0 - std::exp(-1.0), 1e-10);
+    EvalResult gPdf = eval("=GAMMADIST(1,1,1,FALSE)");
+    ASSERT_TRUE(gPdf.isNumber());
+    EXPECT_NEAR(gPdf.getNumber(), std::exp(-1.0), 1e-10);
+    EvalResult gInv = eval("=GAMMA.INV(0.5,1,1)");
+    ASSERT_TRUE(gInv.isNumber());
+    EXPECT_NEAR(gInv.getNumber(), -std::log(0.5), 1e-8);
+    EvalResult gInv2 = eval("=GAMMAINV(0.5,1,1)");
+    ASSERT_TRUE(gInv2.isNumber());
+    EXPECT_NEAR(gInv2.getNumber(), gInv.getNumber(), 1e-12);
+    EvalResult roundtrip = eval("=GAMMA.DIST(GAMMA.INV(0.8,2,3),2,3,TRUE)");
+    ASSERT_TRUE(roundtrip.isNumber());
+    EXPECT_NEAR(roundtrip.getNumber(), 0.8, 1e-6);
+    EXPECT_EQ(eval("=GAMMA.DIST(-1,1,1,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMA.INV(1,1,1)").getError(), CellError::NUM);
+
+    EvalResult hg = eval("=HYPGEOM.DIST(1,4,8,20,FALSE)");
+    ASSERT_TRUE(hg.isNumber());
+    EXPECT_NEAR(hg.getNumber(), 1760.0 / 4845.0, 1e-12);
+    EvalResult hgCdf = eval("=HYPGEOM.DIST(1,4,8,20,TRUE)");
+    ASSERT_TRUE(hgCdf.isNumber());
+    EXPECT_GE(hgCdf.getNumber(), hg.getNumber());
+    EvalResult hgLegacy = eval("=HYPGEOMDIST(1,4,8,20)");
+    ASSERT_TRUE(hgLegacy.isNumber());
+    EXPECT_NEAR(hgLegacy.getNumber(), hg.getNumber(), 1e-15);
+    EXPECT_EQ(eval("=HYPGEOM.DIST(5,4,8,20,FALSE)").getError(), CellError::NUM);
+
+    EvalResult nb = eval("=NEGBINOM.DIST(10,5,0.25,FALSE)");
+    ASSERT_TRUE(nb.isNumber());
+    EXPECT_NEAR(nb.getNumber(), 0.0550486603756, 1e-10);
+    EvalResult nbCdf = eval("=NEGBINOM.DIST(0,5,0.25,TRUE)");
+    ASSERT_TRUE(nbCdf.isNumber());
+    EXPECT_NEAR(nbCdf.getNumber(), std::pow(0.25, 5.0), 1e-12);
+    EvalResult nbLegacy = eval("=NEGBINOMDIST(10,5,0.25)");
+    ASSERT_TRUE(nbLegacy.isNumber());
+    EXPECT_NEAR(nbLegacy.getNumber(), nb.getNumber(), 1e-15);
+    EXPECT_EQ(eval("=NEGBINOM.DIST(1,0,0.5,FALSE)").getError(), CellError::NUM);
+}
+
 }  // namespace
 }  // namespace cells

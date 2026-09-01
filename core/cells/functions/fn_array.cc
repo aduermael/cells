@@ -1,8 +1,10 @@
 #include "core/cells/functions/fn_array.h"
 
+#include <cmath>
 #include <cstdlib>
 
 #include <algorithm>
+#include <string>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
@@ -1125,6 +1127,610 @@ EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     return EvalResult::Array(std::move(out));
 }
 
+namespace {
+
+std::vector<EvalResult> flattenPreserve(const std::vector<std::vector<EvalResult>>& data,
+                                        bool byColumn) {
+    std::vector<EvalResult> flat;
+    if (byColumn) {
+        const size_t cols = gridCols(data);
+        for (size_t c = 0; c < cols; ++c) {
+            for (size_t r = 0; r < data.size(); ++r) {
+                flat.push_back(gridAt(data, r, c));
+            }
+        }
+    } else {
+        for (const auto& row : data) {
+            for (const EvalResult& v : row) {
+                flat.push_back(v);
+            }
+        }
+    }
+    return flat;
+}
+
+bool isVector1D(const std::vector<std::vector<EvalResult>>& data) {
+    if (data.empty()) {
+        return false;
+    }
+    const size_t cols = gridCols(data);
+    return data.size() == 1 || cols <= 1;
+}
+
+EvalResult evalOptionalPad(const std::vector<const ASTNode*>& args, size_t index, EvalContext& ctx,
+                           EvalResult* pad) {
+    if (args.size() <= index) {
+        *pad = EvalResult::Error(CellError::NA);
+        return EvalResult::Empty();
+    }
+    *pad = evaluate(args[index], ctx);
+    return EvalResult::Empty();
+}
+
+EvalResult wrapVector(const std::vector<EvalResult>& flat, int wrapCount, const EvalResult& pad,
+                      bool wrapCols) {
+    if (wrapCount < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (flat.empty()) {
+        return EvalResult::EmptyArray();
+    }
+    const int n = static_cast<int>(flat.size());
+    const int groups = (n + wrapCount - 1) / wrapCount;
+    std::vector<std::vector<EvalResult>> out;
+    if (wrapCols) {
+        out.resize(static_cast<size_t>(wrapCount),
+                   std::vector<EvalResult>(static_cast<size_t>(groups), pad));
+        for (int i = 0; i < n; ++i) {
+            const int r = i % wrapCount;
+            const int c = i / wrapCount;
+            out[static_cast<size_t>(r)][static_cast<size_t>(c)] = flat[static_cast<size_t>(i)];
+        }
+    } else {
+        out.resize(static_cast<size_t>(groups),
+                   std::vector<EvalResult>(static_cast<size_t>(wrapCount), pad));
+        for (int i = 0; i < n; ++i) {
+            const int r = i / wrapCount;
+            const int c = i % wrapCount;
+            out[static_cast<size_t>(r)][static_cast<size_t>(c)] = flat[static_cast<size_t>(i)];
+        }
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+bool cellIsBlank(const EvalResult& v) {
+    return v.isEmpty() || (v.isString() && v.getString().empty());
+}
+
+int trimMode(const EvalResult& n) {
+    if (n.isError()) {
+        return -1;
+    }
+    const int m = static_cast<int>(n.getNumber());
+    if (m < 0 || m > 3) {
+        return -1;
+    }
+    return m;
+}
+
+EvalResult asMatrixNumber(const EvalResult& v) {
+    if (v.isError()) {
+        return v;
+    }
+    if (v.isNumber()) {
+        return v;
+    }
+    if (v.isEmpty()) {
+        return EvalResult::Number(0.0);
+    }
+    return EvalResult::Error(CellError::VALUE);
+}
+
+std::pair<std::vector<std::vector<double>>, EvalResult> toNumericMatrix(
+    const std::vector<std::vector<EvalResult>>& data) {
+    const size_t rows = data.size();
+    const size_t cols = gridCols(data);
+    if (rows == 0 || cols == 0) {
+        return {{}, EvalResult::Error(CellError::VALUE)};
+    }
+    std::vector<std::vector<double>> m(rows, std::vector<double>(cols, 0.0));
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
+            const EvalResult n = asMatrixNumber(gridAt(data, r, c));
+            if (n.isError()) {
+                return {{}, n};
+            }
+            m[r][c] = n.getNumber();
+        }
+    }
+    return {std::move(m), EvalResult::Empty()};
+}
+
+double matrixAbsMax(const std::vector<std::vector<double>>& m) {
+    double mx = 0.0;
+    for (const auto& row : m) {
+        for (double v : row) {
+            mx = std::max(mx, std::fabs(v));
+        }
+    }
+    return mx;
+}
+
+EvalResult gaussDeterminant(std::vector<std::vector<double>> a) {
+    const size_t n = a.size();
+    const double scale = matrixAbsMax(a);
+    const double eps = std::max(1e-14, 1e-12 * scale);
+    double det = 1.0;
+    for (size_t k = 0; k < n; ++k) {
+        size_t pivot = k;
+        double best = std::fabs(a[k][k]);
+        for (size_t i = k + 1; i < n; ++i) {
+            const double mag = std::fabs(a[i][k]);
+            if (mag > best) {
+                best = mag;
+                pivot = i;
+            }
+        }
+        if (best <= eps) {
+            return EvalResult::Number(0.0);
+        }
+        if (pivot != k) {
+            std::swap(a[k], a[pivot]);
+            det = -det;
+        }
+        det *= a[k][k];
+        for (size_t i = k + 1; i < n; ++i) {
+            const double f = a[i][k] / a[k][k];
+            for (size_t j = k; j < n; ++j) {
+                a[i][j] -= f * a[k][j];
+            }
+        }
+    }
+    if (!std::isfinite(det)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(det));
+}
+
+EvalResult gaussInverse(std::vector<std::vector<double>> a) {
+    const size_t n = a.size();
+    const double scale = matrixAbsMax(a);
+    const double eps = std::max(1e-14, 1e-12 * scale);
+    std::vector<std::vector<double>> inv(n, std::vector<double>(n, 0.0));
+    for (size_t i = 0; i < n; ++i) {
+        inv[i][i] = 1.0;
+    }
+    for (size_t k = 0; k < n; ++k) {
+        size_t pivot = k;
+        double best = std::fabs(a[k][k]);
+        for (size_t i = k + 1; i < n; ++i) {
+            const double mag = std::fabs(a[i][k]);
+            if (mag > best) {
+                best = mag;
+                pivot = i;
+            }
+        }
+        if (best <= eps) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        if (pivot != k) {
+            std::swap(a[k], a[pivot]);
+            std::swap(inv[k], inv[pivot]);
+        }
+        const double diag = a[k][k];
+        for (size_t j = 0; j < n; ++j) {
+            a[k][j] /= diag;
+            inv[k][j] /= diag;
+        }
+        for (size_t i = 0; i < n; ++i) {
+            if (i == k) {
+                continue;
+            }
+            const double f = a[i][k];
+            for (size_t j = 0; j < n; ++j) {
+                a[i][j] -= f * a[k][j];
+                inv[i][j] -= f * inv[k][j];
+            }
+        }
+    }
+    std::vector<std::vector<EvalResult>> out(n, std::vector<EvalResult>(n));
+    for (size_t r = 0; r < n; ++r) {
+        for (size_t c = 0; c < n; ++c) {
+            if (!std::isfinite(inv[r][c])) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            out[r][c] = EvalResult::Number(excelNormalize(inv[r][c]));
+        }
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+std::string arrayCellText(const EvalResult& v, bool strict) {
+    if (v.isError()) {
+        return errorToString(v.getError());
+    }
+    if (v.isEmpty()) {
+        return "";
+    }
+    if (strict && v.isString()) {
+        std::string out = "\"";
+        for (char c : v.getString()) {
+            if (c == '"') {
+                out += "\"\"";
+            } else {
+                out.push_back(c);
+            }
+        }
+        out.push_back('"');
+        return out;
+    }
+    const EvalResult s = v.toString();
+    if (s.isError()) {
+        return errorToString(s.getError());
+    }
+    return s.getString();
+}
+
+}  // namespace
+
+EvalResult fn_WRAPCOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (!isVector1D(data)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    if (nRes.isError()) {
+        return nRes;
+    }
+    EvalResult pad;
+    const EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
+    if (padErr.isError()) {
+        return padErr;
+    }
+    return wrapVector(flattenPreserve(data, false), static_cast<int>(nRes.getNumber()), pad, true);
+}
+
+EvalResult fn_WRAPROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (!isVector1D(data)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    if (nRes.isError()) {
+        return nRes;
+    }
+    EvalResult pad;
+    const EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
+    if (padErr.isError()) {
+        return padErr;
+    }
+    return wrapVector(flattenPreserve(data, false), static_cast<int>(nRes.getNumber()), pad, false);
+}
+
+EvalResult fn_EXPAND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    const int curRows = static_cast<int>(data.size());
+    const int curCols = static_cast<int>(gridCols(data));
+    int rows = curRows;
+    int cols = curCols;
+    if (args.size() >= 2) {
+        const EvalResult r = evaluate(args[1], ctx);
+        if (r.isError()) {
+            return r;
+        }
+        if (!r.isEmpty()) {
+            const EvalResult n = r.toNumber();
+            if (n.isError()) {
+                return n;
+            }
+            rows = static_cast<int>(n.getNumber());
+        }
+    }
+    if (args.size() >= 3) {
+        const EvalResult c = evaluate(args[2], ctx);
+        if (c.isError()) {
+            return c;
+        }
+        if (!c.isEmpty()) {
+            const EvalResult n = c.toNumber();
+            if (n.isError()) {
+                return n;
+            }
+            cols = static_cast<int>(n.getNumber());
+        }
+    }
+    if (rows < 1 || cols < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (rows < curRows || cols < curCols) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    EvalResult pad = EvalResult::Error(CellError::NA);
+    if (args.size() >= 4) {
+        pad = evaluate(args[3], ctx);
+    }
+    std::vector<std::vector<EvalResult>> out(
+        static_cast<size_t>(rows), std::vector<EvalResult>(static_cast<size_t>(cols), pad));
+    for (int r = 0; r < curRows; ++r) {
+        for (int c = 0; c < curCols; ++c) {
+            out[static_cast<size_t>(r)][static_cast<size_t>(c)] =
+                gridAt(data, static_cast<size_t>(r), static_cast<size_t>(c));
+        }
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    int rowMode = 3;
+    int colMode = 3;
+    if (args.size() >= 2) {
+        const EvalResult m = evaluateAsNumber(args[1], ctx);
+        if (m.isError()) {
+            return m;
+        }
+        rowMode = trimMode(m);
+        if (rowMode < 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    if (args.size() >= 3) {
+        const EvalResult m = evaluateAsNumber(args[2], ctx);
+        if (m.isError()) {
+            return m;
+        }
+        colMode = trimMode(m);
+        if (colMode < 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    const int height = static_cast<int>(data.size());
+    const int width = static_cast<int>(gridCols(data));
+    if (height == 0 || width == 0) {
+        return EvalResult::EmptyArray();
+    }
+    auto rowBlank = [&](int r) {
+        for (int c = 0; c < width; ++c) {
+            if (!cellIsBlank(gridAt(data, static_cast<size_t>(r), static_cast<size_t>(c)))) {
+                return false;
+            }
+        }
+        return true;
+    };
+    auto colBlank = [&](int c) {
+        for (int r = 0; r < height; ++r) {
+            if (!cellIsBlank(gridAt(data, static_cast<size_t>(r), static_cast<size_t>(c)))) {
+                return false;
+            }
+        }
+        return true;
+    };
+    int r0 = 0;
+    int r1 = height - 1;
+    int c0 = 0;
+    int c1 = width - 1;
+    if (rowMode == 1 || rowMode == 3) {
+        while (r0 <= r1 && rowBlank(r0)) {
+            ++r0;
+        }
+    }
+    if (rowMode == 2 || rowMode == 3) {
+        while (r1 >= r0 && rowBlank(r1)) {
+            --r1;
+        }
+    }
+    if (colMode == 1 || colMode == 3) {
+        while (c0 <= c1 && colBlank(c0)) {
+            ++c0;
+        }
+    }
+    if (colMode == 2 || colMode == 3) {
+        while (c1 >= c0 && colBlank(c1)) {
+            --c1;
+        }
+    }
+    if (r0 > r1 || c0 > c1) {
+        return EvalResult::EmptyArray();
+    }
+    std::vector<std::vector<EvalResult>> out;
+    out.reserve(static_cast<size_t>(r1 - r0 + 1));
+    for (int r = r0; r <= r1; ++r) {
+        std::vector<EvalResult> row;
+        row.reserve(static_cast<size_t>(c1 - c0 + 1));
+        for (int c = c0; c <= c1; ++c) {
+            row.push_back(gridAt(data, static_cast<size_t>(r), static_cast<size_t>(c)));
+        }
+        out.push_back(std::move(row));
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_FLATTEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<EvalResult> flat;
+    for (const ASTNode* arg : args) {
+        auto [data, error] = evaluateAs2D(arg, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        auto part = flattenPreserve(data, false);
+        flat.insert(flat.end(), part.begin(), part.end());
+    }
+    if (flat.empty()) {
+        return EvalResult::EmptyArray();
+    }
+    return EvalResult::ColumnArray(std::move(flat));
+}
+
+EvalResult fn_ARRAYTOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    int format = 0;
+    if (args.size() == 2) {
+        const EvalResult f = evaluateAsNumber(args[1], ctx);
+        if (f.isError()) {
+            return f;
+        }
+        format = static_cast<int>(f.getNumber());
+        if (format != 0 && format != 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    const bool strict = format == 1;
+    const size_t rows = data.size();
+    const size_t cols = gridCols(data);
+    std::string out;
+    if (strict) {
+        out.push_back('{');
+    }
+    for (size_t r = 0; r < rows; ++r) {
+        if (r > 0) {
+            out += strict ? ";" : "; ";
+        }
+        for (size_t c = 0; c < cols; ++c) {
+            if (c > 0) {
+                out += strict ? "," : ", ";
+            }
+            out += arrayCellText(gridAt(data, r, c), strict);
+        }
+    }
+    if (strict) {
+        out.push_back('}');
+    }
+    return EvalResult::String(std::move(out));
+}
+
+EvalResult fn_MUNIT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult nRes = evaluateAsNumber(args[0], ctx);
+    if (nRes.isError()) {
+        return nRes;
+    }
+    const int n = static_cast<int>(nRes.getNumber());
+    if (n < 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<std::vector<EvalResult>> out(
+        static_cast<size_t>(n),
+        std::vector<EvalResult>(static_cast<size_t>(n), EvalResult::Number(0.0)));
+    for (int i = 0; i < n; ++i) {
+        out[static_cast<size_t>(i)][static_cast<size_t>(i)] = EvalResult::Number(1.0);
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_MMULT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [a, aErr] = evaluateAs2D(args[0], ctx);
+    if (aErr.isError()) {
+        return aErr;
+    }
+    auto [b, bErr] = evaluateAs2D(args[1], ctx);
+    if (bErr.isError()) {
+        return bErr;
+    }
+    auto [am, aNumErr] = toNumericMatrix(a);
+    if (aNumErr.isError()) {
+        return aNumErr;
+    }
+    auto [bm, bNumErr] = toNumericMatrix(b);
+    if (bNumErr.isError()) {
+        return bNumErr;
+    }
+    const size_t ar = am.size();
+    const size_t ac = am.empty() ? 0 : am[0].size();
+    const size_t br = bm.size();
+    const size_t bc = bm.empty() ? 0 : bm[0].size();
+    if (ac != br) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::vector<std::vector<EvalResult>> out(ar, std::vector<EvalResult>(bc));
+    for (size_t i = 0; i < ar; ++i) {
+        for (size_t j = 0; j < bc; ++j) {
+            double sum = 0.0;
+            for (size_t k = 0; k < ac; ++k) {
+                sum += am[i][k] * bm[k][j];
+            }
+            if (!std::isfinite(sum)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            out[i][j] = EvalResult::Number(excelNormalize(sum));
+        }
+    }
+    return EvalResult::Array(std::move(out));
+}
+
+EvalResult fn_MDETERM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    auto [m, nerr] = toNumericMatrix(data);
+    if (nerr.isError()) {
+        return nerr;
+    }
+    if (m.size() != (m.empty() ? 0 : m[0].size())) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return gaussDeterminant(std::move(m));
+}
+
+EvalResult fn_MINVERSE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [data, error] = evaluateAs2D(args[0], ctx);
+    if (error.isError()) {
+        return error;
+    }
+    auto [m, nerr] = toNumericMatrix(data);
+    if (nerr.isError()) {
+        return nerr;
+    }
+    if (m.size() != (m.empty() ? 0 : m[0].size())) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return gaussInverse(std::move(m));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
@@ -1154,6 +1760,23 @@ void registerArrayFunctions(FunctionRegistry& registry) {
                               "Returns the specified rows from an array", "Array");
     registry.registerFunction("SORTBY", fn_SORTBY, "(array, by_array1, [sort_order1], ...)",
                               "Sorts an array by the values in another array", "Array");
+    registry.registerFunction("WRAPCOLS", fn_WRAPCOLS, "(vector, wrap_count, [pad_with])",
+                              "Wraps a vector into columns", "Array");
+    registry.registerFunction("WRAPROWS", fn_WRAPROWS, "(vector, wrap_count, [pad_with])",
+                              "Wraps a vector into rows", "Array");
+    registry.registerFunction("EXPAND", fn_EXPAND, "(array, rows, [columns], [pad_with])",
+                              "Expands an array to the specified size", "Array");
+    registry.registerFunction("TRIMRANGE", fn_TRIMRANGE,
+                              "(range, [row_trim_mode], [col_trim_mode])",
+                              "Trims empty rows and columns from a range", "Array");
+    registry.registerFunction("FLATTEN", fn_FLATTEN, "(range1, [range2], ...)",
+                              "Flattens arrays into a single column", "Array");
+    registry.registerFunction("ARRAYTOTEXT", fn_ARRAYTOTEXT, "(array, [format])",
+                              "Returns an array as text", "Array");
+    registry.registerFunction("MUNIT", fn_MUNIT, "(dimension)", "Unit (identity) matrix", "Math");
+    registry.registerFunction("MMULT", fn_MMULT, "(array1, array2)", "Matrix product", "Math");
+    registry.registerFunction("MDETERM", fn_MDETERM, "(array)", "Matrix determinant", "Math");
+    registry.registerFunction("MINVERSE", fn_MINVERSE, "(array)", "Inverse matrix", "Math");
 }
 
 }  // namespace cells

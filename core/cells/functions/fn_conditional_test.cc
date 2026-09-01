@@ -1,5 +1,7 @@
 #include "core/cells/functions/fn_conditional.h"
 
+#include <cmath>
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
@@ -229,6 +231,102 @@ TEST_F(FnConditionalTest, UnknownArityIsValueNotName) {
     EXPECT_TRUE(FunctionRegistry::instance().exists("SUMIF"));
     EXPECT_TRUE(FunctionRegistry::instance().exists("COUNTIFS"));
     EXPECT_TRUE(FunctionRegistry::instance().exists("SUMPRODUCT"));
+}
+
+TEST_F(FnConditionalTest, DatabaseFunctionsFieldNameIndexAndCriteria) {
+    setText(0, 0, "Tree");
+    setText(1, 0, "Height");
+    setText(2, 0, "Age");
+    setText(0, 1, "Apple");
+    setNum(1, 1, 18);
+    setNum(2, 1, 20);
+    setText(0, 2, "Pear");
+    setNum(1, 2, 12);
+    setNum(2, 2, 12);
+    setText(0, 3, "Cherry");
+    setNum(1, 3, 13);
+    setNum(2, 3, 14);
+    setText(0, 4, "Apple");
+    setNum(1, 4, 14);
+    setNum(2, 4, 15);
+    setText(0, 5, "Pear");
+    setNum(1, 5, 9);
+    setNum(2, 5, 8);
+
+    setText(0, 7, "Tree");
+    setText(0, 8, "Apple");
+
+    EvalResult sumName = eval("=DSUM(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(sumName.isNumber());
+    EXPECT_DOUBLE_EQ(sumName.getNumber(), 32.0);
+    EvalResult sumIdx = eval("=DSUM(A1:C6,2,A8:A9)");
+    ASSERT_TRUE(sumIdx.isNumber());
+    EXPECT_DOUBLE_EQ(sumIdx.getNumber(), 32.0);
+
+    EvalResult count = eval("=DCOUNT(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(count.isNumber());
+    EXPECT_DOUBLE_EQ(count.getNumber(), 2.0);
+    EvalResult counta = eval("=DCOUNTA(A1:C6,\"Tree\",A8:A9)");
+    ASSERT_TRUE(counta.isNumber());
+    EXPECT_DOUBLE_EQ(counta.getNumber(), 2.0);
+    EvalResult countAll = eval("=DCOUNT(A1:C6,A8:A9)");
+    ASSERT_TRUE(countAll.isNumber());
+    EXPECT_DOUBLE_EQ(countAll.getNumber(), 2.0);
+
+    EvalResult avg = eval("=DAVERAGE(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(avg.isNumber());
+    EXPECT_DOUBLE_EQ(avg.getNumber(), 16.0);
+    EvalResult mx = eval("=DMAX(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(mx.isNumber());
+    EXPECT_DOUBLE_EQ(mx.getNumber(), 18.0);
+    EvalResult mn = eval("=DMIN(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(mn.isNumber());
+    EXPECT_DOUBLE_EQ(mn.getNumber(), 14.0);
+    EvalResult prod = eval("=DPRODUCT(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(prod.isNumber());
+    EXPECT_DOUBLE_EQ(prod.getNumber(), 252.0);
+
+    EvalResult stdev = eval("=DSTDEV(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(stdev.isNumber());
+    EXPECT_NEAR(stdev.getNumber(), std::sqrt(8.0), 1e-12);
+    EvalResult varp = eval("=DVARP(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(varp.isNumber());
+    EXPECT_DOUBLE_EQ(varp.getNumber(), 4.0);
+    EvalResult stdevp = eval("=DSTDEVP(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(stdevp.isNumber());
+    EXPECT_DOUBLE_EQ(stdevp.getNumber(), 2.0);
+    EvalResult var = eval("=DVAR(A1:C6,\"Height\",A8:A9)");
+    ASSERT_TRUE(var.isNumber());
+    EXPECT_DOUBLE_EQ(var.getNumber(), 8.0);
+
+    setText(3, 7, "Tree");
+    setText(3, 8, "Cherry");
+    EvalResult get = eval("=DGET(A1:C6,\"Height\",D8:D9)");
+    ASSERT_TRUE(get.isNumber());
+    EXPECT_DOUBLE_EQ(get.getNumber(), 13.0);
+    EXPECT_EQ(eval("=DGET(A1:C6,\"Height\",A8:A9)").getError(), CellError::NUM);
+    setText(4, 7, "Tree");
+    setText(4, 8, "Fig");
+    EXPECT_EQ(eval("=DGET(A1:C6,\"Height\",E8:E9)").getError(), CellError::NA);
+
+    setText(0, 10, "Tree");
+    setText(1, 10, "Height");
+    setText(0, 11, "P*");
+    setText(1, 11, ">10");
+    EvalResult andRow = eval("=DSUM(A1:C6,\"Height\",A11:B12)");
+    ASSERT_TRUE(andRow.isNumber());
+    EXPECT_DOUBLE_EQ(andRow.getNumber(), 12.0);
+
+    setText(0, 13, "Tree");
+    setText(0, 14, "Cherry");
+    setText(0, 15, "Apple");
+    EvalResult orRows = eval("=DSUM(A1:C6,\"Height\",A14:A16)");
+    ASSERT_TRUE(orRows.isNumber());
+    EXPECT_DOUBLE_EQ(orRows.getNumber(), 45.0);
+
+    EXPECT_EQ(eval("=DSUM(A1:C6,\"Nope\",A8:A9)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=DSUM(A1:C6,0,A8:A9)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=DAVERAGE(A1:C6,\"Height\",E8:E9)").getError(), CellError::DIV);
 }
 
 }  // namespace

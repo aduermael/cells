@@ -118,6 +118,26 @@ EvalResult fn_EXPONDIST(const std::vector<const ASTNode*>& args, EvalContext& ct
 EvalResult fn_EXPON_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CONFIDENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CONFIDENCE_NORM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MODE_MULT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_BINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_BINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_BINOM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CRITBINOM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_BINOM_DIST_RANGE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WEIBULL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WEIBULL_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOGNORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOGNORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOGINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOGNORM_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMADIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMA_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMAINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMA_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HYPGEOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HYPGEOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NEGBINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NEGBINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;
