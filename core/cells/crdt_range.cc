@@ -85,8 +85,7 @@ ApplyResult applyRangeSet(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc && !creating) {
         return ApplyResult::SUPERSEDED;
     }
@@ -158,8 +157,7 @@ ApplyResult applyRangeDelete(Workbook& workbook, const Operation& op) {
     }
 
     // Check for newer operations that resurrect the range
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = latestLoggedOp(workbook, op.target_id);
     if (!latest.isNull() && latest.hlc > op.hlc) {
         if (latest.type == OpType::RANGE_SET) {
             return ApplyResult::RESURRECTED;

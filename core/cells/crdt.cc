@@ -288,9 +288,13 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
     OpLog* oplog = workbook.getOpLog();
 
     // Check for duplicate
-    if (oplog->hasOperation(op.hlc)) {
+#if !defined(CELLS_NO_COLLAB)
+    if (oplog != nullptr && oplog->hasOperation(op.hlc)) {
         return ApplyResult::ALREADY_APPLIED;
     }
+#else
+    (void)oplog;
+#endif
 
     ApplyResult result = ApplyResult::SUCCESS;
 
@@ -349,16 +353,20 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
     }
 
-    // Only add to OpLog on successful application
+    // Only add to OpLog on successful application (no-op when ledger is compiled out)
     if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
         result == ApplyResult::RESURRECTED) {
-        oplog->addOperation(op);
+#if !defined(CELLS_NO_COLLAB)
+        if (oplog != nullptr) {
+            oplog->addOperation(op);
 
-        // Periodic pruning for non-collaboration mode
-        constexpr size_t PRUNE_THRESHOLD = 100;
-        if (!workbook.isCollaborating() && oplog->size() >= PRUNE_THRESHOLD) {
-            oplog->clear();
+            // Periodic pruning for non-collaboration mode
+            constexpr size_t PRUNE_THRESHOLD = 100;
+            if (!workbook.isCollaborating() && oplog->size() >= PRUNE_THRESHOLD) {
+                oplog->clear();
+            }
         }
+#endif
     }
 
     return result;
@@ -401,10 +409,7 @@ size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops) {
 }
 
 bool isSuperseded(const Workbook& workbook, const Operation& op) {
-    const OpLog* oplog = workbook.getOpLog();
-    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
-
-    return !latest.isNull() && latest.hlc >= op.hlc;
+    return internal::logHasNewerOp(workbook, op.target_id, op.hlc, true);
 }
 
 // =============================================================================
@@ -997,6 +1002,7 @@ bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
     // Model B: alone-online empty rooms still need a document UUID in the
     // oplog so late joiners adopt a single shared identity (not only sheets).
     bool hasDocIdentity = false;
+#if !defined(CELLS_NO_COLLAB)
     const OpLog* oplog = workbook.getOpLog();
     if (oplog != nullptr) {
         for (const auto& existing : oplog->getAllOperations()) {
@@ -1006,6 +1012,7 @@ bool ensureDefaultSheetViaCrdt(Workbook& workbook) {
             }
         }
     }
+#endif
     if (!hasDocIdentity) {
         const std::string name = workbook.name.empty() ? "Untitled" : workbook.name;
         const std::string payload = "{\"name\":\"" + internal::jsonEscape(name) + "\"}";
@@ -1345,8 +1352,15 @@ SheetImportResult importSheetViaCrdt(Workbook& target, const Workbook& source,
 }
 
 size_t bootstrapOpLog(Workbook& workbook) {
+#if defined(CELLS_NO_COLLAB)
+    (void)workbook;
+    return 0;
+#else
     size_t count = 0;
     OpLog* oplog = workbook.getOpLog();
+    if (oplog == nullptr) {
+        return 0;
+    }
 
     // Clear any existing operations (start fresh)
     oplog->clear();
@@ -1597,6 +1611,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
     }
 
     return count;
+#endif
 }
 
 // =============================================================================

@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "core/cells/model.h"
-#include "core/cells/oplog.h"
 #include "core/cells/theme.h"
 #include "core/cells/types.h"
 

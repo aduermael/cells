@@ -519,6 +519,38 @@ Token FormulaLexer::scanIdentifierOrColumn() {
 
     const std::string_view letters = source_.substr(start, pos_ - start);
 
+    // Dotted Excel names (RANK.EQ, MODE.SNGL, CEILING.MATH) when followed by '('.
+    if (peek() == '.') {
+        size_t look = pos_;
+        bool dottedFn = false;
+        while (look < source_.size() && source_[look] == '.') {
+            ++look;
+            // Segments may start with a digit (T.DIST.2T, T.INV.2T).
+            if (look >= source_.size() || !isAlphaNumeric(source_[look])) {
+                dottedFn = false;
+                break;
+            }
+            while (look < source_.size() && isAlphaNumeric(source_[look])) {
+                ++look;
+            }
+            if (look < source_.size() && source_[look] == '(') {
+                dottedFn = true;
+                break;
+            }
+            if (look < source_.size() && source_[look] == '.') {
+                continue;
+            }
+            dottedFn = false;
+            break;
+        }
+        if (dottedFn) {
+            while (pos_ < look) {
+                advance();
+            }
+            return makeToken(TokenType::IDENTIFIER, start);
+        }
+    }
+
     // Check if we have underscore (making it definitely an identifier)
     if (peek() == '_') {
         // Continue consuming for identifier
@@ -546,19 +578,24 @@ Token FormulaLexer::scanIdentifierOrColumn() {
     // Check if this could be a valid column name (1-3 letters)
     const bool couldBeColumn = (!letters.empty() && letters.size() <= 3);
 
-    // Check if it's followed by digits (making it a cell reference: A1, AA100)
-    // Exception: if the letters+digits are followed by '(', it's a function call
-    // (e.g., LOG10( should be parsed as function LOG10, not cell ref LOG:10)
-    if (couldBeColumn && isDigit(peek())) {
-        size_t scanPos = pos_;
-        while (scanPos < source_.size() && isDigit(source_[scanPos])) {
-            scanPos++;
+    // Function names may contain digits (LOG10, BIN2DEC, HEX2OCT). If the
+    // remaining alphanumeric run is followed by '(', this is a function call
+    // rather than a cell/column reference.
+    if (isAlphaNumeric(peek())) {
+        size_t look = pos_;
+        while (look < source_.size() && isAlphaNumeric(source_[look])) {
+            ++look;
         }
-        if (scanPos < source_.size() && source_[scanPos] == '(') {
-            // It's a function call: consume digits and return as IDENTIFIER
-            pos_ = scanPos;
+        if (look < source_.size() && source_[look] == '(') {
+            while (pos_ < look) {
+                advance();
+            }
             return makeToken(TokenType::IDENTIFIER, start);
         }
+    }
+
+    // Followed by digits: cell reference (A1, AA100)
+    if (couldBeColumn && isDigit(peek())) {
         return makeToken(TokenType::COLUMN, start);
     }
 

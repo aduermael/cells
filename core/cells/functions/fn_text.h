@@ -108,6 +108,22 @@ EvalResult fn_CHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // CODE(text) - Returns numeric code of first character
 EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_UNICHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_UNICODE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FIXED(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTAFTER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTBEFORE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ASC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ENCODEURL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_JOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

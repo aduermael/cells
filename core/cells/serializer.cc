@@ -10,6 +10,10 @@
 #include "core/cells/format_buffer.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/operation.h"
+#if !defined(CELLS_NO_COLLAB)
+#include "core/cells/oplog.h"
+#endif
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/theme.h"
@@ -168,11 +172,13 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
         serializeSheet(workbook, *sheet, out);
     }
 
-    // Serialize operation log if it has operations
+    // Serialize operation log if it has operations (skipped when compiled out)
+#if !defined(CELLS_NO_COLLAB)
     const OpLog* oplog = workbook.getOpLog();
     if (oplog != nullptr && !oplog->empty()) {
         serializeOpLog(*oplog, out);
     }
+#endif
 
     // Serialize durable peer knowledge (frontiers for offline rejoin)
     serializePeerKnowledge(workbook, out);
@@ -583,6 +589,7 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell, co
     }
 }
 
+#if !defined(CELLS_NO_COLLAB)
 void Serializer::serializeOpLog(const OpLog& oplog, std::ostream& out) const {
     // OpLog section header
     out << "#oplog\n";
@@ -593,6 +600,7 @@ void Serializer::serializeOpLog(const OpLog& oplog, std::ostream& out) const {
         serializeOperation(op, out);
     }
 }
+#endif
 
 void Serializer::serializeOperation(const Operation& op, std::ostream& out) const {
     // Format: O <hlc> <op-type> <target-id> <payload-json>

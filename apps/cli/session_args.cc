@@ -104,6 +104,15 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
             result.options.url = argv[++i];
             continue;
         }
+        if ((arg == "--file" || arg == "-i") && i + 1 < argc) {
+            result.options.input_file = argv[++i];
+            result.options.local = true;
+            continue;
+        }
+        if (arg == "--local") {
+            result.options.local = true;
+            continue;
+        }
         if ((arg == "--session" || arg == "--id") && i + 1 < argc) {
             result.options.session_id = argv[++i];
             continue;
@@ -146,8 +155,14 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
 
         // Positionals
         if (result.options.kind == SessionCommandKind::kStart) {
-            if (result.options.url.empty()) {
-                result.options.url = std::string(arg);
+            if (result.options.url.empty() && result.options.input_file.empty()) {
+                std::string value(arg);
+                if (value.find("://") != std::string::npos) {
+                    result.options.url = std::move(value);
+                } else {
+                    result.options.input_file = std::move(value);
+                    result.options.local = true;
+                }
             } else {
                 result.ok = false;
                 result.error = "Unexpected argument: " + std::string(arg);
@@ -157,7 +172,7 @@ SessionParseResult parse_session_args(int argc, char* argv[]) {
             // Prefer flags; allow positional id then url for convenience
             if (result.options.session_id.empty()) {
                 result.options.session_id = std::string(arg);
-            } else if (result.options.url.empty()) {
+            } else if (result.options.url.empty() && result.options.input_file.empty()) {
                 result.options.url = std::string(arg);
             } else {
                 result.ok = false;
@@ -203,9 +218,10 @@ void validate_session_options(SessionParseResult& result) {
     auto& o = result.options;
     switch (o.kind) {
         case SessionCommandKind::kStart:
-            if (o.url.empty()) {
+            // URL, -i <file>, --local, or neither (empty local workbook) are all valid.
+            if (!o.url.empty() && !o.input_file.empty()) {
                 result.ok = false;
-                result.error = "URL required: cells session start <url>";
+                result.error = "Pass either a collab URL or -i <file>, not both";
             }
             break;
         case SessionCommandKind::kStop:
@@ -232,7 +248,7 @@ void validate_session_options(SessionParseResult& result) {
             }
             break;
         case SessionCommandKind::kDaemon:
-            if (o.session_id.empty() || o.url.empty() || o.socket_path.empty()) {
+            if (o.session_id.empty() || o.socket_path.empty()) {
                 result.ok = false;
                 result.error = "Internal daemon args incomplete";
             }
@@ -246,9 +262,10 @@ void validate_session_options(SessionParseResult& result) {
 
 std::string session_usage(const char* program_name) {
     std::ostringstream o;
-    o << "Session commands (long-running collab peer for agents; stdout is pure JSON/JSONL):\n"
+    o << "Session commands (long-running peer for agents; stdout is pure JSON/JSONL):\n"
       << "  " << program_name
-      << " session start <url> [--idle-minutes N] [--wait-seconds N] [--name NAME]\n"
+      << " session start [-i <file>|--local|<url>] [--idle-minutes N] [--wait-seconds N] "
+         "[--name NAME]\n"
       << "  " << program_name << " session list\n"
       << "  " << program_name << " session status <id>\n"
       << "  " << program_name << " session stop <id>\n"
@@ -257,17 +274,19 @@ std::string session_usage(const char* program_name) {
       << "  " << program_name << " session watch <id> [--duration SECS]\n"
       << "  " << program_name << " session --help\n"
       << "\n"
+      << "  -i, --file PATH    Local workbook (xlsx/csv/zcd); no collab URL or network\n"
+      << "  --local            Empty local workbook (no file, no collab)\n"
       << "  --idle-minutes N   Auto-stop after N minutes idle (default " << kDefaultIdleMinutes
       << "; fractions ok)\n"
       << "  --wait-seconds N   start: wait for ONLINE (peer sync done) before success (default "
-      << kDefaultWaitSeconds << "; 0=no wait)\n"
+      << kDefaultWaitSeconds << "; 0=no wait). Local sessions are ready immediately.\n"
       << "  --name NAME        Presence display name (default \"CLI Agent\")\n"
       << "  --duration SECS    Watch for at most SECS seconds then exit\n"
       << "  --force            exec even if session is still CONNECTING\n"
       << "\n"
-      << "start keeps the daemon running even if not ONLINE yet (ready:false + warning).\n"
+      << "Local sessions: load a file once, exec multiple scripts, export, stop.\n"
+      << "Collab start keeps the daemon running even if not ONLINE yet (ready:false + warning).\n"
       << "export writes the live workbook (zcd/xlsx/csv by extension).\n"
-      << "Prefer session over one-shot `cells sync` for multi-step agent work.\n"
       << "Debug: CELLS_SESSION_DEBUG=1 or session dir daemon.log for state transitions.\n";
     return o.str();
 }

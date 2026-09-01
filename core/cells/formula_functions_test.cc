@@ -3608,5 +3608,20 @@ TEST_F(FunctionTest, OrSkipsEmptyInDirectArgs) {
     EXPECT_TRUE(result.getBoolean());
 }
 
+TEST_F(FunctionTest, TextJoinIgnoreEmpty) {
+    EvalResult r = eval("=TEXTJOIN(\",\",TRUE,\"a\",\"\",\"b\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ(r.getString(), "a,b");
+    EvalResult keep = eval("=TEXTJOIN(\",\",FALSE,\"a\",\"\",\"b\")");
+    ASSERT_TRUE(keep.isString());
+    EXPECT_EQ(keep.getString(), "a,,b");
+}
+
+TEST_F(FunctionTest, CleanRemovesControlChars) {
+    EvalResult r = eval("=CLEAN(\"a\"&CHAR(7)&\"b\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ(r.getString(), "ab");
+}
+
 }  // namespace
 }  // namespace cells

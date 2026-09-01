@@ -549,4 +549,52 @@ bool Converter::executeScript(Workbook& workbook, std::string& error_out) {
     return true;
 }
 
+std::unique_ptr<Workbook> createEmptyWorkbook() {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Untitled");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+    workbook->addSheet(std::move(sheet));
+    return workbook;
+}
+
+std::unique_ptr<Workbook> loadWorkbookFromFile(const std::string& path, std::string& error_out) {
+    if (path.empty()) {
+        return createEmptyWorkbook();
+    }
+    Options options;
+    options.input_file = path;
+    options.input_format = detect_format(path);
+    if (options.input_format == Format::kUnknown) {
+        error_out = "Cannot detect input format from extension: " + path;
+        return nullptr;
+    }
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".tsv" &&
+        options.csv.delimiter == ",") {
+        options.csv.delimiter = "\t";
+    }
+    Converter converter(options);
+    return converter.readInput(error_out);
+}
+
+bool saveWorkbookToFile(const Workbook& workbook, const std::string& path, std::string& error_out) {
+    if (path.empty()) {
+        error_out = "output path required";
+        return false;
+    }
+    Options options;
+    options.output_file = path;
+    options.output_format = detect_format(path);
+    options.output.overwrite = true;
+    if (options.output_format == Format::kUnknown) {
+        error_out = "Cannot detect output format from extension: " + path;
+        return false;
+    }
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".tsv" &&
+        options.csv.delimiter == ",") {
+        options.csv.delimiter = "\t";
+    }
+    Converter converter(options);
+    return converter.writeOutput(workbook, error_out);
+}
+
 }  // namespace cells::cli

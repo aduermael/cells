@@ -23,8 +23,8 @@ brew install bazelisk llvm
 npm install -g @bazel/bazelisk
 # or download from https://github.com/bazelbuild/bazelisk/releases
 
-# Clang
-sudo apt install clang clang-format clang-tidy
+# Clang + GNU gold (ld.gold). Linux C++ links require binutils.
+sudo apt install clang clang-format clang-tidy binutils
 ```
 
 ### Windows
@@ -55,9 +55,14 @@ bazelisk build //apps/cli:cells-converter
 Build the CLI:
 
 ```bash
-bazel run :cli           # Development build
-bazel run :cli-release   # Optimized build
+bazel run :cli                       # Development build (full CLI)
+bazel run :cli-headless              # CLI only — no WASM/UI (`--config=headless`)
+bazel run :cli-headless-no-collab    # Both: no UI, no OpLog, no network
+bazel run :cli-no-collab             # Same as :cli-headless-no-collab
+bazel run :cli-release               # Optimized build
 ```
+
+`--config=headless` documents the no-UI cut. `--config=no-collab` (`--define=CELLS_NO_COLLAB=1`) compiles the engine without the operation ledger and omits the connectivity stack from `//apps/cli:cells-no-collab`. Local file-backed sessions still work (`cells session start -i file.xlsx`).
 
 Output: `dist/cli/cells` (on Windows: `bazel-bin/apps/cli/cells.exe`)
 
@@ -77,6 +82,7 @@ Output: `dist/wasm/`
 
 ```bash
 bazel run :test
+bazel run :formula-todo   # mog-derived formula report (PASS/TODO per case + summary)
 ```
 
 ### E2E Tests
@@ -280,6 +286,9 @@ cells/
 | Task | Command | Output |
 |------|---------|--------|
 | Build CLI (dev) | `bazel run :cli` | `dist/cli/cells` |
+| Build CLI (headless) | `bazel run :cli-headless` | `dist/cli/cells` |
+| Build CLI (headless, no-collab) | `bazel run :cli-headless-no-collab` | `dist/cli/cells` |
+| Build CLI (no-collab) | `bazel run :cli-no-collab` | `dist/cli/cells` |
 | Build CLI (release) | `bazel run :cli-release` | `dist/cli/cells` |
 | Build WASM (dev) | `bazel run :wasm` | `dist/wasm/` |
 | Build WASM (debug) | `bazel run :wasm-debug` | `dist/wasm/` |

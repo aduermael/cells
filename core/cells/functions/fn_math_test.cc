@@ -426,6 +426,95 @@ TEST_F(FnMathTest, AllNewFunctionsRegistered) {
     }
 }
 
+TEST_F(FnMathTest, Combinatorics) {
+    EvalResult c = eval("=COMBIN(5,2)");
+    ASSERT_TRUE(c.isNumber());
+    EXPECT_DOUBLE_EQ(c.getNumber(), 10.0);
+    EvalResult ca = eval("=COMBINA(5,2)");
+    ASSERT_TRUE(ca.isNumber());
+    EXPECT_DOUBLE_EQ(ca.getNumber(), 15.0);
+    EvalResult p = eval("=PERMUT(5,2)");
+    ASSERT_TRUE(p.isNumber());
+    EXPECT_DOUBLE_EQ(p.getNumber(), 20.0);
+    EvalResult pa = eval("=PERMUTATIONA(5,2)");
+    ASSERT_TRUE(pa.isNumber());
+    EXPECT_DOUBLE_EQ(pa.getNumber(), 25.0);
+    EvalResult kgtn = eval("=COMBIN(2,5)");
+    ASSERT_TRUE(kgtn.isError());
+    EXPECT_EQ(kgtn.getError(), CellError::NUM);
+    EvalResult neg = eval("=COMBIN(-1,1)");
+    ASSERT_TRUE(neg.isError());
+    EXPECT_EQ(neg.getError(), CellError::NUM);
+    EvalResult arity = eval("=COMBIN(5)");
+    ASSERT_TRUE(arity.isError());
+    EXPECT_EQ(arity.getError(), CellError::VALUE);
+}
+
+TEST_F(FnMathTest, BaseDecimalRoman) {
+    EvalResult b = eval("=BASE(7,2)");
+    ASSERT_TRUE(b.isString());
+    EXPECT_EQ(b.getString(), "111");
+    EvalResult bp = eval("=BASE(15,2,8)");
+    ASSERT_TRUE(bp.isString());
+    EXPECT_EQ(bp.getString(), "00001111");
+    EvalResult d = eval("=DECIMAL(\"FF\",16)");
+    ASSERT_TRUE(d.isNumber());
+    EXPECT_DOUBLE_EQ(d.getNumber(), 255.0);
+    EvalResult ar = eval("=ARABIC(\"XIV\")");
+    ASSERT_TRUE(ar.isNumber());
+    EXPECT_DOUBLE_EQ(ar.getNumber(), 14.0);
+    EvalResult rom = eval("=ROMAN(14)");
+    ASSERT_TRUE(rom.isString());
+    EXPECT_EQ(rom.getString(), "XIV");
+    EvalResult mn = eval("=MULTINOMIAL(2,3,4)");
+    ASSERT_TRUE(mn.isNumber());
+    EXPECT_DOUBLE_EQ(mn.getNumber(), 1260.0);
+    EvalResult ss = eval("=SERIESSUM(2,1,1,1)");
+    ASSERT_TRUE(ss.isNumber());
+    EXPECT_DOUBLE_EQ(ss.getNumber(), 2.0);
+}
+
+TEST_F(FnMathTest, SumXPairs) {
+    setCellValue(0, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 0, 1.0);
+    setCellValue(1, 1, 4.0);
+    EvalResult my = eval("=SUMX2MY2(A1:A2,B1:B2)");
+    ASSERT_TRUE(my.isNumber());
+    EXPECT_DOUBLE_EQ(my.getNumber(), (4.0 - 1.0) + (9.0 - 16.0));
+    EvalResult py = eval("=SUMX2PY2(A1:A2,B1:B2)");
+    ASSERT_TRUE(py.isNumber());
+    EXPECT_DOUBLE_EQ(py.getNumber(), (4.0 + 1.0) + (9.0 + 16.0));
+    EvalResult d = eval("=SUMXMY2(A1:A2,B1:B2)");
+    ASSERT_TRUE(d.isNumber());
+    EXPECT_DOUBLE_EQ(d.getNumber(), 1.0 + 1.0);
+}
+
+TEST_F(FnMathTest, DottedCeilingFloorAliases) {
+    EvalResult a = eval("=CEILING.MATH(4.3)");
+    EvalResult b = eval("=CEILING_MATH(4.3)");
+    ASSERT_TRUE(a.isNumber());
+    ASSERT_TRUE(b.isNumber());
+    EXPECT_DOUBLE_EQ(a.getNumber(), b.getNumber());
+    EvalResult c = eval("=FLOOR.MATH(4.7)");
+    EvalResult d = eval("=FLOOR_MATH(4.7)");
+    ASSERT_TRUE(c.isNumber());
+    ASSERT_TRUE(d.isNumber());
+    EXPECT_DOUBLE_EQ(c.getNumber(), d.getNumber());
+    EvalResult e = eval("=CEILING.PRECISE(3.2,2)");
+    EvalResult f = eval("=CEILING_PRECISE(3.2,2)");
+    ASSERT_TRUE(e.isNumber());
+    ASSERT_TRUE(f.isNumber());
+    EXPECT_DOUBLE_EQ(e.getNumber(), f.getNumber());
+    EvalResult g = eval("=ISO.CEILING(3.2,2)");
+    EvalResult h = eval("=ISO_CEILING(3.2,2)");
+    ASSERT_TRUE(g.isNumber());
+    ASSERT_TRUE(h.isNumber());
+    EXPECT_DOUBLE_EQ(g.getNumber(), h.getNumber());
+    EXPECT_TRUE(FunctionRegistry::instance().exists("CEILING.MATH"));
+    EXPECT_TRUE(FunctionRegistry::instance().exists("FLOOR.PRECISE"));
+}
+
 TEST_F(FnMathTest, SmokeNoNameErrorForAll) {
     // Each formula must evaluate without #NAME?
     struct Case {
@@ -462,6 +551,38 @@ TEST_F(FnMathTest, SmokeNoNameErrorForAll) {
                                       << (r.isError() ? static_cast<int>(r.getError()) : -1);
         }
     }
+}
+
+TEST_F(FnMathTest, GammaGammaln) {
+    EvalResult g1 = eval("=GAMMA(1)");
+    ASSERT_TRUE(g1.isNumber());
+    EXPECT_DOUBLE_EQ(g1.getNumber(), 1.0);
+    EvalResult g5 = eval("=GAMMA(5)");
+    ASSERT_TRUE(g5.isNumber());
+    EXPECT_DOUBLE_EQ(g5.getNumber(), 24.0);
+    EvalResult ln = eval("=GAMMALN(1)");
+    ASSERT_TRUE(ln.isNumber());
+    EXPECT_DOUBLE_EQ(ln.getNumber(), 0.0);
+    EvalResult prec = eval("=GAMMALN.PRECISE(1)");
+    ASSERT_TRUE(prec.isNumber());
+    EXPECT_DOUBLE_EQ(prec.getNumber(), 0.0);
+    EXPECT_EQ(eval("=GAMMA(0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMA(-1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMALN(0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMA(1,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=GAMMALN()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=GAMMA(\"x\")").getError(), CellError::VALUE);
+}
+
+TEST_F(FnMathTest, PercentOf) {
+    EvalResult p = eval("=PERCENTOF(1,4)");
+    ASSERT_TRUE(p.isNumber());
+    EXPECT_DOUBLE_EQ(p.getNumber(), 0.25);
+    EvalResult whole = eval("=PERCENTOF(10,10)");
+    ASSERT_TRUE(whole.isNumber());
+    EXPECT_DOUBLE_EQ(whole.getNumber(), 1.0);
+    EXPECT_EQ(eval("=PERCENTOF(1,0)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=PERCENTOF(1)").getError(), CellError::VALUE);
 }
 
 }  // namespace

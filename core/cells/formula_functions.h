@@ -30,6 +30,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "core/cells/formula_eval.h"
@@ -70,6 +71,10 @@ public:
     void registerFunction(const std::string& name, FormulaFunction fn, const std::string& signature,
                           const std::string& description, const std::string& category,
                           bool isVolatile = false);
+
+    // Register an alternate spelling for an already-registered function.
+    // Copies implementation, metadata, and volatility from `canonical`.
+    void registerAlias(const std::string& alias, const std::string& canonical);
 
     // Call a function by name with the given arguments
     // Returns NAME error if function doesn't exist
@@ -117,6 +122,12 @@ std::vector<EvalResult> expandArguments(const std::vector<const ASTNode*>& args,
 std::pair<std::vector<double>, EvalResult> collectNumericValues(
     const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// Collect paired numeric values from two array arguments (same expanded length).
+// Skips pairs where either side is empty or non-numeric. Errors propagate.
+// Length mismatch returns #N/A.
+std::pair<std::vector<std::pair<double, double>>, EvalResult> collectPairedNumericValues(
+    const ASTNode* arrayX, const ASTNode* arrayY, EvalContext& ctx);
+
 // Evaluate a single argument and coerce to number
 // Returns the numeric result or an error
 EvalResult evaluateAsNumber(const ASTNode* arg, EvalContext& ctx);
@@ -126,6 +137,22 @@ EvalResult evaluateAsString(const ASTNode* arg, EvalContext& ctx);
 
 // Evaluate a single argument and coerce to boolean
 EvalResult evaluateAsBoolean(const ASTNode* arg, EvalContext& ctx);
+
+// Collect a value as a dense 2D grid (row-major).
+// ARRAY is copied; CELL_RANGE includes empty cells; scalars become 1x1.
+// Unbounded column/row ranges return #VALUE! (do not materialize a million rows).
+// If the error result is set, the grid should be ignored.
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectAs2D(const EvalResult& value,
+                                                                        EvalContext& ctx);
+
+// Evaluate an argument and collect it as a 2D grid.
+std::pair<std::vector<std::vector<EvalResult>>, EvalResult> evaluateAs2D(const ASTNode* arg,
+                                                                         EvalContext& ctx);
+
+// Excel wildcard match used by COUNTIF/SUMIF and XLOOKUP/XMATCH match_mode 2.
+// `*` any sequence, `?` one character, `~` escapes the next character.
+// Comparison is case-insensitive.
+bool excelWildcardMatch(const std::string& text, const std::string& pattern);
 
 // Initialize all built-in functions (called automatically by FunctionRegistry)
 void initializeBuiltinFunctions(FunctionRegistry& registry);

@@ -93,6 +93,30 @@ EvalResult fn_ISLOGICAL(const std::vector<const ASTNode*>& args, EvalContext& ct
 // ISNA(value) - Returns TRUE if value is #N/A
 EvalResult fn_ISNA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// ISERR(value) - TRUE if value is an error other than #N/A
+EvalResult fn_ISERR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ISNONTEXT(value) - TRUE if value is not text
+EvalResult fn_ISNONTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ISEVEN(number) / ISODD(number) - parity of truncated number
+EvalResult fn_ISEVEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ISODD(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// TYPE(value) - Excel type code (1 number, 2 text, 4 bool, 16 error, 64 array)
+EvalResult fn_TYPE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// N(value) - Convert to number (text → 0, TRUE → 1)
+EvalResult fn_N(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ERROR.TYPE(error_val) - Numeric code for an error value
+EvalResult fn_ERROR_TYPE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// ISREF(value) - TRUE if argument is a reference
+EvalResult fn_ISREF(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+EvalResult fn_ISBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Boolean Constants
 // =============================================================================

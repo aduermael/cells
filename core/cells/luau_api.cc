@@ -25,6 +25,9 @@
 
 #include <cstring>
 
+#include <memory>
+#include <vector>
+
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/fill_range.h"
@@ -39,6 +42,7 @@
 #include "core/cells/number_format.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/style_buffer.h"
+#include "core/cells/theme.h"
 
 #include "lua.h"     // NOLINT(build/include_subdir)
 #include "lualib.h"  // NOLINT(build/include_subdir)
@@ -393,7 +397,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                 payload += "}";
             } else {
                 // CRDT-compliant resolution: discover and create entities first
-                FormulaResolver resolver(*workbook, *sheet);
+                FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
                 const RequiredEntities required = resolver.getRequiredEntities(ast.get());
 
                 // Create required columns via CRDT operations
@@ -514,6 +518,8 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: unsupported value type");
     }
 
+    const ID spillMasterBefore = sheet->getSpillMaster(col->id, row->id);
+
     // Apply via CRDT with sheet id (matches WASM createCell) so peers apply on the
     // correct sheet and create the cell if missing.
     const Operation op = makeCellSetOp(*workbook, cellId, sheet->id, payload);
@@ -522,7 +528,11 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     // Trigger recalculation: mark dependents dirty and recalculate
     // This ensures formulas that depend on this cell get updated
     markDirty(sheet, cellId);
-    const std::vector<ID> changed = {cellId};
+    std::vector<ID> changed = {cellId};
+    if (!spillMasterBefore.isNull()) {
+        markDirty(sheet, spillMasterBefore);
+        changed.push_back(spillMasterBefore);
+    }
     cells::recalculate(workbook, changed);
     cells::recalculateVolatile(sheet);
 
@@ -1180,6 +1190,96 @@ int LuauSandbox::luaAddSheet(lua_State* L) {
 
     sandbox->pushSheetObject(L, sheet);
     return 1;
+}
+
+// ============================================================================
+// Cells API: moveSheet(fromIndex, toIndex)
+// 0-based indices. toIndex is the insertion point (may equal sheetCount).
+// ============================================================================
+int LuauSandbox::luaMoveSheet(lua_State* L) {
+    Workbook* workbook = getWorkbook(L);
+    if (workbook == nullptr) {
+        luaL_error(L, "moveSheet: no context set");
+    }
+
+    const int fromIndex = static_cast<int>(luaL_checknumber(L, 1));
+    const int toIndex = static_cast<int>(luaL_checknumber(L, 2));
+    const auto count = static_cast<int>(workbook->sheetCount());
+    if (fromIndex < 0 || fromIndex >= count) {
+        luaL_error(L, "moveSheet: invalid source index");
+    }
+    if (toIndex < 0 || toIndex > count) {
+        luaL_error(L, "moveSheet: invalid target index");
+    }
+    if (fromIndex == toIndex || fromIndex + 1 == toIndex) {
+        return 0;
+    }
+
+    auto sheet = std::move(workbook->sheets[static_cast<size_t>(fromIndex)]);
+    workbook->sheets.erase(workbook->sheets.begin() + fromIndex);
+    const int insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
+    workbook->sheets.insert(workbook->sheets.begin() + insertAt, std::move(sheet));
+    return 0;
+}
+
+// ============================================================================
+// Cells API: setTheme(json)
+// JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont, minorFont } }
+// ============================================================================
+int LuauSandbox::luaSetTheme(lua_State* L) {
+    Workbook* workbook = getWorkbook(L);
+    if (workbook == nullptr) {
+        luaL_error(L, "setTheme: no context set");
+    }
+    const char* jsonC = luaL_checkstring(L, 1);
+    const std::string json = jsonC;
+
+    auto extractString = [](const std::string& body, const std::string& key) -> std::string {
+        const std::string needle = "\"" + key + "\":\"";
+        auto pos = body.find(needle);
+        if (pos == std::string::npos) {
+            return {};
+        }
+        pos += needle.length();
+        const auto end = body.find('"', pos);
+        if (end == std::string::npos) {
+            return {};
+        }
+        return body.substr(pos, end - pos);
+    };
+
+    auto theme = std::make_unique<Theme>();
+    theme->name = extractString(json, "name");
+
+    auto colorsStart = json.find("\"colors\":[");
+    if (colorsStart != std::string::npos) {
+        colorsStart += 10;
+        const auto colorsEnd = json.find(']', colorsStart);
+        if (colorsEnd != std::string::npos) {
+            const std::string colorsStr = json.substr(colorsStart, colorsEnd - colorsStart);
+            int colorIndex = 0;
+            size_t searchPos = 0;
+            while (colorIndex < 12 && searchPos < colorsStr.length()) {
+                const auto qStart = colorsStr.find('"', searchPos);
+                if (qStart == std::string::npos) {
+                    break;
+                }
+                const auto qEnd = colorsStr.find('"', qStart + 1);
+                if (qEnd == std::string::npos) {
+                    break;
+                }
+                theme->colorScheme.setColor(colorIndex,
+                                            colorsStr.substr(qStart + 1, qEnd - qStart - 1));
+                colorIndex++;
+                searchPos = qEnd + 1;
+            }
+        }
+    }
+
+    theme->fontScheme.majorFont = extractString(json, "majorFont");
+    theme->fontScheme.minorFont = extractString(json, "minorFont");
+    workbook->setTheme(std::move(theme));
+    return 0;
 }
 
 // ============================================================================

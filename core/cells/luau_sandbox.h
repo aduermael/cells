@@ -40,6 +40,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "core/cells/crdt.h"
+#include "core/cells/operation.h"
+
 // Forward declarations for Luau types
 struct lua_State;
 
@@ -102,6 +105,13 @@ public:
     // Returns result with success status and any output/error
     [[nodiscard]] ScriptResult execute(const std::string& script);
 
+    // How many times execute() has been entered (UI-mutation gate tests).
+    [[nodiscard]] int64_t executionCount() const { return executionCount_; }
+
+    // Queue a CRDT op for `_applyUiOp()` (must be followed by execute).
+    void queueUiOperation(const Operation& op);
+    [[nodiscard]] ApplyResult lastUiApplyResult() const { return lastUiApplyResult_; }
+
     // Get current configuration
     [[nodiscard]] const SandboxConfig& config() const { return config_; }
 
@@ -132,6 +142,10 @@ private:
     // Instruction counter for current execution
     int64_t instructionCount_{0};
     bool interrupted_{false};
+    int64_t executionCount_{0};
+
+    std::unique_ptr<Operation> pendingUiOp_;
+    ApplyResult lastUiApplyResult_{ApplyResult::INVALID_TARGET};
 
     // Print buffer for capturing print() output
     std::string printBuffer_;
@@ -165,6 +179,8 @@ private:
     static int luaSelectSheet(lua_State* L);  // selectSheet(sheet|name|index)
     static int luaGetSheet(lua_State* L);     // getSheet({name=...}) or getSheet({index=...})
     static int luaAddSheet(lua_State* L);     // addSheet(name?)
+    static int luaMoveSheet(lua_State* L);    // moveSheet(fromIndex, toIndex) 0-based
+    static int luaSetTheme(lua_State* L);     // setTheme(json)
 
     // Range operations
     static int luaRangeSelect(lua_State* L);
@@ -178,6 +194,9 @@ private:
 
     // Output operations
     static int luaPrint(lua_State* L);
+
+    // Internal: apply a CRDT op queued by the UI gateway (still Luau execution).
+    static int luaApplyUiOp(lua_State* L);
 
     // Helper: Get context from registry
     static Workbook* getWorkbook(lua_State* L);

@@ -24,7 +24,9 @@ enum class SessionCommandKind {
 
 struct SessionCliOptions {
     SessionCommandKind kind = SessionCommandKind::kNone;
-    std::string url;                 // start / daemon
+    std::string url;                 // start / daemon (collab URL; empty for local)
+    std::string input_file;          // start / daemon: local workbook path
+    bool local = false;              // start / daemon: file-backed, no collab
     std::string session_id;          // stop / exec / watch / status / export / daemon
     std::string script_file;         // exec --script
     std::string script_inline;       // exec -e

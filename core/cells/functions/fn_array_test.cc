@@ -1141,5 +1141,319 @@ TEST_F(FnArrayTest, TransposeSquareMatrix) {
     EXPECT_DOUBLE_EQ(result.getArrayAt(1, 1).getNumber(), 4.0);
 }
 
+TEST_F(FnArrayTest, VstackHstackShapeAndPad) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+    setCellValue(0, 2, 5.0);
+
+    EvalResult v = eval("=VSTACK(A1:B2,A3)");
+    ASSERT_TRUE(v.isArray());
+    EXPECT_EQ(v.getArrayRows(), 3u);
+    EXPECT_EQ(v.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(v.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(v.getArrayAt(1, 1).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(v.getArrayAt(2, 0).getNumber(), 5.0);
+    ASSERT_TRUE(v.getArrayAt(2, 1).isError());
+    EXPECT_EQ(v.getArrayAt(2, 1).getError(), CellError::NA);
+
+    EvalResult h = eval("=HSTACK(A1:A2,B1:B2)");
+    ASSERT_TRUE(h.isArray());
+    EXPECT_EQ(h.getArrayRows(), 2u);
+    EXPECT_EQ(h.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(h.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(h.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(h.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(h.getArrayAt(1, 1).getNumber(), 4.0);
+
+    EvalResult nested = eval("=VSTACK(SEQUENCE(2),SEQUENCE(2,1,10))");
+    ASSERT_TRUE(nested.isArray());
+    EXPECT_EQ(nested.getArrayRows(), 4u);
+    EXPECT_DOUBLE_EQ(nested.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(nested.getArrayAt(3, 0).getNumber(), 11.0);
+
+    EXPECT_EQ(eval("=VSTACK()").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, TocolTorowIgnoreAndScan) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+
+    EvalResult col = eval("=TOCOL(A1:B2)");
+    ASSERT_TRUE(col.isArray());
+    EXPECT_EQ(col.getArrayRows(), 4u);
+    EXPECT_EQ(col.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(col.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(col.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(col.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(col.getArrayAt(3, 0).getNumber(), 4.0);
+
+    EvalResult byCol = eval("=TOCOL(A1:B2,0,TRUE)");
+    ASSERT_TRUE(byCol.isArray());
+    EXPECT_DOUBLE_EQ(byCol.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(byCol.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(byCol.getArrayAt(2, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(byCol.getArrayAt(3, 0).getNumber(), 4.0);
+
+    EvalResult row = eval("=TOROW(A1:B2)");
+    ASSERT_TRUE(row.isArray());
+    EXPECT_EQ(row.getArrayRows(), 1u);
+    EXPECT_EQ(row.getArrayCols(), 4u);
+    EXPECT_DOUBLE_EQ(row.getArrayAt(0, 3).getNumber(), 4.0);
+
+    EvalResult ignoreBlanks = eval("=TOCOL(A1:C1,1)");
+    ASSERT_TRUE(ignoreBlanks.isArray());
+    EXPECT_EQ(ignoreBlanks.getArrayRows(), 2u);
+    EXPECT_DOUBLE_EQ(ignoreBlanks.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(ignoreBlanks.getArrayAt(1, 0).getNumber(), 2.0);
+
+    EXPECT_EQ(eval("=TOCOL(A1:B2,9)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, TakeDropChooseSortby) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(2, 0, 3.0);
+    setCellValue(0, 1, 4.0);
+    setCellValue(1, 1, 5.0);
+    setCellValue(2, 1, 6.0);
+    setCellValue(0, 2, 7.0);
+    setCellValue(1, 2, 8.0);
+    setCellValue(2, 2, 9.0);
+    setCellValue(3, 0, 30.0);
+    setCellValue(3, 1, 10.0);
+    setCellValue(3, 2, 20.0);
+
+    EvalResult take = eval("=TAKE(A1:C3,2,2)");
+    ASSERT_TRUE(take.isArray());
+    EXPECT_EQ(take.getArrayRows(), 2u);
+    EXPECT_EQ(take.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(take.getArrayAt(1, 1).getNumber(), 5.0);
+
+    EvalResult takeEnd = eval("=TAKE(A1:C3,-1)");
+    ASSERT_TRUE(takeEnd.isArray());
+    EXPECT_EQ(takeEnd.getArrayRows(), 1u);
+    EXPECT_DOUBLE_EQ(takeEnd.getArrayAt(0, 0).getNumber(), 7.0);
+
+    EXPECT_EQ(eval("=TAKE(A1:C3,0)").getError(), CellError::VALUE);
+
+    EvalResult drop = eval("=DROP(A1:C3,1,1)");
+    ASSERT_TRUE(drop.isArray());
+    EXPECT_EQ(drop.getArrayRows(), 2u);
+    EXPECT_EQ(drop.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(drop.getArrayAt(0, 0).getNumber(), 5.0);
+    EXPECT_EQ(eval("=DROP(A1:C3,3)").getError(), CellError::CALC);
+
+    EvalResult cols = eval("=CHOOSECOLS(A1:C3,3,1)");
+    ASSERT_TRUE(cols.isArray());
+    EXPECT_EQ(cols.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(0, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(0, 1).getNumber(), 1.0);
+
+    EvalResult lastCol = eval("=CHOOSECOLS(A1:C3,-1)");
+    ASSERT_TRUE(lastCol.isArray());
+    EXPECT_DOUBLE_EQ(lastCol.getArrayAt(1, 0).getNumber(), 6.0);
+    EXPECT_EQ(eval("=CHOOSECOLS(A1:C3,0)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=CHOOSECOLS(A1:C3,4)").getError(), CellError::VALUE);
+
+    EvalResult rows = eval("=CHOOSEROWS(A1:C3,3,1)");
+    ASSERT_TRUE(rows.isArray());
+    EXPECT_EQ(rows.getArrayRows(), 2u);
+    EXPECT_DOUBLE_EQ(rows.getArrayAt(0, 0).getNumber(), 7.0);
+    EXPECT_DOUBLE_EQ(rows.getArrayAt(1, 2).getNumber(), 3.0);
+
+    EvalResult sorted = eval("=SORTBY(A1:C3,D1:D3)");
+    ASSERT_TRUE(sorted.isArray());
+    EXPECT_DOUBLE_EQ(sorted.getArrayAt(0, 0).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(sorted.getArrayAt(1, 0).getNumber(), 7.0);
+    EXPECT_DOUBLE_EQ(sorted.getArrayAt(2, 0).getNumber(), 1.0);
+
+    EvalResult desc = eval("=SORTBY(A1:C3,D1:D3,-1)");
+    ASSERT_TRUE(desc.isArray());
+    EXPECT_DOUBLE_EQ(desc.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_EQ(eval("=SORTBY(A1:C3,D1:D2)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, WrapColsRowsPadAndRank) {
+    EvalResult cols = eval("=WRAPCOLS(SEQUENCE(6),2)");
+    ASSERT_TRUE(cols.isArray());
+    EXPECT_EQ(cols.getArrayRows(), 2u);
+    EXPECT_EQ(cols.getArrayCols(), 3u);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(0, 1).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(cols.getArrayAt(1, 2).getNumber(), 6.0);
+
+    EvalResult rows = eval("=WRAPROWS(SEQUENCE(6),2)");
+    ASSERT_TRUE(rows.isArray());
+    EXPECT_EQ(rows.getArrayRows(), 3u);
+    EXPECT_EQ(rows.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(rows.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(rows.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(rows.getArrayAt(2, 0).getNumber(), 5.0);
+
+    EvalResult padded = eval("=WRAPCOLS(SEQUENCE(5),2,0)");
+    ASSERT_TRUE(padded.isArray());
+    EXPECT_EQ(padded.getArrayRows(), 2u);
+    EXPECT_EQ(padded.getArrayCols(), 3u);
+    EXPECT_DOUBLE_EQ(padded.getArrayAt(0, 2).getNumber(), 5.0);
+    EXPECT_DOUBLE_EQ(padded.getArrayAt(1, 2).getNumber(), 0.0);
+
+    EvalResult defaultPad = eval("=WRAPROWS(SEQUENCE(3),2)");
+    ASSERT_TRUE(defaultPad.getArrayAt(1, 1).isError());
+    EXPECT_EQ(defaultPad.getArrayAt(1, 1).getError(), CellError::NA);
+
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+    EXPECT_EQ(eval("=WRAPCOLS(A1:B2,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=WRAPROWS(SEQUENCE(4),0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=WRAPCOLS(SEQUENCE(4))").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, ExpandPadAndErrors) {
+    EvalResult e = eval("=EXPAND(SEQUENCE(2),3,2,0)");
+    ASSERT_TRUE(e.isArray());
+    EXPECT_EQ(e.getArrayRows(), 3u);
+    EXPECT_EQ(e.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(e.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(e.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(e.getArrayAt(0, 1).getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(e.getArrayAt(2, 1).getNumber(), 0.0);
+
+    EvalResult keep = eval("=EXPAND(SEQUENCE(2),4)");
+    ASSERT_TRUE(keep.isArray());
+    EXPECT_EQ(keep.getArrayRows(), 4u);
+    EXPECT_EQ(keep.getArrayCols(), 1u);
+    EXPECT_EQ(keep.getArrayAt(3, 0).getError(), CellError::NA);
+
+    EXPECT_EQ(eval("=EXPAND(SEQUENCE(3),2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=EXPAND(SEQUENCE(2),0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=EXPAND(SEQUENCE(2),2,0)").getError(), CellError::NUM);
+}
+
+TEST_F(FnArrayTest, TrimRangeModes) {
+    setCellValue(1, 1, 1.0);
+    setCellValue(2, 1, 2.0);
+    setCellValue(1, 2, 3.0);
+    setCellValue(2, 2, 4.0);
+
+    EvalResult both = eval("=TRIMRANGE(A1:D5)");
+    ASSERT_TRUE(both.isArray());
+    EXPECT_EQ(both.getArrayRows(), 2u);
+    EXPECT_EQ(both.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(both.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(both.getArrayAt(1, 1).getNumber(), 4.0);
+
+    EvalResult noTrim = eval("=TRIMRANGE(A1:D5,0,0)");
+    ASSERT_TRUE(noTrim.isArray());
+    EXPECT_EQ(noTrim.getArrayRows(), 5u);
+    EXPECT_EQ(noTrim.getArrayCols(), 4u);
+
+    EvalResult lead = eval("=TRIMRANGE(A1:D5,1,1)");
+    ASSERT_TRUE(lead.isArray());
+    EXPECT_EQ(lead.getArrayRows(), 4u);
+    EXPECT_EQ(lead.getArrayCols(), 3u);
+    EXPECT_DOUBLE_EQ(lead.getArrayAt(0, 0).getNumber(), 1.0);
+
+    EXPECT_EQ(eval("=TRIMRANGE(A1:D5,4)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, FlattenAndArrayToText) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+
+    EvalResult flat = eval("=FLATTEN(A1:B2)");
+    ASSERT_TRUE(flat.isArray());
+    EXPECT_EQ(flat.getArrayRows(), 4u);
+    EXPECT_EQ(flat.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(flat.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(flat.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(flat.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(flat.getArrayAt(3, 0).getNumber(), 4.0);
+
+    EvalResult two = eval("=FLATTEN(A1:A2,B1:B2)");
+    ASSERT_TRUE(two.isArray());
+    EXPECT_EQ(two.getArrayRows(), 4u);
+    EXPECT_DOUBLE_EQ(two.getArrayAt(3, 0).getNumber(), 4.0);
+
+    EvalResult concise = eval("=ARRAYTOTEXT(A1:B2)");
+    ASSERT_TRUE(concise.isString());
+    EXPECT_EQ(concise.getString(), "1, 2; 3, 4");
+    EvalResult strict = eval("=ARRAYTOTEXT(A1:B2,1)");
+    ASSERT_TRUE(strict.isString());
+    EXPECT_EQ(strict.getString(), "{1,2;3,4}");
+    setCellString(0, 3, "hi");
+    EvalResult quoted = eval("=ARRAYTOTEXT(A4,1)");
+    ASSERT_TRUE(quoted.isString());
+    EXPECT_EQ(quoted.getString(), "{\"hi\"}");
+    EXPECT_EQ(eval("=ARRAYTOTEXT(A1,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=FLATTEN()").getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, MatrixUnitMultiplyDetInverse) {
+    EvalResult ident = eval("=MUNIT(3)");
+    ASSERT_TRUE(ident.isArray());
+    EXPECT_EQ(ident.getArrayRows(), 3u);
+    EXPECT_EQ(ident.getArrayCols(), 3u);
+    EXPECT_DOUBLE_EQ(ident.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(ident.getArrayAt(0, 1).getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(ident.getArrayAt(2, 2).getNumber(), 1.0);
+    EXPECT_EQ(eval("=MUNIT(0)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=MUNIT(-1)").getError(), CellError::VALUE);
+
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+    setCellValue(0, 2, 5.0);
+    setCellValue(1, 2, 6.0);
+    setCellValue(0, 3, 7.0);
+    setCellValue(1, 3, 8.0);
+
+    EvalResult prod = eval("=MMULT(A1:B2,A3:B4)");
+    ASSERT_TRUE(prod.isArray());
+    EXPECT_EQ(prod.getArrayRows(), 2u);
+    EXPECT_EQ(prod.getArrayCols(), 2u);
+    EXPECT_DOUBLE_EQ(prod.getArrayAt(0, 0).getNumber(), 19.0);
+    EXPECT_DOUBLE_EQ(prod.getArrayAt(0, 1).getNumber(), 22.0);
+    EXPECT_DOUBLE_EQ(prod.getArrayAt(1, 0).getNumber(), 43.0);
+    EXPECT_DOUBLE_EQ(prod.getArrayAt(1, 1).getNumber(), 50.0);
+
+    EXPECT_EQ(eval("=MMULT(A1:B2,A1:B1)").getError(), CellError::VALUE);
+    setCellString(2, 0, "x");
+    setCellString(2, 1, "y");
+    EXPECT_EQ(eval("=MMULT(A1:B2,C1:C2)").getError(), CellError::VALUE);
+
+    EvalResult det = eval("=MDETERM(A1:B2)");
+    ASSERT_TRUE(det.isNumber());
+    EXPECT_DOUBLE_EQ(det.getNumber(), -2.0);
+    EXPECT_EQ(eval("=MDETERM(A1:B1)").getError(), CellError::VALUE);
+
+    setCellValue(3, 0, 4.0);
+    setCellValue(4, 0, 7.0);
+    setCellValue(3, 1, 2.0);
+    setCellValue(4, 1, 6.0);
+    EvalResult inv = eval("=MINVERSE(D1:E2)");
+    ASSERT_TRUE(inv.isArray());
+    EXPECT_NEAR(inv.getArrayAt(0, 0).getNumber(), 0.6, 1e-12);
+    EXPECT_NEAR(inv.getArrayAt(0, 1).getNumber(), -0.7, 1e-12);
+    EXPECT_NEAR(inv.getArrayAt(1, 0).getNumber(), -0.2, 1e-12);
+    EXPECT_NEAR(inv.getArrayAt(1, 1).getNumber(), 0.4, 1e-12);
+
+    setCellValue(0, 5, 1.0);
+    setCellValue(1, 5, 2.0);
+    setCellValue(0, 6, 2.0);
+    setCellValue(1, 6, 4.0);
+    EXPECT_EQ(eval("=MINVERSE(A6:B7)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=MINVERSE(A1:B1)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

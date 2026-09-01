@@ -59,6 +59,26 @@ EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx
 // Returns an array with rows and columns swapped
 EvalResult fn_TRANSPOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_VSTACK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HSTACK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TOCOL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TOROW(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TAKE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DROP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHOOSECOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHOOSEROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WRAPCOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WRAPROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_EXPAND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FLATTEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ARRAYTOTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MUNIT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MMULT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MDETERM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MINVERSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

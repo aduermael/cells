@@ -58,6 +58,24 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // range_lookup: TRUE (default) = approximate match, FALSE = exact match
 EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_ROW(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COLUMN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COLUMNS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ADDRESS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHOOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_AREAS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SHEET(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SHEETS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HYPERLINK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// XLOOKUP / XMATCH: match_mode 0 exact, -1 next smaller, 1 next larger, 2 wildcard
+// (* / ? / ~, shared with COUNTIF). search_mode 1/-1 linear, 2/-2 binary
+// (ascending / descending). Wildcard match_mode uses a linear scan.
+EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_LOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

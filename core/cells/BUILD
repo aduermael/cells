@@ -1,5 +1,12 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
+# --config=no-collab / --define=CELLS_NO_COLLAB=1: compile the model without an
+# operation ledger. Connectivity is omitted at the CLI target, not here.
+NO_COLLAB_DEFINES = select({
+    "//:cells_no_collab": ["CELLS_NO_COLLAB"],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "types",
     hdrs = ["types.h"],
@@ -145,6 +152,16 @@ cc_library(
     hdrs = ["id.h"],
     visibility = ["//visibility:public"],
     deps = [":types"],
+)
+
+cc_test(
+    name = "build_config_test",
+    srcs = ["build_config_test.cc"],
+    deps = [
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_test(
@@ -322,7 +339,11 @@ cc_library(
         "model.cc",
         "sheet.cc",
     ],
-    hdrs = ["model.h"],
+    hdrs = [
+        "build_config.h",
+        "model.h",
+    ],
+    defines = NO_COLLAB_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":axis_index",
@@ -333,14 +354,17 @@ cc_library(
         ":formula_serializer",
         ":id",
         ":named_ranges",
-        ":oplog",
+        ":operation",
         ":range",
         ":range_index",
         ":spill_index",
         ":style_types",
         ":theme",
         ":types",
-    ],
+    ] + select({
+        "//:cells_no_collab": [],
+        "//conditions:default": [":oplog"],
+    }),
 )
 
 cc_library(
@@ -355,6 +379,7 @@ cc_library(
         "crdt.h",
         "crdt_internal.h",
     ],
+    defines = NO_COLLAB_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":format_code_parser",
@@ -363,7 +388,10 @@ cc_library(
         ":operation",
         ":range",
         "//core/log",
-    ],
+    ] + select({
+        "//:cells_no_collab": [],
+        "//conditions:default": [":oplog"],
+    }),
 )
 
 cc_library(
@@ -519,24 +547,30 @@ cc_library(
     name = "parser",
     srcs = ["parser.cc"],
     hdrs = ["parser.h"],
+    defines = NO_COLLAB_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":model",
-        ":oplog",
         ":types",
-    ],
+    ] + select({
+        "//:cells_no_collab": [":operation"],
+        "//conditions:default": [":oplog"],
+    }),
 )
 
 cc_library(
     name = "serializer",
     srcs = ["serializer.cc"],
     hdrs = ["serializer.h"],
+    defines = NO_COLLAB_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":model",
-        ":oplog",
         ":types",
-    ],
+    ] + select({
+        "//:cells_no_collab": [":operation"],
+        "//conditions:default": [":oplog"],
+    }),
 )
 
 cc_test(
@@ -688,6 +722,18 @@ cc_test(
         ":id",
         ":xlsx_reader",
         ":xlsx_writer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "xlsx_remaining_work_test",
+    srcs = ["xlsx_remaining_work_test.cc"],
+    data = ["//testdata/xlsx:sample_xlsx_files"],
+    deps = [
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "//third_party/miniz",
         "@googletest//:gtest_main",
     ],
 )
@@ -1032,7 +1078,10 @@ cc_library(
         "formula_eval.cc",
         "formula_functions.cc",
         "//core/cells/functions:fn_array.cc",
+        "//core/cells/functions:fn_conditional.cc",
         "//core/cells/functions:fn_datetime.cc",
+        "//core/cells/functions:fn_engineering.cc",
+        "//core/cells/functions:fn_financial.cc",
         "//core/cells/functions:fn_logic.cc",
         "//core/cells/functions:fn_lookup.cc",
         "//core/cells/functions:fn_math.cc",
@@ -1044,7 +1093,10 @@ cc_library(
         "formula_eval.h",
         "formula_functions.h",
         "//core/cells/functions:fn_array.h",
+        "//core/cells/functions:fn_conditional.h",
         "//core/cells/functions:fn_datetime.h",
+        "//core/cells/functions:fn_engineering.h",
+        "//core/cells/functions:fn_financial.h",
         "//core/cells/functions:fn_logic.h",
         "//core/cells/functions:fn_lookup.h",
         "//core/cells/functions:fn_math.h",
@@ -1058,6 +1110,53 @@ cc_library(
         ":model",
         ":types",
     ],
+)
+
+cc_library(
+    name = "formula_todo_lib",
+    srcs = ["formula_todo.cc"],
+    hdrs = ["formula_todo.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":id",
+        ":model",
+    ],
+)
+
+cc_test(
+    name = "formula_todo_test",
+    srcs = ["formula_todo_test.cc"],
+    data = ["//testdata/formulas:mog_formula_cases"],
+    deps = [
+        ":formula_eval",
+        ":formula_todo_lib",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "formula_todo_strict_test",
+    srcs = ["formula_todo_test.cc"],
+    copts = ["-DCELLS_FORMULA_TODO_STRICT"],
+    data = ["//testdata/formulas:mog_formula_cases"],
+    tags = ["manual"],
+    deps = [
+        ":formula_eval",
+        ":formula_todo_lib",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "formula_todo_report",
+    srcs = ["formula_todo_report.cc"],
+    data = ["//testdata/formulas:mog_formula_cases"],
+    visibility = ["//visibility:public"],
+    deps = [":formula_todo_lib"],
 )
 
 cc_test(
@@ -1266,7 +1365,10 @@ cc_library(
     deps = [
         ":crdt",
         ":fill_range",
+        ":format_buffer",
         ":formula_display",
+        ":number_format",
+        ":style_buffer",
         ":formula_parser",
         ":formula_recalc",
         ":formula_resolver",
@@ -1274,6 +1376,7 @@ cc_library(
         ":id",
         ":model",
         ":ref_converter",
+        ":theme",
         "@luau//:luau",
     ],
 )
@@ -1286,6 +1389,37 @@ cc_test(
         ":id",
         ":luau_sandbox",
         ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ui_mutation",
+    srcs = ["ui_mutation.cc"],
+    hdrs = ["ui_mutation.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":format_buffer",
+        ":id",
+        ":input_parser",
+        ":luau_sandbox",
+        ":model",
+        ":number_format",
+        ":operation",
+    ],
+)
+
+cc_test(
+    name = "ui_mutation_test",
+    srcs = ["ui_mutation_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":luau_sandbox",
+        ":model",
+        ":operation",
+        ":ui_mutation",
         "@googletest//:gtest_main",
     ],
 )

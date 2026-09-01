@@ -227,10 +227,10 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
     // Apply format or clear if empty
     if (!format.isEmpty()) {
         Operation op = makeCellSetFormatOp(*_workbook, cellId, format);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     } else {
         Operation op = makeCellClearFormatOp(*_workbook, cellId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -269,10 +269,10 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     // Apply format or clear if empty
     if (!format.isEmpty()) {
         Operation op = makeCellSetFormatOp(*_workbook, cellId, format);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     } else {
         Operation op = makeCellClearFormatOp(*_workbook, cellId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -1463,16 +1463,16 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
         if (!styleBuffer.isEmpty()) {
             Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         } else {
             // CellStyle has defined properties but StyleBuffer is empty
             // This happens when borders are set to "none" - clear the style
             Operation op = makeCellClearStyleOp(*_workbook, cellId);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         }
     } else {
         Operation op = makeCellClearStyleOp(*_workbook, cellId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -1523,16 +1523,16 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
         if (!styleBuffer.isEmpty()) {
             Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         } else {
             // CellStyle has defined properties but StyleBuffer is empty
             // This happens when borders are set to "none" - clear the style
             Operation op = makeCellClearStyleOp(*_workbook, cellId);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         }
     } else {
         Operation op = makeCellClearStyleOp(*_workbook, cellId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -1672,7 +1672,7 @@ std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
     Operation removeOp = makeRangeDeleteOp(*_workbook, range->id, payload.str());
-    applyOperation(*_workbook, removeOp);
+    applyLocalUiOp(removeOp);
 
     broadcastPendingOperations();
     rebuildViewportIndex();
@@ -1712,7 +1712,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find end column
@@ -1725,7 +1725,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find start row
@@ -1738,7 +1738,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find end row
@@ -1751,7 +1751,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Parse the new style from JSON
@@ -1820,7 +1820,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
                 Operation removeOp =
                     makeRangeDeleteOp(*_workbook, existingRange->id, removePayload.str());
-                applyOperation(*_workbook, removeOp);
+                applyLocalUiOp(removeOp);
 
                 broadcastPendingOperations();
 
@@ -1834,7 +1834,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // Convert to content-addressed StyleBuffer and update the range
             StyleBuffer mergedStyleBuf = StyleBuffer::fromCellStyle(mergedStyle);
             Operation updateOp = makeRangeSetStyleOp(*_workbook, existingRange->id, mergedStyleBuf);
-            applyOperation(*_workbook, updateOp);
+            applyLocalUiOp(updateOp);
 
             broadcastPendingOperations();
 
@@ -1945,12 +1945,12 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
             Operation removeOp =
                 makeRangeDeleteOp(*_workbook, containedOp.rangeId, removePayload.str());
-            applyOperation(*_workbook, removeOp);
+            applyLocalUiOp(removeOp);
         } else {
             // Update the range with the stripped style
             Operation updateOp =
                 makeRangeSetStyleOp(*_workbook, containedOp.rangeId, containedOp.strippedStyle);
-            applyOperation(*_workbook, updateOp);
+            applyLocalUiOp(updateOp);
         }
     }
 
@@ -1960,7 +1960,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         std::ostringstream removePayload;
         removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
         Operation removeOp = makeRangeDeleteOp(*_workbook, splitOp.oldRangeId, removePayload.str());
-        applyOperation(*_workbook, removeOp);
+        applyLocalUiOp(removeOp);
 
         // Create new ranges for each split rectangle
         for (const PositionRect& rect : splitOp.newRects) {
@@ -1977,7 +1977,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 // Note: size is omitted to use local default (sizeSet=false)
                 std::string payload = "{\"pos\":" + std::to_string(rect.minCol) + "}";
                 Operation op = makeColSetOp(*_workbook, rectStartColId, sheet->id, payload);
-                applyOperation(*_workbook, op);
+                applyLocalUiOp(op);
             }
 
             // Find end column
@@ -1990,7 +1990,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 // Note: size is omitted to use local default (sizeSet=false)
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) + "}";
                 Operation op = makeColSetOp(*_workbook, rectEndColId, sheet->id, payload);
-                applyOperation(*_workbook, op);
+                applyLocalUiOp(op);
             }
 
             // Find start row
@@ -2003,7 +2003,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 // Note: size is omitted to use local default (sizeSet=false)
                 std::string payload = "{\"pos\":" + std::to_string(rect.minRow) + "}";
                 Operation op = makeRowSetOp(*_workbook, rectStartRowId, sheet->id, payload);
-                applyOperation(*_workbook, op);
+                applyLocalUiOp(op);
             }
 
             // Find end row
@@ -2016,7 +2016,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 // Note: size is omitted to use local default (sizeSet=false)
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) + "}";
                 Operation op = makeRowSetOp(*_workbook, rectEndRowId, sheet->id, payload);
-                applyOperation(*_workbook, op);
+                applyLocalUiOp(op);
             }
 
             // Create the new split range
@@ -2029,12 +2029,12 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             newRangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
             Operation newRangeOp = makeRangeSetOp(*_workbook, newRangeId, newRangePayload.str());
-            applyOperation(*_workbook, newRangeOp);
+            applyLocalUiOp(newRangeOp);
 
             // Apply the preserved style to the new split range
             Operation newSetStyleOp =
                 makeRangeSetStyleOp(*_workbook, newRangeId, splitOp.styleToPreserve);
-            applyOperation(*_workbook, newSetStyleOp);
+            applyLocalUiOp(newSetStyleOp);
         }
     }
 
@@ -2048,11 +2048,11 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     rangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
 
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, rangePayload.str());
-    applyOperation(*_workbook, rangeOp);
+    applyLocalUiOp(rangeOp);
 
     // Associate the style with the range
     Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, newStyleBuf);
-    applyOperation(*_workbook, setStyleOp);
+    applyLocalUiOp(setStyleOp);
 
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
     // When applying a range style, remove matching properties from individual cells to avoid
@@ -2093,12 +2093,12 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         if (strippedStyle.isEmpty()) {
             // Clear the cell's style using content-addressed operation
             Operation clearOp = makeCellClearStyleOp(*_workbook, cellId);
-            applyOperation(*_workbook, clearOp);
+            applyLocalUiOp(clearOp);
         } else if (strippedStyle != cellStyle) {
             // Style changed, need to update the cell with new content-addressed style
             StyleBuffer strippedBuf = StyleBuffer::fromCellStyle(strippedStyle);
             Operation updateOp = makeCellSetStyleOp(*_workbook, cellId, strippedBuf);
-            applyOperation(*_workbook, updateOp);
+            applyLocalUiOp(updateOp);
         }
     }
 
@@ -2499,7 +2499,7 @@ std::string CellsEngine::setColumnStyle(uint32_t colPosition, const std::string&
         // Note: size is omitted to use local default (sizeSet=false)
         std::string colPayload = "{\"pos\":" + std::to_string(colPosition) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
-        applyOperation(*_workbook, colOp);
+        applyLocalUiOp(colOp);
     }
 
     // Get existing style if column has one
@@ -2520,15 +2520,15 @@ std::string CellsEngine::setColumnStyle(uint32_t colPosition, const std::string&
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
         if (!styleBuffer.isEmpty()) {
             Operation op = makeAxisSetStyleOp(*_workbook, colId, styleBuffer);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         } else {
             // Style properties resolved to empty - clear the style
             Operation op = makeAxisClearStyleOp(*_workbook, colId);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         }
     } else {
         Operation op = makeAxisClearStyleOp(*_workbook, colId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -2565,7 +2565,7 @@ std::string CellsEngine::setRowStyle(uint32_t rowPosition, const std::string& st
         // Note: size is omitted to use local default (sizeSet=false)
         std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
+        applyLocalUiOp(rowOp);
     }
 
     // Get existing style if row has one
@@ -2586,15 +2586,15 @@ std::string CellsEngine::setRowStyle(uint32_t rowPosition, const std::string& st
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
         if (!styleBuffer.isEmpty()) {
             Operation op = makeAxisSetStyleOp(*_workbook, rowId, styleBuffer);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         } else {
             // Style properties resolved to empty - clear the style
             Operation op = makeAxisClearStyleOp(*_workbook, rowId);
-            applyOperation(*_workbook, op);
+            applyLocalUiOp(op);
         }
     } else {
         Operation op = makeAxisClearStyleOp(*_workbook, rowId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -2789,7 +2789,7 @@ std::string CellsEngine::setColumnFormat(uint32_t colPosition, const std::string
         // Note: size is omitted to use local default (sizeSet=false)
         std::string colPayload = "{\"pos\":" + std::to_string(colPosition) + "}";
         Operation colOp = makeColSetOp(*_workbook, colId, colPayload);
-        applyOperation(*_workbook, colOp);
+        applyLocalUiOp(colOp);
     }
 
     // Parse format JSON and create FormatBuffer
@@ -2798,11 +2798,11 @@ std::string CellsEngine::setColumnFormat(uint32_t colPosition, const std::string
     // Apply format to column
     if (!format.isEmpty()) {
         Operation op = makeAxisSetFormatOp(*_workbook, colId, format);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     } else {
         // Empty format - clear the format
         Operation op = makeAxisClearFormatOp(*_workbook, colId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -2839,7 +2839,7 @@ std::string CellsEngine::setRowFormat(uint32_t rowPosition, const std::string& f
         // Note: size is omitted to use local default (sizeSet=false)
         std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, rowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
+        applyLocalUiOp(rowOp);
     }
 
     // Parse format JSON and create FormatBuffer
@@ -2848,11 +2848,11 @@ std::string CellsEngine::setRowFormat(uint32_t rowPosition, const std::string& f
     // Apply format to row
     if (!format.isEmpty()) {
         Operation op = makeAxisSetFormatOp(*_workbook, rowId, format);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     } else {
         // Empty format - clear the format
         Operation op = makeAxisClearFormatOp(*_workbook, rowId);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -2881,7 +2881,7 @@ std::string CellsEngine::clearColumnFormat(uint32_t colPosition) {
     }
 
     Operation op = makeAxisClearFormatOp(*_workbook, col->id);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -2904,7 +2904,7 @@ std::string CellsEngine::clearRowFormat(uint32_t rowPosition) {
     }
 
     Operation op = makeAxisClearFormatOp(*_workbook, row->id);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -2952,7 +2952,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation op = makeColSetOp(*_workbook, startColId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find end column
@@ -2965,7 +2965,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation op = makeColSetOp(*_workbook, endColId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find start row
@@ -2978,7 +2978,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation op = makeRowSetOp(*_workbook, startRowId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Find end row
@@ -2991,7 +2991,7 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
         // Note: size is omitted to use local default (sizeSet=false)
         std::string payload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation op = makeRowSetOp(*_workbook, endRowId, sheet->id, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     // Parse format JSON
@@ -3007,12 +3007,12 @@ std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t sta
 
     ID rangeId = generate_id();
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, insertPayload.str());
-    applyOperation(*_workbook, rangeOp);
+    applyLocalUiOp(rangeOp);
 
     // Set format on the range
     if (!format.isEmpty()) {
         Operation formatOp = makeRangeSetFormatOp(*_workbook, rangeId, format);
-        applyOperation(*_workbook, formatOp);
+        applyLocalUiOp(formatOp);
     }
 
     broadcastPendingOperations();
@@ -3045,7 +3045,7 @@ std::string CellsEngine::removeRangeFormat(uint32_t col, uint32_t row) {
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
     Operation removeOp = makeRangeDeleteOp(*_workbook, range->id, payload.str());
-    applyOperation(*_workbook, removeOp);
+    applyLocalUiOp(removeOp);
 
     broadcastPendingOperations();
 

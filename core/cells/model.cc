@@ -310,7 +310,9 @@ Axis::Axis(const ID& id, const ID& sheetId, bool isCol)
 Workbook::Workbook()
     : id(),
       name("Untitled"),
+#if !defined(CELLS_NO_COLLAB)
       _oplog(std::make_unique<OpLog>()),
+#endif
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
       _depGraph(std::make_unique<DependencyGraph>()) {
@@ -320,7 +322,9 @@ Workbook::Workbook()
 Workbook::Workbook(const ID& id, std::string name)
     : id(id),
       name(std::move(name)),
+#if !defined(CELLS_NO_COLLAB)
       _oplog(std::make_unique<OpLog>()),
+#endif
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
       _depGraph(std::make_unique<DependencyGraph>()) {
@@ -510,11 +514,19 @@ bool Workbook::removeSheet(const ID& sheetId) {
 }
 
 OpLog* Workbook::getOpLog() {
+#if defined(CELLS_NO_COLLAB)
+    return nullptr;
+#else
     return _oplog.get();
+#endif
 }
 
 const OpLog* Workbook::getOpLog() const {
+#if defined(CELLS_NO_COLLAB)
+    return nullptr;
+#else
     return _oplog.get();
+#endif
 }
 
 void Workbook::setNodeId(const ID& nodeId) {
@@ -569,7 +581,12 @@ HLC Workbook::getCurrentHLC() const {
     }
 
     // Get the latest HLC from the OpLog or last generated
-    const HLC oplog_hlc = _oplog->getCurrentHLC();
+    HLC oplog_hlc{};
+#if !defined(CELLS_NO_COLLAB)
+    if (_oplog) {
+        oplog_hlc = _oplog->getCurrentHLC();
+    }
+#endif
     const HLC base = (_lastHLC > oplog_hlc) ? _lastHLC : oplog_hlc;
 
     // Generate new HLC

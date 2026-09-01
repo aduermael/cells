@@ -58,7 +58,9 @@
 #endif
 
 #if defined(__APPLE__)
+#if !defined(CELLS_NO_COLLAB)
 #include <CoreFoundation/CoreFoundation.h>
+#endif
 #include <mach-o/dyld.h>
 #endif
 
@@ -70,12 +72,15 @@
 #include "core/cells/operation.h"
 #include "core/cells/serializer.h"
 #include "core/cells/xlsx_writer.h"
+#if !defined(CELLS_NO_COLLAB)
 #include "core/net/include/SyncClient.h"
+#endif
 
 #include "options.h"
 #include "output_spill.h"
 #include "session_protocol.h"
 #include "session_store.h"
+#include "session_workbook.h"
 
 namespace cells::cli {
 namespace {
@@ -529,7 +534,11 @@ SessionResponse rpc(const std::string& socket_path, const std::string& request_l
 // Daemon: SyncClient + IPC
 // ---------------------------------------------------------------------------
 
+#if !defined(CELLS_NO_COLLAB)
 class SessionDaemon : public net::SyncClientDelegate {
+#else
+class SessionDaemon {
+#endif
 public:
     SessionDaemon(SessionMeta meta, std::string root, std::string socket_path, RoomTarget target)
         : meta_(std::move(meta)),
@@ -540,18 +549,34 @@ public:
     }
 
     int run() {
-        // Empty workbook with NO local sheet/axes. Creating a Sheet1 here would
-        // mint new CRDT IDs that collide with the browser's axes at the same
-        // positions. Structure comes from peer sync; if alone, we add a sheet
-        // via CRDT ops once ONLINE.
-        workbook_ = std::make_unique<Workbook>();
+        const bool local = local_mode();
+        if (local) {
+            std::string err;
+            if (!local_wb_.load(meta_.url == "local:" ? std::string() : meta_.url, err)) {
+                std::cerr << "Error: cannot load session workbook: " << err << "\n";
+                return 1;
+            }
+            workbook_ = local_wb_.release();
+            last_state_ = "ONLINE";
+        } else {
+#if defined(CELLS_NO_COLLAB)
+            std::cerr << "Error: collaboration sessions are not supported in this build\n";
+            return 1;
+#else
+            // Empty workbook with NO local sheet/axes. Creating a Sheet1 here would
+            // mint new CRDT IDs that collide with the browser's axes at the same
+            // positions. Structure comes from peer sync; if alone, we add a sheet
+            // via CRDT ops once ONLINE.
+            workbook_ = std::make_unique<Workbook>();
 
-        net::SyncClientConfig config;
-        config.signaling_url = target_.signaling_ws;
-        sync_ = std::make_unique<net::SyncClient>(workbook_.get(), config);
-        sync_->setDelegate(this);
-        sync_->startSync(target_.room_id);
-        sync_->setLocalName(meta_.name.empty() ? "CLI Agent" : meta_.name);
+            net::SyncClientConfig config;
+            config.signaling_url = target_.signaling_ws;
+            sync_ = std::make_unique<net::SyncClient>(workbook_.get(), config);
+            sync_->setDelegate(this);
+            sync_->startSync(target_.room_id);
+            sync_->setLocalName(meta_.name.empty() ? "CLI Agent" : meta_.name);
+#endif
+        }
 
         listen_fd_ = create_listen_socket(socket_path_);
         if (!sock_valid(listen_fd_)) {
@@ -613,9 +638,11 @@ public:
         }
         clients_.clear();
 
+#if !defined(CELLS_NO_COLLAB)
         if (sync_) {
             sync_->stopSync();
         }
+#endif
         if (sock_valid(listen_fd_)) {
             sock_close(listen_fd_);
             listen_fd_ = kInvalidSock;
@@ -625,6 +652,7 @@ public:
         return 0;
     }
 
+#if !defined(CELLS_NO_COLLAB)
     // SyncClientDelegate
     void syncClientStateDidChange(net::SyncClient& client,
                                   net::SyncClientState state) override {
@@ -700,6 +728,7 @@ public:
             push_event(std::move(e));
         }
     }
+#endif  // !CELLS_NO_COLLAB
 
 private:
     struct Client {
@@ -723,11 +752,17 @@ private:
         if (!workbook_) {
             return;
         }
+#if !defined(CELLS_NO_COLLAB)
         if (sync_ && sync_->getPeerCount() > 0) {
             return;
         }
-        if (::cells::ensureDefaultSheetViaCrdt(*workbook_) && sync_) {
-            sync_->broadcastOperations();
+#endif
+        if (::cells::ensureDefaultSheetViaCrdt(*workbook_)) {
+#if !defined(CELLS_NO_COLLAB)
+            if (sync_) {
+                sync_->broadcastOperations();
+            }
+#endif
         }
     }
 
@@ -741,17 +776,21 @@ private:
     }
 
     void pump_network() {
+#if !defined(CELLS_NO_COLLAB)
 #if defined(__APPLE__)
         // Apple NSURLSession/WebRTC callbacks dispatch to the main queue.
         // Without pumping CFRunLoop the daemon stays CONNECTING forever
         // (one-shot `cells sync` pumps the loop; this must match).
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+        if (sync_) {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+        }
 #endif
         if (!sync_) {
             return;
         }
         sync_->processOutgoing();
         sync_->processPresenceUpdates();
+#endif
     }
 
     std::uint64_t count_cells() const {
@@ -1017,6 +1056,7 @@ private:
         r.last_error = last_error_;
         r.cells = count_cells();
         const size_t sheet_count = workbook_ ? workbook_->sheets.size() : 0;
+#if !defined(CELLS_NO_COLLAB)
         if (sync_) {
             r.state = net::syncClientStateToString(sync_->getState());
             r.peer_id = sync_->getPeerId();
@@ -1027,6 +1067,9 @@ private:
         } else {
             r.state = last_state_.empty() ? "OFFLINE" : last_state_;
         }
+#else
+        r.state = last_state_.empty() ? "ONLINE" : last_state_;
+#endif
         // Signaling ONLINE is not enough: need a sheet to script against.
         r.ready = session_state_is_ready(r.state) && sheet_count > 0;
         if (session_state_is_ready(r.state) && sheet_count == 0) {
@@ -1065,11 +1108,16 @@ private:
     SessionResponse run_exec(const SessionRequest& req) {
         SessionResponse r;
         r.id = meta_.id;
+#if !defined(CELLS_NO_COLLAB)
         if (sync_) {
             std::string st = net::syncClientStateToString(sync_->getState());
             r.state = st;
             r.ready = session_state_is_ready(st);
         }
+#else
+        r.state = last_state_.empty() ? "ONLINE" : last_state_;
+        r.ready = true;
+#endif
         // Only mint a sheet if still empty after peer sync (truly alone).
         ensureDefaultSheetViaCrdt();
         std::string script = req.code;
@@ -1105,6 +1153,7 @@ private:
             return r;
         }
         // Propagate local CRDT ops to peers (full + delta; see SyncClient::broadcastOperations)
+#if !defined(CELLS_NO_COLLAB)
         if (sync_) {
             auto stats_before = sync_->getStats();
             sync_->broadcastOperations();
@@ -1135,12 +1184,18 @@ private:
                 }
             }
         }
+#endif
         r.ok = true;
+#if !defined(CELLS_NO_COLLAB)
         if (sync_) {
             r.state = net::syncClientStateToString(sync_->getState());
             r.ready = session_state_is_ready(r.state);
             r.peers = static_cast<int>(sync_->getPeerCount());
         }
+#else
+        r.state = last_state_.empty() ? "ONLINE" : last_state_;
+        r.ready = true;
+#endif
         r.cells = count_cells();
         return r;
     }
@@ -1158,12 +1213,23 @@ private:
         }
     }
 
+    bool local_mode() const {
+#if defined(CELLS_NO_COLLAB)
+        return true;
+#else
+        return meta_.room == "local" || target_.signaling_ws.empty();
+#endif
+    }
+
     SessionMeta meta_;
     std::string root_;
     std::string socket_path_;
     RoomTarget target_;
+    SessionWorkbook local_wb_;
     std::unique_ptr<Workbook> workbook_;
+#if !defined(CELLS_NO_COLLAB)
     std::unique_ptr<net::SyncClient> sync_;
+#endif
     sock_t listen_fd_ = kInvalidSock;
     std::vector<Client> clients_;
     std::int64_t last_activity_ms_ = 0;
@@ -1263,9 +1329,16 @@ std::int64_t spawn_session_daemon(const std::string& self, const std::string& id
                                   const std::string& root, const std::string& idle_str,
                                   const std::string& name) {
     std::ostringstream cmd;
-    cmd << quote_win_arg(self) << " session _run " << id << ' ' << quote_win_arg(url) << " --socket "
-        << quote_win_arg(sock) << " --root " << quote_win_arg(root) << " --idle-minutes " << idle_str
-        << " --name " << quote_win_arg(name);
+    cmd << quote_win_arg(self) << " session _run " << id;
+    if (url == "local:" || url.empty()) {
+        cmd << " --local";
+    } else if (url.find("://") == std::string::npos) {
+        cmd << " --file " << quote_win_arg(url);
+    } else {
+        cmd << ' ' << quote_win_arg(url);
+    }
+    cmd << " --socket " << quote_win_arg(sock) << " --root " << quote_win_arg(root)
+        << " --idle-minutes " << idle_str << " --name " << quote_win_arg(name);
     std::string cmd_str = cmd.str();
     std::vector<char> cmd_mut(cmd_str.begin(), cmd_str.end());
     cmd_mut.push_back('\0');
@@ -1297,9 +1370,22 @@ int cmd_start(const SessionCliOptions& opts) {
         return emit_json_error("failed to initialize sockets (WSAStartup)");
     }
 
-    RoomTarget target = parse_room_target(opts.url);
-    if (!target.ok) {
-        return emit_json_error(target.error);
+    const bool local = opts.local || !opts.input_file.empty() || opts.url.empty();
+    RoomTarget target;
+    if (local) {
+        target.ok = true;
+        target.url = opts.input_file.empty() ? "local:" : opts.input_file;
+        target.room_id = "local";
+    } else {
+#if defined(CELLS_NO_COLLAB)
+        return emit_json_error(
+            "collaboration is not supported in this build; use: cells session start -i <file>");
+#else
+        target = parse_room_target(opts.url);
+        if (!target.ok) {
+            return emit_json_error(target.error);
+        }
+#endif
     }
 
     std::string self = resolve_self_executable();
@@ -1358,9 +1444,31 @@ int cmd_start(const SessionCliOptions& opts) {
             }
         }
         // re-exec full binary
-        ::execl(self.c_str(), self.c_str(), "session", "_run", id.c_str(), target.url.c_str(),
-                "--socket", sock.c_str(), "--root", root.c_str(), "--idle-minutes", idle_str.c_str(),
-                "--name", meta.name.c_str(), static_cast<char*>(nullptr));
+        std::vector<const char*> child_args;
+        child_args.push_back(self.c_str());
+        child_args.push_back("session");
+        child_args.push_back("_run");
+        child_args.push_back(id.c_str());
+        if (local) {
+            if (opts.input_file.empty()) {
+                child_args.push_back("--local");
+            } else {
+                child_args.push_back("--file");
+                child_args.push_back(opts.input_file.c_str());
+            }
+        } else {
+            child_args.push_back(target.url.c_str());
+        }
+        child_args.push_back("--socket");
+        child_args.push_back(sock.c_str());
+        child_args.push_back("--root");
+        child_args.push_back(root.c_str());
+        child_args.push_back("--idle-minutes");
+        child_args.push_back(idle_str.c_str());
+        child_args.push_back("--name");
+        child_args.push_back(meta.name.c_str());
+        child_args.push_back(nullptr);
+        ::execv(self.c_str(), const_cast<char* const*>(child_args.data()));
         _exit(127);
     }
 #endif
@@ -1460,11 +1568,12 @@ int cmd_start(const SessionCliOptions& opts) {
       << "\"cells\":" << cells << ","
       << "\"peer_id\":\"" << json_escape(peer_id) << "\","
       << "\"pid\":" << meta.pid << ","
+      << "\"local\":" << (local ? "true" : "false") << ","
       << "\"session_alive\":true";
     if (!last_error.empty()) {
         o << ",\"last_error\":\"" << json_escape(last_error) << "\"";
     }
-    if (!collab_ready && wait_ms > 0) {
+    if (!collab_ready && wait_ms > 0 && !local) {
         o << ",\"warning\":\"not ONLINE after wait; daemon kept running — poll "
              "session status or wait for browser peer\"";
     }
@@ -1755,9 +1864,27 @@ int cmd_daemon(const SessionCliOptions& opts) {
         return emit_json_error("failed to initialize sockets (WSAStartup)");
     }
     // Direct daemon entry (for testing / re-exec). Not the normal path (spawn from start).
-    RoomTarget target = parse_room_target(opts.url);
-    if (!target.ok) {
-        return emit_json_error(target.error);
+    const bool local = opts.local || !opts.input_file.empty() || opts.url.empty() ||
+                       opts.url == "local:";
+    RoomTarget target;
+    if (local) {
+        target.ok = true;
+        target.url = opts.input_file.empty() ? (opts.url.empty() ? "local:" : opts.url)
+                                             : opts.input_file;
+        if (target.url.empty()) {
+            target.url = "local:";
+        }
+        target.room_id = "local";
+    } else {
+#if defined(CELLS_NO_COLLAB)
+        return emit_json_error(
+            "collaboration is not supported in this build; use: cells session start -i <file>");
+#else
+        target = parse_room_target(opts.url);
+        if (!target.ok) {
+            return emit_json_error(target.error);
+        }
+#endif
     }
     std::string root = resolve_root(opts);
     SessionMeta meta;

@@ -8,6 +8,11 @@ build:macos --cxxopt=-std=c++17
 
 # Linux-specific settings
 build:linux --cxxopt=-std=c++17
+# Pin GNU gold. Bazel cc autoconfig can pick LLVM lld from a tool (e.g. Swift)
+# that is not on the sandbox PATH → collect2: cannot find 'ld'. GNU bfd does
+# not support Bazel's -Wl,--start-lib. ld.gold ships with binutils
+# (sudo apt install binutils).
+build:linux --linkopt=-fuse-ld=gold
 
 # Windows-specific settings (MSVC)
 build:windows --cxxopt=/std:c++17
@@ -32,3 +37,15 @@ build:wasm-debug --copt=-O0
 build:wasm-debug --cxxopt=-O0
 build:wasm-debug --linkopt=-O0
 build:wasm-debug --strip=never
+
+# Headless engine: CLI / converter only (do not build the WASM UI app).
+# Use: bazel run :cli-headless
+build:headless --define=CELLS_HEADLESS=1
+
+# Production trim: skip the operation ledger and connectivity stack.
+# Model does not construct an OpLog; CLI does not link CRDT sync, WebRTC, or
+# the signaling client. Local file-backed sessions still work.
+# Use: bazel run :cli-no-collab
+# Combine both: bazel run :cli-headless-no-collab
+# (same as: bazel build --config=headless --config=no-collab //apps/cli:cells-no-collab)
+build:no-collab --define=CELLS_NO_COLLAB=1

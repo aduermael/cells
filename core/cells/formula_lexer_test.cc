@@ -509,6 +509,24 @@ TEST(FormulaLexerTest, IdentifierLowercase) {
     EXPECT_EQ(tok.text, "sum");
 }
 
+TEST(FormulaLexerTest, DottedFunctionName) {
+    FormulaLexer lexer("RANK.EQ(");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tok.text, "RANK.EQ");
+}
+
+TEST(FormulaLexerTest, DottedFunctionNameDigitSegment) {
+    FormulaLexer lexer("T.DIST.2T(");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tok.text, "T.DIST.2T");
+    FormulaLexer inv("T.INV.2T(");
+    Token invTok = inv.nextToken();
+    EXPECT_EQ(invTok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(invTok.text, "T.INV.2T");
+}
+
 // ============================================================================
 // Position Tracking Tests
 // ============================================================================
@@ -615,6 +633,25 @@ TEST(FormulaLexerTest, SimpleFormula) {
     EXPECT_EQ(tokens[4].type, TokenType::COLUMN);
     EXPECT_EQ(tokens[5].type, TokenType::NUMBER);
     EXPECT_EQ(tokens[6].type, TokenType::END_OF_INPUT);
+}
+
+TEST(FormulaLexerTest, FunctionNameWithDigits) {
+    FormulaLexer log10("LOG10(");
+    Token t = log10.nextToken();
+    EXPECT_EQ(t.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(t.text, "LOG10");
+    EXPECT_EQ(log10.nextToken().type, TokenType::LPAREN);
+
+    FormulaLexer bin("BIN2DEC(");
+    Token b = bin.nextToken();
+    EXPECT_EQ(b.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(b.text, "BIN2DEC");
+    EXPECT_EQ(bin.nextToken().type, TokenType::LPAREN);
+
+    FormulaLexer hex("HEX2OCT(");
+    Token h = hex.nextToken();
+    EXPECT_EQ(h.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(h.text, "HEX2OCT");
 }
 
 TEST(FormulaLexerTest, FunctionCall) {

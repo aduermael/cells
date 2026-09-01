@@ -34,6 +34,7 @@
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
 #include "core/cells/range.h"
+#include "core/cells/ui_mutation.h"
 #include "core/log/include/Logger.h"
 
 #include "apps/wasm/bindings.h"
@@ -115,6 +116,14 @@ Sheet* CellsEngine::activeSheet() {
         return nullptr;
     }
     return _workbook->getSheetByIndex(_activeSheetIndex);
+}
+
+ApplyResult CellsEngine::applyLocalUiOp(const Operation& op) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+    return uiApplyOperation(_luauSandbox, *_workbook, *sheet, op);
 }
 
 void CellsEngine::rebuildViewportIndex() {
@@ -315,11 +324,13 @@ void CellsEngine::setActiveSheet(int index) {
 
 void CellsEngine::setFreezePanes(int freezeCol, int freezeRow) {
     Sheet* sheet = activeSheet();
-    if (!sheet)
+    if (!_workbook || sheet == nullptr) {
         return;
-
-    sheet->freezeCol = static_cast<uint16_t>(std::max(0, freezeCol));
-    sheet->freezeRow = static_cast<uint16_t>(std::max(0, freezeRow));
+    }
+    const ScriptResult sr = uiFreezePanes(_luauSandbox, *_workbook, *sheet, freezeCol, freezeRow);
+    if (!sr.success) {
+        return;
+    }
     notifyListeners(ChangeType::SHEET_CHANGED);
 }
 
@@ -352,7 +363,7 @@ std::string CellsEngine::addSheet(const std::string& name) {
 
     std::string payload = "{\"name\":\"" + jsonEscape(sheetName) + "\"}";
     Operation op = makeSheetSetOp(*_workbook, sheetId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
 
@@ -381,7 +392,7 @@ std::string CellsEngine::deleteSheet(int index) {
     ID sheetId = sheet->id;
 
     Operation op = makeSheetDeleteOp(*_workbook, sheetId);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
 
@@ -429,7 +440,7 @@ std::string CellsEngine::renameSheet(int index, const std::string& name) {
 
     std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
     Operation op = makeSheetSetOp(*_workbook, sheetId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
 
@@ -454,11 +465,20 @@ std::string CellsEngine::moveSheet(int fromIndex, int toIndex) {
         return "{\"success\":true}";
     }
 
-    auto sheet = std::move(_workbook->sheets[fromIndex]);
-    _workbook->sheets.erase(_workbook->sheets.begin() + fromIndex);
+    Sheet* ctxSheet = activeSheet();
+    if (ctxSheet == nullptr) {
+        ctxSheet = _workbook->getSheetByIndex(0);
+    }
+    if (ctxSheet == nullptr) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+    const ScriptResult sr = uiMoveSheet(_luauSandbox, *_workbook, *ctxSheet, fromIndex, toIndex);
+    if (!sr.success) {
+        return "{\"error\":\"" + jsonEscape(sr.error.empty() ? "Luau execution failed" : sr.error) +
+               "\"}";
+    }
 
     int insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
-    _workbook->sheets.insert(_workbook->sheets.begin() + insertAt, std::move(sheet));
 
     if (static_cast<size_t>(fromIndex) == _activeSheetIndex) {
         setActiveSheetIndex(static_cast<size_t>(insertAt));
@@ -486,668 +506,161 @@ std::string CellsEngine::moveSheet(int fromIndex, int toIndex) {
 // ============================================================================
 
 std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::string& value) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
     if (cellIdStr.size() != ID_LENGTH) {
         return "{\"error\":\"Invalid cell ID\"}";
     }
-    ID cellId(cellIdStr);
-
-    Cell* cell = sheet->getCell(cellId);
-    if (!cell) {
-        return "{\"error\":\"Cell not found\"}";
+    const UiCellWriteResult wr =
+        uiWriteCellById(_luauSandbox, *_workbook, *sheet, ID(cellIdStr), value, false);
+    if (!wr.success) {
+        return "{\"error\":\"" + jsonEscape(wr.error) + "\"}";
     }
-
-    char typeChar = 's';
-    if (!value.empty() && value[0] == '=') {
-        typeChar = 'f';
-    } else if (value.empty()) {
-        typeChar = 's';
-    } else if (value == "TRUE" || value == "true") {
-        typeChar = 'b';
-    } else if (value == "FALSE" || value == "false") {
-        typeChar = 'b';
-    } else {
-        char* endptr = nullptr;
-        strtod(value.c_str(), &endptr);
-        if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
-            typeChar = 'n';
-        }
-    }
-
-    std::string colIdStr = cell->colId.toString();
-    std::string rowIdStr = cell->rowId.toString();
-
-    // Build full-state payload for resurrection correctness
-    // Include style/format so operations are self-sufficient when arriving out of order
-    std::string payload;
-    if (typeChar == 'f') {
-        _refConverter.setContext(*sheet);
-        std::string uuidFormula = _refConverter.formulaToUuid(value);
-        payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
-    } else if (typeChar == 'b') {
-        payload = "{\"t\":\"b\",\"v\":\"" +
-                  std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"";
-    } else if (typeChar == 'n') {
-        payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"";
-    } else {
-        payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"";
-    }
-
-    // Add existing style if present (full-state for resurrection)
-    if (cell->hasStyle()) {
-        const StyleBuffer* sty = _workbook->getEntityStyle(cell->id);
-        if (sty) {
-            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
-        }
-    }
-
-    // Add existing format if present (full-state for resurrection)
-    if (cell->hasFormat()) {
-        const FormatBuffer* fmt = _workbook->getEntityFormat(cell->id);
-        if (fmt) {
-            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
-        }
-    }
-
-    payload += ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
-
-    Operation op = makeCellSetOp(*_workbook, cellId, payload);
-    applyOperation(*_workbook, op);
-
     broadcastPendingOperations();
-
-    markDirty(sheet, cellId);
-    std::vector<ID> changed = {cellId};
-    cells::recalculate(_workbook.get(), changed);
-    cells::recalculateVolatile(sheet);
-
+    rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
     return "{\"success\":true}";
 }
 
 std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellIdStr,
                                                        const std::string& value) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
     if (cellIdStr.size() != ID_LENGTH) {
         return "{\"error\":\"Invalid cell ID\"}";
     }
-    ID cellId(cellIdStr);
-
-    Cell* cell = sheet->getCell(cellId);
-    if (!cell) {
-        return "{\"error\":\"Cell not found\"}";
+    const UiCellWriteResult wr =
+        uiWriteCellById(_luauSandbox, *_workbook, *sheet, ID(cellIdStr), value, true);
+    if (!wr.success) {
+        return "{\"error\":\"" + jsonEscape(wr.error) + "\"}";
     }
-
-    std::string colIdStr = cell->colId.toString();
-    std::string rowIdStr = cell->rowId.toString();
-
-    // Build full-state payload for resurrection correctness
-    // Include style/format so operations are self-sufficient when arriving out of order
-    std::string payload;
-    ID detectedFormatId;
-
-    if (!value.empty() && value[0] == '=') {
-        // Use AST-based conversion to properly handle cross-sheet references
-        FormulaParser parser(value);
-        auto ast = parser.parse();
-
-        if (ast && ast->type != ASTNodeType::ERROR_NODE) {
-            FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
-
-            // CRDT-compliant resolution: discover and create entities first
-            RequiredEntities required = resolver.getRequiredEntities(ast.get());
-
-            // Create required columns via CRDT operations
-            // Note: size is omitted to use local default (sizeSet=false)
-            for (const auto& pending : required.columns) {
-                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
-                Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
-                applyOperation(*_workbook, colOp);
-            }
-
-            // Create required rows via CRDT operations
-            // Note: size is omitted to use local default (sizeSet=false)
-            for (const auto& pending : required.rows) {
-                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
-                Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
-                applyOperation(*_workbook, rowOp);
-            }
-
-            // Create required cells via CRDT operations (empty cells for references)
-            for (const auto& pending : required.cells) {
-                std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
-                                          pending.colId.toString() + "\",\"row\":\"" +
-                                          pending.rowId.toString() + "\"}";
-                Operation cellOp =
-                    makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
-                applyOperation(*_workbook, cellOp);
-            }
-
-            // Now resolve (all entities should exist)
-            ResolveResult resolveResult = resolver.resolve(ast.get());
-
-            if (resolveResult.success) {
-                // Serialize AST to UUID format for storage
-                std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
-            } else {
-                // Resolution failed (e.g., sheet not found) - store as error formula
-                // Fall back to string-based conversion for the formula text
-                _refConverter.setContext(*sheet);
-                std::string uuidFormula = _refConverter.formulaToUuid(value);
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
-            }
-        } else {
-            // Parse failed - store original formula text (will show as error)
-            _refConverter.setContext(*sheet);
-            std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"";
-        }
-    } else if (value == "TRUE" || value == "true") {
-        payload = "{\"t\":\"b\",\"v\":\"true\"";
-    } else if (value == "FALSE" || value == "false") {
-        payload = "{\"t\":\"b\",\"v\":\"false\"";
-    } else if (value.empty()) {
-        payload = "{\"t\":\"s\",\"v\":\"\"";
-    } else {
-        ParsedInput parsed = parseUserInput(value);
-
-        if (parsed.success && parsed.valueType == CellValueType::NUMBER) {
-            std::ostringstream numStr;
-            numStr << std::setprecision(15) << parsed.numericValue;
-            payload = "{\"t\":\"n\",\"v\":\"" + numStr.str() + "\"";
-            detectedFormatId = parsed.formatId;
-        } else {
-            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"";
-        }
-    }
-
-    // Add existing style if present (full-state for resurrection)
-    if (cell->hasStyle()) {
-        const StyleBuffer* sty = _workbook->getEntityStyle(cell->id);
-        if (sty) {
-            payload += ",\"sty\":\"" + sty->toBase64() + "\"";
-        }
-    }
-
-    // Add existing format if present (full-state for resurrection)
-    if (cell->hasFormat()) {
-        const FormatBuffer* fmt = _workbook->getEntityFormat(cell->id);
-        if (fmt) {
-            payload += ",\"fmt\":\"" + fmt->toBase64() + "\"";
-        }
-    }
-
-    payload += ",\"col\":\"" + colIdStr + "\",\"row\":\"" + rowIdStr + "\"}";
-
-    // Check if this cell's position is part of a spill range BEFORE updating
-    // If so, the spill master will need to be recalculated after the update
-    const ID spillMasterIdBeforeUpdate = sheet->getSpillMaster(cell->colId, cell->rowId);
-
-    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
-    applyOperation(*_workbook, op);
-
-    // Convert detected format ID to FormatBuffer
-    std::string formatBase64;
-    if (!detectedFormatId.isNull()) {
-        // Check if cell already has the same format
-        const FormatBuffer* existingFormat = _workbook->getEntityFormat(cell->id);
-
-        // Parse the format ID to get properties
-        ParsedFormatId parsed = parseFormatId(detectedFormatId.toString());
-        if (parsed.valid) {
-            FormatBuffer newFormat;
-            newFormat.setCategory(parsed.category);
-            if (parsed.decimalPlaces > 0) {
-                newFormat.setDecimals(parsed.decimalPlaces);
-            }
-            if (parsed.useThousandsSeparator) {
-                newFormat.setThousandsSeparator(true);
-            }
-            if (!parsed.currencyCode.empty()) {
-                newFormat.setCurrencySymbol(getCurrencySymbol(parsed.currencyCode));
-            }
-
-            // Only apply if different from existing format
-            if (existingFormat == nullptr || *existingFormat != newFormat) {
-                Operation formatOp = makeCellSetFormatOp(*_workbook, cellId, newFormat);
-                applyOperation(*_workbook, formatOp);
-                formatBase64 = newFormat.toBase64();
-            } else if (existingFormat != nullptr) {
-                formatBase64 = existingFormat->toBase64();
-            }
-        }
-    }
-
     broadcastPendingOperations();
-
-    markDirty(sheet, cellId);
-    std::vector<ID> changed = {cellId};
-
-    // If this position was part of a spill range, recalculate the spill master
-    // This will detect the blocking cell and show #SPILL! error on the master
-    if (!spillMasterIdBeforeUpdate.isNull()) {
-        markDirty(sheet, spillMasterIdBeforeUpdate);
-        changed.push_back(spillMasterIdBeforeUpdate);
-    }
-
-    // Also recalculate all cells with #SPILL! error - the value change might
-    // have removed a blocking condition, allowing spills to be restored
-    for (const auto& cellId : sheet->getCellIds()) {
-        Cell* cellPtr = _workbook->getCell(cellId);
-        if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
-            cellPtr->value.error == CellError::SPILL) {
-            markDirty(sheet, cellId);
-            changed.push_back(cellId);
-        }
-    }
-
-    cells::recalculate(_workbook.get(), changed);
-    cells::recalculateVolatile(sheet);
-
+    rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
-
-    // Return format as base64 instead of format ID
-    return "{\"success\":true,\"format\":\"" + formatBase64 + "\"}";
+    return "{\"success\":true,\"format\":\"" + wr.formatBase64 + "\"}";
 }
 
 std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::string& value) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
+    const UiCellWriteResult wr =
+        uiWriteCell(_luauSandbox, *_workbook, *sheet, col, row, value, false);
+    if (!wr.success) {
+        return "{\"error\":\"" + jsonEscape(wr.error) + "\"}";
     }
-
-    ID colId;
-    bool colCreated = false;
-    Axis* colAxis = sheet->getColumnByPosition(col);
-    if (colAxis != nullptr) {
-        colId = colAxis->id;
-    }
-    if (colId.isNull()) {
-        colId = generate_id();
-        colCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
-        Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
-        applyOperation(*_workbook, colOp);
-    }
-
-    ID rowId;
-    bool rowCreated = false;
-    Axis* rowAxis = sheet->getRowByPosition(row);
-    if (rowAxis != nullptr) {
-        rowId = rowAxis->id;
-    }
-    if (rowId.isNull()) {
-        rowId = generate_id();
-        rowCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
-        Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
-        applyOperation(*_workbook, rowOp);
-    }
-
-    // Check if this position is part of a spill range BEFORE creating the cell
-    // If so, the spill master will need to be recalculated after the cell is created
-    const ID spillMasterIdBeforeCreate = sheet->getSpillMaster(colId, rowId);
-
-    ID cellId = generate_id();
-    std::string idSuffix =
-        ",\"col\":\"" + colId.toString() + "\",\"row\":\"" + rowId.toString() + "\"}";
-
-    std::string payload;
-    if (!value.empty() && value[0] == '=') {
-        // Use AST-based conversion to properly handle cross-sheet references
-        FormulaParser parser(value);
-        auto ast = parser.parse();
-
-        if (ast && ast->type != ASTNodeType::ERROR_NODE) {
-            FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
-
-            // CRDT-compliant resolution: discover and create entities first
-            RequiredEntities required = resolver.getRequiredEntities(ast.get());
-
-            // Create required columns via CRDT operations
-            // Note: size is omitted to use local default (sizeSet=false)
-            for (const auto& pending : required.columns) {
-                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
-                Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
-                applyOperation(*_workbook, colOp);
-            }
-
-            // Create required rows via CRDT operations
-            // Note: size is omitted to use local default (sizeSet=false)
-            for (const auto& pending : required.rows) {
-                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
-                Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
-                applyOperation(*_workbook, rowOp);
-            }
-
-            // Create required cells via CRDT operations (empty cells for references)
-            for (const auto& pending : required.cells) {
-                std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
-                                          pending.colId.toString() + "\",\"row\":\"" +
-                                          pending.rowId.toString() + "\"}";
-                Operation cellOp =
-                    makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
-                applyOperation(*_workbook, cellOp);
-            }
-
-            // Now resolve (all entities should exist)
-            ResolveResult resolveResult = resolver.resolve(ast.get());
-
-            if (resolveResult.success) {
-                // Serialize AST to UUID format for storage
-                std::string uuidFormula = FormulaSerializer::serialize(ast.get());
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
-            } else {
-                // Resolution failed (e.g., sheet not found) - store as error formula
-                _refConverter.setContext(*sheet);
-                std::string uuidFormula = _refConverter.formulaToUuid(value);
-                payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
-            }
-        } else {
-            // Parse failed - store original formula text (will show as error)
-            _refConverter.setContext(*sheet);
-            std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload = "{\"t\":\"f\",\"v\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
-        }
-    } else if (value == "TRUE" || value == "true") {
-        payload = "{\"t\":\"b\",\"v\":\"true\"" + idSuffix;
-    } else if (value == "FALSE" || value == "false") {
-        payload = "{\"t\":\"b\",\"v\":\"false\"" + idSuffix;
-    } else if (!value.empty()) {
-        char* endptr = nullptr;
-        strtod(value.c_str(), &endptr);
-        if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
-            payload = "{\"t\":\"n\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
-        } else {
-            payload = "{\"t\":\"s\",\"v\":\"" + jsonEscape(value) + "\"" + idSuffix;
-        }
-    } else {
-        payload = "{\"t\":\"s\",\"v\":\"\"" + idSuffix;
-    }
-
-    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
-    applyOperation(*_workbook, op);
-
-    if (colCreated) {
-        _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
-    }
-    if (rowCreated) {
-        _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
-    }
-    Cell* newCell = sheet->getCell(cellId);
-    if (newCell) {
-        _viewportIndex.onCellAdded(newCell);
-    }
-
-    markDirty(sheet, cellId);
-    std::vector<ID> changed = {cellId};
-
-    // If this position was part of a spill range, recalculate the spill master
-    // This will detect the blocking cell and show #SPILL! error on the master
-    if (!spillMasterIdBeforeCreate.isNull()) {
-        markDirty(sheet, spillMasterIdBeforeCreate);
-        changed.push_back(spillMasterIdBeforeCreate);
-    }
-
-    cells::recalculate(_workbook.get(), changed);
-    cells::recalculateVolatile(sheet);
-
     broadcastPendingOperations();
+    rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
-
-    std::ostringstream json;
-    json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\"}";
-    return json.str();
+    return "{\"success\":true,\"id\":\"" + wr.cellId.toString() + "\"}";
 }
 
 std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
 
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
-    ID colId;
-    bool colCreated = false;
     Axis* colAxis = sheet->getColumnByPosition(col);
-    if (colAxis != nullptr) {
-        colId = colAxis->id;
-    }
-    if (colId.isNull()) {
-        colId = generate_id();
-        colCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string colPayload = "{\"pos\":" + std::to_string(col) + "}";
-        Operation colOp = makeColSetOp(*_workbook, colId, sheet->id, colPayload);
-        applyOperation(*_workbook, colOp);
-    }
-
-    ID rowId;
-    bool rowCreated = false;
     Axis* rowAxis = sheet->getRowByPosition(row);
-    if (rowAxis != nullptr) {
-        rowId = rowAxis->id;
+    Cell* existing = nullptr;
+    if (colAxis != nullptr && rowAxis != nullptr) {
+        existing = sheet->getCellAt(colAxis->id, rowAxis->id);
     }
-    if (rowId.isNull()) {
-        rowId = generate_id();
-        rowCreated = true;
-        // Note: size is omitted to use local default (sizeSet=false)
-        std::string rowPayload = "{\"pos\":" + std::to_string(row) + "}";
-        Operation rowOp = makeRowSetOp(*_workbook, rowId, sheet->id, rowPayload);
-        applyOperation(*_workbook, rowOp);
+    const bool existed = existing != nullptr;
+
+    const UiCellWriteResult wr = uiEnsureCell(_luauSandbox, *_workbook, *sheet, col, row);
+    if (!wr.success) {
+        return "{\"error\":\"" + jsonEscape(wr.error) + "\"}";
     }
-
-    Cell* existingCell = sheet->getCellAt(colId, rowId);
-    if (existingCell) {
-        if (colCreated) {
-            _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
-        }
-        if (rowCreated) {
-            _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
-        }
-
-        std::ostringstream json;
-        json << "{\"success\":true,\"id\":\"" << existingCell->id.toString()
-             << "\",\"existed\":true,";
-
-        // Compute editValue for formatted numbers (dates, percentages, etc.)
-        // Currency shows raw number in formula bar; percentage shows formatted value
-        std::string editValue = existingCell->value.raw;
-        const FormatBuffer* cellFormat = _workbook->getEntityFormat(existingCell->id);
-        if (existingCell->value.type == CellValueType::NUMBER && cellFormat != nullptr &&
-            !cellFormat->isEmpty()) {
-            double numValue = existingCell->value.asNumber();
-            FormatCodeResult formatted =
-                cells::formatWithCode(numValue, cellFormat->toFormatCode());
-            if (formatted.success) {
-                editValue = computeEditValueForCore(numValue, formatted.text, *cellFormat);
-            }
-        }
-
-        if (existingCell->isFormula()) {
-            Formula* formula = existingCell->getFormula();
-            if (formula != nullptr && formula->ast != nullptr) {
-                // Use FormulaDisplayConverter (same path as formula bar / viewport) so
-                // cross-sheet refs display as Sheet1!E1 instead of #REF!.
-                // RefConverter.formulaToA1 only knows the active sheet's UUID maps and
-                // fails for cell UUIDs on other sheets (serializer omits sheet prefixes).
-                const FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
-                const std::string a1Formula = displayConverter.toDisplayString(formula->ast);
-                json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
-            }
-            json << "\"value\":\"" << jsonEscape(existingCell->value.raw) << "\",";
-            json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
-        } else {
-            json << "\"value\":\"" << jsonEscape(existingCell->value.raw) << "\",";
-            json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
-        }
-        json << "}";
-        // Axis COL/ROW ops may have been applied even when the cell already existed.
-        if (colCreated || rowCreated) {
-            broadcastPendingOperations();
-        }
-        return json.str();
+    Cell* cell = sheet->getCell(wr.cellId);
+    if (cell == nullptr) {
+        return "{\"error\":\"Cell not found after create\"}";
     }
 
-    ID cellId = generate_id();
-    std::string payload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + colId.toString() +
-                          "\",\"row\":\"" + rowId.toString() + "\"}";
-
-    Operation op = makeCellSetOp(*_workbook, cellId, sheet->id, payload);
-    applyOperation(*_workbook, op);
-
-    if (colCreated) {
-        _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
-    }
-    if (rowCreated) {
-        _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
-    }
-    Cell* newCell = sheet->getCell(cellId);
-    if (newCell) {
-        _viewportIndex.onCellAdded(newCell);
-    }
     broadcastPendingOperations();
-    notifyListeners(ChangeType::CELL_CHANGED);
+    rebuildViewportIndex();
+    if (!existed) {
+        notifyListeners(ChangeType::CELL_CHANGED);
+    }
 
     std::ostringstream json;
-    json << "{\"success\":true,\"id\":\"" << cellId.toString()
-         << "\",\"existed\":false,\"value\":\"\",\"editValue\":\"\"}";
+    json << "{\"success\":true,\"id\":\"" << cell->id.toString()
+         << "\",\"existed\":" << (existed ? "true" : "false") << ",";
+
+    std::string editValue = cell->value.raw;
+    const FormatBuffer* cellFormat = _workbook->getEntityFormat(cell->id);
+    if (cell->value.type == CellValueType::NUMBER && cellFormat != nullptr &&
+        !cellFormat->isEmpty()) {
+        double numValue = cell->value.asNumber();
+        FormatCodeResult formatted = cells::formatWithCode(numValue, cellFormat->toFormatCode());
+        if (formatted.success) {
+            editValue = computeEditValueForCore(numValue, formatted.text, *cellFormat);
+        }
+    }
+
+    if (cell->isFormula()) {
+        Formula* formula = cell->getFormula();
+        if (formula != nullptr && formula->ast != nullptr) {
+            const FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+            const std::string a1Formula = displayConverter.toDisplayString(formula->ast);
+            json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
+        }
+        json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
+        json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+    } else {
+        json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
+        json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+    }
+    json << "}";
     return json.str();
 }
 
 std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
     if (cellIdStr.size() != ID_LENGTH) {
         return "{\"error\":\"Invalid cell ID\"}";
     }
-    ID cellId(cellIdStr);
-
-    Cell* cellToDelete = _workbook->getCell(cellId);
-    if (!cellToDelete) {
-        return "{\"error\":\"Cell not found\"}";
+    std::string error;
+    if (!uiDeleteCell(_luauSandbox, *_workbook, *sheet, ID(cellIdStr), &error)) {
+        return "{\"error\":\"" + jsonEscape(error) + "\"}";
     }
-
-    const ID colId = cellToDelete->colId;
-    const ID rowId = cellToDelete->rowId;
-
-    Operation op = makeCellDeleteOp(*_workbook, cellId);
-    applyOperation(*_workbook, op);
-
     broadcastPendingOperations();
-
-    _viewportIndex.onCellRemoved(colId, rowId);
-
-    // After deleting a cell, recalculate all cells with #SPILL! error
-    // This allows blocked spills to be restored when the blocking cell is removed
-    std::vector<ID> spillErrorCells;
-    for (const auto& cId : sheet->getCellIds()) {
-        Cell* cellPtr = _workbook->getCell(cId);
-        if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
-            cellPtr->value.error == CellError::SPILL) {
-            spillErrorCells.push_back(cId);
-            markDirty(sheet, cId);
-        }
-    }
-    if (!spillErrorCells.empty()) {
-        cells::recalculate(_workbook.get(), spillErrorCells);
-    }
-
+    rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
-
     return "{\"success\":true}";
 }
 
 std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"error\":\"No sheet available\"}";
     }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
-    ID colId;
     Axis* colAxis = sheet->getColumnByPosition(col);
-    if (colAxis != nullptr) {
-        colId = colAxis->id;
-    }
-    if (colId.isNull()) {
-        return "{\"success\":true,\"deleted\":false}";
-    }
-
-    ID rowId;
     Axis* rowAxis = sheet->getRowByPosition(row);
-    if (rowAxis != nullptr) {
-        rowId = rowAxis->id;
-    }
-    if (rowId.isNull()) {
+    if (colAxis == nullptr || rowAxis == nullptr) {
         return "{\"success\":true,\"deleted\":false}";
     }
-
-    Cell* cellToDelete = sheet->getCellAt(colId, rowId);
-    if (cellToDelete) {
-        Operation op = makeCellDeleteOp(*_workbook, cellToDelete->id);
-        applyOperation(*_workbook, op);
-
-        broadcastPendingOperations();
-
-        _viewportIndex.onCellRemoved(colId, rowId);
-
-        // After deleting a cell, recalculate all cells with #SPILL! error
-        // This allows blocked spills to be restored when the blocking cell is removed
-        std::vector<ID> spillErrorCells;
-        for (const auto& cId : sheet->getCellIds()) {
-            Cell* cellPtr = _workbook->getCell(cId);
-            if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
-                cellPtr->value.error == CellError::SPILL) {
-                spillErrorCells.push_back(cId);
-                markDirty(sheet, cId);
-            }
-        }
-        if (!spillErrorCells.empty()) {
-            cells::recalculate(_workbook.get(), spillErrorCells);
-        }
-
-        notifyListeners(ChangeType::CELL_CHANGED);
-        return "{\"success\":true,\"deleted\":true}";
+    Cell* cell = sheet->getCellAt(colAxis->id, rowAxis->id);
+    if (cell == nullptr) {
+        return "{\"success\":true,\"deleted\":false}";
     }
-
-    return "{\"success\":true,\"deleted\":false}";
+    std::string error;
+    if (!uiDeleteCell(_luauSandbox, *_workbook, *sheet, cell->id, &error)) {
+        return "{\"error\":\"" + jsonEscape(error) + "\"}";
+    }
+    broadcastPendingOperations();
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true,\"deleted\":true}";
 }
 
 // ============================================================================
@@ -1202,7 +715,7 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
     }
     payload += "}";
     Operation op = makeColSetOp(*_workbook, colId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
 
@@ -1293,7 +806,7 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
     }
     payload += "}";
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
 
@@ -1386,7 +899,7 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     }
     payload += "}";
     Operation op = makeColSetOp(*_workbook, colId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1414,11 +927,11 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
         Operation insertOp = makeColSetOp(*_workbook, colId, insertPayload);
-        applyOperation(*_workbook, insertOp);
+        applyLocalUiOp(insertOp);
 
         std::string renamePayload = "{\"name\":\"" + jsonEscape(name) + "\"}";
         Operation renameOp = makeColSetOp(*_workbook, colId, renamePayload);
-        applyOperation(*_workbook, renameOp);
+        applyLocalUiOp(renameOp);
 
         column = sheet->getColumn(colId);
     } else {
@@ -1445,7 +958,7 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         }
         payload += "}";
         Operation op = makeColSetOp(*_workbook, colId, payload);
-        applyOperation(*_workbook, op);
+        applyLocalUiOp(op);
     }
 
     broadcastPendingOperations();
@@ -1597,7 +1110,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
                 col->position < currentPos) {
                 std::string shiftPayload = buildColPayload(col, col->position + 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
-                applyOperation(*_workbook, shiftOp);
+                applyLocalUiOp(shiftOp);
             }
         }
     } else {
@@ -1608,7 +1121,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
                 col->position < targetPos) {
                 std::string shiftPayload = buildColPayload(col, col->position - 1);
                 Operation shiftOp = makeColSetOp(*_workbook, col->id, shiftPayload);
-                applyOperation(*_workbook, shiftOp);
+                applyLocalUiOp(shiftOp);
             }
         }
     }
@@ -1616,7 +1129,7 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     // Move the target column to its final position
     std::string payload = buildColPayload(colAxis, finalPos);
     Operation op = makeColSetOp(*_workbook, colId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
     rebuildViewportIndex();
@@ -1688,7 +1201,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
                 row->position < currentPos) {
                 std::string shiftPayload = buildRowPayload(row, row->position + 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
-                applyOperation(*_workbook, shiftOp);
+                applyLocalUiOp(shiftOp);
             }
         }
     } else {
@@ -1699,7 +1212,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
                 row->position < targetPos) {
                 std::string shiftPayload = buildRowPayload(row, row->position - 1);
                 Operation shiftOp = makeRowSetOp(*_workbook, row->id, shiftPayload);
-                applyOperation(*_workbook, shiftOp);
+                applyLocalUiOp(shiftOp);
             }
         }
     }
@@ -1707,7 +1220,7 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     // Move the target row to its final position
     std::string payload = buildRowPayload(rowAxis, finalPos);
     Operation op = makeRowSetOp(*_workbook, rowId, payload);
-    applyOperation(*_workbook, op);
+    applyLocalUiOp(op);
 
     broadcastPendingOperations();
     rebuildViewportIndex();
@@ -1790,7 +1303,7 @@ std::string CellsEngine::deleteColumnById(const std::string& colIdStr) {
 
     // Use CRDT operation to delete column (this triggers range adjustment)
     Operation op = makeColDeleteOp(*_workbook, colId);
-    ApplyResult result = applyOperation(*_workbook, op);
+    ApplyResult result = applyLocalUiOp(op);
 
     if (result != ApplyResult::SUCCESS && result != ApplyResult::ALREADY_APPLIED) {
         return "{\"error\":\"Failed to delete column\"}";
@@ -1825,7 +1338,7 @@ std::string CellsEngine::deleteRowById(const std::string& rowIdStr) {
 
     // Use CRDT operation to delete row (this triggers range adjustment)
     Operation op = makeRowDeleteOp(*_workbook, rowId);
-    ApplyResult result = applyOperation(*_workbook, op);
+    ApplyResult result = applyLocalUiOp(op);
 
     if (result != ApplyResult::SUCCESS && result != ApplyResult::ALREADY_APPLIED) {
         return "{\"error\":\"Failed to delete row\"}";
@@ -1910,7 +1423,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
         // Note: size is omitted to use local default (sizeSet=false)
         std::string colPayload = "{\"pos\":" + std::to_string(minCol) + "}";
         Operation colOp = makeColSetOp(*_workbook, startColId, colPayload);
-        applyOperation(*_workbook, colOp);
+        applyLocalUiOp(colOp);
     }
 
     // Get or create the start row (anchor)
@@ -1924,7 +1437,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
         // Note: size is omitted to use local default (sizeSet=false)
         std::string rowPayload = "{\"pos\":" + std::to_string(minRow) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, startRowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
+        applyLocalUiOp(rowOp);
     }
 
     // Get or create the end column
@@ -1938,7 +1451,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
         // Note: size is omitted to use local default (sizeSet=false)
         std::string colPayload = "{\"pos\":" + std::to_string(maxCol) + "}";
         Operation colOp = makeColSetOp(*_workbook, endColId, colPayload);
-        applyOperation(*_workbook, colOp);
+        applyLocalUiOp(colOp);
     }
 
     // Get or create the end row
@@ -1952,7 +1465,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
         // Note: size is omitted to use local default (sizeSet=false)
         std::string rowPayload = "{\"pos\":" + std::to_string(maxRow) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, endRowId, rowPayload);
-        applyOperation(*_workbook, rowOp);
+        applyLocalUiOp(rowOp);
     }
 
     // Ensure all intermediate columns exist (for proper range expansion on insert)
@@ -1963,7 +1476,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
             // Note: size is omitted to use local default (sizeSet=false)
             std::string colPayload = "{\"pos\":" + std::to_string(c) + "}";
             Operation colOp = makeColSetOp(*_workbook, newColId, colPayload);
-            applyOperation(*_workbook, colOp);
+            applyLocalUiOp(colOp);
         }
     }
 
@@ -1975,7 +1488,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
             // Note: size is omitted to use local default (sizeSet=false)
             std::string rowPayload = "{\"pos\":" + std::to_string(r) + "}";
             Operation rowOp = makeRowSetOp(*_workbook, newRowId, rowPayload);
-            applyOperation(*_workbook, rowOp);
+            applyLocalUiOp(rowOp);
         }
     }
 
@@ -1989,7 +1502,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow, uin
     payload << "\"flags\":" << static_cast<int>(RangeFlags::MERGE) << "}";
 
     Operation rangeOp = makeRangeSetOp(*_workbook, rangeId, payload.str());
-    applyOperation(*_workbook, rangeOp);
+    applyLocalUiOp(rangeOp);
 
     broadcastPendingOperations();
     rebuildViewportIndex();
@@ -2043,7 +1556,7 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
     payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
 
     Operation removeOp = makeRangeDeleteOp(*_workbook, mergeRange->id, payload.str());
-    applyOperation(*_workbook, removeOp);
+    applyLocalUiOp(removeOp);
 
     broadcastPendingOperations();
     rebuildViewportIndex();
@@ -2061,17 +1574,14 @@ std::string CellsEngine::getWorkbookName() {
 }
 
 void CellsEngine::setWorkbookName(const std::string& name) {
-    if (!_workbook) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return;
     }
-
-    _workbook->name = name;
-
-    std::ostringstream payload;
-    payload << "{\"name\":\"" << jsonEscape(name) << "\"}";
-    Operation op = makeWorkbookSetOp(*_workbook, payload.str());
-    applyOperation(*_workbook, op);
-
+    const ScriptResult sr = uiSetDocumentTitle(_luauSandbox, *_workbook, *sheet, name);
+    if (!sr.success) {
+        return;
+    }
     broadcastPendingOperations();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 }
@@ -2127,63 +1637,16 @@ std::string CellsEngine::getBuiltinThemes() {
 }
 
 std::string CellsEngine::setTheme(const std::string& themeJson) {
-    if (!_workbook) {
+    Sheet* sheet = activeSheet();
+    if (!_workbook || sheet == nullptr) {
         return "{\"success\":false,\"error\":\"No workbook\"}";
     }
-
-    // Parse the theme JSON: { name, colorScheme: { colors: [...] }, fontScheme: { majorFont,
-    // minorFont } } Simple JSON parsing — extract fields manually
-    auto extractString = [](const std::string& json, const std::string& key) -> std::string {
-        std::string needle = "\"" + key + "\":\"";
-        auto pos = json.find(needle);
-        if (pos == std::string::npos) {
-            return {};
-        }
-        pos += needle.length();
-        auto end = json.find('"', pos);
-        if (end == std::string::npos) {
-            return {};
-        }
-        return json.substr(pos, end - pos);
-    };
-
-    auto theme = std::make_unique<Theme>();
-    theme->name = extractString(themeJson, "name");
-
-    // Extract colors array
-    auto colorsStart = themeJson.find("\"colors\":[");
-    if (colorsStart != std::string::npos) {
-        colorsStart += 10;  // skip past "colors":[
-        auto colorsEnd = themeJson.find(']', colorsStart);
-        if (colorsEnd != std::string::npos) {
-            std::string colorsStr = themeJson.substr(colorsStart, colorsEnd - colorsStart);
-            int colorIndex = 0;
-            size_t searchPos = 0;
-            while (colorIndex < 12 && searchPos < colorsStr.length()) {
-                auto qStart = colorsStr.find('"', searchPos);
-                if (qStart == std::string::npos) {
-                    break;
-                }
-                auto qEnd = colorsStr.find('"', qStart + 1);
-                if (qEnd == std::string::npos) {
-                    break;
-                }
-                theme->colorScheme.setColor(colorIndex,
-                                            colorsStr.substr(qStart + 1, qEnd - qStart - 1));
-                colorIndex++;
-                searchPos = qEnd + 1;
-            }
-        }
+    const ScriptResult sr = uiSetTheme(_luauSandbox, *_workbook, *sheet, themeJson);
+    if (!sr.success) {
+        return "{\"success\":false,\"error\":\"" +
+               jsonEscape(sr.error.empty() ? "Luau execution failed" : sr.error) + "\"}";
     }
-
-    theme->fontScheme.majorFont = extractString(themeJson, "majorFont");
-    theme->fontScheme.minorFont = extractString(themeJson, "minorFont");
-
-    _workbook->setTheme(std::move(theme));
-
-    // Notify that cells need re-rendering (theme colors resolve differently now)
     notifyListeners(ChangeType::CELL_CHANGED);
-
     return "{\"success\":true}";
 }
 

@@ -1,5 +1,8 @@
 #include "core/cells/functions/fn_logic.h"
 
+#include <cmath>
+#include <cstdint>
+
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
 
@@ -319,6 +322,132 @@ EvalResult fn_ISNA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Boolean(result.isError() && result.getError() == CellError::NA);
 }
 
+EvalResult fn_ISERR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isError() && result.getError() != CellError::NA);
+}
+
+EvalResult fn_ISNONTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(!result.isString());
+}
+
+namespace {
+
+EvalResult evenOrOdd(const std::vector<const ASTNode*>& args, EvalContext& ctx, bool wantEven) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    EvalResult num = evaluateAsNumber(args[0], ctx);
+    if (num.isError()) {
+        return num;
+    }
+    const double v = num.getNumber();
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const auto truncated = static_cast<std::int64_t>(std::trunc(v));
+    const bool even = (truncated % 2) == 0;
+    return EvalResult::Boolean(wantEven ? even : !even);
+}
+
+}  // namespace
+
+EvalResult fn_ISEVEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return evenOrOdd(args, ctx, true);
+}
+
+EvalResult fn_ISODD(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return evenOrOdd(args, ctx, false);
+}
+
+EvalResult fn_TYPE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult result = evaluate(args[0], ctx);
+    if (result.isNumber() || result.isEmpty()) {
+        return EvalResult::Number(1.0);
+    }
+    if (result.isString()) {
+        return EvalResult::Number(2.0);
+    }
+    if (result.isBoolean()) {
+        return EvalResult::Number(4.0);
+    }
+    if (result.isError()) {
+        return EvalResult::Number(16.0);
+    }
+    if (result.isArray() || result.isRange()) {
+        return EvalResult::Number(64.0);
+    }
+    return EvalResult::Number(1.0);
+}
+
+EvalResult fn_N(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    EvalResult result = evaluate(args[0], ctx);
+    if (result.isError()) {
+        return result;
+    }
+    if (result.isNumber()) {
+        return result;
+    }
+    if (result.isBoolean()) {
+        return EvalResult::Number(result.getBoolean() ? 1.0 : 0.0);
+    }
+    if (result.isEmpty()) {
+        return EvalResult::Number(0.0);
+    }
+    return EvalResult::Number(0.0);
+}
+
+EvalResult fn_ERROR_TYPE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult result = evaluate(args[0], ctx);
+    if (!result.isError()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    switch (result.getError()) {
+        case CellError::NULL_REF:
+            return EvalResult::Number(1.0);
+        case CellError::DIV:
+            return EvalResult::Number(2.0);
+        case CellError::VALUE:
+            return EvalResult::Number(3.0);
+        case CellError::REF:
+            return EvalResult::Number(4.0);
+        case CellError::NAME:
+            return EvalResult::Number(5.0);
+        case CellError::NUM:
+            return EvalResult::Number(6.0);
+        case CellError::NA:
+        default:
+            return EvalResult::Number(7.0);
+    }
+}
+
+EvalResult fn_ISREF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (isReferenceNode(args[0])) {
+        return EvalResult::Boolean(true);
+    }
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isRange());
+}
+
 // =============================================================================
 // XOR Function
 // =============================================================================
@@ -627,6 +756,44 @@ EvalResult fn_FALSE(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*
     return EvalResult::Boolean(false);
 }
 
+EvalResult fn_ISBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 3 || args.size() > 5) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    EvalResult value = evaluateAsNumber(args[0], ctx);
+    if (value.isError()) {
+        return value;
+    }
+    EvalResult lower = evaluateAsNumber(args[1], ctx);
+    if (lower.isError()) {
+        return lower;
+    }
+    EvalResult upper = evaluateAsNumber(args[2], ctx);
+    if (upper.isError()) {
+        return upper;
+    }
+    bool lowerInc = true;
+    if (args.size() >= 4) {
+        const EvalResult inc = evaluateAsBoolean(args[3], ctx);
+        if (inc.isError()) {
+            return inc;
+        }
+        lowerInc = inc.getBoolean();
+    }
+    bool upperInc = true;
+    if (args.size() >= 5) {
+        const EvalResult inc = evaluateAsBoolean(args[4], ctx);
+        if (inc.isError()) {
+            return inc;
+        }
+        upperInc = inc.getBoolean();
+    }
+    const double v = value.getNumber();
+    const bool ge = lowerInc ? v >= lower.getNumber() : v > lower.getNumber();
+    const bool le = upperInc ? v <= upper.getNumber() : v < upper.getNumber();
+    return EvalResult::Boolean(ge && le);
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -674,6 +841,25 @@ void registerLogicFunctions(FunctionRegistry& registry) {
     registry.registerFunction("ISLOGICAL", fn_ISLOGICAL, "(value)",
                               "Returns TRUE if value is a boolean", "Logic");
     registry.registerFunction("ISNA", fn_ISNA, "(value)", "Returns TRUE if value is #N/A", "Logic");
+    registry.registerFunction("ISERR", fn_ISERR, "(value)",
+                              "Returns TRUE if value is an error other than #N/A", "Logic");
+    registry.registerFunction("ISNONTEXT", fn_ISNONTEXT, "(value)",
+                              "Returns TRUE if value is not text", "Logic");
+    registry.registerFunction("ISEVEN", fn_ISEVEN, "(number)", "Returns TRUE if number is even",
+                              "Logic");
+    registry.registerFunction("ISODD", fn_ISODD, "(number)", "Returns TRUE if number is odd",
+                              "Logic");
+    registry.registerFunction("TYPE", fn_TYPE, "(value)", "Returns a type code for the value",
+                              "Logic");
+    registry.registerFunction("N", fn_N, "(value)", "Converts a value to a number", "Logic");
+    registry.registerFunction("ERROR.TYPE", fn_ERROR_TYPE, "(error_val)",
+                              "Returns a number matching an error type", "Logic");
+    registry.registerAlias("ERROR_TYPE", "ERROR.TYPE");
+    registry.registerFunction("ISREF", fn_ISREF, "(value)", "Returns TRUE if value is a reference",
+                              "Logic");
+    registry.registerFunction("ISBETWEEN", fn_ISBETWEEN,
+                              "(value, lower, upper, [lower_inclusive], [upper_inclusive])",
+                              "Returns TRUE if a value is between two numbers", "Logic");
 
     // Boolean constants
     registry.registerFunction("TRUE", fn_TRUE, "()", "Returns the logical value TRUE", "Logic");

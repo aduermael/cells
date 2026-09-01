@@ -1,6 +1,23 @@
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
+# --define=CELLS_NO_COLLAB=1 / --config=no-collab
+# Strips the operation ledger (OpLog) and lets CLI targets omit connectivity.
+config_setting(
+    name = "cells_no_collab",
+    define_values = {"CELLS_NO_COLLAB": "1"},
+    visibility = ["//visibility:public"],
+)
+
+# --define=CELLS_HEADLESS=1 / --config=headless
+# Documents the CLI-only (no WASM UI) product cut. The :cli-headless wrapper
+# builds the CLI binary and does not invoke WASM/UI targets.
+config_setting(
+    name = "cells_headless",
+    define_values = {"CELLS_HEADLESS": "1"},
+    visibility = ["//visibility:public"],
+)
+
 refresh_compile_commands(
     name = "refresh_compile_commands",
     targets = {
@@ -19,6 +36,38 @@ sh_binary(
     name = "cli-release",
     srcs = ["tools/cli-release.sh"],
     data = ["tools/guard.sh"],
+)
+
+# Headless engine (CLI only, no WASM/UI app)
+sh_binary(
+    name = "cli-headless",
+    srcs = ["tools/cli-headless.sh"],
+    data = ["tools/guard.sh"],
+)
+
+# Production trim: headless + no operation ledger + no connectivity
+sh_binary(
+    name = "cli-no-collab",
+    srcs = ["tools/cli-no-collab.sh"],
+    data = ["tools/guard.sh"],
+)
+
+# Same as :cli-no-collab — explicit name for combining both flags.
+sh_binary(
+    name = "cli-headless-no-collab",
+    srcs = ["tools/cli-no-collab.sh"],
+    data = ["tools/guard.sh"],
+)
+
+# Opt-in formula TODO report (mog-derived). Not part of :check.
+sh_binary(
+    name = "formula-todo",
+    srcs = ["tools/formula-todo.sh"],
+    data = [
+        "tools/guard.sh",
+        "//core/cells:formula_todo_report",
+        "//testdata/formulas:mog_formula_cases",
+    ],
 )
 
 # WASM build scripts
