@@ -811,7 +811,7 @@ EvalResult fn_TOCOL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     std::vector<std::vector<EvalResult>> data;
     int ignore = 0;
     bool byColumn = false;
-    const EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
+    EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
     if (parsed.isError()) {
         return parsed;
     }
@@ -826,7 +826,7 @@ EvalResult fn_TOROW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     std::vector<std::vector<EvalResult>> data;
     int ignore = 0;
     bool byColumn = false;
-    const EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
+    EvalResult parsed = parseFlattenArgs(args, ctx, &data, &ignore, &byColumn);
     if (parsed.isError()) {
         return parsed;
     }
@@ -916,8 +916,8 @@ static EvalResult takeOrDrop(const std::vector<std::vector<EvalResult>>& data, c
         std::vector<EvalResult> row;
         row.reserve(static_cast<size_t>(colCount));
         for (int c = 0; c < colCount; ++c) {
-            row.push_back(
-                gridAt(data, static_cast<size_t>(rowStart + r), static_cast<size_t>(colStart + c)));
+            row.push_back(gridAt(data, static_cast<size_t>(rowStart) + static_cast<size_t>(r),
+                                static_cast<size_t>(colStart) + static_cast<size_t>(c)));
         }
         out.push_back(std::move(row));
     }
@@ -932,13 +932,13 @@ EvalResult fn_TAKE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (error.isError()) {
         return error;
     }
-    const EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
+    EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
     if (rowsRes.isError()) {
         return rowsRes;
     }
     const int rows = static_cast<int>(rowsRes.getNumber());
     if (args.size() == 3) {
-        const EvalResult colsRes = evaluateAsNumber(args[2], ctx);
+        EvalResult colsRes = evaluateAsNumber(args[2], ctx);
         if (colsRes.isError()) {
             return colsRes;
         }
@@ -956,13 +956,13 @@ EvalResult fn_DROP(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (error.isError()) {
         return error;
     }
-    const EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
+    EvalResult rowsRes = evaluateAsNumber(args[1], ctx);
     if (rowsRes.isError()) {
         return rowsRes;
     }
     const int rows = static_cast<int>(rowsRes.getNumber());
     if (args.size() == 3) {
-        const EvalResult colsRes = evaluateAsNumber(args[2], ctx);
+        EvalResult colsRes = evaluateAsNumber(args[2], ctx);
         if (colsRes.isError()) {
             return colsRes;
         }
@@ -977,7 +977,7 @@ static EvalResult chooseAxes(const std::vector<std::vector<EvalResult>>& data,
     const int count = byColumn ? static_cast<int>(gridCols(data)) : static_cast<int>(data.size());
     std::vector<int> resolved;
     resolved.reserve(indices.size());
-    for (int idx : indices) {
+    for (const int idx : indices) {
         const int zero = resolveIndex(idx, count);
         if (zero < 0) {
             return EvalResult::Error(CellError::VALUE);
@@ -988,12 +988,12 @@ static EvalResult chooseAxes(const std::vector<std::vector<EvalResult>>& data,
     if (byColumn) {
         out.resize(data.size());
         for (size_t r = 0; r < data.size(); ++r) {
-            for (int c : resolved) {
+            for (const int c : resolved) {
                 out[r].push_back(gridAt(data, r, static_cast<size_t>(c)));
             }
         }
     } else {
-        for (int r : resolved) {
+        for (const int r : resolved) {
             const size_t cols = gridCols(data);
             std::vector<EvalResult> row;
             row.reserve(cols);
@@ -1073,12 +1073,12 @@ EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         ++i;
         int order = 1;
         if (i < args.size()) {
-            const EvalResult maybeOrder = evaluate(args[i], ctx);
+            EvalResult maybeOrder = evaluate(args[i], ctx);
             if (maybeOrder.isError()) {
                 return maybeOrder;
             }
             if (!maybeOrder.isRange() && !maybeOrder.isArray()) {
-                const EvalResult n = maybeOrder.toNumber();
+                EvalResult n = maybeOrder.toNumber();
                 if (n.isError()) {
                     return n;
                 }
@@ -1121,7 +1121,7 @@ EvalResult fn_SORTBY(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     });
     std::vector<std::vector<EvalResult>> out;
     out.reserve(data.size());
-    for (size_t r : order) {
+    for (const size_t r : order) {
         out.push_back(data[r]);
     }
     return EvalResult::Array(std::move(out));
@@ -1249,7 +1249,7 @@ std::pair<std::vector<std::vector<double>>, EvalResult> toNumericMatrix(
 double matrixAbsMax(const std::vector<std::vector<double>>& m) {
     double mx = 0.0;
     for (const auto& row : m) {
-        for (double v : row) {
+        for (const double v : row) {
             mx = std::max(mx, std::fabs(v));
         }
     }
@@ -1354,7 +1354,7 @@ std::string arrayCellText(const EvalResult& v, bool strict) {
     }
     if (strict && v.isString()) {
         std::string out = "\"";
-        for (char c : v.getString()) {
+        for (const char c : v.getString()) {
             if (c == '"') {
                 out += "\"\"";
             } else {
@@ -1384,12 +1384,12 @@ EvalResult fn_WRAPCOLS(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (!isVector1D(data)) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    EvalResult nRes = evaluateAsNumber(args[1], ctx);
     if (nRes.isError()) {
         return nRes;
     }
     EvalResult pad;
-    const EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
+    EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
     if (padErr.isError()) {
         return padErr;
     }
@@ -1407,12 +1407,12 @@ EvalResult fn_WRAPROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (!isVector1D(data)) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    EvalResult nRes = evaluateAsNumber(args[1], ctx);
     if (nRes.isError()) {
         return nRes;
     }
     EvalResult pad;
-    const EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
+    EvalResult padErr = evalOptionalPad(args, 2, ctx, &pad);
     if (padErr.isError()) {
         return padErr;
     }
@@ -1432,7 +1432,7 @@ EvalResult fn_EXPAND(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     int rows = curRows;
     int cols = curCols;
     if (args.size() >= 2) {
-        const EvalResult r = evaluate(args[1], ctx);
+        EvalResult r = evaluate(args[1], ctx);
         if (r.isError()) {
             return r;
         }
@@ -1445,7 +1445,7 @@ EvalResult fn_EXPAND(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         }
     }
     if (args.size() >= 3) {
-        const EvalResult c = evaluate(args[2], ctx);
+        EvalResult c = evaluate(args[2], ctx);
         if (c.isError()) {
             return c;
         }
@@ -1489,7 +1489,7 @@ EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ct
     int rowMode = 3;
     int colMode = 3;
     if (args.size() >= 2) {
-        const EvalResult m = evaluateAsNumber(args[1], ctx);
+        EvalResult m = evaluateAsNumber(args[1], ctx);
         if (m.isError()) {
             return m;
         }
@@ -1499,7 +1499,7 @@ EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ct
         }
     }
     if (args.size() >= 3) {
-        const EvalResult m = evaluateAsNumber(args[2], ctx);
+        EvalResult m = evaluateAsNumber(args[2], ctx);
         if (m.isError()) {
             return m;
         }
@@ -1557,10 +1557,10 @@ EvalResult fn_TRIMRANGE(const std::vector<const ASTNode*>& args, EvalContext& ct
         return EvalResult::EmptyArray();
     }
     std::vector<std::vector<EvalResult>> out;
-    out.reserve(static_cast<size_t>(r1 - r0 + 1));
+    out.reserve(static_cast<size_t>(r1) - static_cast<size_t>(r0) + 1);
     for (int r = r0; r <= r1; ++r) {
         std::vector<EvalResult> row;
-        row.reserve(static_cast<size_t>(c1 - c0 + 1));
+        row.reserve(static_cast<size_t>(c1) - static_cast<size_t>(c0) + 1);
         for (int c = c0; c <= c1; ++c) {
             row.push_back(gridAt(data, static_cast<size_t>(r), static_cast<size_t>(c)));
         }
@@ -1598,7 +1598,7 @@ EvalResult fn_ARRAYTOTEXT(const std::vector<const ASTNode*>& args, EvalContext& 
     }
     int format = 0;
     if (args.size() == 2) {
-        const EvalResult f = evaluateAsNumber(args[1], ctx);
+        EvalResult f = evaluateAsNumber(args[1], ctx);
         if (f.isError()) {
             return f;
         }
@@ -1635,7 +1635,7 @@ EvalResult fn_MUNIT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult nRes = evaluateAsNumber(args[0], ctx);
+    EvalResult nRes = evaluateAsNumber(args[0], ctx);
     if (nRes.isError()) {
         return nRes;
     }

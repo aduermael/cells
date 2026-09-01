@@ -338,7 +338,7 @@ double gammaInv(double p, double alpha, double beta) {
         if (pdf > 0.0 && std::isfinite(pdf)) {
             next = x - (cdf - p) / pdf;
         }
-        if (!(next > lo && next < hi) || !std::isfinite(next)) {
+        if (next <= lo || next >= hi || !std::isfinite(next)) {
             next = 0.5 * (lo + hi);
         }
         if (regularizedGammaP(alpha, next / beta) > p) {
@@ -498,7 +498,7 @@ double betaInv(double p, double a, double b) {
         if (pdf > 0.0 && std::isfinite(pdf)) {
             next = x - (cdf - p) / pdf;
         }
-        if (!(next > lo && next < hi) || !std::isfinite(next)) {
+        if (next <= lo || next >= hi || !std::isfinite(next)) {
             next = 0.5 * (lo + hi);
         }
         if (regularizedBeta(next, a, b) > p) {
@@ -587,7 +587,7 @@ double studentTInv(double p, double nu) {
 }
 
 EvalResult requireTruncatedDf(const ASTNode* arg, EvalContext& ctx, double* df) {
-    const EvalResult n = evaluateAsNumber(arg, ctx);
+    EvalResult n = evaluateAsNumber(arg, ctx);
     if (n.isError()) {
         return n;
     }
@@ -604,7 +604,7 @@ EvalResult requireTruncatedDf(const ASTNode* arg, EvalContext& ctx, double* df) 
 }
 
 EvalResult requireIntInRange(const ASTNode* arg, EvalContext& ctx, int lo, int hi, int* out) {
-    const EvalResult n = evaluateAsNumber(arg, ctx);
+    EvalResult n = evaluateAsNumber(arg, ctx);
     if (n.isError()) {
         return n;
     }
@@ -629,7 +629,7 @@ std::pair<double, double> meanAndDev(const std::vector<double>& values, bool pop
     for (const double v : values) {
         sum += v;
     }
-    const double n = static_cast<double>(values.size());
+    const auto n = static_cast<double>(values.size());
     const double mean = sum / n;
     double ss = 0.0;
     for (const double v : values) {
@@ -819,14 +819,14 @@ EvalResult percentRankImpl(const std::vector<const ASTNode*>& args, EvalContext&
     if (values.size() < 2) {
         return EvalResult::Error(CellError::NA);
     }
-    const EvalResult xRes = evaluateAsNumber(args[1], ctx);
+    EvalResult xRes = evaluateAsNumber(args[1], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     const double x = xRes.getNumber();
     int significance = 3;
     if (args.size() == 3) {
-        const EvalResult s = evaluateAsNumber(args[2], ctx);
+        EvalResult s = evaluateAsNumber(args[2], ctx);
         if (s.isError()) {
             return s;
         }
@@ -841,7 +841,7 @@ EvalResult percentRankImpl(const std::vector<const ASTNode*>& args, EvalContext&
     }
     size_t lt = 0;
     size_t eq = 0;
-    for (double v : values) {
+    for (const double v : values) {
         if (v < x) {
             ++lt;
         } else if (v == x) {
@@ -994,7 +994,7 @@ EvalResult fn_LARGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (values.empty()) {
         return EvalResult::Error(CellError::NUM);
     }
-    const EvalResult kRes = evaluateAsNumber(args[1], ctx);
+    EvalResult kRes = evaluateAsNumber(args[1], ctx);
     if (kRes.isError()) {
         return kRes;
     }
@@ -1017,7 +1017,7 @@ EvalResult fn_SMALL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (values.empty()) {
         return EvalResult::Error(CellError::NUM);
     }
-    const EvalResult kRes = evaluateAsNumber(args[1], ctx);
+    EvalResult kRes = evaluateAsNumber(args[1], ctx);
     if (kRes.isError()) {
         return kRes;
     }
@@ -1033,7 +1033,7 @@ EvalResult fn_RANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    EvalResult numRes = evaluateAsNumber(args[0], ctx);
     if (numRes.isError()) {
         return numRes;
     }
@@ -1058,9 +1058,7 @@ EvalResult fn_RANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     for (const double v : values) {
         if (v == number) {
             found = true;
-        } else if (order == 0 && v > number) {
-            ++better;
-        } else if (order != 0 && v < number) {
+        } else if ((order == 0 && v > number) || (order != 0 && v < number)) {
             ++better;
         }
     }
@@ -1118,7 +1116,7 @@ EvalResult fn_QUARTILE_INC(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult qRes = evaluateAsNumber(args[1], ctx);
+    EvalResult qRes = evaluateAsNumber(args[1], ctx);
     if (qRes.isError()) {
         return qRes;
     }
@@ -1132,7 +1130,7 @@ EvalResult fn_QUARTILE_INC(const std::vector<const ASTNode*>& args, EvalContext&
     }
     // QUARTILE.INC(array, n) = PERCENTILE.INC(array, n/4)
     NumberLiteralNode kNode(static_cast<double>(quart) / 4.0);
-    std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
+    const std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
     return computePercentile(pctArgs, ctx, true);
 }
 
@@ -1165,12 +1163,12 @@ EvalResult fn_AVEDEV(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         return EvalResult::Error(CellError::NUM);
     }
     double sum = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         sum += v;
     }
     const double mean = sum / static_cast<double>(values.size());
     double acc = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         acc += std::abs(v - mean);
     }
     return EvalResult::Number(excelNormalize(acc / static_cast<double>(values.size())));
@@ -1188,12 +1186,12 @@ EvalResult fn_DEVSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::NUM);
     }
     double sum = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         sum += v;
     }
     const double mean = sum / static_cast<double>(values.size());
     double acc = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         const double d = v - mean;
         acc += d * d;
     }
@@ -1212,7 +1210,7 @@ EvalResult fn_GEOMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return EvalResult::Error(CellError::NUM);
     }
     double logSum = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         if (v <= 0.0) {
             return EvalResult::Error(CellError::NUM);
         }
@@ -1234,7 +1232,7 @@ EvalResult fn_HARMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return EvalResult::Error(CellError::NUM);
     }
     double recip = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         if (v <= 0.0) {
             return EvalResult::Error(CellError::NUM);
         }
@@ -1247,15 +1245,15 @@ EvalResult fn_STANDARDIZE(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult x = evaluateAsNumber(args[0], ctx);
+    EvalResult x = evaluateAsNumber(args[0], ctx);
     if (x.isError()) {
         return x;
     }
-    const EvalResult mean = evaluateAsNumber(args[1], ctx);
+    EvalResult mean = evaluateAsNumber(args[1], ctx);
     if (mean.isError()) {
         return mean;
     }
-    const EvalResult sd = evaluateAsNumber(args[2], ctx);
+    EvalResult sd = evaluateAsNumber(args[2], ctx);
     if (sd.isError()) {
         return sd;
     }
@@ -1291,7 +1289,7 @@ EvalResult fn_FORECAST(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult x = evaluateAsNumber(args[0], ctx);
+    EvalResult x = evaluateAsNumber(args[0], ctx);
     if (x.isError()) {
         return x;
     }
@@ -1362,7 +1360,7 @@ EvalResult fn_QUARTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult qRes = evaluateAsNumber(args[1], ctx);
+    EvalResult qRes = evaluateAsNumber(args[1], ctx);
     if (qRes.isError()) {
         return qRes;
     }
@@ -1371,7 +1369,7 @@ EvalResult fn_QUARTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext&
         return EvalResult::Error(CellError::NUM);
     }
     NumberLiteralNode kNode(static_cast<double>(quart) / 4.0);
-    std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
+    const std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
     return computePercentile(pctArgs, ctx, false);
 }
 
@@ -1379,7 +1377,7 @@ EvalResult fn_RANK_AVG(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    EvalResult numRes = evaluateAsNumber(args[0], ctx);
     if (numRes.isError()) {
         return numRes;
     }
@@ -1404,9 +1402,7 @@ EvalResult fn_RANK_AVG(const std::vector<const ASTNode*>& args, EvalContext& ctx
     for (const double v : values) {
         if (v == number) {
             ++ties;
-        } else if (order == 0 && v > number) {
-            ++better;
-        } else if (order != 0 && v < number) {
+        } else if ((order == 0 && v > number) || (order != 0 && v < number)) {
             ++better;
         }
     }
@@ -1429,7 +1425,7 @@ EvalResult fn_AVERAGEA(const std::vector<const ASTNode*>& args, EvalContext& ctx
         return EvalResult::Error(CellError::DIV);
     }
     double sum = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         sum += v;
     }
     return EvalResult::Number(excelNormalize(sum / static_cast<double>(values.size())));
@@ -1447,7 +1443,7 @@ EvalResult fn_MINA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Number(0.0);
     }
     double m = values[0];
-    for (double v : values) {
+    for (const double v : values) {
         if (v < m) {
             m = v;
         }
@@ -1467,7 +1463,7 @@ EvalResult fn_MAXA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Number(0.0);
     }
     double m = values[0];
-    for (double v : values) {
+    for (const double v : values) {
         if (v > m) {
             m = v;
         }
@@ -1491,7 +1487,7 @@ EvalResult fn_FISHER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1506,7 +1502,7 @@ EvalResult fn_FISHERINV(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1522,7 +1518,7 @@ EvalResult fn_PHI(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1533,7 +1529,7 @@ EvalResult fn_GAUSS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1560,7 +1556,7 @@ EvalResult fn_SKEW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         const double t = (v - mean) / s;
         m3 += t * t * t;
     }
-    const double n = static_cast<double>(values.size());
+    const auto n = static_cast<double>(values.size());
     return EvalResult::Number(excelNormalize(n / ((n - 1.0) * (n - 2.0)) * m3));
 }
 
@@ -1607,7 +1603,7 @@ EvalResult fn_KURT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         const double t = (v - mean) / s;
         m4 += t * t * t * t;
     }
-    const double n = static_cast<double>(values.size());
+    const auto n = static_cast<double>(values.size());
     const double a = n * (n + 1.0) / ((n - 1.0) * (n - 2.0) * (n - 3.0));
     const double b = 3.0 * (n - 1.0) * (n - 1.0) / ((n - 2.0) * (n - 3.0));
     return EvalResult::Number(excelNormalize(a * m4 - b));
@@ -1644,7 +1640,7 @@ EvalResult fn_VARPA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 }
 
 EvalResult fn_STDEVA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
-    const EvalResult v = fn_VARA(args, ctx);
+    EvalResult v = fn_VARA(args, ctx);
     if (v.isError()) {
         return v;
     }
@@ -1652,7 +1648,7 @@ EvalResult fn_STDEVA(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
 }
 
 EvalResult fn_STDEVPA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
-    const EvalResult v = fn_VARPA(args, ctx);
+    EvalResult v = fn_VARPA(args, ctx);
     if (v.isError()) {
         return v;
     }
@@ -1681,7 +1677,7 @@ EvalResult fn_NORMSDIST(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1692,11 +1688,11 @@ EvalResult fn_NORM_S_DIST(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult z = evaluateAsNumber(args[0], ctx);
+    EvalResult z = evaluateAsNumber(args[0], ctx);
     if (z.isError()) {
         return z;
     }
-    const EvalResult cum = evaluateAsBoolean(args[1], ctx);
+    EvalResult cum = evaluateAsBoolean(args[1], ctx);
     if (cum.isError()) {
         return cum;
     }
@@ -1714,17 +1710,17 @@ EvalResult fn_NORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx
     double x = 0.0;
     double mean = 0.0;
     double stdev = 0.0;
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     x = xRes.getNumber();
-    const EvalResult mRes = evaluateAsNumber(args[1], ctx);
+    EvalResult mRes = evaluateAsNumber(args[1], ctx);
     if (mRes.isError()) {
         return mRes;
     }
     mean = mRes.getNumber();
-    const EvalResult sRes = evaluateAsNumber(args[2], ctx);
+    EvalResult sRes = evaluateAsNumber(args[2], ctx);
     if (sRes.isError()) {
         return sRes;
     }
@@ -1732,7 +1728,7 @@ EvalResult fn_NORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (stdev <= 0.0) {
         return EvalResult::Error(CellError::NUM);
     }
-    const EvalResult cum = evaluateAsBoolean(args[3], ctx);
+    EvalResult cum = evaluateAsBoolean(args[3], ctx);
     if (cum.isError()) {
         return cum;
     }
@@ -1751,7 +1747,7 @@ EvalResult fn_NORMSINV(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult p = evaluateAsNumber(args[0], ctx);
+    EvalResult p = evaluateAsNumber(args[0], ctx);
     if (p.isError()) {
         return p;
     }
@@ -1769,15 +1765,15 @@ EvalResult fn_NORMINV(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult p = evaluateAsNumber(args[0], ctx);
+    EvalResult p = evaluateAsNumber(args[0], ctx);
     if (p.isError()) {
         return p;
     }
-    const EvalResult mean = evaluateAsNumber(args[1], ctx);
+    EvalResult mean = evaluateAsNumber(args[1], ctx);
     if (mean.isError()) {
         return mean;
     }
-    const EvalResult stdev = evaluateAsNumber(args[2], ctx);
+    EvalResult stdev = evaluateAsNumber(args[2], ctx);
     if (stdev.isError()) {
         return stdev;
     }
@@ -1800,7 +1796,7 @@ EvalResult fn_TRIMMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (error.isError()) {
         return error;
     }
-    const EvalResult percentRes = evaluateAsNumber(args[1], ctx);
+    EvalResult percentRes = evaluateAsNumber(args[1], ctx);
     if (percentRes.isError()) {
         return percentRes;
     }
@@ -1827,15 +1823,15 @@ EvalResult fn_POISSON(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    EvalResult meanRes = evaluateAsNumber(args[1], ctx);
     if (meanRes.isError()) {
         return meanRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -1862,15 +1858,15 @@ EvalResult fn_EXPONDIST(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult lambdaRes = evaluateAsNumber(args[1], ctx);
+    EvalResult lambdaRes = evaluateAsNumber(args[1], ctx);
     if (lambdaRes.isError()) {
         return lambdaRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -1893,15 +1889,15 @@ EvalResult fn_CONFIDENCE(const std::vector<const ASTNode*>& args, EvalContext& c
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult alpha = evaluateAsNumber(args[0], ctx);
+    EvalResult alpha = evaluateAsNumber(args[0], ctx);
     if (alpha.isError()) {
         return alpha;
     }
-    const EvalResult stdev = evaluateAsNumber(args[1], ctx);
+    EvalResult stdev = evaluateAsNumber(args[1], ctx);
     if (stdev.isError()) {
         return stdev;
     }
-    const EvalResult size = evaluateAsNumber(args[2], ctx);
+    EvalResult size = evaluateAsNumber(args[2], ctx);
     if (size.isError()) {
         return size;
     }
@@ -1966,7 +1962,7 @@ EvalResult fn_MODE_MULT(const std::vector<const ASTNode*>& args, EvalContext& ct
 namespace {
 
 EvalResult requireTruncInt(const ASTNode* arg, EvalContext& ctx, int* out, bool allowNeg) {
-    const EvalResult n = evaluateAsNumber(arg, ctx);
+    EvalResult n = evaluateAsNumber(arg, ctx);
     if (n.isError()) {
         return n;
     }
@@ -1993,11 +1989,11 @@ EvalResult fn_BINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (e.isError()) {
         return e;
     }
-    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    EvalResult pRes = evaluateAsNumber(args[2], ctx);
     if (pRes.isError()) {
         return pRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2021,15 +2017,15 @@ EvalResult fn_BINOM_INV(const std::vector<const ASTNode*>& args, EvalContext& ct
         return EvalResult::Error(CellError::VALUE);
     }
     int trials = 0;
-    const EvalResult e = requireTruncInt(args[0], ctx, &trials, false);
+    EvalResult e = requireTruncInt(args[0], ctx, &trials, false);
     if (e.isError()) {
         return e;
     }
-    const EvalResult pRes = evaluateAsNumber(args[1], ctx);
+    EvalResult pRes = evaluateAsNumber(args[1], ctx);
     if (pRes.isError()) {
         return pRes;
     }
-    const EvalResult aRes = evaluateAsNumber(args[2], ctx);
+    EvalResult aRes = evaluateAsNumber(args[2], ctx);
     if (aRes.isError()) {
         return aRes;
     }
@@ -2055,7 +2051,7 @@ EvalResult fn_BINOM_DIST_RANGE(const std::vector<const ASTNode*>& args, EvalCont
     if (e.isError()) {
         return e;
     }
-    const EvalResult pRes = evaluateAsNumber(args[1], ctx);
+    EvalResult pRes = evaluateAsNumber(args[1], ctx);
     if (pRes.isError()) {
         return pRes;
     }
@@ -2087,19 +2083,19 @@ EvalResult fn_WEIBULL(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    EvalResult aRes = evaluateAsNumber(args[1], ctx);
     if (aRes.isError()) {
         return aRes;
     }
-    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    EvalResult bRes = evaluateAsNumber(args[2], ctx);
     if (bRes.isError()) {
         return bRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2128,19 +2124,19 @@ EvalResult fn_LOGNORM_DIST(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() != 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    EvalResult meanRes = evaluateAsNumber(args[1], ctx);
     if (meanRes.isError()) {
         return meanRes;
     }
-    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    EvalResult sdRes = evaluateAsNumber(args[2], ctx);
     if (sdRes.isError()) {
         return sdRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2160,15 +2156,15 @@ EvalResult fn_LOGNORMDIST(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    EvalResult meanRes = evaluateAsNumber(args[1], ctx);
     if (meanRes.isError()) {
         return meanRes;
     }
-    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    EvalResult sdRes = evaluateAsNumber(args[2], ctx);
     if (sdRes.isError()) {
         return sdRes;
     }
@@ -2185,15 +2181,15 @@ EvalResult fn_LOGNORM_INV(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
-    const EvalResult meanRes = evaluateAsNumber(args[1], ctx);
+    EvalResult meanRes = evaluateAsNumber(args[1], ctx);
     if (meanRes.isError()) {
         return meanRes;
     }
-    const EvalResult sdRes = evaluateAsNumber(args[2], ctx);
+    EvalResult sdRes = evaluateAsNumber(args[2], ctx);
     if (sdRes.isError()) {
         return sdRes;
     }
@@ -2213,19 +2209,19 @@ EvalResult fn_GAMMA_DIST(const std::vector<const ASTNode*>& args, EvalContext& c
     if (args.size() != 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    EvalResult aRes = evaluateAsNumber(args[1], ctx);
     if (aRes.isError()) {
         return aRes;
     }
-    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    EvalResult bRes = evaluateAsNumber(args[2], ctx);
     if (bRes.isError()) {
         return bRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2253,15 +2249,15 @@ EvalResult fn_GAMMA_INV(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
-    const EvalResult aRes = evaluateAsNumber(args[1], ctx);
+    EvalResult aRes = evaluateAsNumber(args[1], ctx);
     if (aRes.isError()) {
         return aRes;
     }
-    const EvalResult bRes = evaluateAsNumber(args[2], ctx);
+    EvalResult bRes = evaluateAsNumber(args[2], ctx);
     if (bRes.isError()) {
         return bRes;
     }
@@ -2306,7 +2302,7 @@ EvalResult fn_HYPGEOM_DIST(const std::vector<const ASTNode*>& args, EvalContext&
     if (e.isError()) {
         return e;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[4], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[4], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2369,11 +2365,11 @@ EvalResult fn_NEGBINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext
     if (e.isError()) {
         return e;
     }
-    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    EvalResult pRes = evaluateAsNumber(args[2], ctx);
     if (pRes.isError()) {
         return pRes;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[3], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2403,7 +2399,7 @@ EvalResult fn_NEGBINOMDIST(const std::vector<const ASTNode*>& args, EvalContext&
     if (e.isError()) {
         return e;
     }
-    const EvalResult pRes = evaluateAsNumber(args[2], ctx);
+    EvalResult pRes = evaluateAsNumber(args[2], ctx);
     if (pRes.isError()) {
         return pRes;
     }
@@ -2422,16 +2418,16 @@ EvalResult fn_CHISQ_DIST(const std::vector<const ASTNode*>& args, EvalContext& c
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2449,12 +2445,12 @@ EvalResult fn_CHISQ_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2473,12 +2469,12 @@ EvalResult fn_CHISQ_INV(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2493,12 +2489,12 @@ EvalResult fn_CHISQ_INV_RT(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2539,11 +2535,11 @@ EvalResult fn_CHISQ_TEST(const std::vector<const ASTNode*>& args, EvalContext& c
             return EvalResult::Error(CellError::NA);
         }
         for (size_t c = 0; c < cols; ++c) {
-            const EvalResult aN = actual[r][c].toNumber();
+            EvalResult aN = actual[r][c].toNumber();
             if (aN.isError()) {
                 return aN;
             }
-            const EvalResult eN = expected[r][c].toNumber();
+            EvalResult eN = expected[r][c].toNumber();
             if (eN.isError()) {
                 return eN;
             }
@@ -2574,16 +2570,16 @@ EvalResult fn_T_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
-    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
     if (cumRes.isError()) {
         return cumRes;
     }
@@ -2598,12 +2594,12 @@ EvalResult fn_T_DIST_2T(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2618,12 +2614,12 @@ EvalResult fn_T_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2634,17 +2630,17 @@ EvalResult fn_TDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
     int tails = 0;
-    const EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
+    EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
     if (tailsErr.isError()) {
         return tailsErr;
     }
@@ -2662,12 +2658,12 @@ EvalResult fn_T_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2682,12 +2678,12 @@ EvalResult fn_T_INV_2T(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    EvalResult pRes = evaluateAsNumber(args[0], ctx);
     if (pRes.isError()) {
         return pRes;
     }
     double df = 0.0;
-    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
     if (dfErr.isError()) {
         return dfErr;
     }
@@ -2707,12 +2703,12 @@ EvalResult fn_T_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         return EvalResult::Error(CellError::VALUE);
     }
     int tails = 0;
-    const EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
+    EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
     if (tailsErr.isError()) {
         return tailsErr;
     }
     int type = 0;
-    const EvalResult typeErr = requireIntInRange(args[3], ctx, 1, 3, &type);
+    EvalResult typeErr = requireIntInRange(args[3], ctx, 1, 3, &type);
     if (typeErr.isError()) {
         return typeErr;
     }
@@ -2736,7 +2732,7 @@ EvalResult fn_T_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         if (!(sd > 0.0)) {
             return EvalResult::Error(CellError::DIV);
         }
-        const double n = static_cast<double>(diff.size());
+        const auto n = static_cast<double>(diff.size());
         tStat = mean / (sd / std::sqrt(n));
         df = n - 1.0;
     } else {
@@ -2753,8 +2749,8 @@ EvalResult fn_T_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         }
         const auto [m1, s1] = meanAndDev(x, false);
         const auto [m2, s2] = meanAndDev(y, false);
-        const double n1 = static_cast<double>(x.size());
-        const double n2 = static_cast<double>(y.size());
+        const auto n1 = static_cast<double>(x.size());
+        const auto n2 = static_cast<double>(y.size());
         if (type == 2) {
             const double sp2 = ((n1 - 1.0) * s1 * s1 + (n2 - 1.0) * s2 * s2) / (n1 + n2 - 2.0);
             if (!(sp2 > 0.0)) {
@@ -2799,13 +2795,13 @@ EvalResult fn_Z_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (values.empty()) {
         return EvalResult::Error(CellError::NA);
     }
-    const EvalResult xRes = evaluateAsNumber(args[1], ctx);
+    EvalResult xRes = evaluateAsNumber(args[1], ctx);
     if (xRes.isError()) {
         return xRes;
     }
     double sigma = 0.0;
     if (args.size() == 3) {
-        const EvalResult sRes = evaluateAsNumber(args[2], ctx);
+        EvalResult sRes = evaluateAsNumber(args[2], ctx);
         if (sRes.isError()) {
             return sRes;
         }
@@ -2826,7 +2822,7 @@ EvalResult fn_Z_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     for (const double v : values) {
         sum += v;
     }
-    const double n = static_cast<double>(values.size());
+    const auto n = static_cast<double>(values.size());
     const double z = (sum / n - xRes.getNumber()) / (sigma / std::sqrt(n));
     return finiteNumber(1.0 - standardNormalCdf(z));
 }

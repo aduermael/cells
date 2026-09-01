@@ -344,7 +344,7 @@ EvalResult evenOrOdd(const std::vector<const ASTNode*>& args, EvalContext& ctx, 
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult num = evaluateAsNumber(args[0], ctx);
+    EvalResult num = evaluateAsNumber(args[0], ctx);
     if (num.isError()) {
         return num;
     }
@@ -394,7 +394,7 @@ EvalResult fn_N(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult result = evaluate(args[0], ctx);
+    EvalResult result = evaluate(args[0], ctx);
     if (result.isError()) {
         return result;
     }
@@ -432,7 +432,6 @@ EvalResult fn_ERROR_TYPE(const std::vector<const ASTNode*>& args, EvalContext& c
         case CellError::NUM:
             return EvalResult::Number(6.0);
         case CellError::NA:
-            return EvalResult::Number(7.0);
         default:
             return EvalResult::Number(7.0);
     }
@@ -761,15 +760,15 @@ EvalResult fn_ISBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() < 3 || args.size() > 5) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult value = evaluateAsNumber(args[0], ctx);
+    EvalResult value = evaluateAsNumber(args[0], ctx);
     if (value.isError()) {
         return value;
     }
-    const EvalResult lower = evaluateAsNumber(args[1], ctx);
+    EvalResult lower = evaluateAsNumber(args[1], ctx);
     if (lower.isError()) {
         return lower;
     }
-    const EvalResult upper = evaluateAsNumber(args[2], ctx);
+    EvalResult upper = evaluateAsNumber(args[2], ctx);
     if (upper.isError()) {
         return upper;
     }

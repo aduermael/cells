@@ -650,7 +650,7 @@ EvalResult fn_ROW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (n->type == ASTNodeType::COLUMN_REF || n->type == ASTNodeType::COLUMN_RANGE_REF) {
         return EvalResult::Number(1.0);
     }
-    const EvalResult r = evaluate(n, ctx);
+    EvalResult r = evaluate(n, ctx);
     if (r.isError()) {
         return r;
     }
@@ -669,7 +669,7 @@ EvalResult fn_ROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult r = evaluate(args[0], ctx);
+    EvalResult r = evaluate(args[0], ctx);
     if (r.isError()) {
         return r;
     }
@@ -731,7 +731,7 @@ EvalResult fn_COLUMN(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (n->type == ASTNodeType::ROW_REF || n->type == ASTNodeType::ROW_RANGE_REF) {
         return EvalResult::Number(1.0);
     }
-    const EvalResult r = evaluate(n, ctx);
+    EvalResult r = evaluate(n, ctx);
     if (r.isError()) {
         return r;
     }
@@ -750,7 +750,7 @@ EvalResult fn_COLUMNS(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult r = evaluate(args[0], ctx);
+    EvalResult r = evaluate(args[0], ctx);
     if (r.isError()) {
         return r;
     }
@@ -772,11 +772,11 @@ EvalResult fn_ADDRESS(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() < 2 || args.size() > 5) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult rowRes = evaluateAsNumber(args[0], ctx);
+    EvalResult rowRes = evaluateAsNumber(args[0], ctx);
     if (rowRes.isError()) {
         return rowRes;
     }
-    const EvalResult colRes = evaluateAsNumber(args[1], ctx);
+    EvalResult colRes = evaluateAsNumber(args[1], ctx);
     if (colRes.isError()) {
         return colRes;
     }
@@ -842,7 +842,7 @@ EvalResult fn_CHOOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() < 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult idxRes = evaluateAsNumber(args[0], ctx);
+    EvalResult idxRes = evaluateAsNumber(args[0], ctx);
     if (idxRes.isError()) {
         return idxRes;
     }
@@ -912,7 +912,7 @@ EvalResult fn_AREAS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (isReferenceNode(args[0])) {
         return EvalResult::Number(1.0);
     }
-    const EvalResult r = evaluate(args[0], ctx);
+    EvalResult r = evaluate(args[0], ctx);
     if (r.isError()) {
         return r;
     }
@@ -944,7 +944,7 @@ EvalResult fn_SHEET(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         }
         return EvalResult::Number(static_cast<double>(idx));
     }
-    const EvalResult r = evaluate(args[0], ctx);
+    EvalResult r = evaluate(args[0], ctx);
     if (r.isError()) {
         return r;
     }
@@ -980,7 +980,7 @@ EvalResult fn_SHEETS(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (isReferenceNode(args[0])) {
         return EvalResult::Number(1.0);
     }
-    const EvalResult r = evaluate(args[0], ctx);
+    EvalResult r = evaluate(args[0], ctx);
     if (r.isError()) {
         return r;
     }
@@ -994,7 +994,7 @@ EvalResult fn_HYPERLINK(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult loc = evaluate(args[0], ctx);
+    EvalResult loc = evaluate(args[0], ctx);
     if (loc.isError()) {
         return loc;
     }
@@ -1218,7 +1218,7 @@ EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() < 3 || args.size() > 6) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult lookup = evaluate(args[0], ctx);
+    EvalResult lookup = evaluate(args[0], ctx);
     if (lookup.isError()) {
         return lookup;
     }
@@ -1283,7 +1283,7 @@ EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() < 2 || args.size() > 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult lookup = evaluate(args[0], ctx);
+    EvalResult lookup = evaluate(args[0], ctx);
     if (lookup.isError()) {
         return lookup;
     }
@@ -1329,7 +1329,7 @@ EvalResult fn_LOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult lookup = evaluate(args[0], ctx);
+    EvalResult lookup = evaluate(args[0], ctx);
     if (lookup.isError()) {
         return lookup;
     }
@@ -1341,8 +1341,8 @@ EvalResult fn_LOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         const size_t rows = arr.size();
         const size_t cols = gridWidth(arr);
         const bool byRow = cols > rows;
-        bool horiz = byRow;
-        size_t n = byRow ? cols : rows;
+        const bool horiz = byRow;
+        const size_t n = byRow ? cols : rows;
         const int match = approximateLookup(lookup, arr, horiz, n);
         if (match < 0) {
             return EvalResult::Error(CellError::NA);

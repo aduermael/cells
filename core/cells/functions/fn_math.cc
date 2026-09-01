@@ -1579,7 +1579,7 @@ EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 namespace {
 
 EvalResult requireTruncNonNegInt(const ASTNode* arg, EvalContext& ctx, int& out) {
-    const EvalResult n = evaluateAsNumber(arg, ctx);
+    EvalResult n = evaluateAsNumber(arg, ctx);
     if (n.isError()) {
         return n;
     }
@@ -1780,11 +1780,11 @@ EvalResult fn_BASE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    EvalResult numRes = evaluateAsNumber(args[0], ctx);
     if (numRes.isError()) {
         return numRes;
     }
-    const EvalResult radixRes = evaluateAsNumber(args[1], ctx);
+    EvalResult radixRes = evaluateAsNumber(args[1], ctx);
     if (radixRes.isError()) {
         return radixRes;
     }
@@ -1795,7 +1795,7 @@ EvalResult fn_BASE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     }
     int minLen = 0;
     if (args.size() == 3) {
-        const EvalResult lenRes = evaluateAsNumber(args[2], ctx);
+        EvalResult lenRes = evaluateAsNumber(args[2], ctx);
         if (lenRes.isError()) {
             return lenRes;
         }
@@ -1826,11 +1826,11 @@ EvalResult fn_DECIMAL(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
-    const EvalResult radixRes = evaluateAsNumber(args[1], ctx);
+    EvalResult radixRes = evaluateAsNumber(args[1], ctx);
     if (radixRes.isError()) {
         return radixRes;
     }
@@ -1843,7 +1843,7 @@ EvalResult fn_DECIMAL(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return EvalResult::Number(0.0);
     }
     double value = 0.0;
-    for (char c : s) {
+    for (const char c : s) {
         if (std::isspace(static_cast<unsigned char>(c)) != 0) {
             continue;
         }
@@ -1863,7 +1863,7 @@ EvalResult fn_ARABIC(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
@@ -1910,7 +1910,7 @@ EvalResult fn_ROMAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    EvalResult numRes = evaluateAsNumber(args[0], ctx);
     if (numRes.isError()) {
         return numRes;
     }
@@ -1919,7 +1919,7 @@ EvalResult fn_ROMAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::VALUE);
     }
     if (args.size() == 2) {
-        const EvalResult formRes = evaluateAsNumber(args[1], ctx);
+        EvalResult formRes = evaluateAsNumber(args[1], ctx);
         if (formRes.isError()) {
             return formRes;
         }
@@ -1948,7 +1948,7 @@ EvalResult fn_MULTINOMIAL(const std::vector<const ASTNode*>& args, EvalContext& 
     int sum = 0;
     std::vector<int> ks;
     ks.reserve(values.size());
-    for (double v : values) {
+    for (const double v : values) {
         if (v < 0.0) {
             return EvalResult::Error(CellError::NUM);
         }
@@ -1958,7 +1958,7 @@ EvalResult fn_MULTINOMIAL(const std::vector<const ASTNode*>& args, EvalContext& 
     }
     double result = 1.0;
     int filled = 0;
-    for (int k : ks) {
+    for (const int k : ks) {
         for (int i = 1; i <= k; ++i) {
             ++filled;
             result *= static_cast<double>(filled);
@@ -1976,15 +1976,15 @@ EvalResult fn_SERIESSUM(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    EvalResult xRes = evaluateAsNumber(args[0], ctx);
     if (xRes.isError()) {
         return xRes;
     }
-    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    EvalResult nRes = evaluateAsNumber(args[1], ctx);
     if (nRes.isError()) {
         return nRes;
     }
-    const EvalResult mRes = evaluateAsNumber(args[2], ctx);
+    EvalResult mRes = evaluateAsNumber(args[2], ctx);
     if (mRes.isError()) {
         return mRes;
     }
@@ -2023,7 +2023,7 @@ EvalResult fn_GAMMA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -2042,7 +2042,7 @@ EvalResult fn_GAMMALN(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -2065,11 +2065,11 @@ EvalResult fn_PERCENTOF(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult num = evaluateAsNumber(args[0], ctx);
+    EvalResult num = evaluateAsNumber(args[0], ctx);
     if (num.isError()) {
         return num;
     }
-    const EvalResult den = evaluateAsNumber(args[1], ctx);
+    EvalResult den = evaluateAsNumber(args[1], ctx);
     if (den.isError()) {
         return den;
     }

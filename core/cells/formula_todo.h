@@ -3,6 +3,8 @@
 #ifndef CELLS_FORMULA_TODO_H_
 #define CELLS_FORMULA_TODO_H_
 
+#include <cstdint>
+
 #include <string>
 #include <vector>
 
@@ -15,7 +17,7 @@ struct FormulaCase {
     std::string expected;
 };
 
-enum class CaseStatus { kPass, kRemaining, kFail };
+enum class CaseStatus : std::uint8_t { kPass, kRemaining, kFail };
 
 struct CaseOutcome {
     FormulaCase c;

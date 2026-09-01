@@ -28,8 +28,8 @@ std::string function_name_from_formula(const std::string& formula) {
     }
     std::string name;
     while (i < formula.size()) {
-        const unsigned char ch = static_cast<unsigned char>(formula[i]);
-        if (std::isalnum(ch) || ch == '.' || ch == '_') {
+        const auto ch = static_cast<unsigned char>(formula[i]);
+        if (std::isalnum(ch) != 0 || ch == '.' || ch == '_') {
             name.push_back(static_cast<char>(std::toupper(ch)));
             ++i;
             continue;
@@ -42,7 +42,7 @@ std::string function_name_from_formula(const std::string& formula) {
 bool parse_a1(const std::string& ref, uint32_t& col, uint32_t& row) {
     size_t i = 0;
     uint32_t c = 0;
-    while (i < ref.size() && std::isalpha(static_cast<unsigned char>(ref[i]))) {
+    while (i < ref.size() && std::isalpha(static_cast<unsigned char>(ref[i])) != 0) {
         c = c * 26 +
             static_cast<uint32_t>(std::toupper(static_cast<unsigned char>(ref[i])) - 'A' + 1);
         ++i;
@@ -51,7 +51,7 @@ bool parse_a1(const std::string& ref, uint32_t& col, uint32_t& row) {
         return false;
     }
     uint32_t r = 0;
-    while (i < ref.size() && std::isdigit(static_cast<unsigned char>(ref[i]))) {
+    while (i < ref.size() && std::isdigit(static_cast<unsigned char>(ref[i])) != 0) {
         r = r * 10 + static_cast<uint32_t>(ref[i] - '0');
         ++i;
     }
@@ -69,10 +69,13 @@ struct Harness {
     ID colIds[26]{};
     ID rowIds[100]{};
 
-    Harness() {
-        workbook = std::make_unique<Workbook>(generate_id(), "Todo");
-        workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
-        sheet = workbook->getSheetByIndex(0);
+    static std::unique_ptr<Workbook> makeWorkbook() {
+        auto wb = std::make_unique<Workbook>(generate_id(), "Todo");
+        wb->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+        return wb;
+    }
+
+    Harness() : workbook(makeWorkbook()), sheet(workbook->getSheetByIndex(0)) {
         for (uint32_t i = 0; i < 26; i++) {
             auto col = std::make_unique<Axis>(generate_id(), true);
             col->position = i;
@@ -103,8 +106,8 @@ struct Harness {
             if (eq == std::string::npos) {
                 continue;
             }
-            std::string a1 = part.substr(0, eq);
-            std::string val = part.substr(eq + 1);
+            const std::string a1 = part.substr(0, eq);
+            const std::string val = part.substr(eq + 1);
             uint32_t col = 0;
             uint32_t row = 0;
             if (!parse_a1(a1, col, row) || col >= 26 || row >= 100) {
@@ -179,7 +182,7 @@ std::string format_result(const EvalResult& r) {
 
 bool matches_expected(const EvalResult& r, const std::string& expected) {
     if (expected == "implemented") {
-        return !(r.type == EvalResult::Type::ERROR && r.error == CellError::NAME);
+        return r.type != EvalResult::Type::ERROR || r.error != CellError::NAME;
     }
     if (expected.rfind("n:", 0) == 0) {
         if (r.type != EvalResult::Type::NUMBER) {
@@ -229,9 +232,9 @@ std::string formula_todo_cases_path() {
         candidates.push_back(std::string(runfiles) + "/_main/testdata/formulas/mog_cases.tsv");
         candidates.push_back(std::string(runfiles) + "/cells/testdata/formulas/mog_cases.tsv");
     }
-    candidates.push_back("testdata/formulas/mog_cases.tsv");
+    candidates.emplace_back("testdata/formulas/mog_cases.tsv");
     for (const auto& p : candidates) {
-        std::ifstream in(p);
+        const std::ifstream in(p);
         if (in) {
             return p;
         }
@@ -252,7 +255,7 @@ std::vector<FormulaCase> load_formula_todo_cases(const std::string& path) {
         }
         std::vector<std::string> cols;
         std::string cur;
-        for (char c : line) {
+        for (const char c : line) {
             if (c == '\t') {
                 cols.push_back(cur);
                 cur.clear();
@@ -293,7 +296,7 @@ CorpusReport run_formula_todo_corpus(const std::string& cases_path) {
     for (const auto& c : cases) {
         Harness harness;
         harness.apply_cells(c.cells);
-        EvalResult r = harness.eval_formula(c.formula);
+        const EvalResult r = harness.eval_formula(c.formula);
         CaseOutcome o;
         o.c = c;
         o.status = classify(c, r);

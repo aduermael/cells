@@ -282,12 +282,12 @@ bool isWeekendMask(int serialInt, int mask) {
 bool isHoliday(int serialInt, const std::vector<int>& holidays);
 
 EvalResult weekendMaskFromArg(const ASTNode* arg, EvalContext& ctx, int* mask) {
-    const EvalResult w = evaluate(arg, ctx);
+    EvalResult w = evaluate(arg, ctx);
     if (w.isError()) {
         return w;
     }
     if (w.isNumber() || w.isBoolean() || w.isEmpty()) {
-        const EvalResult n = w.toNumber();
+        EvalResult n = w.toNumber();
         if (n.isError()) {
             return n;
         }
@@ -370,7 +370,7 @@ std::vector<int> holidaySerials(const ASTNode* arg, EvalContext& ctx, EvalResult
 }
 
 bool isHoliday(int serialInt, const std::vector<int>& holidays) {
-    for (int h : holidays) {
+    for (const int h : holidays) {
         if (h == serialInt) {
             return true;
         }
@@ -890,11 +890,11 @@ EvalResult fn_EDATE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult start = evaluateAsNumber(args[0], ctx);
+    EvalResult start = evaluateAsNumber(args[0], ctx);
     if (start.isError()) {
         return start;
     }
-    const EvalResult months = evaluateAsNumber(args[1], ctx);
+    EvalResult months = evaluateAsNumber(args[1], ctx);
     if (months.isError()) {
         return months;
     }
@@ -910,11 +910,11 @@ EvalResult fn_DAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult end = evaluateAsNumber(args[0], ctx);
+    EvalResult end = evaluateAsNumber(args[0], ctx);
     if (end.isError()) {
         return end;
     }
-    const EvalResult start = evaluateAsNumber(args[1], ctx);
+    EvalResult start = evaluateAsNumber(args[1], ctx);
     if (start.isError()) {
         return start;
     }
@@ -926,15 +926,15 @@ EvalResult fn_DATEDIF(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    EvalResult endRes = evaluateAsNumber(args[1], ctx);
     if (endRes.isError()) {
         return endRes;
     }
-    const EvalResult unitRes = evaluateAsString(args[2], ctx);
+    EvalResult unitRes = evaluateAsString(args[2], ctx);
     if (unitRes.isError()) {
         return unitRes;
     }
@@ -999,7 +999,7 @@ EvalResult fn_DATEDIF(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         return EvalResult::Number(static_cast<double>(days));
     }
     if (unit == "YD") {
-        int startDoy = static_cast<int>(start) - static_cast<int>(dateToSerial(y1, 1, 1));
+        const int startDoy = static_cast<int>(start) - static_cast<int>(dateToSerial(y1, 1, 1));
         int endDoy = static_cast<int>(end) - static_cast<int>(dateToSerial(y2, 1, 1));
         if (endDoy < startDoy) {
             endDoy += (y1 % 4 == 0 ? 366 : 365);
@@ -1013,7 +1013,7 @@ EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult serialRes = evaluateAsNumber(args[0], ctx);
+    EvalResult serialRes = evaluateAsNumber(args[0], ctx);
     if (serialRes.isError()) {
         return serialRes;
     }
@@ -1035,7 +1035,8 @@ EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     serialToDate(serialRes.getNumber(), year, month, day);
     const int jan1 = static_cast<int>(dateToSerial(year, 1, 1));
     const int jan1Wd = weekdaySun1(jan1);  // 1=Sun
-    int startWd = 1;                       // Sunday
+    int startWd = 1;
+                       // Sunday
     if (returnType == 2 || returnType == 21 || returnType == 11) {
         startWd = 2;  // Monday
     } else if (returnType != 1) {
@@ -1046,18 +1047,19 @@ EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     }
     const int jan1Off = (jan1Wd - startWd + 7) % 7;
     const int doy = serialInt - jan1;
-    return EvalResult::Number(static_cast<double>((doy + jan1Off) / 7 + 1));
+    const int week = (doy + jan1Off) / 7 + 1;
+    return EvalResult::Number(static_cast<double>(week));
 }
 
 EvalResult fn_NETWORKDAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    EvalResult endRes = evaluateAsNumber(args[1], ctx);
     if (endRes.isError()) {
         return endRes;
     }
@@ -1079,11 +1081,11 @@ EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult daysRes = evaluateAsNumber(args[1], ctx);
+    EvalResult daysRes = evaluateAsNumber(args[1], ctx);
     if (daysRes.isError()) {
         return daysRes;
     }
@@ -1105,11 +1107,11 @@ EvalResult fn_NETWORKDAYS_INTL(const std::vector<const ASTNode*>& args, EvalCont
     if (args.size() < 2 || args.size() > 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    EvalResult endRes = evaluateAsNumber(args[1], ctx);
     if (endRes.isError()) {
         return endRes;
     }
@@ -1137,11 +1139,11 @@ EvalResult fn_WORKDAY_INTL(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() < 2 || args.size() > 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult daysRes = evaluateAsNumber(args[1], ctx);
+    EvalResult daysRes = evaluateAsNumber(args[1], ctx);
     if (daysRes.isError()) {
         return daysRes;
     }
@@ -1169,11 +1171,11 @@ EvalResult fn_DAYS360(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    EvalResult endRes = evaluateAsNumber(args[1], ctx);
     if (endRes.isError()) {
         return endRes;
     }
@@ -1200,17 +1202,17 @@ EvalResult fn_YEARFRAC(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    EvalResult startRes = evaluateAsNumber(args[0], ctx);
     if (startRes.isError()) {
         return startRes;
     }
-    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    EvalResult endRes = evaluateAsNumber(args[1], ctx);
     if (endRes.isError()) {
         return endRes;
     }
     int basis = 0;
     if (args.size() == 3) {
-        const EvalResult b = evaluateAsNumber(args[2], ctx);
+        EvalResult b = evaluateAsNumber(args[2], ctx);
         if (b.isError()) {
             return b;
         }
@@ -1263,7 +1265,7 @@ EvalResult fn_ISOWEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& c
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult serialRes = evaluateAsNumber(args[0], ctx);
+    EvalResult serialRes = evaluateAsNumber(args[0], ctx);
     if (serialRes.isError()) {
         return serialRes;
     }

@@ -12,7 +12,7 @@ namespace cells {
 namespace {
 
 EvalResult requireNumber(const ASTNode* arg, EvalContext& ctx, double& out) {
-    const EvalResult r = evaluateAsNumber(arg, ctx);
+    EvalResult r = evaluateAsNumber(arg, ctx);
     if (r.isError()) {
         return r;
     }
@@ -114,7 +114,7 @@ EvalResult annuityNper(double rate, double pmt, double pv, double fv, int type) 
 EvalResult parseAnnuityType(const std::vector<const ASTNode*>& args, size_t index, EvalContext& ctx,
                             int& type) {
     double typeVal = 0.0;
-    const EvalResult e = optionalNumber(args, index, ctx, 0.0, typeVal);
+    EvalResult e = optionalNumber(args, index, ctx, 0.0, typeVal);
     if (e.isError()) {
         return e;
     }
@@ -148,12 +148,12 @@ EvalResult ipmtAt(double rate, double per, double nper, double pv, double fv, in
     if (per < 1.0 || per >= nper + 1.0) {
         return EvalResult::Error(CellError::NUM);
     }
-    const EvalResult pmtRes = annuityPmt(rate, nper, pv, fv, type);
+    EvalResult pmtRes = annuityPmt(rate, nper, pv, fv, type);
     if (pmtRes.isError()) {
         return pmtRes;
     }
     const double pmt = pmtRes.getNumber();
-    const EvalResult fvRes = annuityFv(rate, per - 1.0, pmt, pv, type);
+    EvalResult fvRes = annuityFv(rate, per - 1.0, pmt, pv, type);
     if (fvRes.isError()) {
         return fvRes;
     }
@@ -369,11 +369,11 @@ EvalResult fn_NPV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::VALUE);
     }
     double rate = 0.0;
-    const EvalResult e = requireNumber(args[0], ctx, rate);
+    EvalResult e = requireNumber(args[0], ctx, rate);
     if (e.isError()) {
         return e;
     }
-    std::vector<const ASTNode*> valueArgs(args.begin() + 1, args.end());
+    const std::vector<const ASTNode*> valueArgs(args.begin() + 1, args.end());
     auto [values, err] = collectNumericValues(valueArgs, ctx);
     if (err.isError()) {
         return err;
@@ -503,7 +503,7 @@ EvalResult fn_FVSCHEDULE(const std::vector<const ASTNode*>& args, EvalContext& c
         return EvalResult::Error(CellError::VALUE);
     }
     double principal = 0.0;
-    const EvalResult e = requireNumber(args[0], ctx, principal);
+    EvalResult e = requireNumber(args[0], ctx, principal);
     if (e.isError()) {
         return e;
     }
@@ -794,11 +794,11 @@ EvalResult fn_PPMT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (e.isError()) {
         return e;
     }
-    const EvalResult pmtRes = annuityPmt(rate, nper, pv, fv, type);
+    EvalResult pmtRes = annuityPmt(rate, nper, pv, fv, type);
     if (pmtRes.isError()) {
         return pmtRes;
     }
-    const EvalResult ipmtRes = ipmtAt(rate, per, nper, pv, fv, type);
+    EvalResult ipmtRes = ipmtAt(rate, per, nper, pv, fv, type);
     if (ipmtRes.isError()) {
         return ipmtRes;
     }
@@ -894,7 +894,7 @@ EvalResult fn_CUMPRINC(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (rate <= 0.0 || nper <= 0.0 || pv <= 0.0 || start < 1.0 || end < start || end > nper) {
         return EvalResult::Error(CellError::NUM);
     }
-    const EvalResult pmtRes = annuityPmt(rate, nper, pv, 0.0, type);
+    EvalResult pmtRes = annuityPmt(rate, nper, pv, 0.0, type);
     if (pmtRes.isError()) {
         return pmtRes;
     }

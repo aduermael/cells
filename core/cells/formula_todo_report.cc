@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    cells::CorpusReport report = cells::run_formula_todo_corpus(cases_path);
+    const cells::CorpusReport report = cells::run_formula_todo_corpus(cases_path);
     if (!report.error.empty()) {
         std::cerr << "Error: " << report.error << "\n";
         return 1;

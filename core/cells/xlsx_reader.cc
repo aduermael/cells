@@ -1461,7 +1461,7 @@ public:
             if (mz_zip_reader_file_stat(&archive_, i, &stat) == 0) {
                 continue;
             }
-            if (stat.m_is_directory) {
+            if (stat.m_is_directory != 0) {
                 continue;
             }
             names.emplace_back(stat.m_filename);

@@ -21,7 +21,7 @@ constexpr int kOctBits = 30;
 constexpr int kHexBits = 40;
 
 EvalResult requireBitNumber(const ASTNode* arg, EvalContext& ctx, std::int64_t& out) {
-    const EvalResult n = evaluateAsNumber(arg, ctx);
+    EvalResult n = evaluateAsNumber(arg, ctx);
     if (n.isError()) {
         return n;
     }
@@ -64,7 +64,7 @@ EvalResult parseTwos(const std::string& s, int base) {
     }
     const int bits = bitsForBase(base);
     std::int64_t value = 0;
-    for (char c : s) {
+    for (const char c : s) {
         const int d = digitValue(c);
         if (d < 0 || d >= base) {
             return EvalResult::Error(CellError::NUM);
@@ -120,7 +120,7 @@ EvalResult formatTwos(std::int64_t value, int base, int places) {
 }
 
 EvalResult evalTextArg(const ASTNode* arg, EvalContext& ctx, std::string& out) {
-    const EvalResult r = evaluate(arg, ctx);
+    EvalResult r = evaluate(arg, ctx);
     if (r.isError()) {
         return r;
     }
@@ -137,7 +137,7 @@ EvalResult evalTextArg(const ASTNode* arg, EvalContext& ctx, std::string& out) {
         }
         return EvalResult::Empty();
     }
-    const EvalResult s = r.toString();
+    EvalResult s = r.toString();
     if (s.isError()) {
         return s;
     }
@@ -150,7 +150,7 @@ EvalResult fromBaseFn(const std::vector<const ASTNode*>& args, EvalContext& ctx,
         return EvalResult::Error(CellError::VALUE);
     }
     std::string text;
-    const EvalResult e = evalTextArg(args[0], ctx, text);
+    EvalResult e = evalTextArg(args[0], ctx, text);
     if (e.isError()) {
         return e;
     }
@@ -161,14 +161,14 @@ EvalResult toBaseFn(const std::vector<const ASTNode*>& args, EvalContext& ctx, i
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
     const auto value = static_cast<std::int64_t>(std::trunc(n.getNumber()));
     int places = -1;
     if (args.size() == 2) {
-        const EvalResult p = evaluateAsNumber(args[1], ctx);
+        EvalResult p = evaluateAsNumber(args[1], ctx);
         if (p.isError()) {
             return p;
         }
@@ -186,18 +186,18 @@ EvalResult convertBaseFn(const std::vector<const ASTNode*>& args, EvalContext& c
         return EvalResult::Error(CellError::VALUE);
     }
     std::string text;
-    const EvalResult e = evalTextArg(args[0], ctx, text);
+    EvalResult e = evalTextArg(args[0], ctx, text);
     if (e.isError()) {
         return e;
     }
-    const EvalResult parsed = parseTwos(text, fromBase);
+    EvalResult parsed = parseTwos(text, fromBase);
     if (parsed.isError()) {
         return parsed;
     }
     const auto value = static_cast<std::int64_t>(parsed.getNumber());
     int places = -1;
     if (args.size() == 2) {
-        const EvalResult p = evaluateAsNumber(args[1], ctx);
+        EvalResult p = evaluateAsNumber(args[1], ctx);
         if (p.isError()) {
             return p;
         }
@@ -339,7 +339,7 @@ ComplexNum parseComplexNumber(const std::string& s) {
 }
 
 EvalResult evalComplex(const ASTNode* arg, EvalContext& ctx, ComplexNum& out) {
-    const EvalResult r = evaluate(arg, ctx);
+    EvalResult r = evaluate(arg, ctx);
     if (r.isError()) {
         return r;
     }
@@ -355,7 +355,7 @@ EvalResult evalComplex(const ASTNode* arg, EvalContext& ctx, ComplexNum& out) {
         out.ok = true;
         return EvalResult::Empty();
     }
-    const EvalResult s = r.toString();
+    EvalResult s = r.toString();
     if (s.isError()) {
         return s;
     }
@@ -450,7 +450,7 @@ EvalResult fn_BITLSHIFT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (e.isError()) {
         return e;
     }
-    const EvalResult shRes = evaluateAsNumber(args[1], ctx);
+    EvalResult shRes = evaluateAsNumber(args[1], ctx);
     if (shRes.isError()) {
         return shRes;
     }
@@ -458,7 +458,7 @@ EvalResult fn_BITLSHIFT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (shift < -53 || shift > 53) {
         return EvalResult::Error(CellError::NUM);
     }
-    std::uint64_t u = static_cast<std::uint64_t>(n);
+    auto u = static_cast<std::uint64_t>(n);
     if (shift >= 0) {
         u <<= static_cast<unsigned>(shift);
     } else {
@@ -479,7 +479,7 @@ EvalResult fn_BITRSHIFT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (e.isError()) {
         return e;
     }
-    const EvalResult shRes = evaluateAsNumber(args[1], ctx);
+    EvalResult shRes = evaluateAsNumber(args[1], ctx);
     if (shRes.isError()) {
         return shRes;
     }
@@ -487,7 +487,7 @@ EvalResult fn_BITRSHIFT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (shift < -53 || shift > 53) {
         return EvalResult::Error(CellError::NUM);
     }
-    std::uint64_t u = static_cast<std::uint64_t>(n);
+    auto u = static_cast<std::uint64_t>(n);
     if (shift >= 0) {
         u >>= static_cast<unsigned>(shift);
     } else {
@@ -542,7 +542,7 @@ EvalResult fn_DELTA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n1 = evaluateAsNumber(args[0], ctx);
+    EvalResult n1 = evaluateAsNumber(args[0], ctx);
     if (n1.isError()) {
         return n1;
     }
@@ -561,7 +561,7 @@ EvalResult fn_GESTEP(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -580,14 +580,14 @@ EvalResult fn_ERF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult lower = evaluateAsNumber(args[0], ctx);
+    EvalResult lower = evaluateAsNumber(args[0], ctx);
     if (lower.isError()) {
         return lower;
     }
     if (args.size() == 1) {
         return EvalResult::Number(excelNormalize(std::erf(lower.getNumber())));
     }
-    const EvalResult upper = evaluateAsNumber(args[1], ctx);
+    EvalResult upper = evaluateAsNumber(args[1], ctx);
     if (upper.isError()) {
         return upper;
     }
@@ -599,7 +599,7 @@ EvalResult fn_ERFC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -621,17 +621,17 @@ EvalResult fn_COMPLEX(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() < 2 || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult realRes = evaluateAsNumber(args[0], ctx);
+    EvalResult realRes = evaluateAsNumber(args[0], ctx);
     if (realRes.isError()) {
         return realRes;
     }
-    const EvalResult imagRes = evaluateAsNumber(args[1], ctx);
+    EvalResult imagRes = evaluateAsNumber(args[1], ctx);
     if (imagRes.isError()) {
         return imagRes;
     }
     std::string suffix = "i";
     if (args.size() == 3) {
-        const EvalResult s = evaluateAsString(args[2], ctx);
+        EvalResult s = evaluateAsString(args[2], ctx);
         if (s.isError()) {
             return s;
         }
@@ -647,7 +647,7 @@ EvalResult fn_COMPLEX(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 
 EvalResult fn_IMABS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     ComplexNum c;
-    const EvalResult e = fnComplexUnary(args, ctx, c);
+    EvalResult e = fnComplexUnary(args, ctx, c);
     if (e.isError()) {
         return e;
     }
@@ -656,7 +656,7 @@ EvalResult fn_IMABS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
 EvalResult fn_IMREAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     ComplexNum c;
-    const EvalResult e = fnComplexUnary(args, ctx, c);
+    EvalResult e = fnComplexUnary(args, ctx, c);
     if (e.isError()) {
         return e;
     }
@@ -665,7 +665,7 @@ EvalResult fn_IMREAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
 
 EvalResult fn_IMAGINARY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     ComplexNum c;
-    const EvalResult e = fnComplexUnary(args, ctx, c);
+    EvalResult e = fnComplexUnary(args, ctx, c);
     if (e.isError()) {
         return e;
     }
@@ -674,7 +674,7 @@ EvalResult fn_IMAGINARY(const std::vector<const ASTNode*>& args, EvalContext& ct
 
 EvalResult fn_IMARGUMENT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     ComplexNum c;
-    const EvalResult e = fnComplexUnary(args, ctx, c);
+    EvalResult e = fnComplexUnary(args, ctx, c);
     if (e.isError()) {
         return e;
     }
@@ -686,7 +686,7 @@ EvalResult fn_IMARGUMENT(const std::vector<const ASTNode*>& args, EvalContext& c
 
 EvalResult fn_IMCONJUGATE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     ComplexNum c;
-    const EvalResult e = fnComplexUnary(args, ctx, c);
+    EvalResult e = fnComplexUnary(args, ctx, c);
     if (e.isError()) {
         return e;
     }
@@ -703,7 +703,7 @@ EvalResult fn_IMSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     bool hasSuffix = false;
     for (const ASTNode* arg : args) {
         ComplexNum c;
-        const EvalResult e = evalComplex(arg, ctx, c);
+        EvalResult e = evalComplex(arg, ctx, c);
         if (e.isError()) {
             return e;
         }
@@ -751,7 +751,7 @@ EvalResult fn_IMPRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ct
     bool hasSuffix = false;
     for (const ASTNode* arg : args) {
         ComplexNum c;
-        const EvalResult e = evalComplex(arg, ctx, c);
+        EvalResult e = evalComplex(arg, ctx, c);
         if (e.isError()) {
             return e;
         }
@@ -806,7 +806,7 @@ EvalResult fn_IMPOWER(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (e.isError()) {
         return e;
     }
-    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    EvalResult nRes = evaluateAsNumber(args[1], ctx);
     if (nRes.isError()) {
         return nRes;
     }

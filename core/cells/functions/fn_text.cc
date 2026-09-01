@@ -750,11 +750,11 @@ EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (args.size() < 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult delimRes = evaluateAsString(args[0], ctx);
+    EvalResult delimRes = evaluateAsString(args[0], ctx);
     if (delimRes.isError()) {
         return delimRes;
     }
-    const EvalResult ignoreRes = evaluateAsBoolean(args[1], ctx);
+    EvalResult ignoreRes = evaluateAsBoolean(args[1], ctx);
     if (ignoreRes.isError()) {
         return ignoreRes;
     }
@@ -765,13 +765,13 @@ EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult text = evaluateAsString(args[0], ctx);
+    EvalResult text = evaluateAsString(args[0], ctx);
     if (text.isError()) {
         return text;
     }
     std::string out;
     out.reserve(text.getString().size());
-    for (unsigned char c : text.getString()) {
+    for (const unsigned char c : text.getString()) {
         if (c >= 32) {
             out.push_back(static_cast<char>(c));
         }
@@ -857,7 +857,7 @@ std::string formatWithDecimals(double value, int decimals, bool thousands) {
         decimals = 0;
     }
     const bool neg = scaled < 0.0;
-    double mag = std::abs(scaled);
+    const double mag = std::abs(scaled);
     auto intPart = static_cast<long long>(std::floor(mag + 1e-12));
     double frac = mag - static_cast<double>(intPart);
     if (frac < 0.0) {
@@ -1015,7 +1015,7 @@ EvalResult joinTexts(const std::vector<const ASTNode*>& args, EvalContext& ctx, 
                      const std::string& delim, bool ignoreEmpty) {
     std::vector<std::string> parts;
     for (size_t i = start; i < args.size(); ++i) {
-        const EvalResult val = evaluate(args[i], ctx);
+        EvalResult val = evaluate(args[i], ctx);
         if (val.isError()) {
             return val;
         }
@@ -1065,7 +1065,7 @@ EvalResult fn_UNICHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
@@ -1080,7 +1080,7 @@ EvalResult fn_UNICODE(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult t = evaluateAsString(args[0], ctx);
+    EvalResult t = evaluateAsString(args[0], ctx);
     if (t.isError()) {
         return t;
     }
@@ -1099,13 +1099,13 @@ EvalResult fn_FIXED(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.empty() || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
     int decimals = 2;
     if (args.size() >= 2) {
-        const EvalResult d = evaluateAsNumber(args[1], ctx);
+        EvalResult d = evaluateAsNumber(args[1], ctx);
         if (d.isError()) {
             return d;
         }
@@ -1129,13 +1129,13 @@ EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    EvalResult n = evaluateAsNumber(args[0], ctx);
     if (n.isError()) {
         return n;
     }
     int decimals = 2;
     if (args.size() == 2) {
-        const EvalResult d = evaluateAsNumber(args[1], ctx);
+        EvalResult d = evaluateAsNumber(args[1], ctx);
         if (d.isError()) {
             return d;
         }
@@ -1145,7 +1145,7 @@ EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         }
     }
     const double v = n.getNumber();
-    std::string body = formatWithDecimals(std::abs(v), decimals, true);
+    const std::string body = formatWithDecimals(std::abs(v), decimals, true);
     if (v < 0.0) {
         return EvalResult::String("($" + body + ")");
     }
@@ -1156,7 +1156,7 @@ EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.empty() || args.size() > 3) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
@@ -1193,7 +1193,7 @@ EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& 
         s.pop_back();
     }
     std::string cleaned;
-    for (char c : s) {
+    for (const char c : s) {
         if (c == group[0]) {
             continue;
         }
@@ -1267,17 +1267,17 @@ EvalResult textBeforeAfter(const std::vector<const ASTNode*>& args, EvalContext&
     if (args.size() < 2 || args.size() > 6) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
-    const EvalResult delimRes = evaluateAsString(args[1], ctx);
+    EvalResult delimRes = evaluateAsString(args[1], ctx);
     if (delimRes.isError()) {
         return delimRes;
     }
     int instance = 1;
     if (args.size() >= 3) {
-        const EvalResult inst = evaluateAsNumber(args[2], ctx);
+        EvalResult inst = evaluateAsNumber(args[2], ctx);
         if (inst.isError()) {
             return inst;
         }
@@ -1288,7 +1288,7 @@ EvalResult textBeforeAfter(const std::vector<const ASTNode*>& args, EvalContext&
     }
     bool insensitive = false;
     if (args.size() >= 4) {
-        const EvalResult mode = evaluateAsNumber(args[3], ctx);
+        EvalResult mode = evaluateAsNumber(args[3], ctx);
         if (mode.isError()) {
             return mode;
         }
@@ -1320,7 +1320,7 @@ EvalResult textBeforeAfter(const std::vector<const ASTNode*>& args, EvalContext&
         }
         return ifNotFound;
     }
-    int idx = instance > 0 ? instance - 1 : static_cast<int>(pos.size()) + instance;
+    const int idx = instance > 0 ? instance - 1 : static_cast<int>(pos.size()) + instance;
     if (idx < 0 || idx >= static_cast<int>(pos.size())) {
         if (matchEnd) {
             return EvalResult::String(after ? std::string() : text);
@@ -1374,11 +1374,11 @@ EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() < 2 || args.size() > 6) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
-    const EvalResult colDelimRes = evaluateAsString(args[1], ctx);
+    EvalResult colDelimRes = evaluateAsString(args[1], ctx);
     if (colDelimRes.isError()) {
         return colDelimRes;
     }
@@ -1405,7 +1405,7 @@ EvalResult fn_TEXTSPLIT(const std::vector<const ASTNode*>& args, EvalContext& ct
     }
     bool insensitive = false;
     if (args.size() >= 5) {
-        const EvalResult mode = evaluateAsNumber(args[4], ctx);
+        EvalResult mode = evaluateAsNumber(args[4], ctx);
         if (mode.isError()) {
             return mode;
         }
@@ -1458,13 +1458,13 @@ EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& 
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult value = evaluate(args[0], ctx);
+    EvalResult value = evaluate(args[0], ctx);
     if (value.isError()) {
         return value;
     }
     int format = 0;
     if (args.size() == 2) {
-        const EvalResult f = evaluateAsNumber(args[1], ctx);
+        EvalResult f = evaluateAsNumber(args[1], ctx);
         if (f.isError()) {
             return f;
         }
@@ -1478,7 +1478,7 @@ EvalResult fn_VALUETOTEXT(const std::vector<const ASTNode*>& args, EvalContext& 
     }
     if (format == 1 && value.isString()) {
         std::string out = "\"";
-        for (char c : value.getString()) {
+        for (const char c : value.getString()) {
             if (c == '"') {
                 out += "\"\"";
             } else {
@@ -1495,7 +1495,7 @@ EvalResult fn_ASC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult text = evaluateAsString(args[0], ctx);
+    EvalResult text = evaluateAsString(args[0], ctx);
     if (text.isError()) {
         return text;
     }
@@ -1520,13 +1520,13 @@ EvalResult fn_ENCODEURL(const std::vector<const ASTNode*>& args, EvalContext& ct
     if (args.size() != 1) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult text = evaluateAsString(args[0], ctx);
+    EvalResult text = evaluateAsString(args[0], ctx);
     if (text.isError()) {
         return text;
     }
     static const char* kHex = "0123456789ABCDEF";
     std::string out;
-    for (unsigned char c : text.getString()) {
+    for (const unsigned char c : text.getString()) {
         if (urlUnreserved(c)) {
             out.push_back(static_cast<char>(c));
         } else {
@@ -1542,7 +1542,7 @@ EvalResult fn_JOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 2) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult delimRes = evaluateAsString(args[0], ctx);
+    EvalResult delimRes = evaluateAsString(args[0], ctx);
     if (delimRes.isError()) {
         return delimRes;
     }
@@ -1553,11 +1553,11 @@ EvalResult fn_SPLIT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.size() < 2 || args.size() > 4) {
         return EvalResult::Error(CellError::VALUE);
     }
-    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    EvalResult textRes = evaluateAsString(args[0], ctx);
     if (textRes.isError()) {
         return textRes;
     }
-    const EvalResult delimRes = evaluateAsString(args[1], ctx);
+    EvalResult delimRes = evaluateAsString(args[1], ctx);
     if (delimRes.isError()) {
         return delimRes;
     }

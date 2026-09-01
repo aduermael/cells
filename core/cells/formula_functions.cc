@@ -370,9 +370,9 @@ std::pair<std::vector<std::vector<EvalResult>>, EvalResult> collectAs2D(const Ev
 
     const uint32_t startColPos =
         startCol->position <= endCol->position ? startCol->position : endCol->position;
-    const uint32_t cols = static_cast<uint32_t>(
+    const auto cols = static_cast<uint32_t>(
         std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
-    const uint32_t rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
+    const auto rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
 
     std::vector<std::vector<EvalResult>> result;
     result.reserve(rows);

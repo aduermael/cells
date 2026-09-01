@@ -18,7 +18,7 @@ std::string luaQuote(const std::string& s) {
     std::string out;
     out.reserve(s.size() + 2);
     out.push_back('"');
-    for (unsigned char c : s) {
+    for (const unsigned char c : s) {
         switch (c) {
             case '\\':
                 out += "\\\\";

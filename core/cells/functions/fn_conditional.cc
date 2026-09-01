@@ -515,7 +515,7 @@ EvalResult databaseAggregate(const std::vector<const ASTNode*>& args, EvalContex
     const bool haveField = args.size() == 3;
     int fieldCol = -1;
     if (haveField) {
-        const EvalResult field = evaluate(args[1], ctx);
+        EvalResult field = evaluate(args[1], ctx);
         if (field.isError()) {
             return field;
         }
@@ -666,10 +666,10 @@ EvalResult fn_SUMIF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     }
     // SUMIF(range, criteria, [sum_range]) → value-first when sum_range present
     if (args.size() == 2) {
-        std::vector<const ASTNode*> rewritten = {args[0], args[0], args[1]};
+        const std::vector<const ASTNode*> rewritten = {args[0], args[0], args[1]};
         return aggregateIfs(rewritten, ctx, AggKind::Sum, true, 3);
     }
-    std::vector<const ASTNode*> rewritten = {args[2], args[0], args[1]};
+    const std::vector<const ASTNode*> rewritten = {args[2], args[0], args[1]};
     return aggregateIfs(rewritten, ctx, AggKind::Sum, true, 3);
 }
 
@@ -693,10 +693,10 @@ EvalResult fn_AVERAGEIF(const std::vector<const ASTNode*>& args, EvalContext& ct
         return EvalResult::Error(CellError::VALUE);
     }
     if (args.size() == 2) {
-        std::vector<const ASTNode*> rewritten = {args[0], args[0], args[1]};
+        const std::vector<const ASTNode*> rewritten = {args[0], args[0], args[1]};
         return aggregateIfs(rewritten, ctx, AggKind::Average, true, 3);
     }
-    std::vector<const ASTNode*> rewritten = {args[2], args[0], args[1]};
+    const std::vector<const ASTNode*> rewritten = {args[2], args[0], args[1]};
     return aggregateIfs(rewritten, ctx, AggKind::Average, true, 3);
 }
 
