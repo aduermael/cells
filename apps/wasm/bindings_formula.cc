@@ -16,9 +16,8 @@
 //
 // =============================================================================
 
-#include "apps/wasm/bindings.h"
-
 #include <cmath>
+
 #include <iomanip>
 #include <set>
 #include <sstream>
@@ -32,6 +31,8 @@
 #include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/operation.h"
+
+#include "apps/wasm/bindings.h"
 
 namespace cells::wasm {
 
@@ -47,7 +48,8 @@ std::string CellsEngine::validateFormula(const std::string& formulaText) {
     json << "\"errors\":[";
     const auto& errors = parser.errors();
     for (size_t i = 0; i < errors.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         json << "\"" << jsonEscape(errors[i]) << "\"";
     }
     json << "],";
@@ -149,13 +151,16 @@ std::string CellsEngine::getCellDependencies(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
-    if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+    if (cellIdStr.size() != ID_LENGTH)
+        return "{\"error\":\"Invalid cell ID\"}";
     ID cellId(cellIdStr);
 
     DependencyGraph* depGraph = sheet->getDependencyGraph();
-    if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+    if (!depGraph)
+        return "{\"error\":\"No dependency graph\"}";
 
     std::vector<DependencyRef> deps = depGraph->getDependencies(cellId);
 
@@ -163,7 +168,8 @@ std::string CellsEngine::getCellDependencies(const std::string& cellIdStr) {
     json << "{\"dependencies\":[";
 
     for (size_t i = 0; i < deps.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         const auto& dep = deps[i];
 
         json << "{";
@@ -211,13 +217,16 @@ std::string CellsEngine::getCellDependents(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
-    if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+    if (cellIdStr.size() != ID_LENGTH)
+        return "{\"error\":\"Invalid cell ID\"}";
     ID cellId(cellIdStr);
 
     DependencyGraph* depGraph = sheet->getDependencyGraph();
-    if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+    if (!depGraph)
+        return "{\"error\":\"No dependency graph\"}";
 
     std::vector<ID> dependents = depGraph->getDependents(cellId);
 
@@ -225,7 +234,8 @@ std::string CellsEngine::getCellDependents(const std::string& cellIdStr) {
     json << "{\"dependents\":[";
 
     for (size_t i = 0; i < dependents.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         json << "\"" << dependents[i].toString() << "\"";
     }
 
@@ -239,7 +249,8 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     FormulaParser parser(formulaText);
     auto ast = parser.parse();
@@ -258,7 +269,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     for (const auto& pending : required.columns) {
         std::string colPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
         Operation colOp = makeColSetOp(*_workbook, pending.id, pending.sheetId, colPayload);
-        applyOperation(*_workbook, colOp);
+        applyLocalUiOp(colOp);
     }
 
     // Create required rows via CRDT operations
@@ -266,16 +277,15 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     for (const auto& pending : required.rows) {
         std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) + "}";
         Operation rowOp = makeRowSetOp(*_workbook, pending.id, pending.sheetId, rowPayload);
-        applyOperation(*_workbook, rowOp);
+        applyLocalUiOp(rowOp);
     }
 
     // Create required cells via CRDT operations (empty cells for references)
     for (const auto& pending : required.cells) {
-        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" +
-                                  pending.colId.toString() + "\",\"row\":\"" +
-                                  pending.rowId.toString() + "\"}";
+        std::string cellPayload = "{\"t\":\"s\",\"v\":\"\",\"col\":\"" + pending.colId.toString() +
+                                  "\",\"row\":\"" + pending.rowId.toString() + "\"}";
         Operation cellOp = makeCellSetOp(*_workbook, pending.id, pending.sheetId, cellPayload);
-        applyOperation(*_workbook, cellOp);
+        applyLocalUiOp(cellOp);
     }
 
     // Now resolve (all entities should exist)
@@ -291,7 +301,8 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     json << "{\"references\":[";
 
     for (size_t i = 0; i < refs.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         const auto& ref = refs[i];
 
         json << "{";
@@ -376,14 +387,13 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
                 json << "\"type\":\"named\",";
                 json << "\"name\":\"" << jsonEscape(ref.namedRangeName) << "\"";
                 // Resolve the named range to get target coordinates
-                const NamedRange* nr = _workbook->getNamedRanges()->resolve(
-                    ref.namedRangeName, sheet->id);
+                const NamedRange* nr =
+                    _workbook->getNamedRanges()->resolve(ref.namedRangeName, sheet->id);
                 if (nr) {
                     const auto& target = nr->target;
                     // Get the target sheet (may be different from current sheet)
-                    Sheet* targetSheet = target.sheetId.isNull()
-                        ? sheet
-                        : _workbook->getSheet(target.sheetId);
+                    Sheet* targetSheet =
+                        target.sheetId.isNull() ? sheet : _workbook->getSheet(target.sheetId);
                     if (targetSheet) {
                         switch (target.type) {
                             case NamedRangeTarget::Type::CELL: {
@@ -483,13 +493,16 @@ std::string CellsEngine::detectCircularRef(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
-    if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+    if (cellIdStr.size() != ID_LENGTH)
+        return "{\"error\":\"Invalid cell ID\"}";
     ID cellId(cellIdStr);
 
     DependencyGraph* depGraph = sheet->getDependencyGraph();
-    if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+    if (!depGraph)
+        return "{\"error\":\"No dependency graph\"}";
 
     std::vector<ID> cycle = depGraph->detectCycle(cellId);
 
@@ -498,7 +511,8 @@ std::string CellsEngine::detectCircularRef(const std::string& cellIdStr) {
     json << "\"cycle\":[";
 
     for (size_t i = 0; i < cycle.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         json << "\"" << cycle[i].toString() << "\"";
     }
 
@@ -512,10 +526,12 @@ std::string CellsEngine::getVolatileCells() {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     DependencyGraph* depGraph = sheet->getDependencyGraph();
-    if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+    if (!depGraph)
+        return "{\"error\":\"No dependency graph\"}";
 
     std::vector<ID> volatile_cells = depGraph->getVolatileCells();
 
@@ -523,7 +539,8 @@ std::string CellsEngine::getVolatileCells() {
     json << "{\"volatileCells\":[";
 
     for (size_t i = 0; i < volatile_cells.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         json << "\"" << volatile_cells[i].toString() << "\"";
     }
 
@@ -537,7 +554,8 @@ std::string CellsEngine::getCellDisplayValue(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     if (cellIdStr.size() != ID_LENGTH) {
         return "{\"error\":\"Invalid cell ID\"}";
@@ -592,7 +610,8 @@ std::string CellsEngine::recalculate() {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     std::vector<ID> dirtyCells = getDirtyCells(sheet);
 
@@ -623,7 +642,8 @@ bool CellsEngine::hasDirtyCellsCheck() {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return false;
+    if (!sheet)
+        return false;
 
     return hasDirtyCells(sheet);
 }
@@ -634,7 +654,8 @@ std::string CellsEngine::markCellDirty(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     if (cellIdStr.size() != ID_LENGTH) {
         return "{\"error\":\"Invalid cell ID\"}";
@@ -646,7 +667,8 @@ std::string CellsEngine::markCellDirty(const std::string& cellIdStr) {
     int dirtyCount = 0;
     for (const auto& cellId : sheet->getCellIds()) {
         Cell* cell = _workbook->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const Formula* formula = cell->getFormula();
         if (formula && formula->dirty) {
             ++dirtyCount;
@@ -664,7 +686,8 @@ std::string CellsEngine::getDirtyCellIds() {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "{\"error\":\"Sheet not found\"}";
+    if (!sheet)
+        return "{\"error\":\"Sheet not found\"}";
 
     std::vector<ID> dirtyCells = getDirtyCells(sheet);
 
@@ -672,7 +695,8 @@ std::string CellsEngine::getDirtyCellIds() {
     json << "{\"dirtyCells\":[";
 
     for (size_t i = 0; i < dirtyCells.size(); ++i) {
-        if (i > 0) json << ",";
+        if (i > 0)
+            json << ",";
         json << "\"" << dirtyCells[i].toString() << "\"";
     }
 

@@ -641,5 +641,32 @@ TEST_F(FnLookupTest, HlookupTooFewArgs) {
     EXPECT_EQ(result.getError(), CellError::VALUE);
 }
 
+TEST_F(FnLookupTest, RowRowsColumnColumns) {
+    EvalResult row = eval("=ROW(C5)");
+    ASSERT_TRUE(row.isNumber());
+    EXPECT_DOUBLE_EQ(row.getNumber(), 5.0);
+    EvalResult rows = eval("=ROWS(A1:C5)");
+    ASSERT_TRUE(rows.isNumber());
+    EXPECT_DOUBLE_EQ(rows.getNumber(), 5.0);
+    EvalResult col = eval("=COLUMN(C5)");
+    ASSERT_TRUE(col.isNumber());
+    EXPECT_DOUBLE_EQ(col.getNumber(), 3.0);
+    EvalResult cols = eval("=COLUMNS(A1:C5)");
+    ASSERT_TRUE(cols.isNumber());
+    EXPECT_DOUBLE_EQ(cols.getNumber(), 3.0);
+}
+
+TEST_F(FnLookupTest, AddressAndChoose) {
+    EvalResult absAddr = eval("=ADDRESS(1,1)");
+    ASSERT_TRUE(absAddr.isString());
+    EXPECT_EQ(absAddr.getString(), "$A$1");
+    EvalResult rel = eval("=ADDRESS(2,3,4)");
+    ASSERT_TRUE(rel.isString());
+    EXPECT_EQ(rel.getString(), "C2");
+    EvalResult ch = eval("=CHOOSE(2,\"a\",\"b\",\"c\")");
+    ASSERT_TRUE(ch.isString());
+    EXPECT_EQ(ch.getString(), "b");
+}
+
 }  // namespace
 }  // namespace cells

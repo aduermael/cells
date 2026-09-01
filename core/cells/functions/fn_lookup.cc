@@ -616,6 +616,243 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return getCellAtPosition(ctx, bounds, rowIndex - 1, matchCol);
 }
 
+EvalResult fn_ROW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() > 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (args.empty()) {
+        if (ctx.currentCellId.isNull() || ctx.sheet == nullptr) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        const Cell* cell = ctx.sheet->getCell(ctx.currentCellId);
+        if (cell == nullptr) {
+            return EvalResult::Error(CellError::REF);
+        }
+        const Axis* row = ctx.sheet->getRow(cell->rowId);
+        if (row == nullptr) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(row->position + 1));
+    }
+    const ASTNode* n = args[0];
+    if (n->type == ASTNodeType::CELL_REF) {
+        return EvalResult::Number(static_cast<const CellRefNode*>(n)->row);
+    }
+    if (n->type == ASTNodeType::RANGE_REF) {
+        const auto* range = static_cast<const RangeRefNode*>(n);
+        if (range->topLeft) {
+            return EvalResult::Number(range->topLeft->row);
+        }
+    }
+    if (n->type == ASTNodeType::ROW_REF) {
+        return EvalResult::Number(static_cast<const RowRefNode*>(n)->row);
+    }
+    if (n->type == ASTNodeType::COLUMN_REF || n->type == ASTNodeType::COLUMN_RANGE_REF) {
+        return EvalResult::Number(1.0);
+    }
+    const EvalResult r = evaluate(n, ctx);
+    if (r.isError()) {
+        return r;
+    }
+    if (r.isRange()) {
+        const RangeDimensions dims =
+            getRangeDimensions(r.getRangeBounds(), r.targetSheet ? r.targetSheet : ctx.sheet);
+        if (!dims.valid) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(dims.startRowPos + 1));
+    }
+    return EvalResult::Error(CellError::VALUE);
+}
+
+EvalResult fn_ROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult r = evaluate(args[0], ctx);
+    if (r.isError()) {
+        return r;
+    }
+    if (r.isArray()) {
+        return EvalResult::Number(static_cast<double>(r.getArrayRows()));
+    }
+    if (r.isRange()) {
+        const RangeDimensions dims =
+            getRangeDimensions(r.getRangeBounds(), r.targetSheet ? r.targetSheet : ctx.sheet);
+        if (!dims.valid) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(dims.rows));
+    }
+    return EvalResult::Number(1.0);
+}
+
+static int columnLettersToNumber(const std::string& letters) {
+    const int32_t pos = Sheet::columnNameToPosition(letters);
+    if (pos < 0) {
+        return 0;
+    }
+    return pos + 1;
+}
+
+EvalResult fn_COLUMN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() > 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (args.empty()) {
+        if (ctx.currentCellId.isNull() || ctx.sheet == nullptr) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        const Cell* cell = ctx.sheet->getCell(ctx.currentCellId);
+        if (cell == nullptr) {
+            return EvalResult::Error(CellError::REF);
+        }
+        const Axis* col = ctx.sheet->getColumn(cell->colId);
+        if (col == nullptr) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(col->position + 1));
+    }
+    const ASTNode* n = args[0];
+    if (n->type == ASTNodeType::CELL_REF) {
+        return EvalResult::Number(
+            columnLettersToNumber(static_cast<const CellRefNode*>(n)->column));
+    }
+    if (n->type == ASTNodeType::RANGE_REF) {
+        const auto* range = static_cast<const RangeRefNode*>(n);
+        if (range->topLeft) {
+            return EvalResult::Number(columnLettersToNumber(range->topLeft->column));
+        }
+    }
+    if (n->type == ASTNodeType::COLUMN_REF) {
+        return EvalResult::Number(
+            columnLettersToNumber(static_cast<const ColumnRefNode*>(n)->column));
+    }
+    if (n->type == ASTNodeType::ROW_REF || n->type == ASTNodeType::ROW_RANGE_REF) {
+        return EvalResult::Number(1.0);
+    }
+    const EvalResult r = evaluate(n, ctx);
+    if (r.isError()) {
+        return r;
+    }
+    if (r.isRange()) {
+        const RangeDimensions dims =
+            getRangeDimensions(r.getRangeBounds(), r.targetSheet ? r.targetSheet : ctx.sheet);
+        if (!dims.valid) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(dims.startColPos + 1));
+    }
+    return EvalResult::Error(CellError::VALUE);
+}
+
+EvalResult fn_COLUMNS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult r = evaluate(args[0], ctx);
+    if (r.isError()) {
+        return r;
+    }
+    if (r.isArray()) {
+        return EvalResult::Number(static_cast<double>(r.getArrayCols()));
+    }
+    if (r.isRange()) {
+        const RangeDimensions dims =
+            getRangeDimensions(r.getRangeBounds(), r.targetSheet ? r.targetSheet : ctx.sheet);
+        if (!dims.valid) {
+            return EvalResult::Error(CellError::REF);
+        }
+        return EvalResult::Number(static_cast<double>(dims.cols));
+    }
+    return EvalResult::Number(1.0);
+}
+
+EvalResult fn_ADDRESS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 5) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult rowRes = evaluateAsNumber(args[0], ctx);
+    if (rowRes.isError()) {
+        return rowRes;
+    }
+    const EvalResult colRes = evaluateAsNumber(args[1], ctx);
+    if (colRes.isError()) {
+        return colRes;
+    }
+    int absNum = 1;
+    if (args.size() >= 3) {
+        const EvalResult a = evaluateAsNumber(args[2], ctx);
+        if (a.isError()) {
+            return a;
+        }
+        absNum = static_cast<int>(a.getNumber());
+    }
+    bool a1 = true;
+    if (args.size() >= 4) {
+        const EvalResult a1Res = evaluateAsBoolean(args[3], ctx);
+        if (a1Res.isError()) {
+            return a1Res;
+        }
+        a1 = a1Res.getBoolean();
+    }
+    std::string sheetName;
+    if (args.size() == 5) {
+        const EvalResult s = evaluateAsString(args[4], ctx);
+        if (s.isError()) {
+            return s;
+        }
+        sheetName = s.getString();
+    }
+    const int row = static_cast<int>(rowRes.getNumber());
+    const int col = static_cast<int>(colRes.getNumber());
+    if (row < 1 || col < 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (!a1) {
+        return EvalResult::Error(CellError::VALUE);  // R1C1 not supported
+    }
+    const bool absCol = (absNum == 1 || absNum == 3);
+    const bool absRow = (absNum == 1 || absNum == 2);
+    if (absNum < 1 || absNum > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    std::string ref;
+    if (absCol) {
+        ref += '$';
+    }
+    ref += Sheet::positionToColumnName(static_cast<uint32_t>(col - 1));
+    if (absRow) {
+        ref += '$';
+    }
+    ref += std::to_string(row);
+    if (!sheetName.empty()) {
+        const bool quote =
+            sheetName.find(' ') != std::string::npos || sheetName.find('!') != std::string::npos;
+        if (quote) {
+            ref = "'" + sheetName + "'!" + ref;
+        } else {
+            ref = sheetName + "!" + ref;
+        }
+    }
+    return EvalResult::String(ref);
+}
+
+EvalResult fn_CHOOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult idxRes = evaluateAsNumber(args[0], ctx);
+    if (idxRes.isError()) {
+        return idxRes;
+    }
+    const int idx = static_cast<int>(idxRes.getNumber());
+    if (idx < 1 || static_cast<size_t>(idx) >= args.size()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return evaluate(args[static_cast<size_t>(idx)], ctx);
+}
+
 void registerLookupFunctions(FunctionRegistry& registry) {
     registry.registerFunction("INDEX", fn_INDEX, "(array, row_num, [col_num])",
                               "Returns a value at a position in a range", "Lookup");
@@ -627,6 +864,18 @@ void registerLookupFunctions(FunctionRegistry& registry) {
     registry.registerFunction("HLOOKUP", fn_HLOOKUP,
                               "(lookup_value, table_array, row_index, [range_lookup])",
                               "Horizontal lookup in first row", "Lookup");
+    registry.registerFunction("ROW", fn_ROW, "([reference])", "Row number of a reference",
+                              "Lookup");
+    registry.registerFunction("ROWS", fn_ROWS, "(array)", "Number of rows in a reference",
+                              "Lookup");
+    registry.registerFunction("COLUMN", fn_COLUMN, "([reference])", "Column number of a reference",
+                              "Lookup");
+    registry.registerFunction("COLUMNS", fn_COLUMNS, "(array)", "Number of columns in a reference",
+                              "Lookup");
+    registry.registerFunction("ADDRESS", fn_ADDRESS, "(row, col, [abs_num], [a1], [sheet])",
+                              "Cell address as text", "Lookup");
+    registry.registerFunction("CHOOSE", fn_CHOOSE, "(index, value1, [value2], ...)",
+                              "Selects a value by index", "Lookup");
 }
 
 }  // namespace cells

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include <algorithm>
+#include <functional>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
@@ -215,6 +216,176 @@ EvalResult fn_PERCENTILE_EXC(const std::vector<const ASTNode*>& args, EvalContex
     return computePercentile(args, ctx, false);  // Exclusive
 }
 
+EvalResult fn_LARGE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, error] = collectNumericValues({args[0]}, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const EvalResult kRes = evaluateAsNumber(args[1], ctx);
+    if (kRes.isError()) {
+        return kRes;
+    }
+    const int k = static_cast<int>(kRes.getNumber());
+    if (k < 1 || static_cast<size_t>(k) > values.size()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    std::sort(values.begin(), values.end(), std::greater<double>());
+    return EvalResult::Number(values[static_cast<size_t>(k) - 1]);
+}
+
+EvalResult fn_SMALL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, error] = collectNumericValues({args[0]}, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const EvalResult kRes = evaluateAsNumber(args[1], ctx);
+    if (kRes.isError()) {
+        return kRes;
+    }
+    const int k = static_cast<int>(kRes.getNumber());
+    if (k < 1 || static_cast<size_t>(k) > values.size()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    std::sort(values.begin(), values.end());
+    return EvalResult::Number(values[static_cast<size_t>(k) - 1]);
+}
+
+EvalResult fn_RANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    if (numRes.isError()) {
+        return numRes;
+    }
+    const double number = numRes.getNumber();
+    auto [values, error] = collectNumericValues({args[1]}, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    int order = 0;
+    if (args.size() == 3) {
+        const EvalResult orderRes = evaluateAsNumber(args[2], ctx);
+        if (orderRes.isError()) {
+            return orderRes;
+        }
+        order = static_cast<int>(orderRes.getNumber()) != 0 ? 1 : 0;
+    }
+    bool found = false;
+    size_t better = 0;
+    for (const double v : values) {
+        if (v == number) {
+            found = true;
+        } else if (order == 0 && v > number) {
+            ++better;
+        } else if (order != 0 && v < number) {
+            ++better;
+        }
+    }
+    if (!found) {
+        return EvalResult::Error(CellError::NA);
+    }
+    return EvalResult::Number(static_cast<double>(better + 1));
+}
+
+EvalResult fn_RANK_EQ(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_RANK(args, ctx);
+}
+
+EvalResult fn_MODE_SNGL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    std::vector<double> seen;
+    std::vector<size_t> counts;
+    for (const double v : values) {
+        size_t idx = seen.size();
+        for (size_t i = 0; i < seen.size(); ++i) {
+            if (seen[i] == v) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx == seen.size()) {
+            seen.push_back(v);
+            counts.push_back(1);
+        } else {
+            ++counts[idx];
+        }
+    }
+    size_t best = 0;
+    for (size_t i = 1; i < counts.size(); ++i) {
+        if (counts[i] > counts[best]) {
+            best = i;
+        }
+    }
+    if (counts[best] < 2) {
+        return EvalResult::Error(CellError::NA);
+    }
+    return EvalResult::Number(seen[best]);
+}
+
+EvalResult fn_QUARTILE_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult qRes = evaluateAsNumber(args[1], ctx);
+    if (qRes.isError()) {
+        return qRes;
+    }
+    const double q = qRes.getNumber();
+    if (q < 0.0 || q > 4.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const int quart = static_cast<int>(q);
+    if (quart < 0 || quart > 4) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    // QUARTILE.INC(array, n) = PERCENTILE.INC(array, n/4)
+    NumberLiteralNode kNode(static_cast<double>(quart) / 4.0);
+    std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
+    return computePercentile(pctArgs, ctx, true);
+}
+
+EvalResult fn_COUNTBLANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const std::vector<EvalResult> expanded = expandArguments(args, ctx);
+    size_t count = 0;
+    for (const EvalResult& val : expanded) {
+        if (val.isError()) {
+            return val;
+        }
+        if (val.isEmpty()) {
+            ++count;
+        }
+    }
+    return EvalResult::Number(static_cast<double>(count));
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -236,6 +407,34 @@ void registerStatsFunctions(FunctionRegistry& registry) {
                               "Inclusive percentile", "Statistics");
     registry.registerFunction("PERCENTILEEXC", fn_PERCENTILE_EXC, "(array, k)",
                               "Exclusive percentile", "Statistics");
+    registry.registerFunction("LARGE", fn_LARGE, "(array, k)", "k-th largest value", "Statistics");
+    registry.registerFunction("SMALL", fn_SMALL, "(array, k)", "k-th smallest value", "Statistics");
+    registry.registerFunction("RANK", fn_RANK, "(number, ref, [order])",
+                              "Rank of a number in a list", "Statistics");
+    registry.registerFunction("RANK.EQ", fn_RANK_EQ, "(number, ref, [order])",
+                              "Rank of a number (ties share rank)", "Statistics");
+    registry.registerFunction("RANK_EQ", fn_RANK_EQ, "(number, ref, [order])",
+                              "Rank of a number (ties share rank)", "Statistics");
+    registry.registerFunction("RANKEQ", fn_RANK_EQ, "(number, ref, [order])",
+                              "Rank of a number (ties share rank)", "Statistics");
+    registry.registerFunction("MODE", fn_MODE_SNGL, "(number1, [number2], ...)",
+                              "Most frequent number", "Statistics");
+    registry.registerFunction("MODE.SNGL", fn_MODE_SNGL, "(number1, [number2], ...)",
+                              "Most frequent number", "Statistics");
+    registry.registerFunction("MODE_SNGL", fn_MODE_SNGL, "(number1, [number2], ...)",
+                              "Most frequent number", "Statistics");
+    registry.registerFunction("MODESNGL", fn_MODE_SNGL, "(number1, [number2], ...)",
+                              "Most frequent number", "Statistics");
+    registry.registerFunction("QUARTILE", fn_QUARTILE_INC, "(array, quart)", "Inclusive quartile",
+                              "Statistics");
+    registry.registerFunction("QUARTILE.INC", fn_QUARTILE_INC, "(array, quart)",
+                              "Inclusive quartile", "Statistics");
+    registry.registerFunction("QUARTILE_INC", fn_QUARTILE_INC, "(array, quart)",
+                              "Inclusive quartile", "Statistics");
+    registry.registerFunction("QUARTILEINC", fn_QUARTILE_INC, "(array, quart)",
+                              "Inclusive quartile", "Statistics");
+    registry.registerFunction("COUNTBLANK", fn_COUNTBLANK, "(range)", "Count empty cells",
+                              "Statistics");
 }
 
 }  // namespace cells

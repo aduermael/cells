@@ -5,8 +5,10 @@
 #include <cstdio>
 #include <ctime>
 
+#include <algorithm>
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
@@ -132,6 +134,88 @@ void serialToTime(double serial, int& hour, int& minute, int& second) {
 // Helper: Convert hours/minutes/seconds to time fraction
 double timeToSerial(int hour, int minute, int second) {
     return (hour * 3600.0 + minute * 60.0 + second) / (24.0 * 60.0 * 60.0);
+}
+
+int daysInMonthOf(int year, int month) {
+    static const int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int d = kDays[month - 1];
+    if (month == 2) {
+        const bool leap =
+            (year == 1900) || ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
+        if (leap) {
+            d = 29;
+        }
+    }
+    return d;
+}
+
+double addMonthsToSerial(double serial, int months) {
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    serialToDate(serial, year, month, day);
+    month += months;
+    while (month > 12) {
+        year++;
+        month -= 12;
+    }
+    while (month < 1) {
+        year--;
+        month += 12;
+    }
+    const int last = daysInMonthOf(year, month);
+    if (day > last) {
+        day = last;
+    }
+    return dateToSerial(year, month, day);
+}
+
+int weekdaySun1(int serialInt) {
+    return ((serialInt - 1) % 7) + 1;
+}
+
+bool isWeekendSunSat(int serialInt) {
+    const int wd = weekdaySun1(serialInt);
+    return wd == 1 || wd == 7;
+}
+
+std::vector<int> holidaySerials(const ASTNode* arg, EvalContext& ctx, EvalResult* error) {
+    std::vector<int> out;
+    const EvalResult r = evaluate(arg, ctx);
+    if (r.isError()) {
+        *error = r;
+        return out;
+    }
+    std::vector<EvalResult> vals;
+    if (r.isRange()) {
+        vals = collectRangeValues(r, ctx);
+    } else {
+        vals.push_back(r);
+    }
+    for (const EvalResult& v : vals) {
+        if (v.isError()) {
+            *error = v;
+            return {};
+        }
+        if (v.isEmpty()) {
+            continue;
+        }
+        const EvalResult n = v.toNumber();
+        if (n.isError()) {
+            continue;
+        }
+        out.push_back(static_cast<int>(n.getNumber()));
+    }
+    return out;
+}
+
+bool isHoliday(int serialInt, const std::vector<int>& holidays) {
+    for (int h : holidays) {
+        if (h == serialInt) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -642,6 +726,254 @@ EvalResult fn_WEEKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return EvalResult::Number(weekday);
 }
 
+EvalResult fn_EDATE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult start = evaluateAsNumber(args[0], ctx);
+    if (start.isError()) {
+        return start;
+    }
+    const EvalResult months = evaluateAsNumber(args[1], ctx);
+    if (months.isError()) {
+        return months;
+    }
+    const double result =
+        addMonthsToSerial(start.getNumber(), static_cast<int>(months.getNumber()));
+    if (result < 1 || result > 2958465) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(result);
+}
+
+EvalResult fn_DAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult end = evaluateAsNumber(args[0], ctx);
+    if (end.isError()) {
+        return end;
+    }
+    const EvalResult start = evaluateAsNumber(args[1], ctx);
+    if (start.isError()) {
+        return start;
+    }
+    return EvalResult::Number(static_cast<double>(static_cast<int>(end.getNumber()) -
+                                                  static_cast<int>(start.getNumber())));
+}
+
+EvalResult fn_DATEDIF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    if (startRes.isError()) {
+        return startRes;
+    }
+    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    if (endRes.isError()) {
+        return endRes;
+    }
+    const EvalResult unitRes = evaluateAsString(args[2], ctx);
+    if (unitRes.isError()) {
+        return unitRes;
+    }
+    const double start = startRes.getNumber();
+    const double end = endRes.getNumber();
+    if (end < start) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    int y1 = 0;
+    int m1 = 0;
+    int d1 = 0;
+    int y2 = 0;
+    int m2 = 0;
+    int d2 = 0;
+    serialToDate(start, y1, m1, d1);
+    serialToDate(end, y2, m2, d2);
+
+    std::string unit = unitRes.getString();
+    for (char& c : unit) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+
+    if (unit == "Y") {
+        int years = y2 - y1;
+        if (m2 < m1 || (m2 == m1 && d2 < d1)) {
+            --years;
+        }
+        return EvalResult::Number(static_cast<double>(years));
+    }
+    if (unit == "M") {
+        int months = (y2 - y1) * 12 + (m2 - m1);
+        if (d2 < d1) {
+            --months;
+        }
+        return EvalResult::Number(static_cast<double>(months));
+    }
+    if (unit == "D") {
+        return EvalResult::Number(
+            static_cast<double>(static_cast<int>(end) - static_cast<int>(start)));
+    }
+    if (unit == "YM") {
+        int months = m2 - m1;
+        if (d2 < d1) {
+            --months;
+        }
+        if (months < 0) {
+            months += 12;
+        }
+        return EvalResult::Number(static_cast<double>(months));
+    }
+    if (unit == "MD") {
+        int days = d2 - d1;
+        if (days < 0) {
+            int month = m2 - 1;
+            int year = y2;
+            if (month < 1) {
+                month = 12;
+                --year;
+            }
+            days += daysInMonthOf(year, month);
+        }
+        return EvalResult::Number(static_cast<double>(days));
+    }
+    if (unit == "YD") {
+        int startDoy = static_cast<int>(start) - static_cast<int>(dateToSerial(y1, 1, 1));
+        int endDoy = static_cast<int>(end) - static_cast<int>(dateToSerial(y2, 1, 1));
+        if (endDoy < startDoy) {
+            endDoy += (y1 % 4 == 0 ? 366 : 365);
+        }
+        return EvalResult::Number(static_cast<double>(endDoy - startDoy));
+    }
+    return EvalResult::Error(CellError::NUM);
+}
+
+EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult serialRes = evaluateAsNumber(args[0], ctx);
+    if (serialRes.isError()) {
+        return serialRes;
+    }
+    int returnType = 1;
+    if (args.size() == 2) {
+        const EvalResult t = evaluateAsNumber(args[1], ctx);
+        if (t.isError()) {
+            return t;
+        }
+        returnType = static_cast<int>(t.getNumber());
+    }
+    const int serialInt = static_cast<int>(serialRes.getNumber());
+    if (serialInt < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    serialToDate(serialRes.getNumber(), year, month, day);
+    const int jan1 = static_cast<int>(dateToSerial(year, 1, 1));
+    const int jan1Wd = weekdaySun1(jan1);  // 1=Sun
+    int startWd = 1;                       // Sunday
+    if (returnType == 2 || returnType == 21 || returnType == 11) {
+        startWd = 2;  // Monday
+    } else if (returnType != 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (returnType == 21) {
+        // ISO week: week 1 contains the first Thursday (Jan 4).
+        const int wd = weekdaySun1(serialInt);  // 1=Sun ... 7=Sat
+        int isoWd = wd == 1 ? 7 : wd - 1;       // 1=Mon ... 7=Sun
+        const int thursday = serialInt + (4 - isoWd);
+        int ty = 0;
+        int tm = 0;
+        int td = 0;
+        serialToDate(static_cast<double>(thursday), ty, tm, td);
+        const int jan4 = static_cast<int>(dateToSerial(ty, 1, 4));
+        int jan4Wd = weekdaySun1(jan4);
+        int jan4Iso = jan4Wd == 1 ? 7 : jan4Wd - 1;
+        const int week1Mon = jan4 - (jan4Iso - 1);
+        const int week = (thursday - week1Mon) / 7 + 1;
+        return EvalResult::Number(static_cast<double>(week));
+    }
+    const int jan1Off = (jan1Wd - startWd + 7) % 7;
+    const int doy = serialInt - jan1;
+    return EvalResult::Number(static_cast<double>((doy + jan1Off) / 7 + 1));
+}
+
+EvalResult fn_NETWORKDAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    if (startRes.isError()) {
+        return startRes;
+    }
+    const EvalResult endRes = evaluateAsNumber(args[1], ctx);
+    if (endRes.isError()) {
+        return endRes;
+    }
+    std::vector<int> holidays;
+    if (args.size() == 3) {
+        EvalResult err = EvalResult::Empty();
+        holidays = holidaySerials(args[2], ctx, &err);
+        if (err.isError()) {
+            return err;
+        }
+    }
+    int start = static_cast<int>(startRes.getNumber());
+    int end = static_cast<int>(endRes.getNumber());
+    int sign = 1;
+    if (end < start) {
+        std::swap(start, end);
+        sign = -1;
+    }
+    int count = 0;
+    for (int d = start; d <= end; ++d) {
+        if (!isWeekendSunSat(d) && !isHoliday(d, holidays)) {
+            ++count;
+        }
+    }
+    return EvalResult::Number(static_cast<double>(sign * count));
+}
+
+EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult startRes = evaluateAsNumber(args[0], ctx);
+    if (startRes.isError()) {
+        return startRes;
+    }
+    const EvalResult daysRes = evaluateAsNumber(args[1], ctx);
+    if (daysRes.isError()) {
+        return daysRes;
+    }
+    std::vector<int> holidays;
+    if (args.size() == 3) {
+        EvalResult err = EvalResult::Empty();
+        holidays = holidaySerials(args[2], ctx, &err);
+        if (err.isError()) {
+            return err;
+        }
+    }
+    const int days = static_cast<int>(daysRes.getNumber());
+    int d = static_cast<int>(startRes.getNumber());
+    if (days == 0) {
+        return EvalResult::Number(static_cast<double>(d));
+    }
+    const int step = days > 0 ? 1 : -1;
+    int remaining = days > 0 ? days : -days;
+    while (remaining > 0) {
+        d += step;
+        if (!isWeekendSunSat(d) && !isHoliday(d, holidays)) {
+            --remaining;
+        }
+    }
+    return EvalResult::Number(static_cast<double>(d));
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -673,6 +1005,18 @@ void registerDateTimeFunctions(FunctionRegistry& registry) {
                               "Returns the day of the week", "Date");
     registry.registerFunction("EOMONTH", fn_EOMONTH, "(start_date, months)",
                               "Returns the last day of the month N months from start_date", "Date");
+    registry.registerFunction("EDATE", fn_EDATE, "(start_date, months)",
+                              "Date the specified number of months from start_date", "Date");
+    registry.registerFunction("DAYS", fn_DAYS, "(end_date, start_date)",
+                              "Number of days between two dates", "Date");
+    registry.registerFunction("DATEDIF", fn_DATEDIF, "(start_date, end_date, unit)",
+                              "Difference between dates in years, months, or days", "Date");
+    registry.registerFunction("WEEKNUM", fn_WEEKNUM, "(date, [return_type])",
+                              "Week number of a date", "Date");
+    registry.registerFunction("NETWORKDAYS", fn_NETWORKDAYS, "(start_date, end_date, [holidays])",
+                              "Working days between two dates", "Date");
+    registry.registerFunction("WORKDAY", fn_WORKDAY, "(start_date, days, [holidays])",
+                              "Date a given number of working days from start_date", "Date");
 }
 
 }  // namespace cells

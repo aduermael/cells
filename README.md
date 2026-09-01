@@ -178,24 +178,35 @@ cells output.xlsx -e 'setCell("A1", "Hello") setCell("A2", "=A1 & \" World\")'
 
 Same engine, two shapes: **WebAssembly** in the browser, **native** for the CLI. The web UI stays intentionally thin (canvas + events in TypeScript). Spreadsheet logic (model, formulas, CRDT ops) lives in C++17 and is shared.
 
+**The UI must not mutate the workbook except by executing Luau. There is no UI path around the scripting runtime straight to the model.** Formula evaluation stays native C++ (AST + registry — not Lua). Remote CRDT apply and file load/import are not UI and are not that bypass.
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │              Web UI (TypeScript)                    │
 │         Canvas rendering, event handling            │
 └─────────────────────────────────────────────────────┘
-                        │ WASM
+                        │ WASM (no skip-sandbox writes)
                         ▼
 ┌─────────────────────────────────────────────────────┐
-│             Core Engine (C++17)                     │
-│    Data Model  │  Formulas  │  CRDT Operations      │
+│         Luau sandbox (UI mutations only)            │
+│     setCell / setFormat / … → CRDT operations       │
 └─────────────────────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────┐
-│              Persistence Layer                      │
-│   Native: .zcd  │  Import/Export: .xlsx, .csv       │
+│             Core Engine (C++17)                     │
+│    Data Model  │  Native formulas  │  CRDT ops      │
 └─────────────────────────────────────────────────────┘
+                        │
+          ┌─────────────┴──────────────┐
+          ▼                            ▼
+┌──────────────────┐         ┌─────────────────────┐
+│ Persistence      │         │ Remote CRDT apply   │
+│ .zcd / xlsx /csv │         │ (not UI; not Lua)   │
+└──────────────────┘         └─────────────────────┘
 ```
+
+Contract details: [docs/scripting.md](./docs/scripting.md).
 
 ### Collaboration & `.zcd`
 
@@ -266,7 +277,8 @@ bazel run :check            # All checks (test + lint + types)
 |----------|-------------|
 | [Data Model](./docs/data-model.md) | Cell addressing, spatial indexing |
 | [CRDT](./docs/crdt.md) | Collaboration operations and sync |
-| [Formula Engine](./docs/formula-engine.md) | Parser, evaluation, dependencies |
+| [Formula Engine](./docs/formula-engine.md) | Parser, evaluation, dependencies (native C++, not Lua) |
+| [Scripting](./docs/scripting.md) | Luau-only UI mutations; native formulas; remote/load are not UI |
 | [Excel Parity](./docs/excel-parity.md) | Formulas, features, and XLSX fidelity tracker |
 | [Persistence](./docs/persistence.md) | File formats (.zcd, .xlsx) |
 | [Networking](./docs/networking.md) | P2P connections, signaling |

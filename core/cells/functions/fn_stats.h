@@ -61,6 +61,14 @@ EvalResult fn_PERCENTILE_INC(const std::vector<const ASTNode*>& args, EvalContex
 // k must be between 0 and 1 (exclusive)
 EvalResult fn_PERCENTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_LARGE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SMALL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_RANK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_RANK_EQ(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MODE_SNGL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_QUARTILE_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COUNTBLANK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

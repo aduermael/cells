@@ -85,6 +85,7 @@ cc_binary(
         "//core/cells:id",
         "//core/cells:luau_autocomplete",
         "//core/cells:luau_sandbox",
+        "//core/cells:ui_mutation",
         "//core/cells:model",
         "//core/cells:number_format",
         "//core/cells:number_formatter",

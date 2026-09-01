@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include <string>
+#include <vector>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
@@ -738,9 +739,84 @@ EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Number(static_cast<double>(static_cast<unsigned char>(text[0])));
 }
 
-// =============================================================================
-// Registration
-// =============================================================================
+EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult delimRes = evaluateAsString(args[0], ctx);
+    if (delimRes.isError()) {
+        return delimRes;
+    }
+    const EvalResult ignoreRes = evaluateAsBoolean(args[1], ctx);
+    if (ignoreRes.isError()) {
+        return ignoreRes;
+    }
+    const std::string& delim = delimRes.getString();
+    const bool ignoreEmpty = ignoreRes.getBoolean();
+
+    std::vector<std::string> parts;
+    for (size_t i = 2; i < args.size(); ++i) {
+        const EvalResult val = evaluate(args[i], ctx);
+        if (val.isError()) {
+            return val;
+        }
+        std::vector<EvalResult> items;
+        if (val.isRange()) {
+            items = collectRangeValues(val, ctx);
+        } else if (val.isArray()) {
+            for (const auto& row : val.getArray()) {
+                items.insert(items.end(), row.begin(), row.end());
+            }
+        } else {
+            items.push_back(val);
+        }
+        for (const EvalResult& item : items) {
+            if (item.isError()) {
+                return item;
+            }
+            if (item.isEmpty()) {
+                if (!ignoreEmpty) {
+                    parts.emplace_back("");
+                }
+                continue;
+            }
+            const EvalResult s = item.toString();
+            if (s.isError()) {
+                return s;
+            }
+            if (ignoreEmpty && s.getString().empty()) {
+                continue;
+            }
+            parts.push_back(s.getString());
+        }
+    }
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            result += delim;
+        }
+        result += parts[i];
+    }
+    return EvalResult::String(result);
+}
+
+EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult text = evaluateAsString(args[0], ctx);
+    if (text.isError()) {
+        return text;
+    }
+    std::string out;
+    out.reserve(text.getString().size());
+    for (unsigned char c : text.getString()) {
+        if (c >= 32) {
+            out.push_back(static_cast<char>(c));
+        }
+    }
+    return EvalResult::String(out);
+}
 
 void registerTextFunctions(FunctionRegistry& registry) {
     // Basic text functions
@@ -784,6 +860,11 @@ void registerTextFunctions(FunctionRegistry& registry) {
     registry.registerFunction("CHAR", fn_CHAR, "(number)", "Returns character for ASCII code",
                               "Text");
     registry.registerFunction("CODE", fn_CODE, "(text)", "Returns ASCII code of first character",
+                              "Text");
+    registry.registerFunction("TEXTJOIN", fn_TEXTJOIN,
+                              "(delimiter, ignore_empty, text1, [text2], ...)",
+                              "Joins text with a delimiter", "Text");
+    registry.registerFunction("CLEAN", fn_CLEAN, "(text)", "Removes non-printable characters",
                               "Text");
 }
 

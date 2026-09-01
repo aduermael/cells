@@ -9,6 +9,7 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/functions/fn_array.h"
+#include "core/cells/functions/fn_conditional.h"
 #include "core/cells/functions/fn_datetime.h"
 #include "core/cells/functions/fn_logic.h"
 #include "core/cells/functions/fn_lookup.h"
@@ -203,6 +204,7 @@ void initializeBuiltinFunctions(FunctionRegistry& registry) {
     // Register functions from individual modules
     registerArrayFunctions(registry);
     registerMathFunctions(registry);
+    registerConditionalFunctions(registry);
     registerLogicFunctions(registry);
     registerTextFunctions(registry);
     registerDateTimeFunctions(registry);

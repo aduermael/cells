@@ -108,6 +108,9 @@ EvalResult fn_CHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // CODE(text) - Returns numeric code of first character
 EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

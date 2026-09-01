@@ -87,6 +87,13 @@ EvalResult fn_WEEKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // EOMONTH(start_date, months) - Returns last day of month N months from start_date
 EvalResult fn_EOMONTH(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_EDATE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DATEDIF(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NETWORKDAYS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_WORKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

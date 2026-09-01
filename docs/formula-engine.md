@@ -10,7 +10,7 @@
 | AST Parser | ✅ Implemented |
 | Execution Engine | ✅ Implemented |
 | Dependency Graph | ✅ Implemented |
-| Function Library | ✅ 137 functions |
+| Function Library | ✅ 167 functions |
 | Dynamic Arrays (Spill) | ✅ Implemented |
 
 For the full function inventory, missing Excel functions, and product/feature parity, see [Excel Parity](./excel-parity.md).
@@ -19,7 +19,7 @@ For the full function inventory, missing Excel functions, and product/feature pa
 
 ## Overview
 
-The formula engine parses Excel-style formulas into an AST and executes them natively in C++, managing the dependency graph for reactive updates.
+The formula engine parses Excel-style formulas into an AST and executes them natively in C++, managing the dependency graph for reactive updates. Formula evaluation is **not** Lua: the UI mutates the workbook by executing Luau (`setCell`, …), but `=SUMIF(...)` and the rest of the function library run in the C++ AST evaluator. See [Scripting](./scripting.md).
 
 ```
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
