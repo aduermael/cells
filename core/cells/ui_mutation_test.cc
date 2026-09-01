@@ -154,5 +154,66 @@ TEST(UiMutationTest, MissingCellIdIsNotASkipPath) {
     EXPECT_EQ(sandbox.executionCount(), before);
 }
 
+TEST(UiMutationTest, FreezePanesExecutesLuau) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    LuauSandbox sandbox;
+    const int64_t before = sandbox.executionCount();
+
+    ScriptResult sr = uiFreezePanes(sandbox, *workbook, *sheet, 1, 2);
+    ASSERT_TRUE(sr.success) << sr.error;
+    EXPECT_GT(sandbox.executionCount(), before);
+    EXPECT_EQ(sheet->freezeCol, static_cast<uint16_t>(1));
+    EXPECT_EQ(sheet->freezeRow, static_cast<uint16_t>(2));
+}
+
+TEST(UiMutationTest, SetDocumentTitleExecutesLuau) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    LuauSandbox sandbox;
+    const int64_t before = sandbox.executionCount();
+
+    ScriptResult sr = uiSetDocumentTitle(sandbox, *workbook, *sheet, "Q1 Report");
+    ASSERT_TRUE(sr.success) << sr.error;
+    EXPECT_GT(sandbox.executionCount(), before);
+    EXPECT_EQ(workbook->name, "Q1 Report");
+}
+
+TEST(UiMutationTest, MoveSheetExecutesLuau) {
+    auto workbook = createTestWorkbook();
+    auto sheet2 = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    sheet2->setWorkbook(workbook.get());
+    workbook->addSheet(std::move(sheet2));
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_EQ(workbook->sheetCount(), 2u);
+    const std::string first = workbook->getSheetByIndex(0)->name;
+    const std::string second = workbook->getSheetByIndex(1)->name;
+
+    LuauSandbox sandbox;
+    const int64_t before = sandbox.executionCount();
+    ScriptResult sr = uiMoveSheet(sandbox, *workbook, *sheet, 0, 2);
+    ASSERT_TRUE(sr.success) << sr.error;
+    EXPECT_GT(sandbox.executionCount(), before);
+    EXPECT_EQ(workbook->getSheetByIndex(0)->name, second);
+    EXPECT_EQ(workbook->getSheetByIndex(1)->name, first);
+}
+
+TEST(UiMutationTest, SetThemeExecutesLuau) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    LuauSandbox sandbox;
+    const int64_t before = sandbox.executionCount();
+
+    const std::string json =
+        R"({"name":"TestTheme","colorScheme":{"colors":["#111111","#222222"]},"fontScheme":{"majorFont":"Arial","minorFont":"Calibri"}})";
+    ScriptResult sr = uiSetTheme(sandbox, *workbook, *sheet, json);
+    ASSERT_TRUE(sr.success) << sr.error;
+    EXPECT_GT(sandbox.executionCount(), before);
+    ASSERT_TRUE(workbook->hasTheme());
+    EXPECT_EQ(workbook->getTheme()->name, "TestTheme");
+    EXPECT_EQ(workbook->getTheme()->fontScheme.majorFont, "Arial");
+    EXPECT_EQ(workbook->getTheme()->colorScheme.getColor(0), "#111111");
+}
+
 }  // namespace
 }  // namespace cells

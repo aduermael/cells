@@ -179,6 +179,8 @@ private:
     static int luaSelectSheet(lua_State* L);  // selectSheet(sheet|name|index)
     static int luaGetSheet(lua_State* L);     // getSheet({name=...}) or getSheet({index=...})
     static int luaAddSheet(lua_State* L);     // addSheet(name?)
+    static int luaMoveSheet(lua_State* L);    // moveSheet(fromIndex, toIndex) 0-based
+    static int luaSetTheme(lua_State* L);     // setTheme(json)
 
     // Range operations
     static int luaRangeSelect(lua_State* L);

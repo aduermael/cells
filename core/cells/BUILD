@@ -1372,6 +1372,7 @@ cc_library(
         ":id",
         ":model",
         ":ref_converter",
+        ":theme",
         "@luau//:luau",
     ],
 )
