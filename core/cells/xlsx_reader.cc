@@ -86,8 +86,8 @@ std::string stripXlfnPrefix(const std::string& formula) {
             // Replace dots within the function name that follows
             // (e.g., CEILING.MATH → CEILING_MATH)
             while (pos < result.size() &&
-                   (std::isalpha(static_cast<unsigned char>(result[pos])) != 0 ||
-                    result[pos] == '.')) {
+                   (std::isalnum(static_cast<unsigned char>(result[pos])) != 0 ||
+                    result[pos] == '.' || result[pos] == '_')) {
                 if (result[pos] == '.') {
                     result[pos] = '_';
                 }

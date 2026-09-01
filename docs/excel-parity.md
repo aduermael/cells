@@ -3,7 +3,7 @@
 Living status of Cells vs Microsoft Excel: formulas, spreadsheet features, file I/O, and UI.
 
 **Last reviewed:** 2026-09-01  
-**Function count:** **444** registered (Excel has ~484 worksheet functions ≈ **92%**; dotted/underscore aliases share one implementation)  
+**Function count:** **475** registered (Excel has ~484 worksheet functions ≈ **98%**; dotted/underscore aliases share one implementation)  
 **Source of truth for implementations:** `core/cells/functions/fn_*.cc`
 
 Update this document when adding functions, shipping features, or changing XLSX fidelity. Cross-check the function list against the registry if counts drift.
@@ -15,7 +15,7 @@ Update this document when adding functions, shipping features, or changing XLSX 
 | Area | Status | Notes |
 |------|--------|-------|
 | Formula engine (parse / eval / deps / spill) | ✅ Solid | AST-native C++; UUID-stable refs |
-| Function library breadth | 🟡 Partial | 444 / ~484 Excel functions (aliases included) |
+| Function library breadth | 🟡 Partial | 475 / ~484 Excel functions (aliases included) |
 | Grid editing & selection | ✅ Solid | Fill handle, multi-range, formula bar |
 | Cell / range formatting | ✅ Solid | Fonts, fills, borders, number formats, themes |
 | XLSX import / export | 🟡 Partial | Values, formulas, styles, merges; fidelity still improving |
@@ -62,14 +62,14 @@ Details: [Formula Engine](./formula-engine.md).
 | Logic / information (subset) | 30 | ~40 | Strong modern set (`LET`, `LAMBDA`, `IFS`, …) plus ISERR/TYPE/N/ISBETWEEN |
 | Text | 41 | ~50 | Core string ops + UNICHAR/DOLLAR/FIXED + TEXTAFTER/TEXTBEFORE/TEXTSPLIT + ASC/ENCODEURL/JOIN/SPLIT |
 | Date / time | 25 | ~40 | Core extractors + DAYS360/YEARFRAC/ISOWEEKNUM + INTL workdays |
-| Statistics | 98 | ~100 | Basic + regression + percentrank + skew/kurt/normal + binomial/gamma/weibull/lognormal/hypergeometric |
+| Statistics | 129 | ~100 | Basic + regression + percentrank + skew/kurt/normal + binomial/gamma/weibull/lognormal/hypergeometric + χ² / t / z tests |
 | Array / dynamic | 21 | ~25 | Spill set + reshape (`VSTACK`/`TAKE`/`TOCOL`/`WRAPCOLS`/`EXPAND`/`TRIMRANGE`/…) |
 | Lookup & reference | 17 | ~40 | Classic + `XLOOKUP`/`XMATCH`/`LOOKUP` + ROW/COLUMN/ADDRESS/CHOOSE |
 | Financial | 24 | ~55 | Closed-form annuity, depreciation, T-bill (no RATE/IRR) |
 | Engineering | 34 | ~50 | Bitwise, base conversion, ERF, COMPLEX, IM* |
 | Database | 12 | ~12 | DSUM/DCOUNT/DGET and the rest of the D* set |
 | Cube / web / other | 0 | many | Out of scope for now |
-| **Total registered** | **444** | **~484** | **~92%** (includes dotted/underscore aliases) |
+| **Total registered** | **475** | **~484** | **~98%** (includes dotted/underscore aliases) |
 
 Excel totals vary by version (Microsoft 365 adds functions over time). Counts above are directional, not exact product marketing numbers.
 
@@ -87,7 +87,7 @@ Categories currently green in that harness: **logical**, **math-basic**, **math-
 
 ---
 
-### Implemented functions (444 registered names)
+### Implemented functions (475 registered names)
 
 Both Excel dotted names and underscore/concat aliases resolve to one implementation. Registered names historically used underscores where Excel uses dots (e.g. `CEILING.MATH` → `CEILING_MATH` on XLSX import via `_xlfn.` stripping). Some aliases omit the underscore (`STDEVS` for `STDEV.S`, `PERCENTILEINC` for `PERCENTILE.INC`).
 
@@ -212,7 +212,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `YEARFRAC` | | Fraction of a year between dates |
 | `ISOWEEKNUM` | | ISO 8601 week number |
 
-#### Statistics (98)
+#### Statistics (129)
 
 | Function | Description |
 |----------|-------------|
@@ -246,6 +246,13 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `GAMMADIST` / `GAMMA.DIST` / `GAMMAINV` / `GAMMA.INV` | Gamma PDF/CDF/inverse |
 | `HYPGEOMDIST` / `HYPGEOM.DIST` | Hypergeometric PMF/CDF |
 | `NEGBINOMDIST` / `NEGBINOM.DIST` | Negative binomial PMF/CDF |
+| `CHISQ.DIST` / `CHISQ.DIST.RT` / `CHIDIST` | Chi-squared PDF/CDF/right-tail |
+| `CHISQ.INV` / `CHISQ.INV.RT` / `CHIINV` | Chi-squared left- and right-tail inverses |
+| `CHISQ.TEST` / `CHITEST` | Pearson chi-squared test p-value |
+| `T.DIST` / `T.DIST.2T` / `T.DIST.RT` / `TDIST` | Student's t PDF/CDF and tail probabilities |
+| `T.INV` / `T.INV.2T` / `TINV` | Student's t left- and two-tail inverses |
+| `T.TEST` / `TTEST` | Paired, equal-variance, and Welch t-tests |
+| `Z.TEST` / `ZTEST` | One-tailed z-test p-value |
 
 #### Engineering (34)
 

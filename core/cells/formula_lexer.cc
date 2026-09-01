@@ -525,7 +525,8 @@ Token FormulaLexer::scanIdentifierOrColumn() {
         bool dottedFn = false;
         while (look < source_.size() && source_[look] == '.') {
             ++look;
-            if (look >= source_.size() || !isAlpha(source_[look])) {
+            // Segments may start with a digit (T.DIST.2T, T.INV.2T).
+            if (look >= source_.size() || !isAlphaNumeric(source_[look])) {
                 dottedFn = false;
                 break;
             }

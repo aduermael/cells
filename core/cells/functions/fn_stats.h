@@ -138,6 +138,25 @@ EvalResult fn_HYPGEOMDIST(const std::vector<const ASTNode*>& args, EvalContext& 
 EvalResult fn_HYPGEOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NEGBINOMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_NEGBINOM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHISQ_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHISQ_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHIDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHISQ_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHISQ_INV_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHIINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHISQ_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHITEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_DIST_2T(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_INV_2T(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_T_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_TTEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_Z_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ZTEST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

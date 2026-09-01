@@ -355,6 +355,275 @@ double gammaInv(double p, double alpha, double beta) {
     return x;
 }
 
+// Regularized upper incomplete gamma Q(a, x) = Γ(a,x)/Γ(a).
+double regularizedGammaQ(double a, double x) {
+    if (x <= 0.0) {
+        return 1.0;
+    }
+    if (a <= 0.0) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double q = x < a + 1.0 ? 1.0 - gammaSeries(a, x) : gammaContinued(a, x);
+    if (q < 0.0) {
+        return 0.0;
+    }
+    if (q > 1.0) {
+        return 1.0;
+    }
+    return q;
+}
+
+// χ²(df) is Gamma(shape=df/2, scale=2).
+double chiSqPdf(double x, double df) {
+    return gammaPdf(x, df / 2.0, 2.0);
+}
+
+double chiSqCdf(double x, double df) {
+    return regularizedGammaP(df / 2.0, x / 2.0);
+}
+
+double chiSqSf(double x, double df) {
+    return regularizedGammaQ(df / 2.0, x / 2.0);
+}
+
+double chiSqInv(double p, double df) {
+    return gammaInv(p, df / 2.0, 2.0);
+}
+
+// Incomplete-beta continued fraction (modified Lentz).
+double betaContinued(double a, double b, double x) {
+    constexpr double kFpmin = 1e-300;
+    constexpr double kEps = 1e-15;
+    const double qab = a + b;
+    const double qap = a + 1.0;
+    const double qam = a - 1.0;
+    double c = 1.0;
+    double d = 1.0 - qab * x / qap;
+    if (std::fabs(d) < kFpmin) {
+        d = kFpmin;
+    }
+    d = 1.0 / d;
+    double h = d;
+    for (int m = 1; m <= 200; ++m) {
+        const double m2 = 2.0 * static_cast<double>(m);
+        double aa =
+            static_cast<double>(m) * (b - static_cast<double>(m)) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d;
+        if (std::fabs(d) < kFpmin) {
+            d = kFpmin;
+        }
+        c = 1.0 + aa / c;
+        if (std::fabs(c) < kFpmin) {
+            c = kFpmin;
+        }
+        d = 1.0 / d;
+        h *= d * c;
+        aa = -(a + static_cast<double>(m)) * (qab + static_cast<double>(m)) * x /
+             ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d;
+        if (std::fabs(d) < kFpmin) {
+            d = kFpmin;
+        }
+        c = 1.0 + aa / c;
+        if (std::fabs(c) < kFpmin) {
+            c = kFpmin;
+        }
+        d = 1.0 / d;
+        const double del = d * c;
+        h *= del;
+        if (std::fabs(del - 1.0) < kEps) {
+            break;
+        }
+    }
+    return h;
+}
+
+// Regularized incomplete beta I_x(a, b).
+double regularizedBeta(double x, double a, double b) {
+    if (x <= 0.0) {
+        return 0.0;
+    }
+    if (x >= 1.0) {
+        return 1.0;
+    }
+    if (a <= 0.0 || b <= 0.0) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double lnBt = std::lgamma(a + b) - std::lgamma(a) - std::lgamma(b) + a * std::log(x) +
+                        b * std::log(1.0 - x);
+    const double bt = std::exp(lnBt);
+    double p = 0.0;
+    if (x < (a + 1.0) / (a + b + 2.0)) {
+        p = bt * betaContinued(a, b, x) / a;
+    } else {
+        p = 1.0 - bt * betaContinued(b, a, 1.0 - x) / b;
+    }
+    if (p < 0.0) {
+        return 0.0;
+    }
+    if (p > 1.0) {
+        return 1.0;
+    }
+    return p;
+}
+
+double betaInv(double p, double a, double b) {
+    if (p <= 0.0) {
+        return 0.0;
+    }
+    if (p >= 1.0) {
+        return 1.0;
+    }
+    double lo = 0.0;
+    double hi = 1.0;
+    double x = a / (a + b);
+    const double lnB = std::lgamma(a) + std::lgamma(b) - std::lgamma(a + b);
+    if (p < 0.5) {
+        const double guess = std::exp((std::log(std::max(p, 1e-300) * a) + lnB) / a);
+        if (guess > 0.0 && guess < 1.0 && std::isfinite(guess)) {
+            x = guess;
+        }
+    } else {
+        const double guess = 1.0 - std::exp((std::log(std::max(1.0 - p, 1e-300) * b) + lnB) / b);
+        if (guess > 0.0 && guess < 1.0 && std::isfinite(guess)) {
+            x = guess;
+        }
+    }
+    for (int i = 0; i < 60; ++i) {
+        const double cdf = regularizedBeta(x, a, b);
+        const double xx = std::min(std::max(x, 1e-300), 1.0 - 1e-16);
+        const double lnPdf = (a - 1.0) * std::log(xx) + (b - 1.0) * std::log(1.0 - xx) - lnB;
+        const double pdf = std::exp(lnPdf);
+        double next = x;
+        if (pdf > 0.0 && std::isfinite(pdf)) {
+            next = x - (cdf - p) / pdf;
+        }
+        if (!(next > lo && next < hi) || !std::isfinite(next)) {
+            next = 0.5 * (lo + hi);
+        }
+        if (regularizedBeta(next, a, b) > p) {
+            hi = next;
+        } else {
+            lo = next;
+        }
+        if (std::fabs(next - x) <= 1e-14) {
+            x = next;
+            break;
+        }
+        x = next;
+    }
+    return x;
+}
+
+constexpr double kPi = 3.14159265358979323846;
+
+double studentTPdf(double x, double nu) {
+    const double ln = std::lgamma((nu + 1.0) / 2.0) - std::lgamma(nu / 2.0) -
+                      0.5 * std::log(nu * kPi) - ((nu + 1.0) / 2.0) * std::log1p(x * x / nu);
+    return std::exp(ln);
+}
+
+// Two-tailed probability P(|T| > t). `nu` may be non-integer (Welch T.TEST).
+double studentTTwoTail(double t, double nu) {
+    const double tt = std::fabs(t);
+    const double x = nu / (nu + tt * tt);
+    return regularizedBeta(x, nu / 2.0, 0.5);
+}
+
+double studentTCdf(double t, double nu) {
+    const double two = studentTTwoTail(t, nu);
+    if (t >= 0.0) {
+        return 1.0 - 0.5 * two;
+    }
+    return 0.5 * two;
+}
+
+double studentTSf(double t, double nu) {
+    return 1.0 - studentTCdf(t, nu);
+}
+
+double studentTInvTwoTail(double p, double nu) {
+    if (p >= 1.0) {
+        return 0.0;
+    }
+    if (p <= 0.0) {
+        return std::numeric_limits<double>::infinity();
+    }
+    const double x = betaInv(p, nu / 2.0, 0.5);
+    if (!(x > 0.0)) {
+        return std::numeric_limits<double>::infinity();
+    }
+    if (x >= 1.0) {
+        return 0.0;
+    }
+    double t = std::sqrt(nu * (1.0 - x) / x);
+    for (int i = 0; i < 8; ++i) {
+        const double f = studentTTwoTail(t, nu) - p;
+        const double pdf = studentTPdf(t, nu);
+        if (!(pdf > 0.0) || !std::isfinite(pdf)) {
+            break;
+        }
+        const double next = t + f / (2.0 * pdf);
+        if (!(next > 0.0) || !std::isfinite(next)) {
+            break;
+        }
+        if (std::fabs(next - t) <= 1e-14 * std::max(1.0, t)) {
+            t = next;
+            break;
+        }
+        t = next;
+    }
+    return t;
+}
+
+double studentTInv(double p, double nu) {
+    if (p == 0.5) {
+        return 0.0;
+    }
+    if (p > 0.5) {
+        return studentTInvTwoTail(2.0 * (1.0 - p), nu);
+    }
+    return -studentTInvTwoTail(2.0 * p, nu);
+}
+
+EvalResult requireTruncatedDf(const ASTNode* arg, EvalContext& ctx, double* df) {
+    const EvalResult n = evaluateAsNumber(arg, ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double raw = n.getNumber();
+    if (!(raw >= 1.0)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double truncated = std::floor(raw);
+    if (truncated < 1.0 || truncated >= 1e10) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    *df = truncated;
+    return EvalResult::Empty();
+}
+
+EvalResult requireIntInRange(const ASTNode* arg, EvalContext& ctx, int lo, int hi, int* out) {
+    const EvalResult n = evaluateAsNumber(arg, ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double raw = n.getNumber();
+    if (!std::isfinite(raw) || raw < static_cast<double>(lo) ||
+        raw >= static_cast<double>(hi) + 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    *out = static_cast<int>(raw);
+    return EvalResult::Empty();
+}
+
+EvalResult finiteNumber(double v) {
+    if (!std::isfinite(v)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(v));
+}
+
 std::pair<double, double> meanAndDev(const std::vector<double>& values, bool population) {
     double sum = 0.0;
     for (const double v : values) {
@@ -2149,6 +2418,423 @@ EvalResult fn_NEGBINOMDIST(const std::vector<const ASTNode*>& args, EvalContext&
     return EvalResult::Number(excelNormalize(v));
 }
 
+EvalResult fn_CHISQ_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    if (x < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (cumRes.getBoolean()) {
+        return finiteNumber(chiSqCdf(x, df));
+    }
+    return finiteNumber(chiSqPdf(x, df));
+}
+
+EvalResult fn_CHISQ_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double x = xRes.getNumber();
+    if (x < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(chiSqSf(x, df));
+}
+
+EvalResult fn_CHIDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_CHISQ_DIST_RT(args, ctx);
+}
+
+EvalResult fn_CHISQ_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double p = pRes.getNumber();
+    if (p < 0.0 || p >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(chiSqInv(p, df));
+}
+
+EvalResult fn_CHISQ_INV_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double p = pRes.getNumber();
+    if (p <= 0.0 || p > 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(chiSqInv(1.0 - p, df));
+}
+
+EvalResult fn_CHIINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_CHISQ_INV_RT(args, ctx);
+}
+
+EvalResult fn_CHISQ_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [actual, actualErr] = evaluateAs2D(args[0], ctx);
+    if (actualErr.isError()) {
+        return actualErr;
+    }
+    auto [expected, expectedErr] = evaluateAs2D(args[1], ctx);
+    if (expectedErr.isError()) {
+        return expectedErr;
+    }
+    if (actual.empty() || expected.empty() || actual[0].empty() || expected[0].empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    const size_t rows = actual.size();
+    const size_t cols = actual[0].size();
+    if (expected.size() != rows || expected[0].size() != cols) {
+        return EvalResult::Error(CellError::NA);
+    }
+    double stat = 0.0;
+    for (size_t r = 0; r < rows; ++r) {
+        if (actual[r].size() != cols || expected[r].size() != cols) {
+            return EvalResult::Error(CellError::NA);
+        }
+        for (size_t c = 0; c < cols; ++c) {
+            const EvalResult aN = actual[r][c].toNumber();
+            if (aN.isError()) {
+                return aN;
+            }
+            const EvalResult eN = expected[r][c].toNumber();
+            if (eN.isError()) {
+                return eN;
+            }
+            const double e = eN.getNumber();
+            if (e < 0.0) {
+                return EvalResult::Error(CellError::NUM);
+            }
+            if (e == 0.0) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            const double d = aN.getNumber() - e;
+            stat += d * d / e;
+        }
+    }
+    const double df = (rows == 1 || cols == 1) ? static_cast<double>(rows * cols - 1)
+                                               : static_cast<double>((rows - 1) * (cols - 1));
+    if (df < 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(chiSqSf(stat, df));
+}
+
+EvalResult fn_CHITEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_CHISQ_TEST(args, ctx);
+}
+
+EvalResult fn_T_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const EvalResult cumRes = evaluateAsBoolean(args[2], ctx);
+    if (cumRes.isError()) {
+        return cumRes;
+    }
+    const double x = xRes.getNumber();
+    if (cumRes.getBoolean()) {
+        return finiteNumber(studentTCdf(x, df));
+    }
+    return finiteNumber(studentTPdf(x, df));
+}
+
+EvalResult fn_T_DIST_2T(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double x = xRes.getNumber();
+    if (x < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(studentTTwoTail(x, df));
+}
+
+EvalResult fn_T_DIST_RT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    return finiteNumber(studentTSf(xRes.getNumber(), df));
+}
+
+EvalResult fn_TDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    int tails = 0;
+    const EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
+    if (tailsErr.isError()) {
+        return tailsErr;
+    }
+    const double x = xRes.getNumber();
+    if (x < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    if (tails == 1) {
+        return finiteNumber(studentTSf(x, df));
+    }
+    return finiteNumber(studentTTwoTail(x, df));
+}
+
+EvalResult fn_T_INV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double p = pRes.getNumber();
+    if (p <= 0.0 || p >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(studentTInv(p, df));
+}
+
+EvalResult fn_T_INV_2T(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult pRes = evaluateAsNumber(args[0], ctx);
+    if (pRes.isError()) {
+        return pRes;
+    }
+    double df = 0.0;
+    const EvalResult dfErr = requireTruncatedDf(args[1], ctx, &df);
+    if (dfErr.isError()) {
+        return dfErr;
+    }
+    const double p = pRes.getNumber();
+    if (p <= 0.0 || p > 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return finiteNumber(studentTInvTwoTail(p, df));
+}
+
+EvalResult fn_TINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_T_INV_2T(args, ctx);
+}
+
+EvalResult fn_T_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int tails = 0;
+    const EvalResult tailsErr = requireIntInRange(args[2], ctx, 1, 2, &tails);
+    if (tailsErr.isError()) {
+        return tailsErr;
+    }
+    int type = 0;
+    const EvalResult typeErr = requireIntInRange(args[3], ctx, 1, 3, &type);
+    if (typeErr.isError()) {
+        return typeErr;
+    }
+
+    double tStat = 0.0;
+    double df = 0.0;
+    if (type == 1) {
+        auto [pairs, err] = collectPairedNumericValues(args[0], args[1], ctx);
+        if (err.isError()) {
+            return err;
+        }
+        if (pairs.size() < 2) {
+            return EvalResult::Error(pairs.empty() ? CellError::NA : CellError::DIV);
+        }
+        std::vector<double> diff;
+        diff.reserve(pairs.size());
+        for (const auto& p : pairs) {
+            diff.push_back(p.first - p.second);
+        }
+        const auto [mean, sd] = meanAndDev(diff, false);
+        if (!(sd > 0.0)) {
+            return EvalResult::Error(CellError::DIV);
+        }
+        const double n = static_cast<double>(diff.size());
+        tStat = mean / (sd / std::sqrt(n));
+        df = n - 1.0;
+    } else {
+        auto [x, xErr] = collectNumericValues({args[0]}, ctx);
+        if (xErr.isError()) {
+            return xErr;
+        }
+        auto [y, yErr] = collectNumericValues({args[1]}, ctx);
+        if (yErr.isError()) {
+            return yErr;
+        }
+        if (x.size() < 2 || y.size() < 2) {
+            return EvalResult::Error((x.empty() || y.empty()) ? CellError::NA : CellError::DIV);
+        }
+        const auto [m1, s1] = meanAndDev(x, false);
+        const auto [m2, s2] = meanAndDev(y, false);
+        const double n1 = static_cast<double>(x.size());
+        const double n2 = static_cast<double>(y.size());
+        if (type == 2) {
+            const double sp2 = ((n1 - 1.0) * s1 * s1 + (n2 - 1.0) * s2 * s2) / (n1 + n2 - 2.0);
+            if (!(sp2 > 0.0)) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            tStat = (m1 - m2) / std::sqrt(sp2 * (1.0 / n1 + 1.0 / n2));
+            df = n1 + n2 - 2.0;
+        } else {
+            const double v1 = s1 * s1 / n1;
+            const double v2 = s2 * s2 / n2;
+            const double se2 = v1 + v2;
+            if (!(se2 > 0.0)) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            tStat = (m1 - m2) / std::sqrt(se2);
+            const double den = v1 * v1 / (n1 - 1.0) + v2 * v2 / (n2 - 1.0);
+            if (!(den > 0.0)) {
+                return EvalResult::Error(CellError::DIV);
+            }
+            df = se2 * se2 / den;
+        }
+    }
+    if (!(df >= 1.0)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double two = studentTTwoTail(tStat, df);
+    return finiteNumber(tails == 1 ? 0.5 * two : two);
+}
+
+EvalResult fn_TTEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_T_TEST(args, ctx);
+}
+
+EvalResult fn_Z_TEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2 && args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues({args[0]}, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[1], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    double sigma = 0.0;
+    if (args.size() == 3) {
+        const EvalResult sRes = evaluateAsNumber(args[2], ctx);
+        if (sRes.isError()) {
+            return sRes;
+        }
+        sigma = sRes.getNumber();
+        if (!(sigma > 0.0)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    } else {
+        if (values.size() < 2) {
+            return EvalResult::Error(CellError::DIV);
+        }
+        sigma = meanAndDev(values, false).second;
+        if (!(sigma > 0.0)) {
+            return EvalResult::Error(CellError::DIV);
+        }
+    }
+    double sum = 0.0;
+    for (const double v : values) {
+        sum += v;
+    }
+    const double n = static_cast<double>(values.size());
+    const double z = (sum / n - xRes.getNumber()) / (sigma / std::sqrt(n));
+    return finiteNumber(1.0 - standardNormalCdf(z));
+}
+
+EvalResult fn_ZTEST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_Z_TEST(args, ctx);
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -2393,6 +3079,58 @@ void registerStatsFunctions(FunctionRegistry& registry) {
                               "(number_f, number_s, probability_s, cumulative)",
                               "Negative binomial distribution", "Statistics");
     registry.registerAlias("NEGBINOM_DIST", "NEGBINOM.DIST");
+    registry.registerFunction("CHISQ.DIST", fn_CHISQ_DIST, "(x, deg_freedom, cumulative)",
+                              "Chi-squared probability density or left-tailed cumulative",
+                              "Statistics");
+    registry.registerAlias("CHISQ_DIST", "CHISQ.DIST");
+    registry.registerFunction("CHISQ.DIST.RT", fn_CHISQ_DIST_RT, "(x, deg_freedom)",
+                              "Chi-squared right-tailed probability", "Statistics");
+    registry.registerAlias("CHISQ_DIST_RT", "CHISQ.DIST.RT");
+    registry.registerFunction("CHIDIST", fn_CHIDIST, "(x, deg_freedom)",
+                              "Chi-squared right-tailed probability", "Statistics");
+    registry.registerFunction("CHISQ.INV", fn_CHISQ_INV, "(probability, deg_freedom)",
+                              "Inverse of the chi-squared left-tailed cumulative", "Statistics");
+    registry.registerAlias("CHISQ_INV", "CHISQ.INV");
+    registry.registerFunction("CHISQ.INV.RT", fn_CHISQ_INV_RT, "(probability, deg_freedom)",
+                              "Inverse of the chi-squared right-tailed probability", "Statistics");
+    registry.registerAlias("CHISQ_INV_RT", "CHISQ.INV.RT");
+    registry.registerFunction("CHIINV", fn_CHIINV, "(probability, deg_freedom)",
+                              "Inverse of the chi-squared right-tailed probability", "Statistics");
+    registry.registerFunction("CHISQ.TEST", fn_CHISQ_TEST, "(actual_range, expected_range)",
+                              "Pearson chi-squared test p-value", "Statistics");
+    registry.registerAlias("CHISQ_TEST", "CHISQ.TEST");
+    registry.registerFunction("CHITEST", fn_CHITEST, "(actual_range, expected_range)",
+                              "Pearson chi-squared test p-value", "Statistics");
+    registry.registerFunction("T.DIST", fn_T_DIST, "(x, deg_freedom, cumulative)",
+                              "Student's t probability density or left-tailed cumulative",
+                              "Statistics");
+    registry.registerAlias("T_DIST", "T.DIST");
+    registry.registerFunction("T.DIST.2T", fn_T_DIST_2T, "(x, deg_freedom)",
+                              "Student's t two-tailed probability", "Statistics");
+    registry.registerAlias("T_DIST_2T", "T.DIST.2T");
+    registry.registerFunction("T.DIST.RT", fn_T_DIST_RT, "(x, deg_freedom)",
+                              "Student's t right-tailed probability", "Statistics");
+    registry.registerAlias("T_DIST_RT", "T.DIST.RT");
+    registry.registerFunction("TDIST", fn_TDIST, "(x, deg_freedom, tails)",
+                              "Student's t right-tailed or two-tailed probability", "Statistics");
+    registry.registerFunction("T.INV", fn_T_INV, "(probability, deg_freedom)",
+                              "Inverse of the Student's t left-tailed cumulative", "Statistics");
+    registry.registerAlias("T_INV", "T.INV");
+    registry.registerFunction("T.INV.2T", fn_T_INV_2T, "(probability, deg_freedom)",
+                              "Inverse of the Student's t two-tailed probability", "Statistics");
+    registry.registerAlias("T_INV_2T", "T.INV.2T");
+    registry.registerFunction("TINV", fn_TINV, "(probability, deg_freedom)",
+                              "Inverse of the Student's t two-tailed probability", "Statistics");
+    registry.registerFunction("T.TEST", fn_T_TEST, "(array1, array2, tails, type)",
+                              "Student's t-test p-value", "Statistics");
+    registry.registerAlias("T_TEST", "T.TEST");
+    registry.registerFunction("TTEST", fn_TTEST, "(array1, array2, tails, type)",
+                              "Student's t-test p-value", "Statistics");
+    registry.registerFunction("Z.TEST", fn_Z_TEST, "(array, x, [sigma])",
+                              "One-tailed z-test p-value", "Statistics");
+    registry.registerAlias("Z_TEST", "Z.TEST");
+    registry.registerFunction("ZTEST", fn_ZTEST, "(array, x, [sigma])", "One-tailed z-test p-value",
+                              "Statistics");
 }
 
 }  // namespace cells

@@ -938,5 +938,308 @@ TEST_F(FnStatsTest, BinomWeibullLognormGammaHypgeomNegbinom) {
     EXPECT_EQ(eval("=NEGBINOM.DIST(1,0,0.5,FALSE)").getError(), CellError::NUM);
 }
 
+TEST_F(FnStatsTest, ChiSqDistInvAndAliases) {
+    EvalResult cdf = eval("=CHISQ.DIST(2,2,TRUE)");
+    ASSERT_TRUE(cdf.isNumber());
+    EXPECT_NEAR(cdf.getNumber(), 1.0 - std::exp(-1.0), 1e-12);
+    EvalResult gamma = eval("=GAMMA.DIST(2,1,2,TRUE)");
+    ASSERT_TRUE(gamma.isNumber());
+    EXPECT_NEAR(cdf.getNumber(), gamma.getNumber(), 1e-12);
+    EvalResult pdf = eval("=CHISQ.DIST(2,2,FALSE)");
+    ASSERT_TRUE(pdf.isNumber());
+    EXPECT_NEAR(pdf.getNumber(), eval("=GAMMA.DIST(2,1,2,FALSE)").getNumber(), 1e-12);
+    EvalResult pdf0 = eval("=CHISQ.DIST(0,2,FALSE)");
+    ASSERT_TRUE(pdf0.isNumber());
+    EXPECT_NEAR(pdf0.getNumber(), 0.5, 1e-12);
+
+    EvalResult rt = eval("=CHISQ.DIST.RT(2,2)");
+    ASSERT_TRUE(rt.isNumber());
+    EXPECT_NEAR(rt.getNumber(), std::exp(-1.0), 1e-12);
+    EvalResult chidist = eval("=CHIDIST(2,2)");
+    ASSERT_TRUE(chidist.isNumber());
+    EXPECT_NEAR(chidist.getNumber(), rt.getNumber(), 1e-15);
+    EXPECT_NEAR(rt.getNumber() + cdf.getNumber(), 1.0, 1e-12);
+
+    EvalResult invRt = eval("=CHISQ.INV.RT(0.05,10)");
+    ASSERT_TRUE(invRt.isNumber());
+    EXPECT_NEAR(invRt.getNumber(), 18.307038053275146, 1e-8);
+    EvalResult chiinv = eval("=CHIINV(0.05,10)");
+    ASSERT_TRUE(chiinv.isNumber());
+    EXPECT_NEAR(chiinv.getNumber(), invRt.getNumber(), 1e-12);
+    EvalResult invLeft = eval("=CHISQ.INV(0.95,10)");
+    ASSERT_TRUE(invLeft.isNumber());
+    EXPECT_NEAR(invLeft.getNumber(), invRt.getNumber(), 1e-8);
+    EvalResult median = eval("=CHISQ.INV(0.5,2)");
+    ASSERT_TRUE(median.isNumber());
+    EXPECT_NEAR(median.getNumber(), -2.0 * std::log(0.5), 1e-8);
+
+    EvalResult roundtrip = eval("=CHISQ.DIST(CHISQ.INV(0.8,5),5,TRUE)");
+    ASSERT_TRUE(roundtrip.isNumber());
+    EXPECT_NEAR(roundtrip.getNumber(), 0.8, 1e-6);
+    EvalResult roundtripRt = eval("=CHISQ.DIST.RT(CHISQ.INV.RT(0.2,8),8)");
+    ASSERT_TRUE(roundtripRt.isNumber());
+    EXPECT_NEAR(roundtripRt.getNumber(), 0.2, 1e-6);
+
+    EvalResult zeroInv = eval("=CHISQ.INV(0,4)");
+    ASSERT_TRUE(zeroInv.isNumber());
+    EXPECT_NEAR(zeroInv.getNumber(), 0.0, 1e-12);
+    EvalResult oneInvRt = eval("=CHISQ.INV.RT(1,4)");
+    ASSERT_TRUE(oneInvRt.isNumber());
+    EXPECT_NEAR(oneInvRt.getNumber(), 0.0, 1e-12);
+
+    EvalResult truncDf = eval("=CHISQ.DIST(2,2.9,TRUE)");
+    ASSERT_TRUE(truncDf.isNumber());
+    EXPECT_NEAR(truncDf.getNumber(), cdf.getNumber(), 1e-12);
+
+    EXPECT_EQ(eval("=CHISQ.DIST(-0.1,2,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.DIST(1,0.5,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.DIST(1,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=CHISQ.DIST.RT(-1,2)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.INV(1,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.INV.RT(0,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.INV(-0.1,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.DIST(0,1,FALSE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHIINV()").getError(), CellError::VALUE);
+}
+
+TEST_F(FnStatsTest, ChiSqTestPearson) {
+    setCellValue(0, 0, 16.0);
+    setCellValue(0, 1, 4.0);
+    setCellValue(1, 0, 10.0);
+    setCellValue(1, 1, 10.0);
+    EvalResult oneD = eval("=CHISQ.TEST(A1:A2,B1:B2)");
+    ASSERT_TRUE(oneD.isNumber());
+    EvalResult sf = eval("=CHISQ.DIST.RT(7.2,1)");
+    ASSERT_TRUE(sf.isNumber());
+    EXPECT_NEAR(oneD.getNumber(), sf.getNumber(), 1e-12);
+    EvalResult alias = eval("=CHITEST(A1:A2,B1:B2)");
+    ASSERT_TRUE(alias.isNumber());
+    EXPECT_NEAR(alias.getNumber(), oneD.getNumber(), 1e-15);
+
+    setCellValue(0, 0, 10.0);
+    setCellValue(1, 0, 20.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(1, 1, 10.0);
+    setCellValue(2, 0, 15.0);
+    setCellValue(3, 0, 15.0);
+    setCellValue(2, 1, 15.0);
+    setCellValue(3, 1, 15.0);
+    EvalResult grid = eval("=CHISQ.TEST(A1:B2,C1:D2)");
+    ASSERT_TRUE(grid.isNumber());
+    EvalResult gridSf = eval("=CHISQ.DIST.RT(20/3,1)");
+    ASSERT_TRUE(gridSf.isNumber());
+    EXPECT_NEAR(grid.getNumber(), gridSf.getNumber(), 1e-12);
+
+    setCellValue(0, 0, 5.0);
+    setCellValue(0, 1, 5.0);
+    setCellValue(0, 2, 5.0);
+    setCellValue(1, 0, 5.0);
+    setCellValue(1, 1, 5.0);
+    setCellValue(1, 2, 5.0);
+    EvalResult match = eval("=CHISQ.TEST(A1:A3,B1:B3)");
+    ASSERT_TRUE(match.isNumber());
+    EXPECT_NEAR(match.getNumber(), 1.0, 1e-12);
+
+    EXPECT_EQ(eval("=CHISQ.TEST(A1:A3,B1:B2)").getError(), CellError::NA);
+    setCellValue(4, 0, 0.0);
+    setCellValue(4, 1, 10.0);
+    EXPECT_EQ(eval("=CHISQ.TEST(A1:A2,E1:E2)").getError(), CellError::DIV);
+    setCellValue(4, 0, -1.0);
+    EXPECT_EQ(eval("=CHISQ.TEST(A1:A2,E1:E2)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=CHISQ.TEST(A1:A2)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnStatsTest, StudentTDistInvAndTails) {
+    EvalResult pdf = eval("=T.DIST(0,1,FALSE)");
+    ASSERT_TRUE(pdf.isNumber());
+    EXPECT_NEAR(pdf.getNumber(), 1.0 / 3.14159265358979323846, 1e-12);
+    EvalResult cdf = eval("=T.DIST(0,10,TRUE)");
+    ASSERT_TRUE(cdf.isNumber());
+    EXPECT_NEAR(cdf.getNumber(), 0.5, 1e-12);
+    EvalResult cauchyCdf = eval("=T.DIST(1,1,TRUE)");
+    ASSERT_TRUE(cauchyCdf.isNumber());
+    EXPECT_NEAR(cauchyCdf.getNumber(), 0.75, 1e-12);
+
+    EvalResult rt = eval("=T.DIST.RT(1,1)");
+    ASSERT_TRUE(rt.isNumber());
+    EXPECT_NEAR(rt.getNumber(), 0.25, 1e-12);
+    EvalResult rtNeg = eval("=T.DIST.RT(-1,1)");
+    ASSERT_TRUE(rtNeg.isNumber());
+    EXPECT_NEAR(rtNeg.getNumber(), 0.75, 1e-12);
+    EvalResult twoT = eval("=T.DIST.2T(1,1)");
+    ASSERT_TRUE(twoT.isNumber());
+    EXPECT_NEAR(twoT.getNumber(), 0.5, 1e-12);
+    EXPECT_NEAR(twoT.getNumber(), 2.0 * rt.getNumber(), 1e-12);
+
+    EvalResult tdist1 = eval("=TDIST(1,1,1)");
+    ASSERT_TRUE(tdist1.isNumber());
+    EXPECT_NEAR(tdist1.getNumber(), rt.getNumber(), 1e-15);
+    EvalResult tdist2 = eval("=TDIST(1,1,2)");
+    ASSERT_TRUE(tdist2.isNumber());
+    EXPECT_NEAR(tdist2.getNumber(), twoT.getNumber(), 1e-15);
+    EvalResult tdistTrunc = eval("=TDIST(1,1,2.9)");
+    ASSERT_TRUE(tdistTrunc.isNumber());
+    EXPECT_NEAR(tdistTrunc.getNumber(), twoT.getNumber(), 1e-15);
+
+    EvalResult inv = eval("=T.INV(0.75,1)");
+    ASSERT_TRUE(inv.isNumber());
+    EXPECT_NEAR(inv.getNumber(), 1.0, 1e-9);
+    EvalResult invLow = eval("=T.INV(0.25,1)");
+    ASSERT_TRUE(invLow.isNumber());
+    EXPECT_NEAR(invLow.getNumber(), -1.0, 1e-9);
+    EvalResult inv2t = eval("=T.INV.2T(0.5,1)");
+    ASSERT_TRUE(inv2t.isNumber());
+    EXPECT_NEAR(inv2t.getNumber(), 1.0, 1e-9);
+    EvalResult tinv = eval("=TINV(0.5,1)");
+    ASSERT_TRUE(tinv.isNumber());
+    EXPECT_NEAR(tinv.getNumber(), inv2t.getNumber(), 1e-15);
+    EvalResult crit = eval("=T.INV.2T(0.05,10)");
+    ASSERT_TRUE(crit.isNumber());
+    EXPECT_NEAR(crit.getNumber(), 2.2281388519649385, 1e-8);
+    EvalResult leftCrit = eval("=T.INV(0.975,10)");
+    ASSERT_TRUE(leftCrit.isNumber());
+    EXPECT_NEAR(leftCrit.getNumber(), crit.getNumber(), 1e-8);
+    EvalResult half = eval("=T.INV(0.5,8)");
+    ASSERT_TRUE(half.isNumber());
+    EXPECT_NEAR(half.getNumber(), 0.0, 1e-12);
+    EvalResult inv2tOne = eval("=T.INV.2T(1,5)");
+    ASSERT_TRUE(inv2tOne.isNumber());
+    EXPECT_NEAR(inv2tOne.getNumber(), 0.0, 1e-12);
+
+    EvalResult roundtrip = eval("=T.DIST(T.INV(0.8,7),7,TRUE)");
+    ASSERT_TRUE(roundtrip.isNumber());
+    EXPECT_NEAR(roundtrip.getNumber(), 0.8, 1e-6);
+    EvalResult roundtrip2t = eval("=T.DIST.2T(T.INV.2T(0.1,9),9)");
+    ASSERT_TRUE(roundtrip2t.isNumber());
+    EXPECT_NEAR(roundtrip2t.getNumber(), 0.1, 1e-6);
+
+    EXPECT_EQ(eval("=T.DIST.2T(-1,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=TDIST(-1,5,1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=TDIST(1,5,3)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.DIST(0,0.5,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.DIST(0,10)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=T.INV(0,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.INV(1,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.INV.2T(0,5)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.DIST.RT(1)").getError(), CellError::VALUE);
+}
+
+TEST_F(FnStatsTest, TTestTypesAndTails) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(0, 3, 4.0);
+    setCellValue(0, 4, 5.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(1, 1, 4.0);
+    setCellValue(1, 2, 6.0);
+    setCellValue(1, 3, 8.0);
+    setCellValue(1, 4, 10.0);
+    EvalResult paired2 = eval("=T.TEST(A1:A5,B1:B5,2,1)");
+    ASSERT_TRUE(paired2.isNumber());
+    EvalResult pairedSf = eval("=T.DIST.2T(4.242640687119285,4)");
+    ASSERT_TRUE(pairedSf.isNumber());
+    EXPECT_NEAR(paired2.getNumber(), pairedSf.getNumber(), 1e-9);
+    EvalResult paired1 = eval("=T.TEST(A1:A5,B1:B5,1,1)");
+    ASSERT_TRUE(paired1.isNumber());
+    EXPECT_NEAR(paired1.getNumber(), paired2.getNumber() / 2.0, 1e-12);
+    EvalResult pairedAlias = eval("=TTEST(A1:A5,B1:B5,2,1)");
+    ASSERT_TRUE(pairedAlias.isNumber());
+    EXPECT_NEAR(pairedAlias.getNumber(), paired2.getNumber(), 1e-15);
+
+    setCellValue(2, 0, 1.0);
+    setCellValue(2, 1, 2.0);
+    setCellValue(2, 2, 3.0);
+    setCellValue(2, 3, 4.0);
+    setCellValue(3, 0, 2.0);
+    setCellValue(3, 1, 4.0);
+    setCellValue(3, 2, 6.0);
+    EvalResult eqVar = eval("=T.TEST(C1:C4,D1:D3,2,2)");
+    ASSERT_TRUE(eqVar.isNumber());
+    EvalResult eqVarSf = eval("=T.DIST.2T(1.2179969144117253,5)");
+    ASSERT_TRUE(eqVarSf.isNumber());
+    EXPECT_NEAR(eqVar.getNumber(), eqVarSf.getNumber(), 1e-9);
+    EvalResult eqVar1 = eval("=T.TEST(C1:C4,D1:D3,1,2)");
+    ASSERT_TRUE(eqVar1.isNumber());
+    EXPECT_NEAR(eqVar1.getNumber(), eqVar.getNumber() / 2.0, 1e-12);
+
+    EvalResult welch = eval("=T.TEST(C1:C4,D1:D3,2,3)");
+    ASSERT_TRUE(welch.isNumber());
+    EXPECT_NEAR(welch.getNumber(), 0.3338237000775014, 1e-8);
+    EvalResult welch1 = eval("=T.TEST(C1:C4,D1:D3,1,3)");
+    ASSERT_TRUE(welch1.isNumber());
+    EXPECT_NEAR(welch1.getNumber(), welch.getNumber() / 2.0, 1e-12);
+    EXPECT_NE(welch.getNumber(), eqVar.getNumber());
+
+    setCellValue(4, 0, 3.0);
+    setCellValue(4, 1, 4.0);
+    setCellValue(4, 2, 5.0);
+    setCellValue(4, 3, 8.0);
+    setCellValue(4, 4, 9.0);
+    setCellValue(4, 5, 1.0);
+    setCellValue(4, 6, 2.0);
+    setCellValue(4, 7, 4.0);
+    setCellValue(4, 8, 5.0);
+    setCellValue(5, 0, 6.0);
+    setCellValue(5, 1, 19.0);
+    setCellValue(5, 2, 3.0);
+    setCellValue(5, 3, 2.0);
+    setCellValue(5, 4, 14.0);
+    setCellValue(5, 5, 4.0);
+    setCellValue(5, 6, 5.0);
+    setCellValue(5, 7, 17.0);
+    setCellValue(5, 8, 1.0);
+    EvalResult msPaired = eval("=T.TEST(E1:E9,F1:F9,2,1)");
+    ASSERT_TRUE(msPaired.isNumber());
+    EXPECT_NEAR(msPaired.getNumber(), 0.19601578492528215, 1e-8);
+    EvalResult msEq = eval("=T.TEST(E1:E9,F1:F9,2,2)");
+    ASSERT_TRUE(msEq.isNumber());
+    EXPECT_NEAR(msEq.getNumber(), 0.19199588676039628, 1e-8);
+    EvalResult msWelch = eval("=T.TEST(E1:E9,F1:F9,2,3)");
+    ASSERT_TRUE(msWelch.isNumber());
+    EXPECT_NEAR(msWelch.getNumber(), 0.2022939233686779, 1e-8);
+
+    EXPECT_EQ(eval("=T.TEST(A1:A5,B1:B4,2,1)").getError(), CellError::NA);
+    EXPECT_EQ(eval("=T.TEST(A1:A5,B1:B5,3,1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.TEST(A1:A5,B1:B5,2,4)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=T.TEST(A1:A5,B1:B5,2)").getError(), CellError::VALUE);
+    setCellValue(6, 0, 1.0);
+    setCellValue(6, 1, 2.0);
+    setCellValue(7, 0, 1.0);
+    setCellValue(7, 1, 2.0);
+    EXPECT_EQ(eval("=T.TEST(G1:G2,H1:H2,2,1)").getError(), CellError::DIV);
+}
+
+TEST_F(FnStatsTest, ZTestOptionalSigma) {
+    setCellValue(0, 0, 4.0);
+    setCellValue(0, 1, 5.0);
+    setCellValue(0, 2, 6.0);
+    EvalResult center = eval("=Z.TEST(A1:A3,5)");
+    ASSERT_TRUE(center.isNumber());
+    EXPECT_NEAR(center.getNumber(), 0.5, 1e-12);
+    EvalResult alias = eval("=ZTEST(A1:A3,5)");
+    ASSERT_TRUE(alias.isNumber());
+    EXPECT_NEAR(alias.getNumber(), 0.5, 1e-15);
+
+    EvalResult vs4 = eval("=Z.TEST(A1:A3,4)");
+    ASSERT_TRUE(vs4.isNumber());
+    EXPECT_NEAR(vs4.getNumber(), 0.041632258331775196, 1e-12);
+    EvalResult withSigma = eval("=Z.TEST(A1:A3,4,1)");
+    ASSERT_TRUE(withSigma.isNumber());
+    EXPECT_NEAR(withSigma.getNumber(), vs4.getNumber(), 1e-12);
+    EvalResult sigma2 = eval("=Z.TEST(A1:A3,4,2)");
+    ASSERT_TRUE(sigma2.isNumber());
+    EXPECT_NEAR(sigma2.getNumber(), 0.19323811538561642, 1e-12);
+    EvalResult norms = eval("=1-NORMSDIST(SQRT(3)/2)");
+    ASSERT_TRUE(norms.isNumber());
+    EXPECT_NEAR(sigma2.getNumber(), norms.getNumber(), 1e-12);
+
+    EXPECT_EQ(eval("=Z.TEST(A1:A3,4,0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=Z.TEST(A1:A3,4,-1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=Z.TEST(A1,4)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=Z.TEST()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=Z.TEST(A1:A3)").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

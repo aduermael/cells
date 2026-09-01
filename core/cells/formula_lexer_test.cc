@@ -516,6 +516,17 @@ TEST(FormulaLexerTest, DottedFunctionName) {
     EXPECT_EQ(tok.text, "RANK.EQ");
 }
 
+TEST(FormulaLexerTest, DottedFunctionNameDigitSegment) {
+    FormulaLexer lexer("T.DIST.2T(");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tok.text, "T.DIST.2T");
+    FormulaLexer inv("T.INV.2T(");
+    Token invTok = inv.nextToken();
+    EXPECT_EQ(invTok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(invTok.text, "T.INV.2T");
+}
+
 // ============================================================================
 // Position Tracking Tests
 // ============================================================================
