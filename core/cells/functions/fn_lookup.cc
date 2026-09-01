@@ -1182,11 +1182,13 @@ EvalResult fn_XLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         searchMode = static_cast<int>(s.getNumber());
     }
     if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
+        // match_mode 2 (wildcard) is not implemented.
         return EvalResult::Error(CellError::VALUE);
     }
     if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
         return EvalResult::Error(CellError::VALUE);
     }
+    // search_mode ±2 is Excel binary search; we only have a linear scan.
     if (searchMode == 2) {
         searchMode = 1;
     } else if (searchMode == -2) {
@@ -1244,11 +1246,13 @@ EvalResult fn_XMATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         searchMode = static_cast<int>(s.getNumber());
     }
     if (matchMode != 0 && matchMode != -1 && matchMode != 1) {
+        // match_mode 2 (wildcard) is not implemented.
         return EvalResult::Error(CellError::VALUE);
     }
     if (searchMode != 1 && searchMode != -1 && searchMode != 2 && searchMode != -2) {
         return EvalResult::Error(CellError::VALUE);
     }
+    // search_mode ±2 is Excel binary search; we only have a linear scan.
     if (searchMode == 2) {
         searchMode = 1;
     } else if (searchMode == -2) {

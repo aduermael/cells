@@ -783,5 +783,54 @@ TEST_F(FnLookupTest, XmatchAndLookup) {
     EXPECT_EQ(eval("=LOOKUP(5,A1:A3,B1:B3)").getError(), CellError::NA);
 }
 
+// XLOOKUP / XMATCH vs Excel — implemented:
+//   match_mode  0 exact, -1 next smaller, 1 next larger
+//   search_mode 1 first-to-last, -1 last-to-first (linear)
+// Not implemented:
+//   match_mode  2 wildcard (* and ?) — currently #VALUE!
+//   search_mode 2 / -2 binary search — currently remapped to linear 1 / -1
+// Extend these tests when those modes are added; do not delete them.
+TEST_F(FnLookupTest, XlookupXmatchIncompleteVersusExcel) {
+    setCellValue(0, 0, "apple");
+    setCellValue(0, 1, "banana");
+    setCellValue(0, 2, "apricot");
+    setCellValue(1, 0, 1.0);
+    setCellValue(1, 1, 2.0);
+    setCellValue(1, 2, 3.0);
+
+    EXPECT_EQ(eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2)").getError(), CellError::VALUE)
+        << "XLOOKUP match_mode 2 (wildcard) is not implemented";
+    EXPECT_EQ(eval("=XMATCH(\"a*\",A1:A3,2)").getError(), CellError::VALUE)
+        << "XMATCH match_mode 2 (wildcard) is not implemented";
+
+    // Binary search_mode is accepted but is a linear scan, not Excel binary search.
+    EvalResult bin = eval("=XLOOKUP(\"banana\",A1:A3,B1:B3,\"none\",0,2)");
+    ASSERT_TRUE(bin.isNumber()) << "search_mode 2 currently remaps to linear first-to-last";
+    EXPECT_DOUBLE_EQ(bin.getNumber(), 2.0);
+    EvalResult binRev = eval("=XLOOKUP(\"banana\",A1:A3,B1:B3,\"none\",0,-2)");
+    ASSERT_TRUE(binRev.isNumber()) << "search_mode -2 currently remaps to linear last-to-first";
+    EXPECT_DOUBLE_EQ(binRev.getNumber(), 2.0);
+    EvalResult xmBin = eval("=XMATCH(\"banana\",A1:A3,0,2)");
+    ASSERT_TRUE(xmBin.isNumber()) << "XMATCH search_mode 2 currently remaps to linear";
+    EXPECT_DOUBLE_EQ(xmBin.getNumber(), 2.0);
+}
+
+TEST_F(FnLookupTest, DISABLED_XlookupWildcardMatchMode) {
+    // Excel: match_mode 2 treats lookup as a wildcard (* and ?). Enable this
+    // test when that path is implemented; today match_mode 2 is #VALUE!.
+    setCellValue(0, 0, "apple");
+    setCellValue(0, 1, "banana");
+    setCellValue(0, 2, "apricot");
+    setCellValue(1, 0, 1.0);
+    setCellValue(1, 1, 2.0);
+    setCellValue(1, 2, 3.0);
+    EvalResult r = eval("=XLOOKUP(\"a*\",A1:A3,B1:B3,\"none\",2)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(r.getNumber(), 1.0);
+    EvalResult m = eval("=XMATCH(\"a*\",A1:A3,2)");
+    ASSERT_TRUE(m.isNumber());
+    EXPECT_DOUBLE_EQ(m.getNumber(), 1.0);
+}
+
 }  // namespace
 }  // namespace cells
