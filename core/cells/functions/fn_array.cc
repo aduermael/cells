@@ -917,7 +917,7 @@ static EvalResult takeOrDrop(const std::vector<std::vector<EvalResult>>& data, c
         row.reserve(static_cast<size_t>(colCount));
         for (int c = 0; c < colCount; ++c) {
             row.push_back(gridAt(data, static_cast<size_t>(rowStart) + static_cast<size_t>(r),
-                                static_cast<size_t>(colStart) + static_cast<size_t>(c)));
+                                 static_cast<size_t>(colStart) + static_cast<size_t>(c)));
         }
         out.push_back(std::move(row));
     }

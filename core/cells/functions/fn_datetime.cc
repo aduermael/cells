@@ -1035,8 +1035,7 @@ EvalResult fn_WEEKNUM(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     serialToDate(serialRes.getNumber(), year, month, day);
     const int jan1 = static_cast<int>(dateToSerial(year, 1, 1));
     const int jan1Wd = weekdaySun1(jan1);  // 1=Sun
-    int startWd = 1;
-                       // Sunday
+    int startWd = 1;                       // Sunday
     if (returnType == 2 || returnType == 21 || returnType == 11) {
         startWd = 2;  // Monday
     } else if (returnType != 1) {
