@@ -1078,6 +1078,7 @@ cc_library(
         "formula_eval.cc",
         "formula_functions.cc",
         "//core/cells/functions:fn_array.cc",
+        "//core/cells/functions:fn_conditional.cc",
         "//core/cells/functions:fn_datetime.cc",
         "//core/cells/functions:fn_logic.cc",
         "//core/cells/functions:fn_lookup.cc",
@@ -1090,6 +1091,7 @@ cc_library(
         "formula_eval.h",
         "formula_functions.h",
         "//core/cells/functions:fn_array.h",
+        "//core/cells/functions:fn_conditional.h",
         "//core/cells/functions:fn_datetime.h",
         "//core/cells/functions:fn_logic.h",
         "//core/cells/functions:fn_lookup.h",
@@ -1359,7 +1361,10 @@ cc_library(
     deps = [
         ":crdt",
         ":fill_range",
+        ":format_buffer",
         ":formula_display",
+        ":number_format",
+        ":style_buffer",
         ":formula_parser",
         ":formula_recalc",
         ":formula_resolver",
@@ -1379,6 +1384,37 @@ cc_test(
         ":id",
         ":luau_sandbox",
         ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ui_mutation",
+    srcs = ["ui_mutation.cc"],
+    hdrs = ["ui_mutation.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":format_buffer",
+        ":id",
+        ":input_parser",
+        ":luau_sandbox",
+        ":model",
+        ":number_format",
+        ":operation",
+    ],
+)
+
+cc_test(
+    name = "ui_mutation_test",
+    srcs = ["ui_mutation_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":luau_sandbox",
+        ":model",
+        ":operation",
+        ":ui_mutation",
         "@googletest//:gtest_main",
     ],
 )

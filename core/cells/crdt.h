@@ -21,7 +21,8 @@
 // 3. SyncManager broadcasts to peers automatically
 //
 // Dependencies: model.h, operation.h
-// Used by: bindings.cc (UI-triggered edits), sync_manager.cc (remote ops)
+// Used by: luau_api.cc (scripted UI mutations), ui_mutation.h (Luau gateway),
+//          sync_manager.cc / applyRemoteOperation (remote ops; not UI)
 //
 // =============================================================================
 

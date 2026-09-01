@@ -2,8 +2,8 @@
 
 Living status of Cells vs Microsoft Excel: formulas, spreadsheet features, file I/O, and UI.
 
-**Last reviewed:** 2026-07-28  
-**Function count:** **137** registered (Excel has ~484 worksheet functions ≈ **28%**)  
+**Last reviewed:** 2026-09-01  
+**Function count:** **167** registered (Excel has ~484 worksheet functions ≈ **35%**)  
 **Source of truth for implementations:** `core/cells/functions/fn_*.cc`
 
 Update this document when adding functions, shipping features, or changing XLSX fidelity. Cross-check the function list against the registry if counts drift.
@@ -15,7 +15,7 @@ Update this document when adding functions, shipping features, or changing XLSX 
 | Area | Status | Notes |
 |------|--------|-------|
 | Formula engine (parse / eval / deps / spill) | ✅ Solid | AST-native C++; UUID-stable refs |
-| Function library breadth | 🟡 Partial | 137 / ~484 Excel functions |
+| Function library breadth | 🟡 Partial | 167 / ~484 Excel functions |
 | Grid editing & selection | ✅ Solid | Fill handle, multi-range, formula bar |
 | Cell / range formatting | ✅ Solid | Fonts, fills, borders, number formats, themes |
 | XLSX import / export | 🟡 Partial | Values, formulas, styles, merges; fidelity still improving |
@@ -58,18 +58,18 @@ Details: [Formula Engine](./formula-engine.md).
 
 | Category | Implemented | Excel (approx.) | Coverage (rough) |
 |----------|------------:|----------------:|------------------:|
-| Math & trig | 64 | ~80 | High for core + trig + common extras |
+| Math & trig | 73 | ~80 | Core + trig + conditional aggregates |
 | Logic / information (subset) | 21 | ~40 | Strong modern set (`LET`, `LAMBDA`, `IFS`, …) |
-| Text | 19 | ~50 | Core string ops |
-| Date / time | 14 | ~40 | Core extractors; missing workday helpers |
-| Statistics | 10 | ~100 | Basic only |
+| Text | 21 | ~50 | Core string ops + TEXTJOIN/CLEAN |
+| Date / time | 20 | ~40 | Core extractors + workday/datedif helpers |
+| Statistics | 17 | ~100 | Basic + LARGE/SMALL/RANK/MODE/QUARTILE |
 | Array / dynamic | 5 | ~25 | Core spill set only |
-| Lookup & reference | 4 | ~40 | Classic only (no `XLOOKUP`) |
+| Lookup & reference | 10 | ~40 | Classic + ROW/COLUMN/ADDRESS/CHOOSE |
 | Financial | 0 | ~55 | Entire category missing |
 | Engineering | 0 | ~50 | Entire category missing |
 | Database | 0 | ~12 | Entire category missing |
 | Cube / web / other | 0 | many | Out of scope for now |
-| **Total registered** | **137** | **~484** | **~28%** |
+| **Total registered** | **167** | **~484** | **~35%** |
 
 Excel totals vary by version (Microsoft 365 adds functions over time). Counts above are directional, not exact product marketing numbers.
 
@@ -87,11 +87,11 @@ Categories currently green in that harness: **logical**, **math-basic**, **math-
 
 ---
 
-### Implemented functions (137)
+### Implemented functions (167)
 
 Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → `CEILING_MATH` on XLSX import via `_xlfn.` stripping). Some aliases omit the underscore (`STDEVS` for `STDEV.S`, `PERCENTILEINC` for `PERCENTILE.INC`).
 
-#### Math (64)
+#### Math (73)
 
 | Function | Description |
 |----------|-------------|
@@ -122,6 +122,11 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `CSCH` / `SECH` / `COTH` | Reciprocal hyperbolic |
 | `RADIANS` / `DEGREES` | Angle conversion |
 | `RAND` / `RANDBETWEEN` | Random (volatile) |
+| `SUMIF` / `SUMIFS` | Conditional sum |
+| `COUNTIF` / `COUNTIFS` | Conditional count |
+| `AVERAGEIF` / `AVERAGEIFS` | Conditional average |
+| `MINIFS` / `MAXIFS` | Conditional min / max |
+| `SUMPRODUCT` | Sum of products |
 
 #### Logic (21)
 
@@ -135,7 +140,7 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `EXACT` | Case-sensitive string equality |
 | `ISBLANK` / `ISNUMBER` / `ISTEXT` / `ISERROR` / `ISLOGICAL` / `ISNA` | Type tests |
 
-#### Text (19)
+#### Text (21)
 
 | Function | Description |
 |----------|-------------|
@@ -146,8 +151,10 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `CONCAT` / `CONCATENATE` / `REPT` | Join / repeat |
 | `TEXT` / `VALUE` | Format / parse numbers |
 | `CHAR` / `CODE` | Character codes |
+| `TEXTJOIN` | Join with delimiter |
+| `CLEAN` | Strip non-printable characters |
 
-#### Lookup (4)
+#### Lookup (10)
 
 | Function | Description |
 |----------|-------------|
@@ -155,8 +162,12 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `MATCH` | Position of value |
 | `VLOOKUP` | Vertical lookup |
 | `HLOOKUP` | Horizontal lookup |
+| `ROW` / `ROWS` | Row number / height |
+| `COLUMN` / `COLUMNS` | Column number / width |
+| `ADDRESS` | Cell address as text |
+| `CHOOSE` | Pick value by index |
 
-#### Date / time (14)
+#### Date / time (20)
 
 | Function | Volatile | Description |
 |----------|:--------:|-------------|
@@ -168,8 +179,14 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `HOUR` / `MINUTE` / `SECOND` | | Time parts |
 | `WEEKDAY` | | Day of week |
 | `EOMONTH` | | End of month offset |
+| `EDATE` | | Date offset by months |
+| `DAYS` | | Day difference |
+| `DATEDIF` | | Date difference by unit |
+| `WEEKNUM` | | Week number |
+| `NETWORKDAYS` | | Working days between dates |
+| `WORKDAY` | | Date after N working days |
 
-#### Statistics (10)
+#### Statistics (17)
 
 | Function | Description |
 |----------|-------------|
@@ -177,6 +194,11 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 | `STDEV` / `STDEVS` / `STDEVP` | Std. deviation (sample / sample alias / population) |
 | `VAR` / `VARS` / `VARP` | Variance |
 | `PERCENTILE` / `PERCENTILEINC` / `PERCENTILEEXC` | Percentiles |
+| `LARGE` / `SMALL` | k-th largest / smallest |
+| `RANK` / `RANK.EQ` | Rank in a list |
+| `MODE` / `MODE.SNGL` | Most frequent number |
+| `QUARTILE` / `QUARTILE.INC` | Inclusive quartile |
+| `COUNTBLANK` | Empty cells |
 
 #### Array / dynamic (5)
 
@@ -194,24 +216,12 @@ Registered names use underscores where Excel uses dots (e.g. `CEILING.MATH` → 
 
 Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and functions already appearing in the Excel roundtrip corpus.
 
-#### Conditional aggregates — high priority
-
-| Function | Notes |
-|----------|-------|
-| `SUMIF` / `SUMIFS` | Extremely common |
-| `COUNTIF` / `COUNTIFS` | Extremely common |
-| `AVERAGEIF` / `AVERAGEIFS` | |
-| `MINIFS` / `MAXIFS` | |
-| `SUMPRODUCT` | Array-style aggregation |
-
 #### Lookup & reference — high priority
 
 | Function | Notes |
 |----------|-------|
 | `XLOOKUP` / `XMATCH` | Modern Excel default |
 | `OFFSET` / `INDIRECT` | Dynamic refs (volatile) |
-| `ROW` / `ROWS` / `COLUMN` / `COLUMNS` | |
-| `ADDRESS` / `CHOOSE` | |
 
 #### Financial — entire category missing
 
@@ -220,14 +230,6 @@ Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and f
 | `PV` / `FV` / `PMT` / `NPER` / `RATE` | Loan / annuity basics |
 | `NPV` / `IRR` / `XNPV` / `XIRR` | Investment analysis |
 | `DB` / `DDB` / `SLN` | Depreciation |
-
-#### Date helpers
-
-| Function | Notes |
-|----------|-------|
-| `NETWORKDAYS` / `WORKDAY` | Business days |
-| `EDATE` / `DAYS` / `DATEDIF` | |
-| `WEEKNUM` | |
 
 #### Dynamic arrays (beyond core spill set)
 
@@ -238,21 +240,6 @@ Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and f
 | `TOCOL` / `TOROW` / `TAKE` / `DROP` | Shape |
 | `CHOOSECOLS` / `CHOOSEROWS` | |
 | `MAP` / `REDUCE` / `SCAN` | LAMBDA helpers |
-
-#### Statistics extras
-
-| Function | Notes |
-|----------|-------|
-| `LARGE` / `SMALL` / `RANK` / `RANK.EQ` | |
-| `MODE.SNGL` / `QUARTILE.INC` | |
-| `COUNTBLANK` | |
-
-#### Text extras
-
-| Function | Notes |
-|----------|-------|
-| `TEXTJOIN` | Common modern text join |
-| `CLEAN` | |
 
 #### Information
 

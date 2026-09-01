@@ -58,6 +58,13 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // range_lookup: TRUE (default) = approximate match, FALSE = exact match
 EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+EvalResult fn_ROW(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ROWS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COLUMN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COLUMNS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ADDRESS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CHOOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

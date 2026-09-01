@@ -532,5 +532,65 @@ TEST_F(FnStatsTest, PercentileErrorPropagation) {
     EXPECT_EQ(result.getError(), CellError::DIV);
 }
 
+TEST_F(FnStatsTest, LargeAndSmall) {
+    setCellValue(0, 0, 10);
+    setCellValue(0, 1, 30);
+    setCellValue(0, 2, 20);
+    EvalResult large = eval("=LARGE(A1:A3,2)");
+    ASSERT_TRUE(large.isNumber());
+    EXPECT_DOUBLE_EQ(large.getNumber(), 20.0);
+    EvalResult small = eval("=SMALL(A1:A3,2)");
+    ASSERT_TRUE(small.isNumber());
+    EXPECT_DOUBLE_EQ(small.getNumber(), 20.0);
+}
+
+TEST_F(FnStatsTest, RankEq) {
+    setCellValue(0, 0, 100);
+    setCellValue(0, 1, 80);
+    setCellValue(0, 2, 80);
+    setCellValue(0, 3, 50);
+    EvalResult r1 = eval("=RANK(100,A1:A4)");
+    ASSERT_TRUE(r1.isNumber());
+    EXPECT_DOUBLE_EQ(r1.getNumber(), 1.0);
+    EvalResult r2 = eval("=RANK.EQ(80,A1:A4)");
+    ASSERT_TRUE(r2.isNumber());
+    EXPECT_DOUBLE_EQ(r2.getNumber(), 2.0);
+    EvalResult r3 = eval("=RANK(50,A1:A4,1)");
+    ASSERT_TRUE(r3.isNumber());
+    EXPECT_DOUBLE_EQ(r3.getNumber(), 1.0);
+}
+
+TEST_F(FnStatsTest, ModeSngl) {
+    EvalResult r = eval("=MODE.SNGL(1,2,2,3,3,3,4)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(r.getNumber(), 3.0);
+    EvalResult unique = eval("=MODE(1,2,3)");
+    ASSERT_TRUE(unique.isError());
+    EXPECT_EQ(unique.getError(), CellError::NA);
+}
+
+TEST_F(FnStatsTest, QuartileInc) {
+    setCellValue(0, 0, 1);
+    setCellValue(0, 1, 2);
+    setCellValue(0, 2, 3);
+    setCellValue(0, 3, 4);
+    EvalResult q0 = eval("=QUARTILE.INC(A1:A4,0)");
+    EvalResult q2 = eval("=QUARTILE.INC(A1:A4,2)");
+    EvalResult q4 = eval("=QUARTILE.INC(A1:A4,4)");
+    ASSERT_TRUE(q0.isNumber());
+    ASSERT_TRUE(q2.isNumber());
+    ASSERT_TRUE(q4.isNumber());
+    EXPECT_DOUBLE_EQ(q0.getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(q2.getNumber(), 2.5);
+    EXPECT_DOUBLE_EQ(q4.getNumber(), 4.0);
+}
+
+TEST_F(FnStatsTest, CountBlank) {
+    setCellValue(0, 0, 1);
+    EvalResult r = eval("=COUNTBLANK(A1:A3)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(r.getNumber(), 2.0);
+}
+
 }  // namespace
 }  // namespace cells

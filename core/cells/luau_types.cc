@@ -464,7 +464,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                     payload += "}";
                 } else {
                     // CRDT-compliant resolution: discover and create entities first
-                    FormulaResolver resolver(*workbook, *sheet);
+                    FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
 
                     // Phase 1: Discover what entities need to be created
                     const RequiredEntities required = resolver.getRequiredEntities(ast.get());

@@ -21,14 +21,15 @@
 #ifndef APPS_WASM_BINDINGS_H_
 #define APPS_WASM_BINDINGS_H_
 
-#include <emscripten/val.h>
-
 #include <cstdint>
+
+#include <emscripten/val.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/crdt.h"
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
@@ -47,15 +48,15 @@ using namespace emscripten;
 // ============================================================================
 
 enum class ChangeType {
-    CELL_CHANGED,       // Cell value/formula modified
-    STRUCTURE_CHANGED,  // Rows/columns added, removed, resized, moved
-    SHEET_CHANGED,      // Active sheet changed, sheet added/deleted/renamed/moved
-    DATA_LOADED,        // New file loaded or workbook created
-    LOAD_PROGRESS,      // File loading progress update (includes cell count)
-    SYNC_STATE_CHANGED, // Sync connection state changed
-    PEER_JOINED,        // A peer joined the sync session
-    PEER_LEFT,          // A peer left the sync session
-    PRESENCE_CHANGED    // Remote peer presence (cursor/selection) changed
+    CELL_CHANGED,        // Cell value/formula modified
+    STRUCTURE_CHANGED,   // Rows/columns added, removed, resized, moved
+    SHEET_CHANGED,       // Active sheet changed, sheet added/deleted/renamed/moved
+    DATA_LOADED,         // New file loaded or workbook created
+    LOAD_PROGRESS,       // File loading progress update (includes cell count)
+    SYNC_STATE_CHANGED,  // Sync connection state changed
+    PEER_JOINED,         // A peer joined the sync session
+    PEER_LEFT,           // A peer left the sync session
+    PRESENCE_CHANGED     // Remote peer presence (cursor/selection) changed
 };
 
 // ============================================================================
@@ -135,7 +136,8 @@ public:
     // ========================================================================
 
     std::string updateCell(const std::string& cellIdStr, const std::string& value);
-    std::string updateCellWithFormatDetection(const std::string& cellIdStr, const std::string& value);
+    std::string updateCellWithFormatDetection(const std::string& cellIdStr,
+                                              const std::string& value);
     std::string createCell(uint32_t col, uint32_t row, const std::string& value);
     std::string getOrCreateCellAt(uint32_t col, uint32_t row);
     std::string deleteCell(const std::string& cellIdStr);
@@ -170,10 +172,11 @@ public:
     std::string getAvailableStyles();
 
     // Range style operations (creates a Range with RANGE_STYLE flag)
-    std::string setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol, uint32_t endRow,
-                              const std::string& styleJson);
+    std::string setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                              uint32_t endRow, const std::string& styleJson);
     std::string setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
-                                     uint32_t endCol, uint32_t endRow, const std::string& styleJson);
+                                     uint32_t endCol, uint32_t endRow,
+                                     const std::string& styleJson);
     std::string removeRangeStyle(uint32_t col, uint32_t row);
 
     // Cell style presets (built-in named styles like Excel's Cell Styles gallery)
@@ -182,7 +185,8 @@ public:
     // Effective style operations (resolves cell > range > column > row hierarchy)
     // Used by UI to show the actual style in the toolbar
     std::string getEffectiveCellStyle(uint32_t col, uint32_t row);
-    std::string getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2);
+    std::string getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2,
+                                          uint32_t row2);
 
     // Axis style operations (set/get styles for entire columns or rows)
     std::string setColumnStyle(uint32_t colPosition, const std::string& styleJson);
@@ -199,10 +203,11 @@ public:
     std::string clearRowFormat(uint32_t rowPosition);
 
     // Range format operations (set/clear formats for rectangular ranges)
-    std::string setRangeFormat(uint32_t startCol, uint32_t startRow, uint32_t endCol, uint32_t endRow,
-                               const std::string& formatJson);
+    std::string setRangeFormat(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                               uint32_t endRow, const std::string& formatJson);
     std::string setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
-                                      uint32_t endCol, uint32_t endRow, const std::string& formatJson);
+                                      uint32_t endCol, uint32_t endRow,
+                                      const std::string& formatJson);
     std::string removeRangeFormat(uint32_t col, uint32_t row);
 
     // ========================================================================
@@ -243,17 +248,15 @@ public:
     // Fill range (bindings_core.cc)
     // ========================================================================
 
-    std::string fillRange(int sourceMinCol, int sourceMinRow,
-                          int sourceMaxCol, int sourceMaxRow,
-                          int targetMinCol, int targetMinRow,
-                          int targetMaxCol, int targetMaxRow);
+    std::string fillRange(int sourceMinCol, int sourceMinRow, int sourceMaxCol, int sourceMaxRow,
+                          int targetMinCol, int targetMinRow, int targetMaxCol, int targetMaxRow);
 
     // ========================================================================
     // Merge cell operations (bindings_core.cc)
     // ========================================================================
 
-    std::string addMergeRange(uint32_t startCol, uint32_t startRow,
-                              uint32_t endCol, uint32_t endRow);
+    std::string addMergeRange(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                              uint32_t endRow);
     std::string removeMergeRange(uint32_t col, uint32_t row);
 
     // ========================================================================
@@ -365,17 +368,13 @@ public:
     void syncClientPeerDidDisconnect(cells::net::SyncClient& client,
                                      const std::string& peerId) override;
     void syncClientDataDidChange(cells::net::SyncClient& client) override;
-    void syncClientDidError(cells::net::SyncClient& client,
-                            const std::string& error) override;
-    void syncClientLatencyDidUpdate(cells::net::SyncClient& client,
-                                    const std::string& peer_id,
+    void syncClientDidError(cells::net::SyncClient& client, const std::string& error) override;
+    void syncClientLatencyDidUpdate(cells::net::SyncClient& client, const std::string& peer_id,
                                     int latency_ms) override;
-    void syncClientPresenceDidUpdate(cells::net::SyncClient& client,
-                                     const std::string& peerId,
+    void syncClientPresenceDidUpdate(cells::net::SyncClient& client, const std::string& peerId,
                                      const cells::net::PresenceData& presence) override;
     void syncClientPresenceDidRemove(cells::net::SyncClient& client,
                                      const std::string& peerId) override;
-
 
     // ========================================================================
     // Formula API methods (bindings_formula.cc)
@@ -464,9 +463,11 @@ private:
 
     static inline const std::unordered_map<ID, std::string, IDHash> _emptyCustomFormats{};
 
-
     // Broadcast pending operations to peers (queue + send)
     void broadcastPendingOperations();
+
+    // Local UI writes go through Luau. Not a skip-sandbox applyOperation.
+    ApplyResult applyLocalUiOp(const Operation& op);
 };
 
 }  // namespace cells::wasm

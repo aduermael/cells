@@ -29,6 +29,9 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <memory>
+
+#include "core/cells/crdt.h"
 #include "core/cells/model.h"
 
 #include "Luau/Compiler.h"  // NOLINT(build/include_subdir)
@@ -95,7 +98,10 @@ LuauSandbox::LuauSandbox(LuauSandbox&& other) noexcept
       workbook_(other.workbook_),
       sheet_(other.sheet_),
       instructionCount_(other.instructionCount_),
-      interrupted_(other.interrupted_) {
+      interrupted_(other.interrupted_),
+      executionCount_(other.executionCount_),
+      pendingUiOp_(std::move(other.pendingUiOp_)),
+      lastUiApplyResult_(other.lastUiApplyResult_) {
     other.L_ = nullptr;
     other.workbook_ = nullptr;
     other.sheet_ = nullptr;
@@ -119,6 +125,9 @@ LuauSandbox& LuauSandbox::operator=(LuauSandbox&& other) noexcept {
         sheet_ = other.sheet_;
         instructionCount_ = other.instructionCount_;
         interrupted_ = other.interrupted_;
+        executionCount_ = other.executionCount_;
+        pendingUiOp_ = std::move(other.pendingUiOp_);
+        lastUiApplyResult_ = other.lastUiApplyResult_;
 
         other.L_ = nullptr;
         other.workbook_ = nullptr;
@@ -283,6 +292,9 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaPrint, "print");
     lua_setglobal(L_, "print");
 
+    lua_pushcfunction(L_, &LuauSandbox::luaApplyUiOp, "_applyUiOp");
+    lua_setglobal(L_, "_applyUiOp");
+
     // Register style constants
     // Horizontal alignment
     lua_pushstring(L_, "left");
@@ -391,8 +403,27 @@ std::string LuauSandbox::compile(const std::string& source, std::string& bytecod
     return "";  // Success
 }
 
+void LuauSandbox::queueUiOperation(const Operation& op) {
+    pendingUiOp_ = std::make_unique<Operation>(op);
+}
+
+int LuauSandbox::luaApplyUiOp(lua_State* L) {
+    LuauSandbox* sandbox = getSandbox(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sandbox == nullptr || workbook == nullptr) {
+        luaL_error(L, "_applyUiOp: no context set");
+    }
+    if (sandbox->pendingUiOp_ == nullptr) {
+        luaL_error(L, "_applyUiOp: no queued UI operation");
+    }
+    sandbox->lastUiApplyResult_ = applyOperation(*workbook, *sandbox->pendingUiOp_);
+    sandbox->pendingUiOp_.reset();
+    return 0;
+}
+
 ScriptResult LuauSandbox::execute(const std::string& script) {
     ScriptResult result;
+    executionCount_++;
 
     if (L_ == nullptr) {
         result.error = "Lua state not initialized";

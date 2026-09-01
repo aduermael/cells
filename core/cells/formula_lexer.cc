@@ -519,6 +519,37 @@ Token FormulaLexer::scanIdentifierOrColumn() {
 
     const std::string_view letters = source_.substr(start, pos_ - start);
 
+    // Dotted Excel names (RANK.EQ, MODE.SNGL, CEILING.MATH) when followed by '('.
+    if (peek() == '.') {
+        size_t look = pos_;
+        bool dottedFn = false;
+        while (look < source_.size() && source_[look] == '.') {
+            ++look;
+            if (look >= source_.size() || !isAlpha(source_[look])) {
+                dottedFn = false;
+                break;
+            }
+            while (look < source_.size() && isAlphaNumeric(source_[look])) {
+                ++look;
+            }
+            if (look < source_.size() && source_[look] == '(') {
+                dottedFn = true;
+                break;
+            }
+            if (look < source_.size() && source_[look] == '.') {
+                continue;
+            }
+            dottedFn = false;
+            break;
+        }
+        if (dottedFn) {
+            while (pos_ < look) {
+                advance();
+            }
+            return makeToken(TokenType::IDENTIFIER, start);
+        }
+    }
+
     // Check if we have underscore (making it definitely an identifier)
     if (peek() == '_') {
         // Continue consuming for identifier

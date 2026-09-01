@@ -25,6 +25,8 @@
 
 #include <cstring>
 
+#include <vector>
+
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/fill_range.h"
@@ -393,7 +395,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                 payload += "}";
             } else {
                 // CRDT-compliant resolution: discover and create entities first
-                FormulaResolver resolver(*workbook, *sheet);
+                FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
                 const RequiredEntities required = resolver.getRequiredEntities(ast.get());
 
                 // Create required columns via CRDT operations
@@ -514,6 +516,8 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         luaL_error(L, "setCell: unsupported value type");
     }
 
+    const ID spillMasterBefore = sheet->getSpillMaster(col->id, row->id);
+
     // Apply via CRDT with sheet id (matches WASM createCell) so peers apply on the
     // correct sheet and create the cell if missing.
     const Operation op = makeCellSetOp(*workbook, cellId, sheet->id, payload);
@@ -522,7 +526,11 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     // Trigger recalculation: mark dependents dirty and recalculate
     // This ensures formulas that depend on this cell get updated
     markDirty(sheet, cellId);
-    const std::vector<ID> changed = {cellId};
+    std::vector<ID> changed = {cellId};
+    if (!spillMasterBefore.isNull()) {
+        markDirty(sheet, spillMasterBefore);
+        changed.push_back(spillMasterBefore);
+    }
     cells::recalculate(workbook, changed);
     cells::recalculateVolatile(sheet);
 

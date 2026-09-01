@@ -9,6 +9,8 @@ package(default_visibility = ["//core/cells:__pkg__"])
 exports_files([
     "fn_array.cc",
     "fn_array.h",
+    "fn_conditional.cc",
+    "fn_conditional.h",
     "fn_datetime.cc",
     "fn_datetime.h",
     "fn_logic.cc",
@@ -24,6 +26,19 @@ exports_files([
     "fn_text.cc",
     "fn_text.h",
 ])
+
+cc_test(
+    name = "fn_conditional_test",
+    srcs = ["fn_conditional_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
 
 cc_test(
     name = "fn_array_test",
@@ -55,6 +70,19 @@ cc_test(
 cc_test(
     name = "fn_math_test",
     srcs = ["fn_math_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fn_datetime_test",
+    srcs = ["fn_datetime_test.cc"],
     deps = [
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",

@@ -509,6 +509,13 @@ TEST(FormulaLexerTest, IdentifierLowercase) {
     EXPECT_EQ(tok.text, "sum");
 }
 
+TEST(FormulaLexerTest, DottedFunctionName) {
+    FormulaLexer lexer("RANK.EQ(");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tok.text, "RANK.EQ");
+}
+
 // ============================================================================
 // Position Tracking Tests
 // ============================================================================
