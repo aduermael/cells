@@ -1159,6 +1159,14 @@ void registerTextFunctions(FunctionRegistry& registry) {
     registry.registerFunction("NUMBERVALUE", fn_NUMBERVALUE,
                               "(text, [decimal_separator], [group_separator])",
                               "Converts locale-formatted text to a number", "Text");
+    // Unicode Excel treats DBCS byte variants as the character implementations.
+    registry.registerAlias("LENB", "LEN");
+    registry.registerAlias("LEFTB", "LEFT");
+    registry.registerAlias("RIGHTB", "RIGHT");
+    registry.registerAlias("MIDB", "MID");
+    registry.registerAlias("FINDB", "FIND");
+    registry.registerAlias("SEARCHB", "SEARCH");
+    registry.registerAlias("REPLACEB", "REPLACE");
 }
 
 }  // namespace cells

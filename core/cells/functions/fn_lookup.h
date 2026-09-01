@@ -64,6 +64,10 @@ EvalResult fn_COLUMN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_COLUMNS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_ADDRESS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CHOOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_AREAS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SHEET(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SHEETS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HYPERLINK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

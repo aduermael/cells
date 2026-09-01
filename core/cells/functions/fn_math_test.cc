@@ -553,5 +553,26 @@ TEST_F(FnMathTest, SmokeNoNameErrorForAll) {
     }
 }
 
+TEST_F(FnMathTest, GammaGammaln) {
+    EvalResult g1 = eval("=GAMMA(1)");
+    ASSERT_TRUE(g1.isNumber());
+    EXPECT_DOUBLE_EQ(g1.getNumber(), 1.0);
+    EvalResult g5 = eval("=GAMMA(5)");
+    ASSERT_TRUE(g5.isNumber());
+    EXPECT_DOUBLE_EQ(g5.getNumber(), 24.0);
+    EvalResult ln = eval("=GAMMALN(1)");
+    ASSERT_TRUE(ln.isNumber());
+    EXPECT_DOUBLE_EQ(ln.getNumber(), 0.0);
+    EvalResult prec = eval("=GAMMALN.PRECISE(1)");
+    ASSERT_TRUE(prec.isNumber());
+    EXPECT_DOUBLE_EQ(prec.getNumber(), 0.0);
+    EXPECT_EQ(eval("=GAMMA(0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMA(-1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMALN(0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=GAMMA(1,2)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=GAMMALN()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=GAMMA(\"x\")").getError(), CellError::VALUE);
+}
+
 }  // namespace
 }  // namespace cells

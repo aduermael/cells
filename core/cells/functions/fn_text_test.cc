@@ -101,5 +101,41 @@ TEST_F(FnTextExtraTest, DollarFixedNumbervalue) {
     EXPECT_DOUBLE_EQ(pct.getNumber(), 0.5);
 }
 
+TEST_F(FnTextExtraTest, ByteAliasesShareUnicodeImpl) {
+    EvalResult lenb = eval("=LENB(\"abc\")");
+    EvalResult len = eval("=LEN(\"abc\")");
+    ASSERT_TRUE(lenb.isNumber());
+    ASSERT_TRUE(len.isNumber());
+    EXPECT_DOUBLE_EQ(lenb.getNumber(), len.getNumber());
+    EvalResult leftb = eval("=LEFTB(\"hello\",2)");
+    ASSERT_TRUE(leftb.isString());
+    EXPECT_EQ(leftb.getString(), "he");
+    EvalResult rightb = eval("=RIGHTB(\"hello\",2)");
+    ASSERT_TRUE(rightb.isString());
+    EXPECT_EQ(rightb.getString(), "lo");
+    EvalResult midb = eval("=MIDB(\"hello\",2,3)");
+    ASSERT_TRUE(midb.isString());
+    EXPECT_EQ(midb.getString(), "ell");
+    EvalResult findb = eval("=FINDB(\"l\",\"hello\")");
+    ASSERT_TRUE(findb.isNumber());
+    EXPECT_DOUBLE_EQ(findb.getNumber(), 3.0);
+    EvalResult searchb = eval("=SEARCHB(\"L\",\"hello\")");
+    ASSERT_TRUE(searchb.isNumber());
+    EXPECT_DOUBLE_EQ(searchb.getNumber(), 3.0);
+    EvalResult replaceb = eval("=REPLACEB(\"hello\",2,3,\"y\")");
+    ASSERT_TRUE(replaceb.isString());
+    EXPECT_EQ(replaceb.getString(), "hyo");
+    EXPECT_EQ(eval("=LENB()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=LEFTB(\"ab\",-1)").getError(), CellError::VALUE);
+    FunctionRegistry& reg = FunctionRegistry::instance();
+    EXPECT_TRUE(reg.exists("LENB"));
+    EXPECT_TRUE(reg.exists("LEFTB"));
+    EXPECT_TRUE(reg.exists("RIGHTB"));
+    EXPECT_TRUE(reg.exists("MIDB"));
+    EXPECT_TRUE(reg.exists("FINDB"));
+    EXPECT_TRUE(reg.exists("SEARCHB"));
+    EXPECT_TRUE(reg.exists("REPLACEB"));
+}
+
 }  // namespace
 }  // namespace cells

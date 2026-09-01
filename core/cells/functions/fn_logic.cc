@@ -357,25 +357,6 @@ EvalResult evenOrOdd(const std::vector<const ASTNode*>& args, EvalContext& ctx, 
     return EvalResult::Boolean(wantEven ? even : !even);
 }
 
-bool isReferenceNode(const ASTNode* n) {
-    if (n == nullptr) {
-        return false;
-    }
-    switch (n->type) {
-        case ASTNodeType::CELL_REF:
-        case ASTNodeType::RANGE_REF:
-        case ASTNodeType::COLUMN_REF:
-        case ASTNodeType::ROW_REF:
-        case ASTNodeType::COLUMN_RANGE_REF:
-        case ASTNodeType::ROW_RANGE_REF:
-        case ASTNodeType::NAMED_REF:
-        case ASTNodeType::SPILL_RANGE_REF:
-            return true;
-        default:
-            return false;
-    }
-}
-
 }  // namespace
 
 EvalResult fn_ISEVEN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {

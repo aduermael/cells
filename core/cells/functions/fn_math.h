@@ -249,6 +249,9 @@ EvalResult fn_SERIESSUM(const std::vector<const ASTNode*>& args, EvalContext& ct
 EvalResult fn_SUMX2MY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_SUMX2PY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_SUMXMY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMALN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAMMALN_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Registration

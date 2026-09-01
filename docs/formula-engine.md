@@ -10,7 +10,7 @@
 | AST Parser | ✅ Implemented |
 | Execution Engine | ✅ Implemented |
 | Dependency Graph | ✅ Implemented |
-| Function Library | ✅ 280 registered names |
+| Function Library | ✅ 348 registered names |
 | Dynamic Arrays (Spill) | ✅ Implemented |
 
 For the full function inventory, missing Excel functions, and product/feature parity, see [Excel Parity](./excel-parity.md).

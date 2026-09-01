@@ -44,6 +44,16 @@ EvalResult fn_ERFC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_ERF_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_ERFC_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_COMPLEX(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMABS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMAGINARY(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMARGUMENT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMCONJUGATE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMDIV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMPOWER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMPRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMREAL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMSUB(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_IMSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 void registerEngineeringFunctions(FunctionRegistry& registry);
 

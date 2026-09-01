@@ -151,5 +151,48 @@ TEST_F(FnEngineeringTest, DeltaGeStepErfComplex) {
     EXPECT_EQ(cj.getString(), "3-4j");
 }
 
+TEST_F(FnEngineeringTest, ImArithmetic) {
+    EvalResult absv = eval("=IMABS(\"3+4i\")");
+    ASSERT_TRUE(absv.isNumber());
+    EXPECT_DOUBLE_EQ(absv.getNumber(), 5.0);
+    EvalResult re = eval("=IMREAL(\"3+4i\")");
+    ASSERT_TRUE(re.isNumber());
+    EXPECT_DOUBLE_EQ(re.getNumber(), 3.0);
+    EvalResult im = eval("=IMAGINARY(\"3+4i\")");
+    ASSERT_TRUE(im.isNumber());
+    EXPECT_DOUBLE_EQ(im.getNumber(), 4.0);
+    EvalResult arg = eval("=IMARGUMENT(\"0+1i\")");
+    ASSERT_TRUE(arg.isNumber());
+    EXPECT_NEAR(arg.getNumber(), 1.5707963267948966, 1e-12);
+    EvalResult conj = eval("=IMCONJUGATE(\"3+4i\")");
+    ASSERT_TRUE(conj.isString());
+    EXPECT_EQ(conj.getString(), "3-4i");
+    EvalResult sum = eval("=IMSUM(\"3+4i\",\"1+2i\")");
+    ASSERT_TRUE(sum.isString());
+    EXPECT_EQ(sum.getString(), "4+6i");
+    EvalResult sub = eval("=IMSUB(\"3+4i\",\"1+2i\")");
+    ASSERT_TRUE(sub.isString());
+    EXPECT_EQ(sub.getString(), "2+2i");
+    EvalResult prod = eval("=IMPRODUCT(\"3+4i\",\"1+2i\")");
+    ASSERT_TRUE(prod.isString());
+    EXPECT_EQ(prod.getString(), "-5+10i");
+    EvalResult div = eval("=IMDIV(\"1+i\",\"1+i\")");
+    ASSERT_TRUE(div.isString());
+    EXPECT_EQ(div.getString(), "1");
+    EvalResult powv = eval("=IMPOWER(\"2+2i\",2)");
+    ASSERT_TRUE(powv.isString());
+    EXPECT_EQ(powv.getString(), "8i");
+    EvalResult fromComplex = eval("=IMSUM(COMPLEX(3,4),COMPLEX(1,2))");
+    ASSERT_TRUE(fromComplex.isString());
+    EXPECT_EQ(fromComplex.getString(), "4+6i");
+    EXPECT_EQ(eval("=IMABS()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=IMARGUMENT(0)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=IMDIV(\"1+i\",0)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=IMPOWER(0,-1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=IMSUB(\"1+i\")").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=IMSUM()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=IMABS(\"nope\")").getError(), CellError::NUM);
+}
+
 }  // namespace
 }  // namespace cells

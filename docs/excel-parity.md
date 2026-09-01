@@ -3,7 +3,7 @@
 Living status of Cells vs Microsoft Excel: formulas, spreadsheet features, file I/O, and UI.
 
 **Last reviewed:** 2026-09-01  
-**Function count:** **280** registered (Excel has ~484 worksheet functions ≈ **58%**; dotted/underscore aliases share one implementation)  
+**Function count:** **348** registered (Excel has ~484 worksheet functions ≈ **72%**; dotted/underscore aliases share one implementation)  
 **Source of truth for implementations:** `core/cells/functions/fn_*.cc`
 
 Update this document when adding functions, shipping features, or changing XLSX fidelity. Cross-check the function list against the registry if counts drift.
@@ -15,7 +15,7 @@ Update this document when adding functions, shipping features, or changing XLSX 
 | Area | Status | Notes |
 |------|--------|-------|
 | Formula engine (parse / eval / deps / spill) | ✅ Solid | AST-native C++; UUID-stable refs |
-| Function library breadth | 🟡 Partial | 280 / ~484 Excel functions (aliases included) |
+| Function library breadth | 🟡 Partial | 348 / ~484 Excel functions (aliases included) |
 | Grid editing & selection | ✅ Solid | Fill handle, multi-range, formula bar |
 | Cell / range formatting | ✅ Solid | Fonts, fills, borders, number formats, themes |
 | XLSX import / export | 🟡 Partial | Values, formulas, styles, merges; fidelity still improving |
@@ -58,18 +58,18 @@ Details: [Formula Engine](./formula-engine.md).
 
 | Category | Implemented | Excel (approx.) | Coverage (rough) |
 |----------|------------:|----------------:|------------------:|
-| Math & trig | 86 | ~80 | Core + trig + combinatorics + SUMX* |
+| Math & trig | 89 | ~80 | Core + trig + combinatorics + SUMX* + GAMMA |
 | Logic / information (subset) | 29 | ~40 | Strong modern set (`LET`, `LAMBDA`, `IFS`, …) plus ISERR/TYPE/N |
-| Text | 26 | ~50 | Core string ops + UNICHAR/DOLLAR/FIXED |
+| Text | 33 | ~50 | Core string ops + UNICHAR/DOLLAR/FIXED + byte aliases |
 | Date / time | 23 | ~40 | Core extractors + DAYS360/YEARFRAC/ISOWEEKNUM |
-| Statistics | 40 | ~100 | Basic + regression/correlation + percentrank |
+| Statistics | 56 | ~100 | Basic + regression/correlation + percentrank + skew/kurt/normal |
 | Array / dynamic | 5 | ~25 | Core spill set only |
-| Lookup & reference | 10 | ~40 | Classic + ROW/COLUMN/ADDRESS/CHOOSE |
-| Financial | 0 | ~55 | Entire category missing |
-| Engineering | 24 | ~50 | Bitwise, base conversion, ERF, COMPLEX |
+| Lookup & reference | 14 | ~40 | Classic + ROW/COLUMN/ADDRESS/CHOOSE + SHEET/AREAS/HYPERLINK |
+| Financial | 24 | ~55 | Closed-form annuity, depreciation, T-bill (no RATE/IRR) |
+| Engineering | 34 | ~50 | Bitwise, base conversion, ERF, COMPLEX, IM* |
 | Database | 0 | ~12 | Entire category missing |
 | Cube / web / other | 0 | many | Out of scope for now |
-| **Total registered** | **280** | **~484** | **~58%** (includes dotted/underscore aliases) |
+| **Total registered** | **348** | **~484** | **~72%** (includes dotted/underscore aliases) |
 
 Excel totals vary by version (Microsoft 365 adds functions over time). Counts above are directional, not exact product marketing numbers.
 
@@ -87,11 +87,11 @@ Categories currently green in that harness: **logical**, **math-basic**, **math-
 
 ---
 
-### Implemented functions (280 registered names)
+### Implemented functions (348 registered names)
 
 Both Excel dotted names and underscore/concat aliases resolve to one implementation. Registered names historically used underscores where Excel uses dots (e.g. `CEILING.MATH` → `CEILING_MATH` on XLSX import via `_xlfn.` stripping). Some aliases omit the underscore (`STDEVS` for `STDEV.S`, `PERCENTILEINC` for `PERCENTILE.INC`).
 
-#### Math (86 unique + dotted rounding aliases)
+#### Math (89 unique + dotted rounding aliases)
 
 | Function | Description |
 |----------|-------------|
@@ -132,6 +132,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `ARABIC` / `ROMAN` | Roman numerals |
 | `MULTINOMIAL` / `SERIESSUM` | Multinomial coefficient / power series |
 | `SUMX2MY2` / `SUMX2PY2` / `SUMXMY2` | Paired-array square sums |
+| `GAMMA` / `GAMMALN` / `GAMMALN.PRECISE` | Gamma function and ln(Γ) |
 
 #### Logic (29)
 
@@ -147,7 +148,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `ISERR` / `ISNONTEXT` / `ISEVEN` / `ISODD` / `ISREF` | Additional predicates |
 | `TYPE` / `N` / `ERROR.TYPE` | Type code, numeric coerce, error code |
 
-#### Text (26)
+#### Text (33 registered, including LENB/LEFTB/… Unicode aliases)
 
 | Function | Description |
 |----------|-------------|
@@ -162,8 +163,9 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `CLEAN` | Strip non-printable characters |
 | `UNICHAR` / `UNICODE` | Unicode code points |
 | `DOLLAR` / `FIXED` / `NUMBERVALUE` | Numeric text formatting / locale parse |
+| `LENB` / `LEFTB` / `RIGHTB` / `MIDB` / `FINDB` / `SEARCHB` / `REPLACEB` | Byte-count aliases of the Unicode implementations |
 
-#### Lookup (10)
+#### Lookup (14)
 
 | Function | Description |
 |----------|-------------|
@@ -175,6 +177,9 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `COLUMN` / `COLUMNS` | Column number / width |
 | `ADDRESS` | Cell address as text |
 | `CHOOSE` | Pick value by index |
+| `AREAS` | Number of areas in a reference |
+| `SHEET` / `SHEETS` | Sheet index / sheet count |
+| `HYPERLINK` | Display text (or URL) of a hyperlink |
 
 #### Date / time (23)
 
@@ -198,7 +203,7 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `YEARFRAC` | | Fraction of a year between dates |
 | `ISOWEEKNUM` | | ISO 8601 week number |
 
-#### Statistics (40)
+#### Statistics (56)
 
 | Function | Description |
 |----------|-------------|
@@ -218,8 +223,13 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `QUARTILE.EXC` / `RANK.AVG` | Exclusive quartile / average rank |
 | `AVERAGEA` / `MINA` / `MAXA` | Aggregates treating text/logicals |
 | `PERCENTRANK` / `PERCENTRANK.INC` / `PERCENTRANK.EXC` | Percent rank |
+| `FISHER` / `FISHERINV` | Fisher transformation |
+| `PHI` / `GAUSS` / `NORMSDIST` / `NORM.S.DIST` / `NORMDIST` / `NORM.DIST` | Standard/normal PDF and CDF |
+| `SKEW` / `SKEW.P` / `KURT` | Skewness and excess kurtosis |
+| `STDEVA` / `STDEVPA` / `VARA` / `VARPA` | Stdev/variance treating text/logicals |
+| `STEYX` | Standard error of linear regression |
 
-#### Engineering (24)
+#### Engineering (34)
 
 | Function | Description |
 |----------|-------------|
@@ -229,6 +239,21 @@ Both Excel dotted names and underscore/concat aliases resolve to one implementat
 | `DELTA` / `GESTEP` | Kronecker delta / step |
 | `ERF` / `ERFC` / `ERF.PRECISE` / `ERFC.PRECISE` | Error function |
 | `COMPLEX` | Real/imaginary to complex text |
+| `IMABS` / `IMREAL` / `IMAGINARY` / `IMARGUMENT` / `IMCONJUGATE` | Complex parts |
+| `IMSUM` / `IMSUB` / `IMPRODUCT` / `IMDIV` / `IMPOWER` | Complex arithmetic |
+
+#### Financial (24)
+
+| Function | Description |
+|----------|-------------|
+| `PV` / `FV` / `PMT` / `NPER` | Annuity present/future value, payment, periods |
+| `NPV` | Net present value of cash flows |
+| `SLN` / `SYD` / `DB` / `DDB` | Depreciation |
+| `IPMT` / `PPMT` / `CUMIPMT` / `CUMPRINC` / `ISPMT` | Interest vs principal |
+| `EFFECT` / `NOMINAL` | Effective / nominal rate conversion |
+| `DOLLARDE` / `DOLLARFR` | Fractional dollar prices |
+| `FVSCHEDULE` / `PDURATION` / `RRI` | Compounding helpers |
+| `TBILLEQ` / `TBILLPRICE` / `TBILLYIELD` | Treasury bills |
 
 #### Array / dynamic (5)
 
@@ -253,13 +278,15 @@ Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and f
 | `XLOOKUP` / `XMATCH` | Modern Excel default |
 | `OFFSET` / `INDIRECT` | Dynamic refs (volatile) |
 
-#### Financial — entire category missing
+#### Financial — remaining iterative / coupon / yield work
+
+Closed-form annuity, depreciation, dollar-fraction, and T-bill functions are implemented (`PV`/`FV`/`PMT`/`NPER`/`NPV`, `SLN`/`SYD`/`DB`/`DDB`, `IPMT`/`PPMT`/`CUMIPMT`/`CUMPRINC`, `EFFECT`/`NOMINAL`, `TBILL*`, …). Still missing:
 
 | Function | Notes |
 |----------|-------|
-| `PV` / `FV` / `PMT` / `NPER` / `RATE` | Loan / annuity basics |
-| `NPV` / `IRR` / `XNPV` / `XIRR` | Investment analysis |
-| `DB` / `DDB` / `SLN` | Depreciation |
+| `RATE` / `IRR` / `MIRR` / `XIRR` | Iterative solvers |
+| `XNPV` | Dated cash flows |
+| `ACCRINT` / `COUP*` / `PRICE` / `YIELD` / `DURATION` | Bonds / coupons |
 
 #### Dynamic arrays (beyond core spill set)
 
@@ -288,7 +315,8 @@ Not exhaustive of all ~484 Excel functions — focused on high-impact gaps and f
 | Function | Notes |
 |----------|-------|
 | `CONVERT` | Unit conversion tables |
-| `BESSEL*` / `IM*` | Special / complex arithmetic |
+| `BESSEL*` | Special functions |
+| Remaining `IM*` (`IMCOS`, `IMEXP`, …) | Trig/exp on complex text |
 
 ---
 

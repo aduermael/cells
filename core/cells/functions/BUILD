@@ -15,6 +15,8 @@ exports_files([
     "fn_datetime.h",
     "fn_engineering.cc",
     "fn_engineering.h",
+    "fn_financial.cc",
+    "fn_financial.h",
     "fn_logic.cc",
     "fn_logic.h",
     "fn_lookup.cc",
@@ -137,6 +139,19 @@ cc_test(
 cc_test(
     name = "fn_text_test",
     srcs = ["fn_text_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fn_financial_test",
+    srcs = ["fn_financial_test.cc"],
     deps = [
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",

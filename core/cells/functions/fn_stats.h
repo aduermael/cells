@@ -91,6 +91,22 @@ EvalResult fn_MAXA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_PERCENTRANK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_PERCENTRANK_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_PERCENTRANK_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FISHER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FISHERINV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PHI(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GAUSS(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SKEW(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SKEW_P(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_KURT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_STDEVA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_STDEVPA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_VARA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_VARPA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_STEYX(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORMSDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORM_S_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

@@ -14,15 +14,10 @@ namespace cells {
 
 namespace {
 
-// Helper to compute variance (shared by STDEV and VAR)
+// Helper to compute variance from collected values.
 // population: true for population variance (n denominator), false for sample variance (n-1)
-std::pair<double, EvalResult> computeVariance(const std::vector<const ASTNode*>& args,
-                                              EvalContext& ctx, bool population) {
-    auto [values, error] = collectNumericValues(args, ctx);
-    if (error.isError()) {
-        return {0.0, error};
-    }
-
+std::pair<double, EvalResult> computeVarianceFromValues(const std::vector<double>& values,
+                                                        bool population) {
     if (values.empty()) {
         return {0.0, EvalResult::Error(CellError::NUM)};
     }
@@ -32,25 +27,58 @@ std::pair<double, EvalResult> computeVariance(const std::vector<const ASTNode*>&
         return {0.0, EvalResult::Error(CellError::DIV)};
     }
 
-    // Calculate mean
     double sum = 0.0;
     for (const double v : values) {
         sum += v;
     }
     const double mean = sum / static_cast<double>(values.size());
 
-    // Calculate sum of squared deviations
     double sumSquaredDev = 0.0;
     for (const double v : values) {
         const double dev = v - mean;
         sumSquaredDev += dev * dev;
     }
 
-    // Divide by n (population) or n-1 (sample)
     const double denominator =
         population ? static_cast<double>(values.size()) : static_cast<double>(values.size() - 1);
 
     return {sumSquaredDev / denominator, EvalResult::Empty()};
+}
+
+std::pair<double, EvalResult> computeVariance(const std::vector<const ASTNode*>& args,
+                                              EvalContext& ctx, bool population) {
+    auto [values, error] = collectNumericValues(args, ctx);
+    if (error.isError()) {
+        return {0.0, error};
+    }
+    return computeVarianceFromValues(values, population);
+}
+
+constexpr double kSqrt2Pi = 2.5066282746310002;  // sqrt(2*pi)
+constexpr double kSqrt2 = 1.4142135623730951;
+
+double standardNormalPdf(double x) {
+    return std::exp(-0.5 * x * x) / kSqrt2Pi;
+}
+
+double standardNormalCdf(double x) {
+    return 0.5 * (1.0 + std::erf(x / kSqrt2));
+}
+
+std::pair<double, double> meanAndDev(const std::vector<double>& values, bool population) {
+    double sum = 0.0;
+    for (const double v : values) {
+        sum += v;
+    }
+    const double n = static_cast<double>(values.size());
+    const double mean = sum / n;
+    double ss = 0.0;
+    for (const double v : values) {
+        const double d = v - mean;
+        ss += d * d;
+    }
+    const double denom = population ? n : n - 1.0;
+    return {mean, std::sqrt(ss / denom)};
 }
 
 // Helper to compute percentile
@@ -144,6 +172,10 @@ struct LinReg {
     double pearson = 0.0;
     double covarP = 0.0;
     double covarS = 0.0;
+    double n = 0.0;
+    double ssxx = 0.0;
+    double ssyy = 0.0;
+    double ssxy = 0.0;
     EvalResult error = EvalResult::Empty();
 };
 
@@ -181,6 +213,10 @@ LinReg linearRegression(const ASTNode* knownY, const ASTNode* knownX, EvalContex
         out.error = EvalResult::Error(CellError::DIV);
         return out;
     }
+    out.n = n;
+    out.ssxx = ssxx;
+    out.ssyy = ssyy;
+    out.ssxy = ssxy;
     out.slope = ssxy / ssxx;
     out.intercept = meanY - out.slope * meanX;
     out.covarP = ssxy / n;
@@ -892,6 +928,266 @@ EvalResult fn_PERCENTRANK_EXC(const std::vector<const ASTNode*>& args, EvalConte
     return percentRankImpl(args, ctx, true);
 }
 
+EvalResult fn_FISHER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double x = n.getNumber();
+    if (x <= -1.0 || x >= 1.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(0.5 * std::log((1.0 + x) / (1.0 - x))));
+}
+
+EvalResult fn_FISHERINV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double y = n.getNumber();
+    const double e2 = std::exp(2.0 * y);
+    if (!std::isfinite(e2)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize((e2 - 1.0) / (e2 + 1.0)));
+}
+
+EvalResult fn_PHI(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    return EvalResult::Number(excelNormalize(standardNormalPdf(n.getNumber())));
+}
+
+EvalResult fn_GAUSS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    return EvalResult::Number(excelNormalize(standardNormalCdf(n.getNumber()) - 0.5));
+}
+
+EvalResult fn_SKEW(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.size() < 3) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    auto [mean, s] = meanAndDev(values, false);
+    if (s == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    double m3 = 0.0;
+    for (const double v : values) {
+        const double t = (v - mean) / s;
+        m3 += t * t * t;
+    }
+    const double n = static_cast<double>(values.size());
+    return EvalResult::Number(excelNormalize(n / ((n - 1.0) * (n - 2.0)) * m3));
+}
+
+EvalResult fn_SKEW_P(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.size() < 3) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    auto [mean, s] = meanAndDev(values, true);
+    if (s == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    double m3 = 0.0;
+    for (const double v : values) {
+        const double t = (v - mean) / s;
+        m3 += t * t * t;
+    }
+    return EvalResult::Number(excelNormalize(m3 / static_cast<double>(values.size())));
+}
+
+EvalResult fn_KURT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.size() < 4) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    auto [mean, s] = meanAndDev(values, false);
+    if (s == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    double m4 = 0.0;
+    for (const double v : values) {
+        const double t = (v - mean) / s;
+        m4 += t * t * t * t;
+    }
+    const double n = static_cast<double>(values.size());
+    const double a = n * (n + 1.0) / ((n - 1.0) * (n - 2.0) * (n - 3.0));
+    const double b = 3.0 * (n - 1.0) * (n - 1.0) / ((n - 2.0) * (n - 3.0));
+    return EvalResult::Number(excelNormalize(a * m4 - b));
+}
+
+EvalResult fn_VARA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectAverageAValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    auto [var, verr] = computeVarianceFromValues(values, false);
+    if (verr.isError()) {
+        return verr;
+    }
+    return EvalResult::Number(excelNormalize(var));
+}
+
+EvalResult fn_VARPA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectAverageAValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    auto [var, verr] = computeVarianceFromValues(values, true);
+    if (verr.isError()) {
+        return verr;
+    }
+    return EvalResult::Number(excelNormalize(var));
+}
+
+EvalResult fn_STDEVA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    const EvalResult v = fn_VARA(args, ctx);
+    if (v.isError()) {
+        return v;
+    }
+    return EvalResult::Number(excelNormalize(std::sqrt(v.getNumber())));
+}
+
+EvalResult fn_STDEVPA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    const EvalResult v = fn_VARPA(args, ctx);
+    if (v.isError()) {
+        return v;
+    }
+    return EvalResult::Number(excelNormalize(std::sqrt(v.getNumber())));
+}
+
+EvalResult fn_STEYX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    if (r.n < 3.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    const double sse = r.ssyy - (r.ssxy * r.ssxy / r.ssxx);
+    if (sse < 0.0) {
+        return EvalResult::Number(0.0);
+    }
+    return EvalResult::Number(excelNormalize(std::sqrt(sse / (r.n - 2.0))));
+}
+
+EvalResult fn_NORMSDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    return EvalResult::Number(excelNormalize(standardNormalCdf(n.getNumber())));
+}
+
+EvalResult fn_NORM_S_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult z = evaluateAsNumber(args[0], ctx);
+    if (z.isError()) {
+        return z;
+    }
+    const EvalResult cum = evaluateAsBoolean(args[1], ctx);
+    if (cum.isError()) {
+        return cum;
+    }
+    const double x = z.getNumber();
+    if (cum.getBoolean()) {
+        return EvalResult::Number(excelNormalize(standardNormalCdf(x)));
+    }
+    return EvalResult::Number(excelNormalize(standardNormalPdf(x)));
+}
+
+EvalResult fn_NORMDIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    double x = 0.0;
+    double mean = 0.0;
+    double stdev = 0.0;
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    x = xRes.getNumber();
+    const EvalResult mRes = evaluateAsNumber(args[1], ctx);
+    if (mRes.isError()) {
+        return mRes;
+    }
+    mean = mRes.getNumber();
+    const EvalResult sRes = evaluateAsNumber(args[2], ctx);
+    if (sRes.isError()) {
+        return sRes;
+    }
+    stdev = sRes.getNumber();
+    if (stdev <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const EvalResult cum = evaluateAsBoolean(args[3], ctx);
+    if (cum.isError()) {
+        return cum;
+    }
+    const double z = (x - mean) / stdev;
+    if (cum.getBoolean()) {
+        return EvalResult::Number(excelNormalize(standardNormalCdf(z)));
+    }
+    return EvalResult::Number(excelNormalize(standardNormalPdf(z) / stdev));
+}
+
+EvalResult fn_NORM_DIST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_NORMDIST(args, ctx);
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -1010,6 +1306,42 @@ void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerAlias("PERCENTILE.EXC", "PERCENTILEEXC");
     registry.registerAlias("PERCENTILE_INC", "PERCENTILEINC");
     registry.registerAlias("PERCENTILE_EXC", "PERCENTILEEXC");
+
+    registry.registerFunction("FISHER", fn_FISHER, "(x)", "Fisher transformation", "Statistics");
+    registry.registerFunction("FISHERINV", fn_FISHERINV, "(y)", "Inverse Fisher transformation",
+                              "Statistics");
+    registry.registerFunction("PHI", fn_PHI, "(x)", "Standard normal probability density",
+                              "Statistics");
+    registry.registerFunction("GAUSS", fn_GAUSS, "(z)", "Standard normal CDF minus 0.5",
+                              "Statistics");
+    registry.registerFunction("SKEW", fn_SKEW, "(number1, [number2], ...)", "Sample skewness",
+                              "Statistics");
+    registry.registerFunction("SKEW.P", fn_SKEW_P, "(number1, [number2], ...)",
+                              "Population skewness", "Statistics");
+    registry.registerAlias("SKEW_P", "SKEW.P");
+    registry.registerFunction("KURT", fn_KURT, "(number1, [number2], ...)",
+                              "Sample excess kurtosis", "Statistics");
+    registry.registerFunction("STDEVA", fn_STDEVA, "(value1, [value2], ...)",
+                              "Sample standard deviation including text/logicals", "Statistics");
+    registry.registerFunction("STDEVPA", fn_STDEVPA, "(value1, [value2], ...)",
+                              "Population standard deviation including text/logicals",
+                              "Statistics");
+    registry.registerFunction("VARA", fn_VARA, "(value1, [value2], ...)",
+                              "Sample variance including text/logicals", "Statistics");
+    registry.registerFunction("VARPA", fn_VARPA, "(value1, [value2], ...)",
+                              "Population variance including text/logicals", "Statistics");
+    registry.registerFunction("STEYX", fn_STEYX, "(known_y's, known_x's)",
+                              "Standard error of the predicted y-value", "Statistics");
+    registry.registerFunction("NORMSDIST", fn_NORMSDIST, "(z)",
+                              "Standard normal cumulative distribution", "Statistics");
+    registry.registerFunction("NORM.S.DIST", fn_NORM_S_DIST, "(z, cumulative)",
+                              "Standard normal distribution", "Statistics");
+    registry.registerAlias("NORM_S_DIST", "NORM.S.DIST");
+    registry.registerFunction("NORMDIST", fn_NORMDIST, "(x, mean, standard_dev, cumulative)",
+                              "Normal distribution", "Statistics");
+    registry.registerFunction("NORM.DIST", fn_NORM_DIST, "(x, mean, standard_dev, cumulative)",
+                              "Normal distribution", "Statistics");
+    registry.registerAlias("NORM_DIST", "NORM.DIST");
 }
 
 }  // namespace cells

@@ -136,6 +136,26 @@ def main() -> int:
         rows.append((ident, smoke_formula(name), "", "implemented"))
         seen.add(ident)
 
+    # Value-level seeds for newly implemented classes (survive re-extract).
+    extra = [
+        ("SLN.basic", "=SLN(30000,7500,10)", "", "n:2250"),
+        ("PV.annuity", "=PV(0.1,10,100)", "", "n:-614.456710570"),
+        ("DOLLARDE.16", "=DOLLARDE(1.02,16)", "", "n:1.125"),
+        ("EFFECT.quarter", "=EFFECT(0.0525,4)", "", "n:0.05354266737025642"),
+        ("IMSUM.34_12", '=IMSUM("3+4i","1+2i")', "", "s:4+6i"),
+        ("GAMMA.5", "=GAMMA(5)", "", "n:24"),
+        ("FISHER.75", "=FISHER(0.75)", "", "n:0.9729550745276566"),
+        ("PHI.0", "=PHI(0)", "", "n:0.3989422804014327"),
+        ("SHEET.current", "=SHEET()", "", "n:1"),
+        ("AREAS.a1", "=AREAS(A1)", "", "n:1"),
+        ("HYPERLINK.friendly", '=HYPERLINK("http://x","click")', "", "s:click"),
+        ("LENB.hello", '=LENB("hello")', "", "n:5"),
+    ]
+    for ident, formula, cells, expected in extra:
+        if ident not in seen:
+            rows.append((ident, formula, cells, expected))
+            seen.add(ident)
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8") as f:
         f.write("# id\tformula\tcells\texpected\n")

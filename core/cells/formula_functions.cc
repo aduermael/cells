@@ -13,6 +13,7 @@
 #include "core/cells/functions/fn_conditional.h"
 #include "core/cells/functions/fn_datetime.h"
 #include "core/cells/functions/fn_engineering.h"
+#include "core/cells/functions/fn_financial.h"
 #include "core/cells/functions/fn_logic.h"
 #include "core/cells/functions/fn_lookup.h"
 #include "core/cells/functions/fn_math.h"
@@ -281,6 +282,7 @@ void initializeBuiltinFunctions(FunctionRegistry& registry) {
     registerStatsFunctions(registry);
     registerLookupFunctions(registry);
     registerEngineeringFunctions(registry);
+    registerFinancialFunctions(registry);
 }
 
 }  // namespace cells

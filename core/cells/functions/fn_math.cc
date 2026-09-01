@@ -2019,6 +2019,48 @@ EvalResult fn_SUMXMY2(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return sumXPair(args, ctx, 2);
 }
 
+EvalResult fn_GAMMA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double x = n.getNumber();
+    if (x == 0.0 || (x < 0.0 && x == std::floor(x))) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double result = std::tgamma(x);
+    if (!std::isfinite(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_GAMMALN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double x = n.getNumber();
+    if (x <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double result = std::lgamma(x);
+    if (!std::isfinite(result)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(result));
+}
+
+EvalResult fn_GAMMALN_PRECISE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_GAMMALN(args, ctx);
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -2156,6 +2198,12 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Sum of sum of squares", "Math");
     registry.registerFunction("SUMXMY2", fn_SUMXMY2, "(array_x, array_y)",
                               "Sum of squared differences", "Math");
+    registry.registerFunction("GAMMA", fn_GAMMA, "(number)", "Gamma function", "Math");
+    registry.registerFunction("GAMMALN", fn_GAMMALN, "(number)",
+                              "Natural log of the gamma function", "Math");
+    registry.registerFunction("GAMMALN.PRECISE", fn_GAMMALN_PRECISE, "(number)",
+                              "Natural log of the gamma function", "Math");
+    registry.registerAlias("GAMMALN_PRECISE", "GAMMALN.PRECISE");
 
     // Excel dotted names (XLSX import also stores underscore forms).
     registry.registerAlias("CEILING.MATH", "CEILING_MATH");

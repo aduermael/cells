@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 
 #include <algorithm>
 #include <string>
@@ -223,6 +224,168 @@ std::string formatComplexPart(double v) {
         }
     }
     return s;
+}
+
+double snapComplex(double v) {
+    v = excelNormalize(v);
+    if (std::abs(v) < 1e-12) {
+        return 0.0;
+    }
+    const double r = std::round(v);
+    if (std::abs(v - r) < 1e-12) {
+        return r;
+    }
+    return v;
+}
+
+std::string formatComplex(double real, double imag, char suffix) {
+    real = snapComplex(real);
+    imag = snapComplex(imag);
+    if (real == 0.0 && imag == 0.0) {
+        return "0";
+    }
+    if (imag == 0.0) {
+        return formatComplexPart(real);
+    }
+    std::string out;
+    if (real != 0.0) {
+        out += formatComplexPart(real);
+    }
+    if (imag < 0.0) {
+        if (imag == -1.0) {
+            out += "-";
+        } else {
+            out += formatComplexPart(imag);
+        }
+    } else {
+        if (real != 0.0) {
+            out += "+";
+        }
+        if (imag != 1.0) {
+            out += formatComplexPart(imag);
+        }
+    }
+    out += suffix;
+    return out;
+}
+
+bool isImagSuffix(char c) {
+    return c == 'i' || c == 'I' || c == 'j' || c == 'J';
+}
+
+bool parseDoubleStrict(const std::string& t, double& out) {
+    if (t.empty()) {
+        return false;
+    }
+    char* end = nullptr;
+    out = std::strtod(t.c_str(), &end);
+    return end != t.c_str() && *end == '\0';
+}
+
+struct ComplexNum {
+    double re = 0.0;
+    double im = 0.0;
+    char suffix = 'i';
+    bool ok = false;
+    bool hasSuffix = false;
+};
+
+ComplexNum parseComplexNumber(const std::string& s) {
+    ComplexNum c;
+    if (s.empty()) {
+        return c;
+    }
+    if (isImagSuffix(s.back())) {
+        c.suffix = static_cast<char>(std::tolower(static_cast<unsigned char>(s.back())));
+        c.hasSuffix = true;
+        const std::string body = s.substr(0, s.size() - 1);
+        if (body.empty() || body == "+" || body == "-") {
+            c.im = (body == "-") ? -1.0 : 1.0;
+            c.ok = true;
+            return c;
+        }
+        int split = -1;
+        for (size_t i = 0; i < body.size(); ++i) {
+            if ((body[i] == '+' || body[i] == '-') && i > 0) {
+                const char prev = body[i - 1];
+                if (prev != 'e' && prev != 'E') {
+                    split = static_cast<int>(i);
+                }
+            }
+        }
+        if (split < 0) {
+            if (!parseDoubleStrict(body, c.im)) {
+                return c;
+            }
+        } else {
+            if (!parseDoubleStrict(body.substr(0, static_cast<size_t>(split)), c.re)) {
+                return c;
+            }
+            const std::string imag = body.substr(static_cast<size_t>(split));
+            if (imag == "+" || imag == "-") {
+                c.im = (imag == "-") ? -1.0 : 1.0;
+            } else if (!parseDoubleStrict(imag, c.im)) {
+                return c;
+            }
+        }
+        c.ok = true;
+        return c;
+    }
+    if (!parseDoubleStrict(s, c.re)) {
+        return c;
+    }
+    c.ok = true;
+    return c;
+}
+
+EvalResult evalComplex(const ASTNode* arg, EvalContext& ctx, ComplexNum& out) {
+    const EvalResult r = evaluate(arg, ctx);
+    if (r.isError()) {
+        return r;
+    }
+    if (r.isNumber()) {
+        out.re = r.getNumber();
+        out.im = 0.0;
+        out.ok = true;
+        return EvalResult::Empty();
+    }
+    if (r.isBoolean()) {
+        out.re = r.getBoolean() ? 1.0 : 0.0;
+        out.im = 0.0;
+        out.ok = true;
+        return EvalResult::Empty();
+    }
+    const EvalResult s = r.toString();
+    if (s.isError()) {
+        return s;
+    }
+    out = parseComplexNumber(s.getString());
+    if (!out.ok) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Empty();
+}
+
+char combineSuffix(char a, bool aHas, char b, bool bHas, bool& ok) {
+    if (!aHas) {
+        return bHas ? b : 'i';
+    }
+    if (!bHas) {
+        return a;
+    }
+    if (a != b) {
+        ok = false;
+        return a;
+    }
+    return a;
+}
+
+EvalResult fnComplexUnary(const std::vector<const ASTNode*>& args, EvalContext& ctx,
+                          ComplexNum& c) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return evalComplex(args[0], ctx, c);
 }
 
 }  // namespace
@@ -479,32 +642,190 @@ EvalResult fn_COMPLEX(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     }
     const double real = realRes.getNumber();
     const double imag = imagRes.getNumber();
-    if (real == 0.0 && imag == 0.0) {
-        return EvalResult::String("0");
+    return EvalResult::String(formatComplex(real, imag, suffix[0]));
+}
+
+EvalResult fn_IMABS(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    ComplexNum c;
+    const EvalResult e = fnComplexUnary(args, ctx, c);
+    if (e.isError()) {
+        return e;
     }
-    if (imag == 0.0) {
-        return EvalResult::String(formatComplexPart(real));
+    return EvalResult::Number(excelNormalize(std::hypot(c.re, c.im)));
+}
+
+EvalResult fn_IMREAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    ComplexNum c;
+    const EvalResult e = fnComplexUnary(args, ctx, c);
+    if (e.isError()) {
+        return e;
     }
-    std::string out;
-    if (real != 0.0) {
-        out += formatComplexPart(real);
+    return EvalResult::Number(excelNormalize(c.re));
+}
+
+EvalResult fn_IMAGINARY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    ComplexNum c;
+    const EvalResult e = fnComplexUnary(args, ctx, c);
+    if (e.isError()) {
+        return e;
     }
-    if (imag < 0.0) {
-        if (imag == -1.0) {
-            out += "-";
-        } else {
-            out += formatComplexPart(imag);
+    return EvalResult::Number(excelNormalize(c.im));
+}
+
+EvalResult fn_IMARGUMENT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    ComplexNum c;
+    const EvalResult e = fnComplexUnary(args, ctx, c);
+    if (e.isError()) {
+        return e;
+    }
+    if (c.re == 0.0 && c.im == 0.0) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    return EvalResult::Number(excelNormalize(std::atan2(c.im, c.re)));
+}
+
+EvalResult fn_IMCONJUGATE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    ComplexNum c;
+    const EvalResult e = fnComplexUnary(args, ctx, c);
+    if (e.isError()) {
+        return e;
+    }
+    return EvalResult::String(formatComplex(c.re, -c.im, c.hasSuffix ? c.suffix : 'i'));
+}
+
+EvalResult fn_IMSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    double re = 0.0;
+    double im = 0.0;
+    char suffix = 'i';
+    bool hasSuffix = false;
+    for (const ASTNode* arg : args) {
+        ComplexNum c;
+        const EvalResult e = evalComplex(arg, ctx, c);
+        if (e.isError()) {
+            return e;
         }
-    } else {
-        if (real != 0.0) {
-            out += "+";
+        bool ok = true;
+        suffix = combineSuffix(suffix, hasSuffix, c.suffix, c.hasSuffix, ok);
+        if (!ok) {
+            return EvalResult::Error(CellError::VALUE);
         }
-        if (imag != 1.0) {
-            out += formatComplexPart(imag);
-        }
+        hasSuffix = hasSuffix || c.hasSuffix;
+        re += c.re;
+        im += c.im;
     }
-    out += suffix;
-    return EvalResult::String(out);
+    return EvalResult::String(formatComplex(re, im, suffix));
+}
+
+EvalResult fn_IMSUB(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    ComplexNum a;
+    ComplexNum b;
+    EvalResult e = evalComplex(args[0], ctx, a);
+    if (e.isError()) {
+        return e;
+    }
+    e = evalComplex(args[1], ctx, b);
+    if (e.isError()) {
+        return e;
+    }
+    bool ok = true;
+    const char suffix = combineSuffix(a.suffix, a.hasSuffix, b.suffix, b.hasSuffix, ok);
+    if (!ok) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::String(formatComplex(a.re - b.re, a.im - b.im, suffix));
+}
+
+EvalResult fn_IMPRODUCT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    double re = 1.0;
+    double im = 0.0;
+    char suffix = 'i';
+    bool hasSuffix = false;
+    for (const ASTNode* arg : args) {
+        ComplexNum c;
+        const EvalResult e = evalComplex(arg, ctx, c);
+        if (e.isError()) {
+            return e;
+        }
+        bool ok = true;
+        suffix = combineSuffix(suffix, hasSuffix, c.suffix, c.hasSuffix, ok);
+        if (!ok) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        hasSuffix = hasSuffix || c.hasSuffix;
+        const double nre = re * c.re - im * c.im;
+        const double nim = re * c.im + im * c.re;
+        re = nre;
+        im = nim;
+    }
+    return EvalResult::String(formatComplex(re, im, suffix));
+}
+
+EvalResult fn_IMDIV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    ComplexNum a;
+    ComplexNum b;
+    EvalResult e = evalComplex(args[0], ctx, a);
+    if (e.isError()) {
+        return e;
+    }
+    e = evalComplex(args[1], ctx, b);
+    if (e.isError()) {
+        return e;
+    }
+    bool ok = true;
+    const char suffix = combineSuffix(a.suffix, a.hasSuffix, b.suffix, b.hasSuffix, ok);
+    if (!ok) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const double denom = b.re * b.re + b.im * b.im;
+    if (denom == 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double re = (a.re * b.re + a.im * b.im) / denom;
+    const double im = (a.im * b.re - a.re * b.im) / denom;
+    return EvalResult::String(formatComplex(re, im, suffix));
+}
+
+EvalResult fn_IMPOWER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    ComplexNum c;
+    EvalResult e = evalComplex(args[0], ctx, c);
+    if (e.isError()) {
+        return e;
+    }
+    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    if (nRes.isError()) {
+        return nRes;
+    }
+    const double n = nRes.getNumber();
+    const double r = std::hypot(c.re, c.im);
+    if (r == 0.0) {
+        if (n > 0.0) {
+            return EvalResult::String("0");
+        }
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double theta = std::atan2(c.im, c.re);
+    const double rn = std::pow(r, n);
+    if (!std::isfinite(rn)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double re = rn * std::cos(n * theta);
+    const double im = rn * std::sin(n * theta);
+    return EvalResult::String(formatComplex(re, im, c.hasSuffix ? c.suffix : 'i'));
 }
 
 void registerEngineeringFunctions(FunctionRegistry& registry) {
@@ -558,6 +879,26 @@ void registerEngineeringFunctions(FunctionRegistry& registry) {
     registry.registerFunction("COMPLEX", fn_COMPLEX, "(real, imaginary, [suffix])",
                               "Converts real and imaginary coefficients to a complex number",
                               "Engineering");
+    registry.registerFunction("IMABS", fn_IMABS, "(inumber)", "Absolute value of a complex number",
+                              "Engineering");
+    registry.registerFunction("IMAGINARY", fn_IMAGINARY, "(inumber)",
+                              "Imaginary coefficient of a complex number", "Engineering");
+    registry.registerFunction("IMARGUMENT", fn_IMARGUMENT, "(inumber)",
+                              "Argument theta of a complex number", "Engineering");
+    registry.registerFunction("IMCONJUGATE", fn_IMCONJUGATE, "(inumber)", "Complex conjugate",
+                              "Engineering");
+    registry.registerFunction("IMDIV", fn_IMDIV, "(inumber1, inumber2)",
+                              "Quotient of two complex numbers", "Engineering");
+    registry.registerFunction("IMPOWER", fn_IMPOWER, "(inumber, number)",
+                              "Complex number raised to a power", "Engineering");
+    registry.registerFunction("IMPRODUCT", fn_IMPRODUCT, "(inumber1, [inumber2], ...)",
+                              "Product of complex numbers", "Engineering");
+    registry.registerFunction("IMREAL", fn_IMREAL, "(inumber)",
+                              "Real coefficient of a complex number", "Engineering");
+    registry.registerFunction("IMSUB", fn_IMSUB, "(inumber1, inumber2)",
+                              "Difference of two complex numbers", "Engineering");
+    registry.registerFunction("IMSUM", fn_IMSUM, "(inumber1, [inumber2], ...)",
+                              "Sum of complex numbers", "Engineering");
 }
 
 }  // namespace cells

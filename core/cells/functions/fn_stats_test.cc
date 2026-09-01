@@ -688,5 +688,92 @@ TEST_F(FnStatsTest, AverageAMinAMaxA) {
     EXPECT_DOUBLE_EQ(mx.getNumber(), 1.0);
 }
 
+TEST_F(FnStatsTest, FisherPhiGaussNorm) {
+    EvalResult f = eval("=FISHER(0.75)");
+    ASSERT_TRUE(f.isNumber());
+    EXPECT_NEAR(f.getNumber(), 0.5 * std::log(1.75 / 0.25), 1e-12);
+    EvalResult fi = eval("=FISHERINV(0.972955074527657)");
+    ASSERT_TRUE(fi.isNumber());
+    EXPECT_NEAR(fi.getNumber(), 0.75, 1e-9);
+    EvalResult phi = eval("=PHI(0)");
+    ASSERT_TRUE(phi.isNumber());
+    EXPECT_NEAR(phi.getNumber(), 0.3989422804014327, 1e-12);
+    EvalResult gauss = eval("=GAUSS(0)");
+    ASSERT_TRUE(gauss.isNumber());
+    EXPECT_DOUBLE_EQ(gauss.getNumber(), 0.0);
+    EvalResult ns = eval("=NORMSDIST(0)");
+    ASSERT_TRUE(ns.isNumber());
+    EXPECT_DOUBLE_EQ(ns.getNumber(), 0.5);
+    EvalResult nsd = eval("=NORM.S.DIST(0,TRUE)");
+    ASSERT_TRUE(nsd.isNumber());
+    EXPECT_DOUBLE_EQ(nsd.getNumber(), 0.5);
+    EvalResult nsp = eval("=NORM.S.DIST(0,FALSE)");
+    ASSERT_TRUE(nsp.isNumber());
+    EXPECT_NEAR(nsp.getNumber(), phi.getNumber(), 1e-12);
+    EvalResult nd = eval("=NORM.DIST(0,0,1,TRUE)");
+    ASSERT_TRUE(nd.isNumber());
+    EXPECT_DOUBLE_EQ(nd.getNumber(), 0.5);
+    EvalResult ndl = eval("=NORMDIST(0,0,1,TRUE)");
+    ASSERT_TRUE(ndl.isNumber());
+    EXPECT_DOUBLE_EQ(ndl.getNumber(), 0.5);
+    EXPECT_EQ(eval("=FISHER(1)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=FISHER()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=PHI(0,1)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=NORM.DIST(0,0,0,TRUE)").getError(), CellError::NUM);
+    EXPECT_EQ(eval("=NORM.S.DIST(0)").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=GAUSS(\"x\")").getError(), CellError::VALUE);
+}
+
+TEST_F(FnStatsTest, SkewKurtStdeva) {
+    EvalResult skew = eval("=SKEW(3,4,5,2,3,4,5,6,4,7)");
+    ASSERT_TRUE(skew.isNumber());
+    EXPECT_NEAR(skew.getNumber(), 0.359543071407, 1e-9);
+    EvalResult skewp = eval("=SKEW.P(3,4,5,2,3,4,5,6,4,7)");
+    ASSERT_TRUE(skewp.isNumber());
+    EXPECT_NEAR(skewp.getNumber(), 0.303193339354, 1e-9);
+    EvalResult kurt = eval("=KURT(3,4,5,2,3,4,5,6,4,7)");
+    ASSERT_TRUE(kurt.isNumber());
+    EXPECT_NEAR(kurt.getNumber(), -0.151799637209, 1e-8);
+    EvalResult vara = eval("=VARA(1,TRUE)");
+    ASSERT_TRUE(vara.isNumber());
+    EXPECT_DOUBLE_EQ(vara.getNumber(), 0.0);
+    EvalResult stdeva = eval("=STDEVA(1,TRUE,0)");
+    ASSERT_TRUE(stdeva.isNumber());
+    EXPECT_NEAR(stdeva.getNumber(), std::sqrt(eval("=VARA(1,TRUE,0)").getNumber()), 1e-12);
+    EvalResult varpa = eval("=VARPA(1,TRUE)");
+    ASSERT_TRUE(varpa.isNumber());
+    EXPECT_DOUBLE_EQ(varpa.getNumber(), 0.0);
+    EvalResult stdevpa = eval("=STDEVPA(1,0)");
+    ASSERT_TRUE(stdevpa.isNumber());
+    EXPECT_DOUBLE_EQ(stdevpa.getNumber(), 0.5);
+    EXPECT_EQ(eval("=SKEW(1,2)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=KURT(1,2,3)").getError(), CellError::DIV);
+    EXPECT_EQ(eval("=SKEW()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=STDEVA()").getError(), CellError::VALUE);
+    EXPECT_EQ(eval("=VARA(1)").getError(), CellError::DIV);
+}
+
+TEST_F(FnStatsTest, Steyx) {
+    setCellValue(0, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(0, 2, 9.0);
+    setCellValue(0, 3, 1.0);
+    setCellValue(0, 4, 8.0);
+    setCellValue(1, 0, 6.0);
+    setCellValue(1, 1, 5.0);
+    setCellValue(1, 2, 11.0);
+    setCellValue(1, 3, 7.0);
+    setCellValue(1, 4, 5.0);
+    EvalResult s = eval("=STEYX(A1:A5,B1:B5)");
+    ASSERT_TRUE(s.isNumber());
+    EXPECT_NEAR(s.getNumber(), 3.74560674557, 1e-8);
+    EXPECT_EQ(eval("=STEYX(A1:A5)").getError(), CellError::VALUE);
+    setCellValue(2, 0, 1.0);
+    setCellValue(2, 1, 2.0);
+    setCellValue(3, 0, 1.0);
+    setCellValue(3, 1, 2.0);
+    EXPECT_EQ(eval("=STEYX(C1:C2,D1:D2)").getError(), CellError::DIV);
+}
+
 }  // namespace
 }  // namespace cells
