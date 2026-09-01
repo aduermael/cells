@@ -2,15 +2,16 @@
 // Supported content still roundtrips. Currently-dropped domains (charts first)
 // must be reported as remaining — they must not pass as "perfect preserve".
 
-#include "core/cells/xlsx_reader.h"
-#include "core/cells/xlsx_writer.h"
-
-#include <algorithm>
 #include <cctype>
 #include <cstdio>
+
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "core/cells/xlsx_reader.h"
+#include "core/cells/xlsx_writer.h"
 
 #include "gtest/gtest.h"
 #include "miniz.h"
@@ -18,7 +19,9 @@
 namespace cells {
 namespace {
 
-std::string testFilePath(const std::string& filename) { return "testdata/xlsx/" + filename; }
+std::string testFilePath(const std::string& filename) {
+    return "testdata/xlsx/" + filename;
+}
 
 std::vector<std::string> zip_names(const std::string& path) {
     std::vector<std::string> names;
@@ -121,8 +124,8 @@ TEST(XlsxRemainingWork, SupportedSimpleWorkbookStillRoundtrips) {
 
 TEST(XlsxRemainingWork, InventoryDocumentsProductionGaps) {
     // Document the production-bar gaps this suite tracks. Not implementations.
-    const char* remaining[] = {"charts", "pivots",  "tables", "comments",
-                               "images", "vba",     "print",  "conditional-formatting"};
+    const char* remaining[] = {"charts", "pivots", "tables", "comments",
+                               "images", "vba",    "print",  "conditional-formatting"};
     for (const char* domain : remaining) {
         EXPECT_STRNE(domain, "") << domain;
     }

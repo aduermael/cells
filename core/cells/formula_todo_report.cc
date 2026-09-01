@@ -1,12 +1,13 @@
 // Human-readable formula TODO report. One line per case + summary.
 // bazel run :formula-todo  (or //core/cells:formula_todo_report)
 
-#include "core/cells/formula_todo.h"
-
 #include <cstdio>
 #include <cstring>
+
 #include <iostream>
 #include <string>
+
+#include "core/cells/formula_todo.h"
 
 #ifndef _WIN32
 #include <unistd.h>

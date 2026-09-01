@@ -13,6 +13,8 @@ exports_files([
     "fn_conditional.h",
     "fn_datetime.cc",
     "fn_datetime.h",
+    "fn_engineering.cc",
+    "fn_engineering.h",
     "fn_logic.cc",
     "fn_logic.h",
     "fn_lookup.cc",
@@ -96,6 +98,45 @@ cc_test(
 cc_test(
     name = "fn_stats_test",
     srcs = ["fn_stats_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fn_engineering_test",
+    srcs = ["fn_engineering_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fn_logic_test",
+    srcs = ["fn_logic_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fn_text_test",
+    srcs = ["fn_text_test.cc"],
     deps = [
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",

@@ -1,21 +1,22 @@
 #include "core/cells/formula_todo.h"
 
-#include "core/cells/formula_eval.h"
-#include "core/cells/formula_parser.h"
-#include "core/cells/formula_recalc.h"
-#include "core/cells/formula_resolver.h"
-#include "core/cells/id.h"
-#include "core/cells/model.h"
-
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+
 #include <fstream>
 #include <map>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "core/cells/formula_eval.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
+#include "core/cells/id.h"
+#include "core/cells/model.h"
 
 namespace cells {
 namespace {

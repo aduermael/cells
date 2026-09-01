@@ -110,6 +110,26 @@ TEST_F(FnDateTimeExtraTest, NetworkdaysAndWorkday) {
     EXPECT_DOUBLE_EQ(next.getNumber(), monday.getNumber());
 }
 
+TEST_F(FnDateTimeExtraTest, Days360YearFracIsoWeek) {
+    EvalResult d = eval("=DAYS360(DATE(2012,1,1),DATE(2012,7,1))");
+    ASSERT_TRUE(d.isNumber());
+    EXPECT_DOUBLE_EQ(d.getNumber(), 180.0);
+    EvalResult eu = eval("=DAYS360(DATE(2012,1,31),DATE(2012,2,29),TRUE)");
+    ASSERT_TRUE(eu.isNumber());
+    EXPECT_DOUBLE_EQ(eu.getNumber(), 29.0);
+    EvalResult y0 = eval("=YEARFRAC(DATE(2012,1,1),DATE(2012,7,1),0)");
+    ASSERT_TRUE(y0.isNumber());
+    EXPECT_DOUBLE_EQ(y0.getNumber(), 0.5);
+    EvalResult y3 = eval("=YEARFRAC(DATE(2012,1,1),DATE(2012,7,1),3)");
+    ASSERT_TRUE(y3.isNumber());
+    EXPECT_NEAR(y3.getNumber(), 182.0 / 365.0, 1e-9);
+    EvalResult iso = eval("=ISOWEEKNUM(DATE(2024,1,1))");
+    EvalResult w21 = eval("=WEEKNUM(DATE(2024,1,1),21)");
+    ASSERT_TRUE(iso.isNumber());
+    ASSERT_TRUE(w21.isNumber());
+    EXPECT_DOUBLE_EQ(iso.getNumber(), w21.getNumber());
+}
+
 TEST_F(FnDateTimeExtraTest, TextJoinAndCleanViaRegistry) {
     EXPECT_TRUE(FunctionRegistry::instance().exists("NETWORKDAYS"));
     EXPECT_TRUE(FunctionRegistry::instance().exists("WORKDAY"));

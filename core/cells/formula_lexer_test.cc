@@ -624,6 +624,25 @@ TEST(FormulaLexerTest, SimpleFormula) {
     EXPECT_EQ(tokens[6].type, TokenType::END_OF_INPUT);
 }
 
+TEST(FormulaLexerTest, FunctionNameWithDigits) {
+    FormulaLexer log10("LOG10(");
+    Token t = log10.nextToken();
+    EXPECT_EQ(t.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(t.text, "LOG10");
+    EXPECT_EQ(log10.nextToken().type, TokenType::LPAREN);
+
+    FormulaLexer bin("BIN2DEC(");
+    Token b = bin.nextToken();
+    EXPECT_EQ(b.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(b.text, "BIN2DEC");
+    EXPECT_EQ(bin.nextToken().type, TokenType::LPAREN);
+
+    FormulaLexer hex("HEX2OCT(");
+    Token h = hex.nextToken();
+    EXPECT_EQ(h.type, TokenType::IDENTIFIER);
+    EXPECT_EQ(h.text, "HEX2OCT");
+}
+
 TEST(FormulaLexerTest, FunctionCall) {
     FormulaLexer lexer("=SUM(A1:B2)");
     auto tokens = lexer.tokenizeAll();

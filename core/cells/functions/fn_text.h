@@ -110,6 +110,11 @@ EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 EvalResult fn_TEXTJOIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_UNICHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_UNICODE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FIXED(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // =============================================================================
 // Registration

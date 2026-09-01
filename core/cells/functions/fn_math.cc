@@ -1,9 +1,14 @@
 #include "core/cells/functions/fn_math.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 
+#include <algorithm>
 #include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
@@ -1571,6 +1576,449 @@ EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return EvalResult::Number(excelNormalize(result));
 }
 
+namespace {
+
+EvalResult requireTruncNonNegInt(const ASTNode* arg, EvalContext& ctx, int& out) {
+    const EvalResult n = evaluateAsNumber(arg, ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const double v = n.getNumber();
+    if (!std::isfinite(v) || v < 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    out = static_cast<int>(std::floor(v));
+    return EvalResult::Empty();
+}
+
+double combinDouble(int n, int k) {
+    if (k < 0 || k > n) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    if (k > n - k) {
+        k = n - k;
+    }
+    double result = 1.0;
+    for (int i = 1; i <= k; ++i) {
+        result *= static_cast<double>(n - k + i);
+        result /= static_cast<double>(i);
+    }
+    return result;
+}
+
+int romanValue(char c) {
+    switch (static_cast<char>(std::toupper(static_cast<unsigned char>(c)))) {
+        case 'I':
+            return 1;
+        case 'V':
+            return 5;
+        case 'X':
+            return 10;
+        case 'L':
+            return 50;
+        case 'C':
+            return 100;
+        case 'D':
+            return 500;
+        case 'M':
+            return 1000;
+        default:
+            return -1;
+    }
+}
+
+std::string toRoman(int n) {
+    static const int vals[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+    static const char* nums[] = {"M",  "CM", "D",  "CD", "C",  "XC", "L",
+                                 "XL", "X",  "IX", "V",  "IV", "I"};
+    std::string out;
+    for (int i = 0; i < 13; ++i) {
+        while (n >= vals[i]) {
+            out += nums[i];
+            n -= vals[i];
+        }
+    }
+    return out;
+}
+
+int digitValue(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    const char u = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    if (u >= 'A' && u <= 'Z') {
+        return u - 'A' + 10;
+    }
+    return -1;
+}
+
+EvalResult sumXPair(const std::vector<const ASTNode*>& args, EvalContext& ctx, int kind) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [pairs, err] = collectPairedNumericValues(args[0], args[1], ctx);
+    if (err.isError()) {
+        return err;
+    }
+    double sum = 0.0;
+    for (const auto& p : pairs) {
+        if (kind == 0) {
+            sum += p.first * p.first - p.second * p.second;
+        } else if (kind == 1) {
+            sum += p.first * p.first + p.second * p.second;
+        } else {
+            const double d = p.first - p.second;
+            sum += d * d;
+        }
+    }
+    return EvalResult::Number(excelNormalize(sum));
+}
+
+}  // namespace
+
+EvalResult fn_COMBIN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int n = 0;
+    int k = 0;
+    EvalResult e = requireTruncNonNegInt(args[0], ctx, n);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncNonNegInt(args[1], ctx, k);
+    if (e.isError()) {
+        return e;
+    }
+    if (k > n) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const double r = combinDouble(n, k);
+    if (!std::isfinite(r)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(std::round(r)));
+}
+
+EvalResult fn_COMBINA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int n = 0;
+    int k = 0;
+    EvalResult e = requireTruncNonNegInt(args[0], ctx, n);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncNonNegInt(args[1], ctx, k);
+    if (e.isError()) {
+        return e;
+    }
+    if (n == 0) {
+        return k == 0 ? EvalResult::Number(1.0) : EvalResult::Error(CellError::NUM);
+    }
+    // Combinations with repetition: C(n + k - 1, k)
+    const double r = combinDouble(n + k - 1, k);
+    if (!std::isfinite(r)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(std::round(r)));
+}
+
+EvalResult fn_PERMUT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int n = 0;
+    int k = 0;
+    EvalResult e = requireTruncNonNegInt(args[0], ctx, n);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncNonNegInt(args[1], ctx, k);
+    if (e.isError()) {
+        return e;
+    }
+    if (k > n) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double r = 1.0;
+    for (int i = 0; i < k; ++i) {
+        r *= static_cast<double>(n - i);
+        if (!std::isfinite(r)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    return EvalResult::Number(excelNormalize(r));
+}
+
+EvalResult fn_PERMUTATIONA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int n = 0;
+    int k = 0;
+    EvalResult e = requireTruncNonNegInt(args[0], ctx, n);
+    if (e.isError()) {
+        return e;
+    }
+    e = requireTruncNonNegInt(args[1], ctx, k);
+    if (e.isError()) {
+        return e;
+    }
+    if (n == 0) {
+        return k == 0 ? EvalResult::Number(1.0) : EvalResult::Number(0.0);
+    }
+    const double r = excelPow(static_cast<double>(n), static_cast<double>(k));
+    if (!std::isfinite(r)) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize(r));
+}
+
+EvalResult fn_BASE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    if (numRes.isError()) {
+        return numRes;
+    }
+    const EvalResult radixRes = evaluateAsNumber(args[1], ctx);
+    if (radixRes.isError()) {
+        return radixRes;
+    }
+    const double num = std::floor(numRes.getNumber());
+    const int radix = static_cast<int>(std::floor(radixRes.getNumber()));
+    if (num < 0.0 || num >= 0x1p53 || radix < 2 || radix > 36) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    int minLen = 0;
+    if (args.size() == 3) {
+        const EvalResult lenRes = evaluateAsNumber(args[2], ctx);
+        if (lenRes.isError()) {
+            return lenRes;
+        }
+        minLen = static_cast<int>(std::floor(lenRes.getNumber()));
+        if (minLen < 0 || minLen > 255) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    auto u = static_cast<std::uint64_t>(num);
+    std::string digits;
+    if (u == 0) {
+        digits = "0";
+    } else {
+        while (u > 0) {
+            const int d = static_cast<int>(u % static_cast<unsigned>(radix));
+            digits.push_back(static_cast<char>(d < 10 ? '0' + d : 'A' + (d - 10)));
+            u /= static_cast<unsigned>(radix);
+        }
+        std::reverse(digits.begin(), digits.end());
+    }
+    if (minLen > static_cast<int>(digits.size())) {
+        digits.insert(digits.begin(), static_cast<size_t>(minLen) - digits.size(), '0');
+    }
+    return EvalResult::String(digits);
+}
+
+EvalResult fn_DECIMAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    const EvalResult radixRes = evaluateAsNumber(args[1], ctx);
+    if (radixRes.isError()) {
+        return radixRes;
+    }
+    const int radix = static_cast<int>(std::floor(radixRes.getNumber()));
+    if (radix < 2 || radix > 36) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    const std::string& s = textRes.getString();
+    if (s.empty()) {
+        return EvalResult::Number(0.0);
+    }
+    double value = 0.0;
+    for (char c : s) {
+        if (std::isspace(static_cast<unsigned char>(c)) != 0) {
+            continue;
+        }
+        const int d = digitValue(c);
+        if (d < 0 || d >= radix) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        value = value * static_cast<double>(radix) + static_cast<double>(d);
+        if (!std::isfinite(value)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    return EvalResult::Number(excelNormalize(value));
+}
+
+EvalResult fn_ARABIC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    std::string s = textRes.getString();
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start])) != 0) {
+        ++start;
+    }
+    size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])) != 0) {
+        --end;
+    }
+    s = s.substr(start, end - start);
+    if (s.empty()) {
+        return EvalResult::Number(0.0);
+    }
+    int sign = 1;
+    size_t i = 0;
+    if (s[0] == '-') {
+        sign = -1;
+        ++i;
+    }
+    if (i >= s.size()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    int total = 0;
+    int prev = 0;
+    for (; i < s.size(); ++i) {
+        const int v = romanValue(s[i]);
+        if (v < 0) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+        if (v > prev) {
+            total += v - 2 * prev;
+        } else {
+            total += v;
+        }
+        prev = v;
+    }
+    return EvalResult::Number(static_cast<double>(sign * total));
+}
+
+EvalResult fn_ROMAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    if (numRes.isError()) {
+        return numRes;
+    }
+    const int n = static_cast<int>(std::floor(numRes.getNumber()));
+    if (n < 0 || n > 3999) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    if (args.size() == 2) {
+        const EvalResult formRes = evaluateAsNumber(args[1], ctx);
+        if (formRes.isError()) {
+            return formRes;
+        }
+        const int form = static_cast<int>(std::floor(formRes.getNumber()));
+        if (form < 0 || form > 4) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    if (n == 0) {
+        return EvalResult::String("");
+    }
+    return EvalResult::String(toRoman(n));
+}
+
+EvalResult fn_MULTINOMIAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Number(1.0);
+    }
+    int sum = 0;
+    std::vector<int> ks;
+    ks.reserve(values.size());
+    for (double v : values) {
+        if (v < 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        const int k = static_cast<int>(std::floor(v));
+        ks.push_back(k);
+        sum += k;
+    }
+    double result = 1.0;
+    int filled = 0;
+    for (int k : ks) {
+        for (int i = 1; i <= k; ++i) {
+            ++filled;
+            result *= static_cast<double>(filled);
+            result /= static_cast<double>(i);
+            if (!std::isfinite(result)) {
+                return EvalResult::Error(CellError::NUM);
+            }
+        }
+    }
+    (void)sum;
+    return EvalResult::Number(excelNormalize(std::round(result)));
+}
+
+EvalResult fn_SERIESSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[0], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const EvalResult nRes = evaluateAsNumber(args[1], ctx);
+    if (nRes.isError()) {
+        return nRes;
+    }
+    const EvalResult mRes = evaluateAsNumber(args[2], ctx);
+    if (mRes.isError()) {
+        return mRes;
+    }
+    auto [coefs, err] = collectNumericValues({args[3]}, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    const double x = xRes.getNumber();
+    const double n = nRes.getNumber();
+    const double m = mRes.getNumber();
+    double sum = 0.0;
+    for (size_t i = 0; i < coefs.size(); ++i) {
+        const double exp = n + static_cast<double>(i) * m;
+        const double term = coefs[i] * excelPow(x, exp);
+        if (!std::isfinite(term)) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        sum += term;
+    }
+    return EvalResult::Number(excelNormalize(sum));
+}
+
+EvalResult fn_SUMX2MY2(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return sumXPair(args, ctx, 0);
+}
+
+EvalResult fn_SUMX2PY2(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return sumXPair(args, ctx, 1);
+}
+
+EvalResult fn_SUMXMY2(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return sumXPair(args, ctx, 2);
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -1683,6 +2131,38 @@ void registerMathFunctions(FunctionRegistry& registry) {
                               "Math");
     registry.registerFunction("DEGREES", fn_DEGREES, "(angle)", "Converts radians to degrees",
                               "Math");
+
+    registry.registerFunction("COMBIN", fn_COMBIN, "(n, k)", "Number of combinations", "Math");
+    registry.registerFunction("COMBINA", fn_COMBINA, "(n, k)", "Combinations with repetition",
+                              "Math");
+    registry.registerFunction("PERMUT", fn_PERMUT, "(n, k)", "Number of permutations", "Math");
+    registry.registerFunction("PERMUTATIONA", fn_PERMUTATIONA, "(n, k)",
+                              "Permutations with repetition", "Math");
+    registry.registerFunction("BASE", fn_BASE, "(number, radix, [min_length])",
+                              "Converts a number to text of the given radix", "Math");
+    registry.registerFunction("DECIMAL", fn_DECIMAL, "(text, radix)",
+                              "Converts text of the given radix to a number", "Math");
+    registry.registerFunction("ARABIC", fn_ARABIC, "(text)", "Converts a Roman numeral to a number",
+                              "Math");
+    registry.registerFunction("ROMAN", fn_ROMAN, "(number, [form])",
+                              "Converts a number to a Roman numeral", "Math");
+    registry.registerFunction("MULTINOMIAL", fn_MULTINOMIAL, "(number1, [number2], ...)",
+                              "Multinomial coefficient", "Math");
+    registry.registerFunction("SERIESSUM", fn_SERIESSUM, "(x, n, m, coefficients)",
+                              "Sum of a power series", "Math");
+    registry.registerFunction("SUMX2MY2", fn_SUMX2MY2, "(array_x, array_y)",
+                              "Sum of difference of squares", "Math");
+    registry.registerFunction("SUMX2PY2", fn_SUMX2PY2, "(array_x, array_y)",
+                              "Sum of sum of squares", "Math");
+    registry.registerFunction("SUMXMY2", fn_SUMXMY2, "(array_x, array_y)",
+                              "Sum of squared differences", "Math");
+
+    // Excel dotted names (XLSX import also stores underscore forms).
+    registry.registerAlias("CEILING.MATH", "CEILING_MATH");
+    registry.registerAlias("FLOOR.MATH", "FLOOR_MATH");
+    registry.registerAlias("CEILING.PRECISE", "CEILING_PRECISE");
+    registry.registerAlias("FLOOR.PRECISE", "FLOOR_PRECISE");
+    registry.registerAlias("ISO.CEILING", "ISO_CEILING");
 }
 
 }  // namespace cells

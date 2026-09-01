@@ -2,9 +2,11 @@
 
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -818,6 +820,286 @@ EvalResult fn_CLEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::String(out);
 }
 
+namespace {
+
+std::string utf8Encode(std::uint32_t cp) {
+    std::string out;
+    if (cp < 0x80) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    return out;
+}
+
+std::uint32_t utf8DecodeFirst(const std::string& s, bool& ok) {
+    ok = false;
+    if (s.empty()) {
+        return 0;
+    }
+    const auto b0 = static_cast<unsigned char>(s[0]);
+    if (b0 < 0x80) {
+        ok = true;
+        return b0;
+    }
+    if ((b0 & 0xE0) == 0xC0 && s.size() >= 2) {
+        const auto b1 = static_cast<unsigned char>(s[1]);
+        if ((b1 & 0xC0) == 0x80) {
+            ok = true;
+            return (static_cast<std::uint32_t>(b0 & 0x1F) << 6) | (b1 & 0x3F);
+        }
+    } else if ((b0 & 0xF0) == 0xE0 && s.size() >= 3) {
+        const auto b1 = static_cast<unsigned char>(s[1]);
+        const auto b2 = static_cast<unsigned char>(s[2]);
+        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
+            ok = true;
+            return (static_cast<std::uint32_t>(b0 & 0x0F) << 12) |
+                   (static_cast<std::uint32_t>(b1 & 0x3F) << 6) | (b2 & 0x3F);
+        }
+    } else if ((b0 & 0xF8) == 0xF0 && s.size() >= 4) {
+        const auto b1 = static_cast<unsigned char>(s[1]);
+        const auto b2 = static_cast<unsigned char>(s[2]);
+        const auto b3 = static_cast<unsigned char>(s[3]);
+        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80) {
+            ok = true;
+            return (static_cast<std::uint32_t>(b0 & 0x07) << 18) |
+                   (static_cast<std::uint32_t>(b1 & 0x3F) << 12) |
+                   (static_cast<std::uint32_t>(b2 & 0x3F) << 6) | (b3 & 0x3F);
+        }
+    }
+    return 0;
+}
+
+double roundHalfAway(double value) {
+    if (value >= 0.0) {
+        return std::floor(value + 0.5);
+    }
+    return std::ceil(value - 0.5);
+}
+
+std::string formatWithDecimals(double value, int decimals, bool thousands) {
+    double scaled = value;
+    if (decimals >= 0) {
+        const double p = std::pow(10.0, decimals);
+        scaled = roundHalfAway(value * p) / p;
+    } else {
+        const double p = std::pow(10.0, -decimals);
+        scaled = roundHalfAway(value / p) * p;
+        decimals = 0;
+    }
+    const bool neg = scaled < 0.0;
+    double mag = std::abs(scaled);
+    auto intPart = static_cast<long long>(std::floor(mag + 1e-12));
+    double frac = mag - static_cast<double>(intPart);
+    if (frac < 0.0) {
+        frac = 0.0;
+    }
+    std::string intStr = std::to_string(intPart);
+    if (thousands && intStr.size() > 3) {
+        std::string grouped;
+        int count = 0;
+        for (int i = static_cast<int>(intStr.size()) - 1; i >= 0; --i) {
+            if (count > 0 && count % 3 == 0) {
+                grouped.push_back(',');
+            }
+            grouped.push_back(intStr[static_cast<size_t>(i)]);
+            ++count;
+        }
+        std::reverse(grouped.begin(), grouped.end());
+        intStr = grouped;
+    }
+    std::string out = intStr;
+    if (decimals > 0) {
+        double f = frac;
+        std::string fracStr;
+        for (int i = 0; i < decimals; ++i) {
+            f *= 10.0;
+            int digit = static_cast<int>(f + 1e-9);
+            if (digit > 9) {
+                digit = 9;
+            }
+            fracStr.push_back(static_cast<char>('0' + digit));
+            f -= digit;
+        }
+        out += "." + fracStr;
+    }
+    if (neg) {
+        return "-" + out;
+    }
+    return out;
+}
+
+}  // namespace
+
+EvalResult fn_UNICHAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    const auto cp = static_cast<std::int64_t>(std::floor(n.getNumber()));
+    if (cp < 1 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::String(utf8Encode(static_cast<std::uint32_t>(cp)));
+}
+
+EvalResult fn_UNICODE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult t = evaluateAsString(args[0], ctx);
+    if (t.isError()) {
+        return t;
+    }
+    if (t.getString().empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    bool ok = false;
+    const std::uint32_t cp = utf8DecodeFirst(t.getString(), ok);
+    if (!ok || cp == 0) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Number(static_cast<double>(cp));
+}
+
+EvalResult fn_FIXED(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    int decimals = 2;
+    if (args.size() >= 2) {
+        const EvalResult d = evaluateAsNumber(args[1], ctx);
+        if (d.isError()) {
+            return d;
+        }
+        decimals = static_cast<int>(std::floor(d.getNumber()));
+        if (decimals > 127 || decimals < -127) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    bool noCommas = false;
+    if (args.size() == 3) {
+        const EvalResult c = evaluateAsBoolean(args[2], ctx);
+        if (c.isError()) {
+            return c;
+        }
+        noCommas = c.getBoolean();
+    }
+    return EvalResult::String(formatWithDecimals(n.getNumber(), decimals, !noCommas));
+}
+
+EvalResult fn_DOLLAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult n = evaluateAsNumber(args[0], ctx);
+    if (n.isError()) {
+        return n;
+    }
+    int decimals = 2;
+    if (args.size() == 2) {
+        const EvalResult d = evaluateAsNumber(args[1], ctx);
+        if (d.isError()) {
+            return d;
+        }
+        decimals = static_cast<int>(std::floor(d.getNumber()));
+        if (decimals > 127 || decimals < -127) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+    const double v = n.getNumber();
+    std::string body = formatWithDecimals(std::abs(v), decimals, true);
+    if (v < 0.0) {
+        return EvalResult::String("($" + body + ")");
+    }
+    return EvalResult::String("$" + body);
+}
+
+EvalResult fn_NUMBERVALUE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty() || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult textRes = evaluateAsString(args[0], ctx);
+    if (textRes.isError()) {
+        return textRes;
+    }
+    std::string dec = ".";
+    std::string group = ",";
+    if (args.size() >= 2) {
+        const EvalResult d = evaluateAsString(args[1], ctx);
+        if (d.isError()) {
+            return d;
+        }
+        if (!d.getString().empty()) {
+            dec = d.getString().substr(0, 1);
+        }
+    }
+    if (args.size() == 3) {
+        const EvalResult g = evaluateAsString(args[2], ctx);
+        if (g.isError()) {
+            return g;
+        }
+        if (!g.getString().empty()) {
+            group = g.getString().substr(0, 1);
+        }
+    }
+    std::string s = textRes.getString();
+    const size_t start = s.find_first_not_of(" \t\n\r");
+    const size_t end = s.find_last_not_of(" \t\n\r");
+    if (start == std::string::npos) {
+        return EvalResult::Number(0.0);
+    }
+    s = s.substr(start, end - start + 1);
+    bool percent = false;
+    if (!s.empty() && s.back() == '%') {
+        percent = true;
+        s.pop_back();
+    }
+    std::string cleaned;
+    for (char c : s) {
+        if (c == group[0]) {
+            continue;
+        }
+        if (c == dec[0]) {
+            cleaned.push_back('.');
+        } else {
+            cleaned.push_back(c);
+        }
+    }
+    if (cleaned.empty()) {
+        return EvalResult::Number(0.0);
+    }
+    char* endptr = nullptr;
+    const double val = std::strtod(cleaned.c_str(), &endptr);
+    if (endptr == cleaned.c_str()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    while (*endptr != '\0' && std::isspace(static_cast<unsigned char>(*endptr)) != 0) {
+        ++endptr;
+    }
+    if (*endptr != '\0') {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Number(excelNormalize(percent ? val / 100.0 : val));
+}
+
 void registerTextFunctions(FunctionRegistry& registry) {
     // Basic text functions
     registry.registerFunction("LEN", fn_LEN, "(text)", "Returns the number of characters", "Text");
@@ -866,6 +1148,17 @@ void registerTextFunctions(FunctionRegistry& registry) {
                               "Joins text with a delimiter", "Text");
     registry.registerFunction("CLEAN", fn_CLEAN, "(text)", "Removes non-printable characters",
                               "Text");
+    registry.registerFunction("UNICHAR", fn_UNICHAR, "(number)",
+                              "Unicode character for a code point", "Text");
+    registry.registerFunction("UNICODE", fn_UNICODE, "(text)", "Code point of the first character",
+                              "Text");
+    registry.registerFunction("DOLLAR", fn_DOLLAR, "(number, [decimals])",
+                              "Formats a number as currency text", "Text");
+    registry.registerFunction("FIXED", fn_FIXED, "(number, [decimals], [no_commas])",
+                              "Formats a number as text with fixed decimals", "Text");
+    registry.registerFunction("NUMBERVALUE", fn_NUMBERVALUE,
+                              "(text, [decimal_separator], [group_separator])",
+                              "Converts locale-formatted text to a number", "Text");
 }
 
 }  // namespace cells

@@ -68,6 +68,29 @@ EvalResult fn_RANK_EQ(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 EvalResult fn_MODE_SNGL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_QUARTILE_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 EvalResult fn_COUNTBLANK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_AVEDEV(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DEVSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_GEOMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_HARMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_STANDARDIZE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FORECAST(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_FORECAST_LINEAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SLOPE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_INTERCEPT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PEARSON(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_CORREL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_RSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COVAR(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COVARIANCE_P(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COVARIANCE_S(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_QUARTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_RANK_AVG(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_AVERAGEA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MINA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MAXA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERCENTRANK(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERCENTRANK_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERCENTRANK_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
 // Forward declaration
 class FunctionRegistry;

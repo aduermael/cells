@@ -235,6 +235,21 @@ EvalResult fn_RADIANS(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // DEGREES(angle) - Converts radians to degrees
 EvalResult fn_DEGREES(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// Combinatorics / conversion
+EvalResult fn_COMBIN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_COMBINA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERMUT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_PERMUTATIONA(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_BASE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_DECIMAL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ARABIC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_ROMAN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_MULTINOMIAL(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SERIESSUM(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SUMX2MY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SUMX2PY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+EvalResult fn_SUMXMY2(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // =============================================================================
 // Registration
 // =============================================================================

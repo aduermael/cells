@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
@@ -135,6 +136,177 @@ EvalResult computePercentile(const std::vector<const ASTNode*>& args, EvalContex
     const double fraction = rank - static_cast<double>(lower);
     const double result = values[lower] + fraction * (values[upper] - values[lower]);
     return EvalResult::Number(result);
+}
+
+struct LinReg {
+    double slope = 0.0;
+    double intercept = 0.0;
+    double pearson = 0.0;
+    double covarP = 0.0;
+    double covarS = 0.0;
+    EvalResult error = EvalResult::Empty();
+};
+
+LinReg linearRegression(const ASTNode* knownY, const ASTNode* knownX, EvalContext& ctx) {
+    LinReg out;
+    auto [pairs, err] = collectPairedNumericValues(knownX, knownY, ctx);
+    if (err.isError()) {
+        out.error = err;
+        return out;
+    }
+    if (pairs.size() < 2) {
+        out.error = EvalResult::Error(CellError::DIV);
+        return out;
+    }
+    double sumX = 0.0;
+    double sumY = 0.0;
+    for (const auto& p : pairs) {
+        sumX += p.first;
+        sumY += p.second;
+    }
+    const auto n = static_cast<double>(pairs.size());
+    const double meanX = sumX / n;
+    const double meanY = sumY / n;
+    double ssxx = 0.0;
+    double ssyy = 0.0;
+    double ssxy = 0.0;
+    for (const auto& p : pairs) {
+        const double dx = p.first - meanX;
+        const double dy = p.second - meanY;
+        ssxx += dx * dx;
+        ssyy += dy * dy;
+        ssxy += dx * dy;
+    }
+    if (ssxx == 0.0) {
+        out.error = EvalResult::Error(CellError::DIV);
+        return out;
+    }
+    out.slope = ssxy / ssxx;
+    out.intercept = meanY - out.slope * meanX;
+    out.covarP = ssxy / n;
+    out.covarS = ssxy / (n - 1.0);
+    const double denom = std::sqrt(ssxx * ssyy);
+    out.pearson = denom == 0.0 ? 0.0 : ssxy / denom;
+    return out;
+}
+
+std::pair<std::vector<double>, EvalResult> collectAverageAValues(
+    const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    std::vector<double> values;
+    const std::vector<EvalResult> expanded = expandArguments(args, ctx);
+    for (const EvalResult& val : expanded) {
+        if (val.isError()) {
+            return {{}, val};
+        }
+        if (val.isEmpty()) {
+            continue;
+        }
+        if (val.isNumber()) {
+            values.push_back(val.getNumber());
+        } else if (val.isBoolean()) {
+            values.push_back(val.getBoolean() ? 1.0 : 0.0);
+        } else if (val.isString()) {
+            values.push_back(0.0);
+        }
+    }
+    return {values, EvalResult::Empty()};
+}
+
+EvalResult percentRankImpl(const std::vector<const ASTNode*>& args, EvalContext& ctx,
+                           bool exclusive) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues({args[0]}, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.size() < 2) {
+        return EvalResult::Error(CellError::NA);
+    }
+    const EvalResult xRes = evaluateAsNumber(args[1], ctx);
+    if (xRes.isError()) {
+        return xRes;
+    }
+    const double x = xRes.getNumber();
+    int significance = 3;
+    if (args.size() == 3) {
+        const EvalResult s = evaluateAsNumber(args[2], ctx);
+        if (s.isError()) {
+            return s;
+        }
+        significance = static_cast<int>(std::floor(s.getNumber()));
+        if (significance < 1) {
+            return EvalResult::Error(CellError::NUM);
+        }
+    }
+    std::sort(values.begin(), values.end());
+    if (x < values.front() || x > values.back()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    size_t lt = 0;
+    size_t eq = 0;
+    for (double v : values) {
+        if (v < x) {
+            ++lt;
+        } else if (v == x) {
+            ++eq;
+        }
+    }
+    const auto n = static_cast<double>(values.size());
+    double rank = 0.0;
+    if (exclusive) {
+        rank = (static_cast<double>(lt) + 1.0) / (n + 1.0);
+        if (eq == 0) {
+            // Interpolate between surrounding values.
+            double lo = values.front();
+            double hi = values.back();
+            size_t loIdx = 0;
+            size_t hiIdx = values.size() - 1;
+            for (size_t i = 0; i < values.size(); ++i) {
+                if (values[i] < x) {
+                    lo = values[i];
+                    loIdx = i;
+                } else if (values[i] > x) {
+                    hi = values[i];
+                    hiIdx = i;
+                    break;
+                }
+            }
+            if (hi != lo) {
+                const double loR = (static_cast<double>(loIdx) + 1.0) / (n + 1.0);
+                const double hiR = (static_cast<double>(hiIdx) + 1.0) / (n + 1.0);
+                rank = loR + (x - lo) / (hi - lo) * (hiR - loR);
+            }
+        }
+    } else {
+        if (n == 1.0) {
+            rank = 1.0;
+        } else if (eq > 0) {
+            rank = static_cast<double>(lt) / (n - 1.0);
+        } else {
+            double lo = values.front();
+            double hi = values.back();
+            size_t loIdx = 0;
+            size_t hiIdx = values.size() - 1;
+            for (size_t i = 0; i < values.size(); ++i) {
+                if (values[i] < x) {
+                    lo = values[i];
+                    loIdx = i;
+                } else if (values[i] > x) {
+                    hi = values[i];
+                    hiIdx = i;
+                    break;
+                }
+            }
+            const double loR = static_cast<double>(loIdx) / (n - 1.0);
+            const double hiR = static_cast<double>(hiIdx) / (n - 1.0);
+            rank = loR + (x - lo) / (hi - lo) * (hiR - loR);
+        }
+    }
+    const double scale = std::pow(10.0, significance);
+    rank = std::floor(rank * scale + 1e-12) / scale;
+    return EvalResult::Number(excelNormalize(rank));
 }
 
 }  // namespace
@@ -386,6 +558,340 @@ EvalResult fn_COUNTBLANK(const std::vector<const ASTNode*>& args, EvalContext& c
     return EvalResult::Number(static_cast<double>(count));
 }
 
+EvalResult fn_AVEDEV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double sum = 0.0;
+    for (double v : values) {
+        sum += v;
+    }
+    const double mean = sum / static_cast<double>(values.size());
+    double acc = 0.0;
+    for (double v : values) {
+        acc += std::abs(v - mean);
+    }
+    return EvalResult::Number(excelNormalize(acc / static_cast<double>(values.size())));
+}
+
+EvalResult fn_DEVSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double sum = 0.0;
+    for (double v : values) {
+        sum += v;
+    }
+    const double mean = sum / static_cast<double>(values.size());
+    double acc = 0.0;
+    for (double v : values) {
+        const double d = v - mean;
+        acc += d * d;
+    }
+    return EvalResult::Number(excelNormalize(acc));
+}
+
+EvalResult fn_GEOMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double logSum = 0.0;
+    for (double v : values) {
+        if (v <= 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        logSum += std::log(v);
+    }
+    return EvalResult::Number(
+        excelNormalize(std::exp(logSum / static_cast<double>(values.size()))));
+}
+
+EvalResult fn_HARMEAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectNumericValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    double recip = 0.0;
+    for (double v : values) {
+        if (v <= 0.0) {
+            return EvalResult::Error(CellError::NUM);
+        }
+        recip += 1.0 / v;
+    }
+    return EvalResult::Number(excelNormalize(static_cast<double>(values.size()) / recip));
+}
+
+EvalResult fn_STANDARDIZE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult x = evaluateAsNumber(args[0], ctx);
+    if (x.isError()) {
+        return x;
+    }
+    const EvalResult mean = evaluateAsNumber(args[1], ctx);
+    if (mean.isError()) {
+        return mean;
+    }
+    const EvalResult sd = evaluateAsNumber(args[2], ctx);
+    if (sd.isError()) {
+        return sd;
+    }
+    if (sd.getNumber() <= 0.0) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    return EvalResult::Number(excelNormalize((x.getNumber() - mean.getNumber()) / sd.getNumber()));
+}
+
+EvalResult fn_SLOPE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.slope));
+}
+
+EvalResult fn_INTERCEPT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.intercept));
+}
+
+EvalResult fn_FORECAST(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult x = evaluateAsNumber(args[0], ctx);
+    if (x.isError()) {
+        return x;
+    }
+    const LinReg r = linearRegression(args[1], args[2], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.intercept + r.slope * x.getNumber()));
+}
+
+EvalResult fn_FORECAST_LINEAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_FORECAST(args, ctx);
+}
+
+EvalResult fn_PEARSON(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.pearson));
+}
+
+EvalResult fn_CORREL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_PEARSON(args, ctx);
+}
+
+EvalResult fn_RSQ(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.pearson * r.pearson));
+}
+
+EvalResult fn_COVARIANCE_P(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.covarP));
+}
+
+EvalResult fn_COVAR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return fn_COVARIANCE_P(args, ctx);
+}
+
+EvalResult fn_COVARIANCE_S(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const LinReg r = linearRegression(args[0], args[1], ctx);
+    if (r.error.isError()) {
+        return r.error;
+    }
+    return EvalResult::Number(excelNormalize(r.covarS));
+}
+
+EvalResult fn_QUARTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult qRes = evaluateAsNumber(args[1], ctx);
+    if (qRes.isError()) {
+        return qRes;
+    }
+    const int quart = static_cast<int>(qRes.getNumber());
+    if (quart < 1 || quart > 3) {
+        return EvalResult::Error(CellError::NUM);
+    }
+    NumberLiteralNode kNode(static_cast<double>(quart) / 4.0);
+    std::vector<const ASTNode*> pctArgs = {args[0], &kNode};
+    return computePercentile(pctArgs, ctx, false);
+}
+
+EvalResult fn_RANK_AVG(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    const EvalResult numRes = evaluateAsNumber(args[0], ctx);
+    if (numRes.isError()) {
+        return numRes;
+    }
+    const double number = numRes.getNumber();
+    auto [values, error] = collectNumericValues({args[1]}, ctx);
+    if (error.isError()) {
+        return error;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::NA);
+    }
+    int order = 0;
+    if (args.size() == 3) {
+        const EvalResult orderRes = evaluateAsNumber(args[2], ctx);
+        if (orderRes.isError()) {
+            return orderRes;
+        }
+        order = static_cast<int>(orderRes.getNumber()) != 0 ? 1 : 0;
+    }
+    size_t better = 0;
+    size_t ties = 0;
+    for (const double v : values) {
+        if (v == number) {
+            ++ties;
+        } else if (order == 0 && v > number) {
+            ++better;
+        } else if (order != 0 && v < number) {
+            ++better;
+        }
+    }
+    if (ties == 0) {
+        return EvalResult::Error(CellError::NA);
+    }
+    const double avg = static_cast<double>(better) + (static_cast<double>(ties) + 1.0) / 2.0;
+    return EvalResult::Number(avg);
+}
+
+EvalResult fn_AVERAGEA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectAverageAValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Error(CellError::DIV);
+    }
+    double sum = 0.0;
+    for (double v : values) {
+        sum += v;
+    }
+    return EvalResult::Number(excelNormalize(sum / static_cast<double>(values.size())));
+}
+
+EvalResult fn_MINA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectAverageAValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Number(0.0);
+    }
+    double m = values[0];
+    for (double v : values) {
+        if (v < m) {
+            m = v;
+        }
+    }
+    return EvalResult::Number(m);
+}
+
+EvalResult fn_MAXA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    auto [values, err] = collectAverageAValues(args, ctx);
+    if (err.isError()) {
+        return err;
+    }
+    if (values.empty()) {
+        return EvalResult::Number(0.0);
+    }
+    double m = values[0];
+    for (double v : values) {
+        if (v > m) {
+            m = v;
+        }
+    }
+    return EvalResult::Number(m);
+}
+
+EvalResult fn_PERCENTRANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return percentRankImpl(args, ctx, false);
+}
+
+EvalResult fn_PERCENTRANK_INC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return percentRankImpl(args, ctx, false);
+}
+
+EvalResult fn_PERCENTRANK_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    return percentRankImpl(args, ctx, true);
+}
+
 void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
                               "Returns the median value", "Statistics");
@@ -435,6 +941,75 @@ void registerStatsFunctions(FunctionRegistry& registry) {
                               "Inclusive quartile", "Statistics");
     registry.registerFunction("COUNTBLANK", fn_COUNTBLANK, "(range)", "Count empty cells",
                               "Statistics");
+    registry.registerFunction("AVEDEV", fn_AVEDEV, "(number1, [number2], ...)",
+                              "Average of absolute deviations", "Statistics");
+    registry.registerFunction("DEVSQ", fn_DEVSQ, "(number1, [number2], ...)",
+                              "Sum of squared deviations", "Statistics");
+    registry.registerFunction("GEOMEAN", fn_GEOMEAN, "(number1, [number2], ...)", "Geometric mean",
+                              "Statistics");
+    registry.registerFunction("HARMEAN", fn_HARMEAN, "(number1, [number2], ...)", "Harmonic mean",
+                              "Statistics");
+    registry.registerFunction("STANDARDIZE", fn_STANDARDIZE, "(x, mean, standard_dev)",
+                              "Normalized value from a distribution", "Statistics");
+    registry.registerFunction("FORECAST", fn_FORECAST, "(x, known_y's, known_x's)",
+                              "Linear forecast of y for x", "Statistics");
+    registry.registerFunction("FORECAST.LINEAR", fn_FORECAST_LINEAR, "(x, known_y's, known_x's)",
+                              "Linear forecast of y for x", "Statistics");
+    registry.registerAlias("FORECAST_LINEAR", "FORECAST.LINEAR");
+    registry.registerFunction("SLOPE", fn_SLOPE, "(known_y's, known_x's)",
+                              "Slope of linear regression", "Statistics");
+    registry.registerFunction("INTERCEPT", fn_INTERCEPT, "(known_y's, known_x's)",
+                              "Intercept of linear regression", "Statistics");
+    registry.registerFunction("PEARSON", fn_PEARSON, "(array1, array2)",
+                              "Pearson correlation coefficient", "Statistics");
+    registry.registerFunction("CORREL", fn_CORREL, "(array1, array2)", "Correlation coefficient",
+                              "Statistics");
+    registry.registerFunction("RSQ", fn_RSQ, "(known_y's, known_x's)",
+                              "Square of Pearson correlation", "Statistics");
+    registry.registerFunction("COVAR", fn_COVAR, "(array1, array2)", "Population covariance",
+                              "Statistics");
+    registry.registerFunction("COVARIANCE.P", fn_COVARIANCE_P, "(array1, array2)",
+                              "Population covariance", "Statistics");
+    registry.registerAlias("COVARIANCE_P", "COVARIANCE.P");
+    registry.registerFunction("COVARIANCE.S", fn_COVARIANCE_S, "(array1, array2)",
+                              "Sample covariance", "Statistics");
+    registry.registerAlias("COVARIANCE_S", "COVARIANCE.S");
+    registry.registerFunction("QUARTILE.EXC", fn_QUARTILE_EXC, "(array, quart)",
+                              "Exclusive quartile", "Statistics");
+    registry.registerAlias("QUARTILE_EXC", "QUARTILE.EXC");
+    registry.registerAlias("QUARTILEEXC", "QUARTILE.EXC");
+    registry.registerFunction("RANK.AVG", fn_RANK_AVG, "(number, ref, [order])",
+                              "Rank of a number (ties averaged)", "Statistics");
+    registry.registerAlias("RANK_AVG", "RANK.AVG");
+    registry.registerAlias("RANKAVG", "RANK.AVG");
+    registry.registerFunction("AVERAGEA", fn_AVERAGEA, "(value1, [value2], ...)",
+                              "Average including text and logicals", "Statistics");
+    registry.registerFunction("MINA", fn_MINA, "(value1, [value2], ...)",
+                              "Minimum including text and logicals", "Statistics");
+    registry.registerFunction("MAXA", fn_MAXA, "(value1, [value2], ...)",
+                              "Maximum including text and logicals", "Statistics");
+    registry.registerFunction("PERCENTRANK", fn_PERCENTRANK, "(array, x, [significance])",
+                              "Percent rank of a value", "Statistics");
+    registry.registerFunction("PERCENTRANK.INC", fn_PERCENTRANK_INC, "(array, x, [significance])",
+                              "Inclusive percent rank", "Statistics");
+    registry.registerAlias("PERCENTRANK_INC", "PERCENTRANK.INC");
+    registry.registerFunction("PERCENTRANK.EXC", fn_PERCENTRANK_EXC, "(array, x, [significance])",
+                              "Exclusive percent rank", "Statistics");
+    registry.registerAlias("PERCENTRANK_EXC", "PERCENTRANK.EXC");
+
+    // Excel dotted names (XLSX import also stores concatenated/underscore forms).
+    registry.registerAlias("STDEV.S", "STDEVS");
+    registry.registerAlias("STDEV.P", "STDEVP");
+    registry.registerAlias("STDEV_S", "STDEVS");
+    registry.registerAlias("STDEV_P", "STDEVP");
+    registry.registerAlias("VAR.S", "VARS");
+    registry.registerAlias("VAR.P", "VARP");
+    registry.registerAlias("VAR_S", "VARS");
+    registry.registerAlias("VAR_P", "VARP");
+    registry.registerAlias("PERCENTILE.INC", "PERCENTILEINC");
+    registry.registerAlias("PERCENTILE.EXC", "PERCENTILEEXC");
+    registry.registerAlias("PERCENTILE_INC", "PERCENTILEINC");
+    registry.registerAlias("PERCENTILE_EXC", "PERCENTILEEXC");
 }
 
 }  // namespace cells

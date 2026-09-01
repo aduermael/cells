@@ -592,5 +592,101 @@ TEST_F(FnStatsTest, CountBlank) {
     EXPECT_DOUBLE_EQ(r.getNumber(), 2.0);
 }
 
+TEST_F(FnStatsTest, AvedevDevsqMeans) {
+    EvalResult a = eval("=AVEDEV(1,2,3)");
+    ASSERT_TRUE(a.isNumber());
+    EXPECT_DOUBLE_EQ(a.getNumber(), 2.0 / 3.0);
+    EvalResult d = eval("=DEVSQ(1,2,3)");
+    ASSERT_TRUE(d.isNumber());
+    EXPECT_DOUBLE_EQ(d.getNumber(), 2.0);
+    EvalResult g = eval("=GEOMEAN(1,2,4)");
+    ASSERT_TRUE(g.isNumber());
+    EXPECT_DOUBLE_EQ(g.getNumber(), 2.0);
+    EvalResult h = eval("=HARMEAN(1,2,4)");
+    ASSERT_TRUE(h.isNumber());
+    EXPECT_NEAR(h.getNumber(), 12.0 / 7.0, 1e-9);
+    EvalResult z = eval("=GEOMEAN(-1,2)");
+    ASSERT_TRUE(z.isError());
+    EXPECT_EQ(z.getError(), CellError::NUM);
+}
+
+TEST_F(FnStatsTest, StandardizeForecastSlope) {
+    EvalResult s = eval("=STANDARDIZE(5,3,2)");
+    ASSERT_TRUE(s.isNumber());
+    EXPECT_DOUBLE_EQ(s.getNumber(), 1.0);
+    EvalResult sd0 = eval("=STANDARDIZE(1,0,0)");
+    ASSERT_TRUE(sd0.isError());
+    EXPECT_EQ(sd0.getError(), CellError::NUM);
+
+    setCellValue(0, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(0, 2, 4.0);
+    setCellValue(1, 0, 1.0);
+    setCellValue(1, 1, 2.0);
+    setCellValue(1, 2, 3.0);
+    EvalResult sl = eval("=SLOPE(A1:A3,B1:B3)");
+    ASSERT_TRUE(sl.isNumber());
+    EXPECT_DOUBLE_EQ(sl.getNumber(), 1.0);
+    EvalResult ic = eval("=INTERCEPT(A1:A3,B1:B3)");
+    ASSERT_TRUE(ic.isNumber());
+    EXPECT_DOUBLE_EQ(ic.getNumber(), 1.0);
+    EvalResult fc = eval("=FORECAST(1,A1:A3,B1:B3)");
+    ASSERT_TRUE(fc.isNumber());
+    EXPECT_DOUBLE_EQ(fc.getNumber(), 2.0);
+    EvalResult fl = eval("=FORECAST.LINEAR(1,A1:A3,B1:B3)");
+    ASSERT_TRUE(fl.isNumber());
+    EXPECT_DOUBLE_EQ(fl.getNumber(), 2.0);
+    EvalResult cr = eval("=CORREL(A1:A3,B1:B3)");
+    ASSERT_TRUE(cr.isNumber());
+    EXPECT_DOUBLE_EQ(cr.getNumber(), 1.0);
+    EvalResult rs = eval("=RSQ(A1:A3,B1:B3)");
+    ASSERT_TRUE(rs.isNumber());
+    EXPECT_DOUBLE_EQ(rs.getNumber(), 1.0);
+}
+
+TEST_F(FnStatsTest, CovarRankAvgPercentrank) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(1, 0, 1.0);
+    setCellValue(1, 1, 2.0);
+    setCellValue(1, 2, 3.0);
+    EvalResult cv = eval("=COVAR(A1:A3,B1:B3)");
+    ASSERT_TRUE(cv.isNumber());
+    EXPECT_NEAR(cv.getNumber(), 2.0 / 3.0, 1e-9);
+    EvalResult cvs = eval("=COVARIANCE.S(A1:A3,B1:B3)");
+    ASSERT_TRUE(cvs.isNumber());
+    EXPECT_NEAR(cvs.getNumber(), 1.0, 1e-9);
+
+    setCellValue(2, 0, 1.0);
+    setCellValue(2, 1, 2.0);
+    setCellValue(2, 2, 2.0);
+    setCellValue(2, 3, 4.0);
+    EvalResult ra = eval("=RANK.AVG(2,C1:C4)");
+    ASSERT_TRUE(ra.isNumber());
+    EXPECT_DOUBLE_EQ(ra.getNumber(), 2.5);
+
+    EvalResult pr = eval("=PERCENTRANK.INC(A1:A3,2)");
+    ASSERT_TRUE(pr.isNumber());
+    EXPECT_DOUBLE_EQ(pr.getNumber(), 0.5);
+    EvalResult dotted = eval("=STDEV.S(1,2,3)");
+    EvalResult alias = eval("=STDEVS(1,2,3)");
+    ASSERT_TRUE(dotted.isNumber());
+    ASSERT_TRUE(alias.isNumber());
+    EXPECT_DOUBLE_EQ(dotted.getNumber(), alias.getNumber());
+}
+
+TEST_F(FnStatsTest, AverageAMinAMaxA) {
+    EvalResult a = eval("=AVERAGEA(1,TRUE,\"x\")");
+    ASSERT_TRUE(a.isNumber());
+    EXPECT_DOUBLE_EQ(a.getNumber(), 2.0 / 3.0);
+    EvalResult mn = eval("=MINA(1,TRUE)");
+    ASSERT_TRUE(mn.isNumber());
+    EXPECT_DOUBLE_EQ(mn.getNumber(), 1.0);
+    EvalResult mx = eval("=MAXA(1,TRUE)");
+    ASSERT_TRUE(mx.isNumber());
+    EXPECT_DOUBLE_EQ(mx.getNumber(), 1.0);
+}
+
 }  // namespace
 }  // namespace cells

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
@@ -11,6 +12,7 @@
 #include "core/cells/functions/fn_array.h"
 #include "core/cells/functions/fn_conditional.h"
 #include "core/cells/functions/fn_datetime.h"
+#include "core/cells/functions/fn_engineering.h"
 #include "core/cells/functions/fn_logic.h"
 #include "core/cells/functions/fn_lookup.h"
 #include "core/cells/functions/fn_math.h"
@@ -64,6 +66,25 @@ void FunctionRegistry::registerFunction(const std::string& name, FormulaFunction
     functionInfo_[upperName] = FunctionInfo{upperName, signature, description, category};
     if (isVolatile) {
         volatileFunctions_.insert(upperName);
+    }
+}
+
+void FunctionRegistry::registerAlias(const std::string& alias, const std::string& canonical) {
+    const std::string upperAlias = toUpper(alias);
+    const std::string upperCanon = toUpper(canonical);
+    auto fnIt = functions_.find(upperCanon);
+    if (fnIt == functions_.end()) {
+        return;
+    }
+    functions_[upperAlias] = fnIt->second;
+    auto infoIt = functionInfo_.find(upperCanon);
+    if (infoIt != functionInfo_.end()) {
+        FunctionInfo info = infoIt->second;
+        info.name = upperAlias;
+        functionInfo_[upperAlias] = std::move(info);
+    }
+    if (volatileFunctions_.count(upperCanon) > 0) {
+        volatileFunctions_.insert(upperAlias);
     }
 }
 
@@ -172,6 +193,54 @@ std::pair<std::vector<double>, EvalResult> collectNumericValues(
     return {values, EvalResult::Empty()};
 }
 
+std::pair<std::vector<std::pair<double, double>>, EvalResult> collectPairedNumericValues(
+    const ASTNode* arrayX, const ASTNode* arrayY, EvalContext& ctx) {
+    const std::vector<EvalResult> xs = expandArguments({arrayX}, ctx);
+    const std::vector<EvalResult> ys = expandArguments({arrayY}, ctx);
+
+    for (const EvalResult& v : xs) {
+        if (v.isError()) {
+            return {{}, v};
+        }
+    }
+    for (const EvalResult& v : ys) {
+        if (v.isError()) {
+            return {{}, v};
+        }
+    }
+    if (xs.size() != ys.size()) {
+        return {{}, EvalResult::Error(CellError::NA)};
+    }
+
+    std::vector<std::pair<double, double>> pairs;
+    pairs.reserve(xs.size());
+    for (size_t i = 0; i < xs.size(); ++i) {
+        const EvalResult& x = xs[i];
+        const EvalResult& y = ys[i];
+        if (x.isEmpty() || y.isEmpty() || x.isString() || y.isString()) {
+            continue;
+        }
+        double xv = 0.0;
+        double yv = 0.0;
+        if (x.isNumber()) {
+            xv = x.getNumber();
+        } else if (x.isBoolean()) {
+            xv = x.getBoolean() ? 1.0 : 0.0;
+        } else {
+            continue;
+        }
+        if (y.isNumber()) {
+            yv = y.getNumber();
+        } else if (y.isBoolean()) {
+            yv = y.getBoolean() ? 1.0 : 0.0;
+        } else {
+            continue;
+        }
+        pairs.emplace_back(xv, yv);
+    }
+    return {std::move(pairs), EvalResult::Empty()};
+}
+
 EvalResult evaluateAsNumber(const ASTNode* arg, EvalContext& ctx) {
     EvalResult result = evaluate(arg, ctx);
     if (result.isError()) {
@@ -211,6 +280,7 @@ void initializeBuiltinFunctions(FunctionRegistry& registry) {
     registerRandFunctions(registry);
     registerStatsFunctions(registry);
     registerLookupFunctions(registry);
+    registerEngineeringFunctions(registry);
 }
 
 }  // namespace cells

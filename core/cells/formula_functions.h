@@ -30,6 +30,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "core/cells/formula_eval.h"
@@ -70,6 +71,10 @@ public:
     void registerFunction(const std::string& name, FormulaFunction fn, const std::string& signature,
                           const std::string& description, const std::string& category,
                           bool isVolatile = false);
+
+    // Register an alternate spelling for an already-registered function.
+    // Copies implementation, metadata, and volatility from `canonical`.
+    void registerAlias(const std::string& alias, const std::string& canonical);
 
     // Call a function by name with the given arguments
     // Returns NAME error if function doesn't exist
@@ -116,6 +121,12 @@ std::vector<EvalResult> expandArguments(const std::vector<const ASTNode*>& args,
 // Returns pair<values, optional_error> - if error is set, values should be ignored
 std::pair<std::vector<double>, EvalResult> collectNumericValues(
     const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
+// Collect paired numeric values from two array arguments (same expanded length).
+// Skips pairs where either side is empty or non-numeric. Errors propagate.
+// Length mismatch returns #N/A.
+std::pair<std::vector<std::pair<double, double>>, EvalResult> collectPairedNumericValues(
+    const ASTNode* arrayX, const ASTNode* arrayY, EvalContext& ctx);
 
 // Evaluate a single argument and coerce to number
 // Returns the numeric result or an error
