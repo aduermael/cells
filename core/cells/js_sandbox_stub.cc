@@ -4,7 +4,6 @@
 // =============================================================================
 
 #include "core/cells/js_sandbox.h"
-
 #include "core/cells/model.h"
 
 namespace cells {
