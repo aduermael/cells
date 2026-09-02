@@ -27,6 +27,26 @@ Cell* cellAt(Sheet* sheet, uint32_t col, uint32_t row) {
     return sheet->getCellAtPosition(col, row);
 }
 
+TEST(OfficeJsTest, ExcelRunSingleCellValues) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+    const ws = context.workbook.worksheets.getActiveWorksheet();
+    ws.getRange("A2").values = [[2]];
+    await context.sync();
+});
+)JS");
+
+    ASSERT_TRUE(result.success) << result.error;
+    Cell* a2 = cellAt(sheet, 0, 1);
+    ASSERT_NE(a2, nullptr);
+    EXPECT_DOUBLE_EQ(a2->value.asNumber(), 2.0);
+}
+
 TEST(OfficeJsTest, WriteValues) {
     auto workbook = createEmptyWorkbook();
     Sheet* sheet = workbook->sheets[0].get();

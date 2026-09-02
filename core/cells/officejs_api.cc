@@ -1993,6 +1993,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   function Dummy(context, feature) {
     this.context = context;
     this._feature = feature || 'Excel.Unknown';
+    return wrapHostObject(this, 'Unknown');
   }
   Dummy.prototype.load = function () { return this; };
   Dummy.prototype.getRange = function () {
@@ -2031,6 +2032,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function TableCollection(context) {
     this.context = context;
+    return wrapHostObject(this, 'TableCollection');
   }
   TableCollection.prototype.add = function () {
     enqueueNotSupported(this.context, 'Excel.TableCollection.add');
@@ -2045,6 +2047,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function ChartCollection(context) {
     this.context = context;
+    return wrapHostObject(this, 'ChartCollection');
   }
   ChartCollection.prototype.add = function () {
     enqueueNotSupported(this.context, 'Excel.ChartCollection.add');
@@ -2059,6 +2062,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function WorksheetProtection(context) {
     this.context = context;
+    return wrapHostObject(this, 'WorksheetProtection');
   }
   WorksheetProtection.prototype.protect = function () {
     enqueueNotSupported(this.context, 'Excel.WorksheetProtection.protect');
@@ -2106,6 +2110,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this.names = new NamedItemCollection(context);
     this.tables = new TableCollection(context);
     this.protection = new WorksheetProtection(context);
+    return wrapHostObject(this, 'Workbook');
   }
   Workbook.prototype.getSelectedRange = function () {
     var r = new Range(this.context, native.activeSheet(), 0, 0, 1, 1);
@@ -2126,6 +2131,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this._loaded = {};
     this._pending = [];
     this.context._id(this);
+    return wrapHostObject(this, 'WorksheetCollection');
   }
   Object.defineProperty(WorksheetCollection.prototype, 'items', {
     get: function () { return this._loaded.items || []; }
@@ -2176,6 +2182,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this.protection = new WorksheetProtection(context);
     this.names = new NamedItemCollection(context);
     this.context._id(this);
+    return wrapHostObject(this, 'Worksheet');
   }
   Object.defineProperty(Worksheet.prototype, 'name', {
     get: function () { return this._loaded.name != null ? this._loaded.name : this._name; },
@@ -2239,6 +2246,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this._loaded = {};
     this.format = new RangeFormat(this);
     this.context._id(this);
+    return wrapHostObject(this, 'Range');
   }
   Range.prototype._base = function (extra) {
     var cmd = extra || {};
@@ -2397,6 +2405,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this.fill = new RangeFill(range);
     this.font = new RangeFont(range);
     this.borders = new RangeBorderCollection(range);
+    return wrapHostObject(this, 'RangeFormat');
   }
   function defFormat(prop, op) {
     Object.defineProperty(RangeFormat.prototype, prop, {
@@ -2425,6 +2434,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function RangeBorderCollection(range) {
     this._range = range;
+    return wrapHostObject(this, 'RangeBorderCollection');
   }
   RangeBorderCollection.prototype.getItem = function (index) {
     return new RangeBorder(this._range, String(index));
@@ -2436,6 +2446,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this._range = range;
     this._index = index;
     this._loaded = {};
+    return wrapHostObject(this, 'RangeBorder');
   }
   function defBorder(prop) {
     Object.defineProperty(RangeBorder.prototype, prop, {
@@ -2457,6 +2468,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   function RangeFill(range) {
     this._range = range;
     this._loaded = {};
+    return wrapHostObject(this, 'RangeFill');
   }
   Object.defineProperty(RangeFill.prototype, 'color', {
     get: function () { return this._loaded.color; },
@@ -2474,6 +2486,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   function RangeFont(range) {
     this._range = range;
     this._loaded = {};
+    return wrapHostObject(this, 'RangeFont');
   }
   function defFont(prop, key) {
     Object.defineProperty(RangeFont.prototype, prop, {
@@ -2500,6 +2513,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function NamedItemCollection(context) {
     this.context = context;
+    return wrapHostObject(this, 'NamedItemCollection');
   }
   NamedItemCollection.prototype.getItem = function (name) {
     return new NamedItem(this.context, String(name));
@@ -2536,6 +2550,7 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this._name = name;
     this._loaded = {};
     this.context._id(this);
+    return wrapHostObject(this, 'NamedItem');
   }
   Object.defineProperty(NamedItem.prototype, 'name', {
     get: function () { return this._loaded.name != null ? this._loaded.name : this._name; }
@@ -2561,36 +2576,25 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     return prop !== 'then' && prop !== 'toJSON' && prop !== 'toString' && prop !== 'valueOf' &&
            prop !== 'constructor' && prop !== 'inspect' && prop !== 'prototype';
   }
-  function installMissingMethodProxy(ctor, typeName) {
-    var proto = ctor.prototype;
-    ctor.prototype = new Proxy(proto, {
+  // Instance proxy (not prototype): a prototype Proxy re-enters on getter/setter
+  // lookup and overflows the WASM JS stack ("Maximum call stack size exceeded").
+  function wrapHostObject(obj, typeName) {
+    if (obj == null || obj.__cellsWrapped) return obj;
+    obj.__cellsWrapped = true;
+    return new Proxy(obj, {
       get: function (target, prop, receiver) {
-        if ((prop in target) || !isStubbableMethodName(prop)) {
-          return Reflect.get(target, prop, receiver);
+        if (typeof prop === 'string' && isStubbableMethodName(prop) && !(prop in target)) {
+          return function () {
+            var ctx = target.context;
+            if (!ctx && target._range) ctx = target._range.context;
+            if (ctx) enqueueNotSupported(ctx, 'Excel.' + typeName + '.' + prop);
+            return receiver;
+          };
         }
-        return function () {
-          var ctx = receiver && receiver.context;
-          if (!ctx && receiver && receiver._range) ctx = receiver._range.context;
-          if (ctx) enqueueNotSupported(ctx, 'Excel.' + typeName + '.' + prop);
-          return receiver;
-        };
+        return Reflect.get(target, prop, receiver);
       }
     });
   }
-  installMissingMethodProxy(Range, 'Range');
-  installMissingMethodProxy(Worksheet, 'Worksheet');
-  installMissingMethodProxy(Workbook, 'Workbook');
-  installMissingMethodProxy(RangeFormat, 'RangeFormat');
-  installMissingMethodProxy(RangeFill, 'RangeFill');
-  installMissingMethodProxy(RangeFont, 'RangeFont');
-  installMissingMethodProxy(RangeBorder, 'RangeBorder');
-  installMissingMethodProxy(RangeBorderCollection, 'RangeBorderCollection');
-  installMissingMethodProxy(NamedItem, 'NamedItem');
-  installMissingMethodProxy(NamedItemCollection, 'NamedItemCollection');
-  installMissingMethodProxy(WorksheetCollection, 'WorksheetCollection');
-  installMissingMethodProxy(TableCollection, 'TableCollection');
-  installMissingMethodProxy(ChartCollection, 'ChartCollection');
-  installMissingMethodProxy(WorksheetProtection, 'WorksheetProtection');
 
   var Excel = {
     run: function (arg1, arg2) {
