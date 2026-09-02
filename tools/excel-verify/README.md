@@ -24,11 +24,14 @@ From this directory:
 go build -o cells-verify ./cmd/cells-verify
 ```
 
-From the repo root (after the Bazel wrapper lands):
+From the repo root:
 
 ```bash
+bazel run :excel-verify -- version
 bazel run :excel-verify -- excel-save testdata/xlsx/simple.xlsx golden.xlsx
 ```
+
+`excel-save` requires Windows + Excel. On Linux/macOS it exits with a clear error; `version` still works.
 
 ## Commands
 
