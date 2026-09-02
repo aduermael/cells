@@ -12,13 +12,11 @@
 #include "core/cells/csv_writer.h"
 #include "core/cells/id.h"
 #include "core/cells/formula_eval.h"
-#include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
-#include "core/cells/formula_serializer.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/script_dispatch.h"
 #include "core/cells/parser.h"
-#include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
@@ -291,7 +289,6 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
                 return nullptr;
             }
 
-            // Convert A1 formulas to UUID references
             convertFormulasToUuid(*result.workbook);
 
             return std::move(result.workbook);
@@ -458,40 +455,7 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
 }
 
 void Converter::convertFormulasToUuid(Workbook& workbook) {
-    RefConverter converter;
-
-    for (auto& sheet : workbook.sheets) {
-        // Set up context for this sheet
-        converter.setContext(*sheet);
-
-        // Convert formulas in each cell
-        for (const auto& cellId : sheet->getCellIds()) {
-            Cell* cell = workbook.getCell(cellId);
-            if (!cell) continue;
-            if (cell->formula != nullptr && cell->formula->ast != nullptr) {
-                // Generate current formula text from AST
-                std::string formula_text = FormulaSerializer::serialize(cell->formula->ast);
-
-                // Skip if formula doesn't look like it has A1 refs
-                // (Already in UUID format or no refs)
-                if (formula_text.empty()) {
-                    continue;
-                }
-
-                // Convert A1 refs to UUID refs
-                std::string converted = converter.formulaToUuid(formula_text);
-                if (converted != formula_text) {
-                    // Re-parse the converted formula to create new AST
-                    FormulaParser parser(converted);
-                    std::unique_ptr<ASTNode> ast = parser.parse();
-                    auto* formula = new Formula();
-                    formula->ast = ast.release();
-                    formula->dirty = true;
-                    cell->setFormula(formula);
-                }
-            }
-        }
-    }
+    resolveWorkbookFormulas(workbook);
 }
 
 void Converter::evaluateFormulas(Workbook& workbook) {

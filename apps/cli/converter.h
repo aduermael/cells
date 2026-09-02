@@ -67,7 +67,7 @@ private:
     // Generate warnings for feature loss during conversion
     void checkFeatureLoss(const Workbook& workbook);
 
-    // Convert A1 formulas to UUID references (for XLSX import)
+    // Resolve A1 formula ASTs to cell UUIDs (XLSX import; same as reader)
     void convertFormulasToUuid(Workbook& workbook);
 
     // Evaluate all formulas in the workbook and store computed values

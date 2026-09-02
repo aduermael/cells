@@ -1,4 +1,13 @@
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
+#include <iterator>
+#include <string>
+#include <vector>
 
 #include "core/cells/crdt.h"
 #include "core/cells/format_buffer.h"
@@ -11,6 +20,10 @@
 #include "core/cells/script_dispatch.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
+#include "core/cells/xlsx_reader.h"
+#include "core/cells/xlsx_writer.h"
+
+#include "miniz.h"
 
 namespace cells {
 namespace {
@@ -25,6 +38,100 @@ std::unique_ptr<Workbook> createEmptyWorkbook() {
 
 Cell* cellAt(Sheet* sheet, uint32_t col, uint32_t row) {
     return sheet->getCellAtPosition(col, row);
+}
+
+std::string officeJsFixturePath(const std::string& name) {
+    const std::string rel = "testdata/officejs/" + name;
+    std::vector<std::string> candidates = {rel};
+    if (const char* src = std::getenv("TEST_SRCDIR")) {
+        candidates.push_back(std::string(src) + "/_main/" + rel);
+        candidates.push_back(std::string(src) + "/" + rel);
+    }
+    if (const char* ws = std::getenv("BUILD_WORKSPACE_DIRECTORY")) {
+        candidates.push_back(std::string(ws) + "/" + rel);
+    }
+    for (const auto& path : candidates) {
+        if (std::filesystem::exists(path)) {
+            return path;
+        }
+    }
+    return rel;
+}
+
+std::string loadOfficeJsFixture(const std::string& name) {
+    const std::string path = officeJsFixturePath(name);
+    std::ifstream in(path);
+    EXPECT_TRUE(in.good()) << "missing fixture " << path;
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+int gOfficeJsXlsxCounter = 0;
+
+std::string uniqueXlsxPath(const std::string& stem) {
+    return "/tmp/officejs_rt_" + std::to_string(++gOfficeJsXlsxCounter) + "_" + stem + ".xlsx";
+}
+
+class TempXlsxGuard {
+public:
+    explicit TempXlsxGuard(std::string path) : path_(std::move(path)) {}
+    ~TempXlsxGuard() { std::remove(path_.c_str()); }
+    const std::string& path() const { return path_; }
+
+private:
+    std::string path_;
+};
+
+std::string zipEntry(const std::string& path, const std::string& name) {
+    mz_zip_archive archive{};
+    if (mz_zip_reader_init_file(&archive, path.c_str(), 0) == 0) {
+        return {};
+    }
+    const int index = mz_zip_reader_locate_file(&archive, name.c_str(), nullptr, 0);
+    if (index < 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    mz_zip_archive_file_stat stat;
+    if (mz_zip_reader_file_stat(&archive, index, &stat) == 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    std::string content;
+    content.resize(stat.m_uncomp_size);
+    if (mz_zip_reader_extract_to_mem(&archive, index, content.data(), content.size(), 0) == 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    mz_zip_reader_end(&archive);
+    return content;
+}
+
+ScriptResult runOfficeJs(Workbook& workbook, Sheet* sheet, const std::string& src) {
+    JsSandbox sandbox;
+    sandbox.setContext(&workbook, sheet);
+    return sandbox.execute(src);
+}
+
+std::unique_ptr<Workbook> writeAndReadXlsx(const Workbook& workbook, const std::string& path) {
+    auto written = writeXLSX(workbook, path);
+    EXPECT_TRUE(written.ok()) << (written.error ? written.error->toString() : "write failed");
+    if (!written.ok()) {
+        return nullptr;
+    }
+    auto read = readXLSX(path);
+    EXPECT_TRUE(read.ok()) << (read.error ? read.error->toString() : "read failed");
+    return std::move(read.workbook);
+}
+
+std::string allWorksheetXml(const std::string& path) {
+    std::string out;
+    for (int i = 1; i <= 8; ++i) {
+        const std::string xml = zipEntry(path, "xl/worksheets/sheet" + std::to_string(i) + ".xml");
+        if (!xml.empty()) {
+            out += xml;
+        }
+    }
+    return out;
 }
 
 // Same source as the web script panel. Native QuickJS (this suite) has an 8MB
@@ -648,6 +755,230 @@ await Excel.run(async (context) => {
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_NE(result.output.find("formula=[[\"=A1*2\"]]"), std::string::npos) << result.output;
     EXPECT_EQ(result.output.find("==A1"), std::string::npos) << result.output;
+}
+
+TEST(OfficeJsTest, FormulasGetterFixtureXlsxRoundTrip) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto live = runOfficeJs(*workbook, sheet, loadOfficeJsFixture("formulas-getter.js"));
+    ASSERT_TRUE(live.success) << live.error;
+    EXPECT_NE(live.output.find("[[10,\"=A1*2\",\"=A1+1\"]]"), std::string::npos) << live.output;
+    EXPECT_EQ(live.output.find("==A1"), std::string::npos) << live.output;
+
+    const std::string path = uniqueXlsxPath("formulas_getter");
+    TempXlsxGuard guard(path);
+    auto reloaded = writeAndReadXlsx(*workbook, path);
+    ASSERT_NE(reloaded, nullptr);
+    Sheet* rs = reloaded->getSheetByIndex(0);
+    ASSERT_NE(rs, nullptr);
+    const auto after = runOfficeJs(*reloaded, rs, R"JS(
+await Excel.run(async (context) => {
+  const r = context.workbook.worksheets.getActiveWorksheet().getRange("A1:C1");
+  r.load(["values", "formulas"]);
+  await context.sync();
+  console.log("reload values " + JSON.stringify(r.values));
+  console.log("reload formulas " + JSON.stringify(r.formulas));
+});
+)JS");
+    ASSERT_TRUE(after.success) << after.error;
+    EXPECT_NE(after.output.find("reload values [[10,20,11]]"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("reload formulas [[10,\"=A1*2\",\"=A1+1\"]]"), std::string::npos)
+        << after.output;
+    EXPECT_EQ(after.output.find("=="), std::string::npos) << after.output;
+}
+
+TEST(OfficeJsTest, SkippedRowFixtureXlsxRoundTrip) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto live = runOfficeJs(*workbook, sheet, loadOfficeJsFixture("skipped-row-xlsx.js"));
+    ASSERT_TRUE(live.success) << live.error;
+    EXPECT_NE(live.output.find("[[\"title\"],[\"\"],[10],[20]]"), std::string::npos) << live.output;
+    EXPECT_NE(live.output.find("[\"=A3*2\"]"), std::string::npos) << live.output;
+    EXPECT_EQ(sheet->getRowByPosition(1), nullptr);
+
+    const std::string path = uniqueXlsxPath("skipped_row");
+    TempXlsxGuard guard(path);
+    auto written = writeXLSX(*workbook, path);
+    ASSERT_TRUE(written.ok()) << (written.error ? written.error->toString() : "write failed");
+    const std::string xml = zipEntry(path, "xl/worksheets/sheet1.xml");
+    EXPECT_NE(xml.find("r=\"A3\""), std::string::npos) << xml;
+    EXPECT_NE(xml.find("r=\"A4\""), std::string::npos) << xml;
+    EXPECT_NE(xml.find(">A3*2</f>"), std::string::npos) << xml;
+    EXPECT_EQ(xml.find("<row r=\"2\""), std::string::npos) << xml;
+
+    auto read = readXLSX(path);
+    ASSERT_TRUE(read.ok()) << (read.error ? read.error->toString() : "read failed");
+    Sheet* rs = read.workbook->getSheetByIndex(0);
+    ASSERT_NE(rs, nullptr);
+    EXPECT_EQ(cellAt(rs, 0, 1), nullptr);
+    const auto after = runOfficeJs(*read.workbook, rs, R"JS(
+await Excel.run(async (context) => {
+  const r = context.workbook.worksheets.getActiveWorksheet().getRange("A1:A4");
+  r.load(["values", "formulas"]);
+  await context.sync();
+  console.log("reload values " + JSON.stringify(r.values));
+  console.log("reload formulas " + JSON.stringify(r.formulas));
+});
+)JS");
+    ASSERT_TRUE(after.success) << after.error;
+    EXPECT_NE(after.output.find("reload values [[\"title\"],[\"\"],[10],[20]]"), std::string::npos)
+        << after.output;
+    EXPECT_NE(after.output.find("[\"=A3*2\"]"), std::string::npos) << after.output;
+    EXPECT_EQ(after.output.find("#CIRCULAR"), std::string::npos) << after.output;
+}
+
+TEST(OfficeJsTest, CrossSheetFixtureXlsxRoundTrip) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto live = runOfficeJs(*workbook, sheet, loadOfficeJsFixture("cross-sheet-xlsx.js"));
+    ASSERT_TRUE(live.success) << live.error;
+    EXPECT_NE(live.output.find("in-memory values [[42],[42],[99]]"), std::string::npos)
+        << live.output;
+    EXPECT_NE(live.output.find("=Data!A1"), std::string::npos) << live.output;
+    EXPECT_NE(live.output.find("='Cap Table'!A1"), std::string::npos) << live.output;
+    EXPECT_EQ(live.output.find("#REF!"), std::string::npos) << live.output;
+
+    const std::string path = uniqueXlsxPath("cross_sheet");
+    TempXlsxGuard guard(path);
+    auto written = writeXLSX(*workbook, path);
+    ASSERT_TRUE(written.ok()) << (written.error ? written.error->toString() : "write failed");
+    const std::string xml = allWorksheetXml(path);
+    EXPECT_NE(xml.find(">Data!A1</f>"), std::string::npos) << xml;
+    EXPECT_TRUE(xml.find("'Cap Table'!A1") != std::string::npos ||
+                xml.find("&apos;Cap Table&apos;!A1") != std::string::npos)
+        << xml;
+    EXPECT_EQ(xml.find("#REF!"), std::string::npos) << xml;
+
+    auto read = readXLSX(path);
+    ASSERT_TRUE(read.ok()) << (read.error ? read.error->toString() : "read failed");
+    Sheet* summary = read.workbook->getSheetByName("Summary");
+    ASSERT_NE(summary, nullptr);
+    const auto after = runOfficeJs(*read.workbook, summary, R"JS(
+await Excel.run(async (context) => {
+  const r = context.workbook.worksheets.getItem("Summary").getRange("A1:A3");
+  r.load(["values", "formulas"]);
+  await context.sync();
+  console.log("reload values " + JSON.stringify(r.values));
+  console.log("reload formulas " + JSON.stringify(r.formulas));
+});
+)JS");
+    ASSERT_TRUE(after.success) << after.error;
+    EXPECT_NE(after.output.find("reload values [[42],[42],[99]]"), std::string::npos)
+        << after.output;
+    EXPECT_NE(after.output.find("=Data!A1"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("='Cap Table'!A1"), std::string::npos) << after.output;
+    EXPECT_EQ(after.output.find("#REF!"), std::string::npos) << after.output;
+}
+
+TEST(OfficeJsTest, RangeLayoutFixtureXlsxRoundTrip) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto live = runOfficeJs(*workbook, sheet, loadOfficeJsFixture("range-layout.js"));
+    ASSERT_TRUE(live.success) << live.error;
+    EXPECT_NE(live.output.find("layout applied"), std::string::npos) << live.output;
+
+    const std::string path = uniqueXlsxPath("range_layout");
+    TempXlsxGuard guard(path);
+    auto reloaded = writeAndReadXlsx(*workbook, path);
+    ASSERT_NE(reloaded, nullptr);
+    Sheet* rs = reloaded->getSheetByIndex(0);
+    ASSERT_NE(rs, nullptr);
+    EXPECT_FALSE(rs->getRangesAt(0, 0, RangeFlags::MERGE).empty());
+    Cell* a1 = cellAt(rs, 0, 0);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "Helios Robotics, Inc.");
+    const StyleBuffer* styleBuf = reloaded->getEntityStyle(a1->id);
+    ASSERT_NE(styleBuf, nullptr);
+    EXPECT_EQ(styleBuf->toCellStyle().hAlign, TextAlign::CENTER);
+    ASSERT_NE(rs->getColumnByPosition(0), nullptr);
+    EXPECT_EQ(rs->getColumnByPosition(0)->size, 210u);
+    ASSERT_NE(rs->getRowByPosition(0), nullptr);
+    EXPECT_EQ(rs->getRowByPosition(0)->size, 37u);
+    Cell* a2 = cellAt(rs, 0, 1);
+    ASSERT_NE(a2, nullptr);
+    const StyleBuffer* a2Style = reloaded->getEntityStyle(a2->id);
+    ASSERT_NE(a2Style, nullptr);
+    EXPECT_TRUE(a2Style->toCellStyle().wrapText);
+    ASSERT_NE(rs->getRowByPosition(1), nullptr);
+    EXPECT_EQ(rs->getRowByPosition(1)->size, 43u);
+}
+
+TEST(OfficeJsTest, CapTableFixtureXlsxRoundTrip) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto live = runOfficeJs(*workbook, sheet, loadOfficeJsFixture("cap-table.js"));
+    ASSERT_TRUE(live.success) << live.error;
+    EXPECT_NE(live.output.find("Issued shares: 13950000"), std::string::npos) << live.output;
+    EXPECT_NE(live.output.find("Fully diluted shares: 15150000"), std::string::npos) << live.output;
+    EXPECT_NE(live.output.find("Capital raised: 15500900"), std::string::npos) << live.output;
+
+    Sheet* cap = workbook->getSheetByName("Cap Table");
+    ASSERT_NE(cap, nullptr);
+    EXPECT_EQ(cap->getRowByPosition(3), nullptr) << "blank layout row 4 must stay sparse";
+    Cell* issued = cellAt(cap, 3, 13);
+    Cell* fd = cellAt(cap, 3, 15);
+    Cell* capital = cellAt(cap, 5, 13);
+    ASSERT_NE(issued, nullptr);
+    ASSERT_NE(fd, nullptr);
+    ASSERT_NE(capital, nullptr);
+    EXPECT_DOUBLE_EQ(issued->value.asNumber(), 13950000.0);
+    EXPECT_DOUBLE_EQ(fd->value.asNumber(), 15150000.0);
+    EXPECT_DOUBLE_EQ(capital->value.asNumber(), 15500900.0);
+
+    const std::string path = uniqueXlsxPath("cap_table");
+    TempXlsxGuard guard(path);
+    auto written = writeXLSX(*workbook, path);
+    ASSERT_TRUE(written.ok()) << (written.error ? written.error->toString() : "write failed");
+    const std::string xml = allWorksheetXml(path);
+    EXPECT_TRUE(xml.find("'Cap Table'!D14") != std::string::npos ||
+                xml.find("&apos;Cap Table&apos;!D14") != std::string::npos)
+        << xml;
+    EXPECT_TRUE(xml.find("'Cap Table'!D16") != std::string::npos ||
+                xml.find("&apos;Cap Table&apos;!D16") != std::string::npos)
+        << xml;
+    EXPECT_TRUE(xml.find("C6:C13") != std::string::npos) << xml;
+    EXPECT_EQ(xml.find("#REF!"), std::string::npos) << xml;
+
+    auto read = readXLSX(path);
+    ASSERT_TRUE(read.ok()) << (read.error ? read.error->toString() : "read failed");
+    Sheet* cap2 = read.workbook->getSheetByName("Cap Table");
+    Sheet* summary = read.workbook->getSheetByName("Summary");
+    ASSERT_NE(cap2, nullptr);
+    ASSERT_NE(summary, nullptr);
+    EXPECT_EQ(cellAt(cap2, 0, 3), nullptr) << "blank layout row 4 must stay empty";
+
+    const auto after = runOfficeJs(*read.workbook, summary, R"JS(
+await Excel.run(async (context) => {
+  const cap = context.workbook.worksheets.getItem("Cap Table");
+  const summary = context.workbook.worksheets.getItem("Summary");
+  const issued = cap.getRange("D14");
+  const fd = cap.getRange("D16");
+  const capital = cap.getRange("F14");
+  const metrics = summary.getRange("B5:B7");
+  const common = summary.getRange("B15");
+  issued.load("values");
+  fd.load("values");
+  capital.load("values");
+  metrics.load(["values", "formulas"]);
+  common.load(["values", "formulas"]);
+  await context.sync();
+  console.log("reload issued " + issued.values[0][0]);
+  console.log("reload fd " + fd.values[0][0]);
+  console.log("reload capital " + capital.values[0][0]);
+  console.log("reload metrics " + JSON.stringify(metrics.values));
+  console.log("reload metric formulas " + JSON.stringify(metrics.formulas));
+  console.log("reload common " + common.values[0][0]);
+  console.log("reload common formula " + JSON.stringify(common.formulas));
+});
+)JS");
+    ASSERT_TRUE(after.success) << after.error;
+    EXPECT_NE(after.output.find("reload issued 13950000"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("reload fd 15150000"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("reload capital 15500900"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("='Cap Table'!D14"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("='Cap Table'!D16"), std::string::npos) << after.output;
+    EXPECT_NE(after.output.find("'Cap Table'!"), std::string::npos) << after.output;
+    EXPECT_EQ(after.output.find("#REF!"), std::string::npos) << after.output;
 }
 
 }  // namespace

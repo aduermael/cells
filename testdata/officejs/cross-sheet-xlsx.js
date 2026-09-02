@@ -6,7 +6,8 @@
 //   Summary!A2 = ='Data'!A1
 //   Summary!A3 = ='Cap Table'!A1
 //
-// In memory and .zcd these evaluate. .xlsx today writes <f>#REF!</f>.
+// In memory, .zcd, and .xlsx these evaluate as sheet-qualified A1
+// (quoted when the sheet name has spaces).
 //
 // Run:
 //   dist/cli/cells --script testdata/officejs/cross-sheet-xlsx.js /tmp/xsheet.xlsx -y

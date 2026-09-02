@@ -656,6 +656,7 @@ cc_library(
     hdrs = ["xlsx_reader.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":formula_resolver",
         ":id",
         ":model",
         "//third_party/miniz",
@@ -707,9 +708,9 @@ cc_library(
     hdrs = ["xlsx_writer.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":formula_display",
         ":id",
         ":model",
-        ":ref_converter",
         "//third_party/miniz",
     ],
 )
@@ -719,6 +720,7 @@ cc_test(
     srcs = ["xlsx_writer_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
+        ":formula_display",
         ":formula_eval",
         ":formula_recalc",
         ":formula_resolver",
@@ -1460,6 +1462,7 @@ cc_library(
 cc_test(
     name = "officejs_test",
     srcs = ["officejs_test.cc"],
+    data = ["//testdata:officejs_scripts"],
     deps = [
         ":crdt",
         ":id",
@@ -1470,6 +1473,9 @@ cc_test(
         ":named_ranges",
         ":range",
         ":style_buffer",
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "//third_party/miniz",
         "@googletest//:gtest_main",
     ],
 )
