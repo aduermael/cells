@@ -330,6 +330,28 @@ export class ScriptPanel {
     return value === "javascript" ? "javascript" : "luau";
   }
 
+  private restoreLanguage(): void {
+    if (!this.languageSelect) {
+      return;
+    }
+    try {
+      const saved = localStorage.getItem("cells.scriptLanguage");
+      if (saved === "javascript" || saved === "luau") {
+        this.languageSelect.value = saved;
+      }
+    } catch {
+      // private mode / blocked storage
+    }
+  }
+
+  private persistLanguage(): void {
+    try {
+      localStorage.setItem("cells.scriptLanguage", this.currentLanguage());
+    } catch {
+      // private mode / blocked storage
+    }
+  }
+
   private updatePlaceholder(): void {
     if (this.currentLanguage() === "javascript") {
       this.editor.placeholder =
@@ -344,8 +366,10 @@ export class ScriptPanel {
    * Set up event listeners
    */
   private setupEventListeners(): void {
+    this.restoreLanguage();
     this.updatePlaceholder();
     this.languageSelect?.addEventListener("change", () => {
+      this.persistLanguage();
       this.updatePlaceholder();
     });
 
