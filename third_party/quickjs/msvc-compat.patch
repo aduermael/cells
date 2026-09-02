@@ -105,7 +105,6 @@ diff --git a/cutils.h b/cutils.h
  
  static inline uint64_t get_u64(const uint8_t *tab)
  {
-
 diff --git a/quickjs.c b/quickjs.c
 --- a/quickjs.c
 +++ b/quickjs.c
@@ -142,7 +141,15 @@ diff --git a/quickjs.c b/quickjs.c
  #include "list.h"
  #include "quickjs.h"
  #include "libregexp.h"
-
+@@ -68,7 +86,7 @@
+ 
+ /* define to include Atomics.* operations which depend on the OS
+    threads */
+-#if !defined(__EMSCRIPTEN__)
++#if !defined(__EMSCRIPTEN__) && !defined(_MSC_VER)
+ #define CONFIG_ATOMICS
+ #endif
+ 
 diff --git a/dtoa.c b/dtoa.c
 --- a/dtoa.c
 +++ b/dtoa.c
@@ -156,3 +163,30 @@ diff --git a/dtoa.c b/dtoa.c
  #include <math.h>
  #include <setjmp.h>
  
+diff --git a/quickjs.h b/quickjs.h
+--- a/quickjs.h
++++ b/quickjs.h
+@@ -710,7 +710,11 @@
+         JSRefCountHeader *p = __js_rc(JS_VALUE_GET_PTR(v));
+         p->ref_count++;
+     }
++#ifdef __cplusplus
++    return v;
++#else
+     return (JSValue)v;
++#endif
+ }
+ 
+ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
+@@ -719,7 +723,11 @@
+         JSRefCountHeader *p = __js_rc(JS_VALUE_GET_PTR(v));
+         p->ref_count++;
+     }
++#ifdef __cplusplus
++    return v;
++#else
+     return (JSValue)v;
++#endif
+ }
+ 
+ JS_BOOL JS_StrictEq(JSContext *ctx, JSValueConst op1, JSValueConst op2);
