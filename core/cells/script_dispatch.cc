@@ -57,6 +57,13 @@ ScriptKind scriptKindFromLanguage(const std::string& language) {
     return ScriptKind::Luau;
 }
 
+ScriptKind resolveScriptKind(const std::string& language, const std::string& source) {
+    if (scriptKindFromLanguage(language) == ScriptKind::JavaScript) {
+        return ScriptKind::JavaScript;
+    }
+    return detectScriptKind("", source);
+}
+
 ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::string& source,
                                ScriptKind kind) {
     Sheet* ctxSheet = sheet;
@@ -75,7 +82,7 @@ ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::stri
 
 ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::string& source,
                                const std::string& language) {
-    return executeUserScript(workbook, sheet, source, scriptKindFromLanguage(language));
+    return executeUserScript(workbook, sheet, source, resolveScriptKind(language, source));
 }
 
 }  // namespace cells

@@ -597,6 +597,13 @@ TEST(OfficeJsTest, ScriptPanelLanguageDispatch) {
     EXPECT_EQ(scriptKindFromLanguage("luau"), ScriptKind::Luau);
     EXPECT_EQ(scriptKindFromLanguage("javascript"), ScriptKind::JavaScript);
     EXPECT_EQ(scriptKindFromLanguage("JS"), ScriptKind::JavaScript);
+    EXPECT_EQ(resolveScriptKind("luau", "setCell('A1', 1)"), ScriptKind::Luau);
+    EXPECT_EQ(resolveScriptKind("", "setCell('A1', 1)"), ScriptKind::Luau);
+    EXPECT_EQ(resolveScriptKind("luau", "await Excel.run(async (context) => {})"),
+              ScriptKind::JavaScript);
+    EXPECT_EQ(resolveScriptKind("", "await Excel.run(async (context) => {})"),
+              ScriptKind::JavaScript);
+    EXPECT_EQ(resolveScriptKind("javascript", "setCell('A1', 1)"), ScriptKind::JavaScript);
 
     auto workbook = createEmptyWorkbook();
     Sheet* sheet = workbook->sheets[0].get();
@@ -615,6 +622,21 @@ await Excel.run(async (context) => {
     ASSERT_TRUE(luau.success) << luau.error;
     ASSERT_NE(cellAt(sheet, 1, 0), nullptr);
     EXPECT_DOUBLE_EQ(cellAt(sheet, 1, 0)->value.asNumber(), 22.0);
+
+    // Web panel defaults to Luau; Excel.run source must still hit the JS host.
+    auto workbook2 = createEmptyWorkbook();
+    Sheet* sheet2 = workbook2->sheets[0].get();
+    const auto fromLuauToggle = executeUserScript(*workbook2, sheet2, R"JS(
+await Excel.run(async (context) => {
+    const ws = context.workbook.worksheets.getActiveWorksheet();
+    ws.getRange("A2").values = [[2]];
+    await context.sync();
+});
+)JS",
+                                                  "luau");
+    ASSERT_TRUE(fromLuauToggle.success) << fromLuauToggle.error;
+    ASSERT_NE(cellAt(sheet2, 0, 1), nullptr);
+    EXPECT_DOUBLE_EQ(cellAt(sheet2, 0, 1)->value.asNumber(), 2.0);
 }
 
 TEST(OfficeJsTest, FormulasGetterSingleEquals) {
