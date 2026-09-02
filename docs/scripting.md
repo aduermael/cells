@@ -12,6 +12,11 @@ an additional interface — it does not replace Luau.
 Office.js host: `core/cells/js_sandbox.h` (`JsSandbox::execute`). Tests:
 `bazel run :officejs` (or `bazel run :officejs -- WriteValues` for a specific test).
 
+The host is a **subset** of Excel’s add-in API. Known correctness bugs (formulas
+getter, xlsx sparse rows, xlsx cross-sheet `#REF!`) and missing APIs are tracked
+in [officejs.md](./officejs.md). Fixture scripts that should pass:
+[`testdata/officejs/`](../testdata/officejs/).
+
 ## Architecture contract
 
 **The UI must not mutate the workbook except by executing Luau. There is no UI
