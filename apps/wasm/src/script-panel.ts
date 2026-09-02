@@ -80,7 +80,6 @@ export class ScriptPanel {
   private consoleResizeHandle: HTMLElement;
 
   private executeScript: (script: string, language: string) => Promise<ScriptResult>;
-  private languageSelect: HTMLSelectElement | null;
   private onScriptExecuted: () => void | Promise<void>;
   private tokenize?: TokenizeFunction;
 
@@ -122,7 +121,6 @@ export class ScriptPanel {
     consoleClearBtn: HTMLElement;
     consoleResizeHandle: HTMLElement;
     executeScript: (script: string, language: string) => Promise<ScriptResult>;
-    languageSelect?: HTMLSelectElement;
     onScriptExecuted: () => void | Promise<void>;
     tokenize?: TokenizeFunction;
     getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
@@ -143,7 +141,6 @@ export class ScriptPanel {
     this.consoleResizeHandle = config.consoleResizeHandle;
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
-    this.languageSelect = config.languageSelect ?? null;
 
     // Initialize syntax highlighting and smart indent if tokenize function provided
     if (config.tokenize) {
@@ -282,11 +279,10 @@ export class ScriptPanel {
     this.runBtn.setAttribute("disabled", "true");
 
     const startTime = performance.now();
-    const language = this.currentLanguage();
-    console.log("[script-panel] run lang=" + language + " bytes=" + script.length);
+    console.log("[script-panel] run lang=luau bytes=" + script.length);
 
     try {
-      const result = await this.executeScript(script, language);
+      const result = await this.executeScript(script, "luau");
       console.log("[script-panel] result", result);
       const elapsed = performance.now() - startTime;
 
@@ -328,54 +324,10 @@ export class ScriptPanel {
     this.statusEl.className = state;
   }
 
-  private currentLanguage(): string {
-    const value = this.languageSelect?.value ?? "luau";
-    return value === "javascript" ? "javascript" : "luau";
-  }
-
-  private restoreLanguage(): void {
-    if (!this.languageSelect) {
-      return;
-    }
-    try {
-      const saved = localStorage.getItem("cells.scriptLanguage");
-      if (saved === "javascript" || saved === "luau") {
-        this.languageSelect.value = saved;
-      }
-    } catch {
-      // private mode / blocked storage
-    }
-  }
-
-  private persistLanguage(): void {
-    try {
-      localStorage.setItem("cells.scriptLanguage", this.currentLanguage());
-    } catch {
-      // private mode / blocked storage
-    }
-  }
-
-  private updatePlaceholder(): void {
-    if (this.currentLanguage() === "javascript") {
-      this.editor.placeholder =
-        'await Excel.run(async (context) => {\n  const ws = context.workbook.worksheets.getActiveWorksheet();\n  ws.getRange("A1").values = [[1]];\n  await context.sync();\n});';
-    } else {
-      this.editor.placeholder =
-        "-- set value: setCell('A1', 100)\n-- get value: setCell('B1', getCell('A1') * 2)\n-- loop: for i = 1, 10 do setCell('A'..i, i) end\n-- fill range: fillRange({from='A1', to='A1:A10'})";
-    }
-  }
-
   /**
    * Set up event listeners
    */
   private setupEventListeners(): void {
-    this.restoreLanguage();
-    this.updatePlaceholder();
-    this.languageSelect?.addEventListener("change", () => {
-      this.persistLanguage();
-      this.updatePlaceholder();
-    });
-
     // Toggle button
     this.toggleBtn.addEventListener("click", () => {
       this.toggle();

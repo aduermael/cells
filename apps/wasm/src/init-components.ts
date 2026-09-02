@@ -555,7 +555,6 @@ export function createComponents(config: ComponentsConfig): Components {
     consoleCloseBtn: elements.scriptConsoleCloseBtn,
     consoleClearBtn: elements.scriptConsoleClearBtn,
     consoleResizeHandle: elements.scriptConsoleResizeHandle,
-    languageSelect: elements.scriptLanguage,
     executeScript: async (script: string, language: string) => {
       if (!app.dataSource) {
         return { success: false, error: "No data source available", instructions: 0 };

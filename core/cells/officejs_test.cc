@@ -482,10 +482,10 @@ await Excel.run(async (context) => {
     EXPECT_TRUE(style.wrapText);
     Axis* colA = sheet->getColumnByPosition(0);
     ASSERT_NE(colA, nullptr);
-    EXPECT_EQ(colA->size, 28u);
+    EXPECT_EQ(colA->size, 210u);  // Excel columnWidth 28 chars → px (* 7.5)
     Axis* row2 = sheet->getRowByPosition(1);
     ASSERT_NE(row2, nullptr);
-    EXPECT_EQ(row2->size, 32u);
+    EXPECT_EQ(row2->size, 43u);  // Excel rowHeight 32 pt → px (* 96/72)
     Cell* a3 = cellAt(sheet, 0, 2);
     ASSERT_NE(a3, nullptr);
     const StyleBuffer* borderBuf = workbook->getEntityStyle(a3->id);
@@ -585,14 +585,14 @@ await Excel.run(async (context) => {
     const StyleBuffer* styleBuf = workbook->getEntityStyle(a1->id);
     ASSERT_NE(styleBuf, nullptr);
     EXPECT_EQ(styleBuf->toCellStyle().hAlign, TextAlign::CENTER);
-    EXPECT_EQ(sheet->getColumnByPosition(0)->size, 28u);
-    EXPECT_EQ(sheet->getRowByPosition(0)->size, 28u);
+    EXPECT_EQ(sheet->getColumnByPosition(0)->size, 210u);  // 28 chars * 7.5
+    EXPECT_EQ(sheet->getRowByPosition(0)->size, 37u);      // 28 pt * 96/72
     Cell* a2 = cellAt(sheet, 0, 1);
     ASSERT_NE(a2, nullptr);
     const StyleBuffer* a2Style = workbook->getEntityStyle(a2->id);
     ASSERT_NE(a2Style, nullptr);
     EXPECT_TRUE(a2Style->toCellStyle().wrapText);
-    EXPECT_EQ(sheet->getRowByPosition(1)->size, 32u);
+    EXPECT_EQ(sheet->getRowByPosition(1)->size, 43u);  // 32 pt * 96/72
 }
 
 TEST(OfficeJsTest, ScriptPanelLanguageDispatch) {
@@ -603,7 +603,7 @@ TEST(OfficeJsTest, ScriptPanelLanguageDispatch) {
     EXPECT_EQ(resolveScriptKind("luau", "setCell('A1', 1)"), ScriptKind::Luau);
     EXPECT_EQ(resolveScriptKind("", "setCell('A1', 1)"), ScriptKind::Luau);
     EXPECT_EQ(resolveScriptKind("luau", "await Excel.run(async (context) => {})"),
-              ScriptKind::JavaScript);
+              ScriptKind::Luau);
     EXPECT_EQ(resolveScriptKind("", "await Excel.run(async (context) => {})"),
               ScriptKind::JavaScript);
     EXPECT_EQ(resolveScriptKind("javascript", "setCell('A1', 1)"), ScriptKind::JavaScript);
@@ -625,21 +625,6 @@ await Excel.run(async (context) => {
     ASSERT_TRUE(luau.success) << luau.error;
     ASSERT_NE(cellAt(sheet, 1, 0), nullptr);
     EXPECT_DOUBLE_EQ(cellAt(sheet, 1, 0)->value.asNumber(), 22.0);
-
-    // Web panel defaults to Luau; Excel.run source must still hit the JS host.
-    auto workbook2 = createEmptyWorkbook();
-    Sheet* sheet2 = workbook2->sheets[0].get();
-    const auto fromLuauToggle = executeUserScript(*workbook2, sheet2, R"JS(
-await Excel.run(async (context) => {
-    const ws = context.workbook.worksheets.getActiveWorksheet();
-    ws.getRange("A2").values = [[2]];
-    await context.sync();
-});
-)JS",
-                                                  "luau");
-    ASSERT_TRUE(fromLuauToggle.success) << fromLuauToggle.error;
-    ASSERT_NE(cellAt(sheet2, 0, 1), nullptr);
-    EXPECT_DOUBLE_EQ(cellAt(sheet2, 0, 1)->value.asNumber(), 2.0);
 }
 
 TEST(OfficeJsTest, FormulasGetterSingleEquals) {

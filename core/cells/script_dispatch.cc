@@ -61,6 +61,9 @@ ScriptKind resolveScriptKind(const std::string& language, const std::string& sou
     if (scriptKindFromLanguage(language) == ScriptKind::JavaScript) {
         return ScriptKind::JavaScript;
     }
+    if (!language.empty()) {
+        return ScriptKind::Luau;
+    }
     return detectScriptKind("", source);
 }
 

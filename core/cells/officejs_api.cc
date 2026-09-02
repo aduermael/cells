@@ -11,6 +11,7 @@
 #include "core/cells/officejs_api.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -1747,10 +1748,13 @@ JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueCons
             }
             const int col = getInt(ctx, cmd, "col");
             const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
-            const auto width = static_cast<uint32_t>(std::max(getNumber(ctx, cmd, "value"), 0.0));
+            // Excel.RangeFormat.columnWidth is character units (Normal-style "0"
+            // width), not pixels. Same factor as xlsx_reader / xlsx_writer.
+            const double chars = std::max(getNumber(ctx, cmd, "value"), 0.0);
+            const auto widthPx = static_cast<uint32_t>(std::lround(chars * 7.5));
             for (int c = 0; c < colCount; c++) {
                 (void)setColumnWidthByPosition(workbook, *sheet, static_cast<uint32_t>(col + c),
-                                               width);
+                                               widthPx);
             }
         } else if (op == "setRowHeight") {
             Sheet* sheet = resolveSheet();
@@ -1761,10 +1765,13 @@ JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueCons
             }
             const int row = getInt(ctx, cmd, "row");
             const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
-            const auto height = static_cast<uint32_t>(std::max(getNumber(ctx, cmd, "value"), 0.0));
+            // Excel.RangeFormat.rowHeight is points. Axis size is pixels
+            // (1pt = 96/72 px), same as xlsx_reader / xlsx_writer.
+            const double points = std::max(getNumber(ctx, cmd, "value"), 0.0);
+            const auto heightPx = static_cast<uint32_t>(std::lround(points * 96.0 / 72.0));
             for (int r = 0; r < rowCount; r++) {
                 (void)setRowHeightByPosition(workbook, *sheet, static_cast<uint32_t>(row + r),
-                                             height);
+                                             heightPx);
             }
         } else if (op == "setHAlign" || op == "setVAlign" || op == "setWrapText") {
             Sheet* sheet = resolveSheet();

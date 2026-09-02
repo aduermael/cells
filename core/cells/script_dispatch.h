@@ -20,13 +20,12 @@ enum class ScriptKind : std::uint8_t { Luau, JavaScript };
 
 [[nodiscard]] ScriptKind detectScriptKind(const std::string& path, const std::string& source);
 
-// Map a language label from the web script panel (or WASM) to a ScriptKind.
+// Map a language label to a ScriptKind.
 // Empty / "luau" / "lua" → Luau (default). "javascript" / "js" / "officejs" → JavaScript.
 [[nodiscard]] ScriptKind scriptKindFromLanguage(const std::string& language);
 
-// Toggle override plus CLI-style content detection: explicit JS wins; otherwise
-// Excel.run / Office.onReady in source still selects the JavaScript host so a
-// Luau-default panel does not Luau-compile Office.js.
+// Explicit "javascript" wins. Explicit "luau" stays Luau (web panel is Luau-only).
+// Empty language falls back to content detection (Excel.run / Office.onReady).
 [[nodiscard]] ScriptKind resolveScriptKind(const std::string& language, const std::string& source);
 
 // Run source in the matching sandbox against workbook/sheet.
