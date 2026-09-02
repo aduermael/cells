@@ -5,7 +5,18 @@
 // Excel goldens; Cells and later test kinds will share the same Host shape.
 package excel
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+// DefaultTimeout is the max time for one Excel open+save session.
+const DefaultTimeout = 2 * time.Minute
 
 // HostID is the golden-metadata host flavor for Windows Excel.
 const HostID = "excel-win"
@@ -34,4 +45,44 @@ type Host interface {
 // NewHost returns the platform Excel host.
 func NewHost() Host {
 	return newPlatformHost()
+}
+
+// preparePaths resolves absolute paths, requires a .xlsx output, creates the
+// output directory, and removes an existing destination (Excel overwrite
+// dialogs are unreliable even with DisplayAlerts=false).
+func preparePaths(inputPath, outputPath string) (absIn, absOut string, err error) {
+	if strings.TrimSpace(inputPath) == "" || strings.TrimSpace(outputPath) == "" {
+		return "", "", fmt.Errorf("input and output paths are required")
+	}
+	absIn, err = filepath.Abs(inputPath)
+	if err != nil {
+		return "", "", fmt.Errorf("input path: %w", err)
+	}
+	absOut, err = filepath.Abs(outputPath)
+	if err != nil {
+		return "", "", fmt.Errorf("output path: %w", err)
+	}
+	if !strings.EqualFold(filepath.Ext(absOut), ".xlsx") {
+		return "", "", fmt.Errorf("output must be .xlsx, got %q", absOut)
+	}
+	if _, err := os.Stat(absIn); err != nil {
+		return "", "", fmt.Errorf("input: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(absOut), 0o755); err != nil {
+		return "", "", fmt.Errorf("output directory: %w", err)
+	}
+	if !sameFilePath(absIn, absOut) {
+		if err := os.Remove(absOut); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", "", fmt.Errorf("remove existing output: %w", err)
+		}
+	}
+	return absIn, absOut, nil
+}
+
+func sameFilePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
