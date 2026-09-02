@@ -110,6 +110,8 @@ git_repository(
 git_repository(
     name = "quickjs",
     build_file = "//third_party/quickjs:BUILD.quickjs",
-    remote = "https://github.com/bellard/quickjs.git",
     commit = "04be246001599f5995fa2f2d8c91a0f198d3f34c",  # 2026-06-04
+    patch_args = ["-p1"],
+    patches = ["//third_party/quickjs:msvc-compat.patch"],
+    remote = "https://github.com/bellard/quickjs.git",
 )

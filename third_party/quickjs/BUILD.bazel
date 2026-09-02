@@ -1,2 +1,7 @@
 # This directory contains the BUILD file for the external @quickjs repository.
 # See BUILD.quickjs for the actual build targets.
+
+exports_files([
+    "BUILD.quickjs",
+    "msvc-compat.patch",
+])

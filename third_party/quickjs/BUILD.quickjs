@@ -11,7 +11,11 @@ _COPTS = select({
     "@platforms//os:windows": [
         "/DCONFIG_VERSION=\\\"2026-06-04\\\"",
         "/D_CRT_SECURE_NO_WARNINGS",
+        "/D_CRT_NONSTDC_NO_WARNINGS",
         "/J",
+        "/wd4244",
+        "/wd4267",
+        "/wd4996",
     ],
     "//conditions:default": [
         "-DCONFIG_VERSION=\\\"2026-06-04\\\"",

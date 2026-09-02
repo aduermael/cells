@@ -1,0 +1,158 @@
+diff --git a/cutils.h b/cutils.h
+--- a/cutils.h
++++ b/cutils.h
+@@ -29,11 +29,28 @@
+ #include <string.h>
+ #include <inttypes.h>
+ 
++#ifdef _MSC_VER
++#include <intrin.h>
++#include <malloc.h>
++#define likely(x) (x)
++#define unlikely(x) (x)
++#define force_inline __forceinline
++#define no_inline __declspec(noinline)
++#define __maybe_unused
++#ifndef __attribute__
++#define __attribute__(x)
++#endif
++#ifndef alloca
++#define alloca _alloca
++#endif
++#define __builtin_frame_address(n) ((void *)_AddressOfReturnAddress())
++#else
+ #define likely(x)       __builtin_expect(!!(x), 1)
+ #define unlikely(x)     __builtin_expect(!!(x), 0)
+ #define force_inline inline __attribute__((always_inline))
+ #define no_inline __attribute__((noinline))
+ #define __maybe_unused __attribute__((unused))
++#endif
+ 
+ #define xglue(x, y) x ## y
+ #define glue(x, y) xglue(x, y)
+@@ -128,27 +145,66 @@
+ /* WARNING: undefined if a = 0 */
+ static inline int clz32(unsigned int a)
+ {
++#ifdef _MSC_VER
++    unsigned long idx;
++    _BitScanReverse(&idx, a);
++    return 31 - (int)idx;
++#else
+     return __builtin_clz(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int clz64(uint64_t a)
+ {
++#ifdef _MSC_VER
++    unsigned long idx;
++    _BitScanReverse64(&idx, a);
++    return 63 - (int)idx;
++#else
+     return __builtin_clzll(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int ctz32(unsigned int a)
+ {
++#ifdef _MSC_VER
++    unsigned long idx;
++    _BitScanForward(&idx, a);
++    return (int)idx;
++#else
+     return __builtin_ctz(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int ctz64(uint64_t a)
+ {
++#ifdef _MSC_VER
++    unsigned long idx;
++    _BitScanForward64(&idx, a);
++    return (int)idx;
++#else
+     return __builtin_ctzll(a);
++#endif
+ }
+ 
++#ifdef _MSC_VER
++#pragma pack(push, 1)
++struct packed_u64 {
++    uint64_t v;
++};
++
++struct packed_u32 {
++    uint32_t v;
++};
++
++struct packed_u16 {
++    uint16_t v;
++};
++#pragma pack(pop)
++#else
+ struct __attribute__((packed)) packed_u64 {
+     uint64_t v;
+ };
+@@ -160,6 +216,7 @@
+ struct __attribute__((packed)) packed_u16 {
+     uint16_t v;
+ };
++#endif
+ 
+ static inline uint64_t get_u64(const uint8_t *tab)
+ {
+
+diff --git a/quickjs.c b/quickjs.c
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -28,7 +28,9 @@
+ #include <inttypes.h>
+ #include <string.h>
+ #include <assert.h>
++#ifndef _MSC_VER
+ #include <sys/time.h>
++#endif
+ #include <time.h>
+ #include <fenv.h>
+ #include <math.h>
+@@ -41,6 +43,22 @@
+ #endif
+ 
+ #include "cutils.h"
++#ifdef _MSC_VER
++#include <sys/timeb.h>
++struct timeval {
++    long tv_sec;
++    long tv_usec;
++};
++static int gettimeofday(struct timeval *tp, void *tzp)
++{
++    struct __timeb64 tb;
++    (void)tzp;
++    _ftime64(&tb);
++    tp->tv_sec = (long)tb.time;
++    tp->tv_usec = (long)tb.millitm * 1000;
++    return 0;
++}
++#endif
+ #include "list.h"
+ #include "quickjs.h"
+ #include "libregexp.h"
+
+diff --git a/dtoa.c b/dtoa.c
+--- a/dtoa.c
++++ b/dtoa.c
+@@ -28,7 +28,9 @@
+ #include <string.h>
+ #include <assert.h>
+ #include <ctype.h>
++#ifndef _MSC_VER
+ #include <sys/time.h>
++#endif
+ #include <math.h>
+ #include <setjmp.h>
+ 
