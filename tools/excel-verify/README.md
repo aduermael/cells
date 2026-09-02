@@ -36,7 +36,7 @@ bazel run :excel-verify -- excel-save testdata/xlsx/simple.xlsx golden.xlsx
 # Open input in Excel, Save As xlsx to output
 cells-verify excel-save <input.xlsx> <output.xlsx>
 
-# Tool version (on Windows, later also prints Excel version)
+# Tool version (on Windows, also prints Excel version when COM works)
 cells-verify version
 ```
 
@@ -45,5 +45,7 @@ Example:
 ```bash
 cells-verify excel-save testdata/xlsx/simple.xlsx tests/excel-verify/cases/open-save-simple/golden.xlsx
 ```
+
+A successful save also writes `golden.xlsx.meta.json` beside the xlsx (`host`, Excel version/build, OS, input basename, UTC time).
 
 CI never runs Excel. A Windows machine with Excel generates goldens; those files are committed and compared later (not in v1).
