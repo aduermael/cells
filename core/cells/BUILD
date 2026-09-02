@@ -719,9 +719,13 @@ cc_test(
     srcs = ["xlsx_writer_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
+        ":formula_eval",
+        ":formula_recalc",
+        ":formula_resolver",
         ":id",
         ":xlsx_reader",
         ":xlsx_writer",
+        "//third_party/miniz",
         "@googletest//:gtest_main",
     ],
 )
@@ -735,6 +739,20 @@ cc_test(
         ":xlsx_writer",
         "//third_party/miniz",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "xlsx_xml_roundtrip_test",
+    srcs = ["xlsx_xml_roundtrip_test.cc"],
+    data = ["//testdata/xlsx:xml_roundtrip_corpus"],
+    size = "medium",
+    deps = [
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "//third_party/miniz",
+        "@googletest//:gtest_main",
+        "@pugixml",
     ],
 )
 
@@ -1386,9 +1404,14 @@ cc_test(
     srcs = ["luau_sandbox_test.cc"],
     shard_count = 4,
     deps = [
+        ":formula_eval",
+        ":formula_recalc",
+        ":formula_resolver",
         ":id",
         ":luau_sandbox",
         ":model",
+        ":xlsx_reader",
+        ":xlsx_writer",
         "@googletest//:gtest_main",
     ],
 )

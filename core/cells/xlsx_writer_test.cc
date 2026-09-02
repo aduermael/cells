@@ -1,11 +1,15 @@
 #include "core/cells/xlsx_writer.h"
 
 #include <cstdio>
+#include <cstring>
 
 #include <filesystem>
 #include <string>
 
+#include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
@@ -13,6 +17,7 @@
 #include "core/cells/xlsx_reader.h"
 
 #include "gtest/gtest.h"
+#include "miniz.h"
 
 namespace cells {
 namespace {
@@ -3285,6 +3290,188 @@ TEST(XLSXWriterTest, RoundtripDefaultRowHeightAndPageMargins) {
     EXPECT_DOUBLE_EQ(readSheet->pageMargins.bottom, 0.75);
     EXPECT_DOUBLE_EQ(readSheet->pageMargins.header, 0.3);
     EXPECT_DOUBLE_EQ(readSheet->pageMargins.footer, 0.3);
+}
+
+std::string zipEntry(const std::string& path, const std::string& name) {
+    mz_zip_archive archive{};
+    if (mz_zip_reader_init_file(&archive, path.c_str(), 0) == 0) {
+        return {};
+    }
+    const int index = mz_zip_reader_locate_file(&archive, name.c_str(), nullptr, 0);
+    if (index < 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    mz_zip_archive_file_stat stat;
+    if (mz_zip_reader_file_stat(&archive, index, &stat) == 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    std::string content;
+    content.resize(stat.m_uncomp_size);
+    if (mz_zip_reader_extract_to_mem(&archive, index, content.data(), content.size(), 0) == 0) {
+        mz_zip_reader_end(&archive);
+        return {};
+    }
+    mz_zip_reader_end(&archive);
+    return content;
+}
+
+std::unique_ptr<Workbook> createSparseSkippedRowWorkbook() {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "SparseRows");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    const ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row1 = std::make_unique<Axis>(generate_id(), false);
+    row1->position = 0;
+    const ID row1Id = row1->id;
+    sheet->addRow(std::move(row1));
+
+    auto row3 = std::make_unique<Axis>(generate_id(), false);
+    row3->position = 2;
+    const ID row3Id = row3->id;
+    sheet->addRow(std::move(row3));
+
+    auto row4 = std::make_unique<Axis>(generate_id(), false);
+    row4->position = 3;
+    const ID row4Id = row4->id;
+    sheet->addRow(std::move(row4));
+
+    auto c1 = std::make_unique<Cell>(generate_id(), colId, row1Id);
+    c1->value = CellValue("title");
+    sheet->addCell(std::move(c1));
+
+    auto c3 = std::make_unique<Cell>(generate_id(), colId, row3Id);
+    c3->value = CellValue(10.0);
+    sheet->addCell(std::move(c3));
+
+    auto c4 = std::make_unique<Cell>(generate_id(), colId, row4Id);
+    c4->value.raw = "20";
+    c4->value.type = CellValueType::FORMULA_NUMBER;
+    c4->setFormula(createFormula("=A3*2"));
+    sheet->addCell(std::move(c4));
+
+    EXPECT_EQ(sheet->rowCount(), 3u) << "in-memory storage must stay sparse";
+    EXPECT_EQ(sheet->getRowByPosition(1), nullptr);
+
+    workbook->addSheet(std::move(sheet));
+    return workbook;
+}
+
+TEST(XLSXWriterTest, SparseSkippedRowUsesAxisPosition) {
+    auto workbook = createSparseSkippedRowWorkbook();
+    ASSERT_EQ(workbook->getSheetByIndex(0)->rowCount(), 3u);
+
+    std::string path = tempFilePath("sparse_skipped_row.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "write failed");
+    EXPECT_EQ(workbook->getSheetByIndex(0)->rowCount(), 3u);
+
+    const std::string sheetXml = zipEntry(path, "xl/worksheets/sheet1.xml");
+    ASSERT_FALSE(sheetXml.empty());
+    EXPECT_NE(sheetXml.find("r=\"A1\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("r=\"A3\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("r=\"A4\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("<row r=\"1\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("<row r=\"3\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("<row r=\"4\""), std::string::npos);
+    EXPECT_EQ(sheetXml.find("<row r=\"2\""), std::string::npos)
+        << "must not pack skipped Excel row 2 into r=\"2\"";
+    EXPECT_NE(sheetXml.find(">A3*2</f>"), std::string::npos)
+        << "formula text must stay A3*2 (axis position)";
+
+    auto readResult = readXLSX(path);
+    ASSERT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString()
+                                                      : "read failed");
+    Sheet* sheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    Cell* a1 = sheet->getCellAtPosition(0, 0);
+    Cell* a2 = sheet->getCellAtPosition(0, 1);
+    Cell* a3 = sheet->getCellAtPosition(0, 2);
+    Cell* a4 = sheet->getCellAtPosition(0, 3);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "title");
+    EXPECT_EQ(a2, nullptr) << "A2 must stay empty";
+    ASSERT_NE(a3, nullptr);
+    EXPECT_DOUBLE_EQ(a3->value.asNumber(), 10.0);
+    ASSERT_NE(a4, nullptr);
+    EXPECT_TRUE(a4->isFormula());
+    EXPECT_EQ(a4->value.raw.find("CIRCULAR"), std::string::npos);
+
+    if (a4->getFormula() != nullptr && a4->getFormula()->ast != nullptr) {
+        FormulaResolver resolver(*readResult.workbook, *sheet,
+                                 readResult.workbook->getNamedRanges());
+        resolver.resolve(a4->getFormula()->ast);
+        const EvalResult eval = evaluateCell(sheet, a4);
+        EXPECT_NE(eval.error, CellError::CIRCULAR);
+        EXPECT_DOUBLE_EQ(eval.numberValue, 20.0);
+    }
+    EXPECT_DOUBLE_EQ(a4->value.asNumber(), 20.0);
+}
+
+TEST(XLSXWriterTest, SparseSkippedColumnUsesAxisPosition) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "SparseCols");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+
+    auto colA = std::make_unique<Axis>(generate_id(), true);
+    colA->position = 0;
+    const ID colAId = colA->id;
+    sheet->addColumn(std::move(colA));
+
+    auto colC = std::make_unique<Axis>(generate_id(), true);
+    colC->position = 2;
+    const ID colCId = colC->id;
+    sheet->addColumn(std::move(colC));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    const ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cA = std::make_unique<Cell>(generate_id(), colAId, rowId);
+    cA->value = CellValue("left");
+    sheet->addCell(std::move(cA));
+
+    auto cC = std::make_unique<Cell>(generate_id(), colCId, rowId);
+    cC->value = CellValue(5.0);
+    sheet->addCell(std::move(cC));
+
+    EXPECT_EQ(sheet->columnCount(), 2u);
+    EXPECT_EQ(sheet->getColumnByPosition(1), nullptr);
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("sparse_skipped_col.xlsx");
+    TempFileGuard guard(path);
+    auto result = writeXLSX(*workbook, path);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "write failed");
+
+    const std::string sheetXml = zipEntry(path, "xl/worksheets/sheet1.xml");
+    ASSERT_FALSE(sheetXml.empty());
+    EXPECT_NE(sheetXml.find("r=\"A1\""), std::string::npos);
+    EXPECT_NE(sheetXml.find("r=\"C1\""), std::string::npos);
+    EXPECT_EQ(sheetXml.find("r=\"B1\""), std::string::npos);
+
+    auto readResult = readXLSX(path);
+    ASSERT_TRUE(readResult.ok());
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    Cell* a1 = readSheet->getCellAtPosition(0, 0);
+    Cell* b1 = readSheet->getCellAtPosition(1, 0);
+    Cell* c1 = readSheet->getCellAtPosition(2, 0);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "left");
+    EXPECT_EQ(b1, nullptr);
+    ASSERT_NE(c1, nullptr);
+    EXPECT_DOUBLE_EQ(c1->value.asNumber(), 5.0);
 }
 
 }  // namespace

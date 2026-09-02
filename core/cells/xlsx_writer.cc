@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "core/cells/format_buffer.h"
 #include "core/cells/formula_serializer.h"
@@ -138,8 +139,15 @@ public:
 
     // Add content to archive
     bool addFile(const std::string& name, const std::string& content) {
-        return mz_zip_writer_add_mem(&archive_, name.c_str(), content.data(), content.size(),
-                                     MZ_DEFAULT_COMPRESSION) != 0;
+        if (written_.count(name) != 0) {
+            return true;
+        }
+        if (mz_zip_writer_add_mem(&archive_, name.c_str(), content.data(), content.size(),
+                                  MZ_DEFAULT_COMPRESSION) == 0) {
+            return false;
+        }
+        written_.insert(name);
+        return true;
     }
 
     // Finalize and close archive
@@ -160,10 +168,11 @@ public:
 private:
     mz_zip_archive archive_{};
     bool opened_{false};
+    std::unordered_set<std::string> written_;
 };
 
 // Generate [Content_Types].xml
-std::string generateContentTypes(size_t sheetCount) {
+std::string generateContentTypes(size_t sheetCount, const std::vector<std::string>& extra) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n";
@@ -194,12 +203,15 @@ std::string generateContentTypes(size_t sheetCount) {
                "ContentType=\"application/"
                "vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\n";
     }
+    for (const auto& frag : extra) {
+        xml << "  " << frag << "\n";
+    }
     xml << "</Types>";
     return xml.str();
 }
 
 // Generate _rels/.rels (root relationships)
-std::string generateRootRels() {
+std::string generateRootRels(const std::vector<std::string>& extra) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<Relationships "
@@ -213,6 +225,9 @@ std::string generateRootRels() {
     xml << "  <Relationship Id=\"rId3\" "
            "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
            "extended-properties\" Target=\"docProps/app.xml\"/>\n";
+    for (const auto& frag : extra) {
+        xml << "  " << frag << "\n";
+    }
     xml << "</Relationships>";
     return xml.str();
 }
@@ -487,12 +502,16 @@ std::string generateWorkbook(const cells::Workbook& workbook) {
         }
     }
 
+    for (const auto& frag : workbook.xlsxExtraWorkbookChildXml) {
+        xml << "  " << frag << "\n";
+    }
+
     xml << "</workbook>";
     return xml.str();
 }
 
 // Generate xl/_rels/workbook.xml.rels
-std::string generateWorkbookRels(size_t sheetCount) {
+std::string generateWorkbookRels(size_t sheetCount, const std::vector<std::string>& extra) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<Relationships "
@@ -522,6 +541,9 @@ std::string generateWorkbookRels(size_t sheetCount) {
            "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
            "theme\" "
            "Target=\"theme/theme1.xml\"/>\n";
+    for (const auto& frag : extra) {
+        xml << "  " << frag << "\n";
+    }
     xml << "</Relationships>";
     return xml.str();
 }
@@ -1169,12 +1191,6 @@ std::string colIndexToLetter(size_t index) {
     return result;
 }
 
-// Helper to get cell position in grid
-struct CellPosition {
-    size_t colIdx;
-    size_t rowIdx;
-};
-
 // Generate worksheet XML
 // cellStyleIndices maps cell pointer to XLSX style index (s attribute)
 // axisStyleIndices maps axis pointer to XLSX style index (style attribute for cols, s for rows)
@@ -1185,7 +1201,12 @@ std::string generateWorksheet(
     const std::unordered_map<const cells::Axis*, size_t>& axisStyleIndices) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
-    xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
+    xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
+           "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n";
+
+    for (const auto& frag : sheet.xlsxExtraChildXmlBefore) {
+        xml << "  " << frag << "\n";
+    }
 
     // Get ordered columns and rows
     std::vector<std::pair<uint32_t, cells::ID>> columns;
@@ -1210,20 +1231,19 @@ std::string generateWorksheet(
     std::sort(rows.begin(), rows.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
-    // Build column/row ID to index maps
-    std::unordered_map<std::string, size_t> colIdToIndex;
-    std::unordered_map<std::string, size_t> rowIdToIndex;
-    for (size_t i = 0; i < columns.size(); ++i) {
-        colIdToIndex[columns[i].second.toString()] = i;
+    // Map axis ID → Excel 0-based position (not packed 0..n ordinal). Sparse
+    // sheets keep gaps so r="A3" stays row 3 when Excel row 2 has no axis.
+    std::unordered_map<std::string, uint32_t> colIdToIndex;
+    std::unordered_map<std::string, uint32_t> rowIdToIndex;
+    for (const auto& col : columns) {
+        colIdToIndex[col.second.toString()] = col.first;
     }
-    for (size_t i = 0; i < rows.size(); ++i) {
-        rowIdToIndex[rows[i].second.toString()] = i;
+    for (const auto& row : rows) {
+        rowIdToIndex[row.second.toString()] = row.first;
     }
 
-    // Build cell lookup: (colIdx, rowIdx) -> Cell*
+    // Build cell lookup: (colPos, rowPos) -> Cell*
     std::unordered_map<uint64_t, const cells::Cell*> cellGrid;
-    // Also track cell positions
-    std::unordered_map<const cells::Cell*, CellPosition> cellPositions;
     for (const auto& cellId : sheet.getCellIds()) {
         const cells::Cell* cell = workbook.getCell(cellId);
         if (!cell) {
@@ -1234,7 +1254,6 @@ std::string generateWorksheet(
         if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
             const uint64_t key = (static_cast<uint64_t>(rowIt->second) << 32) | colIt->second;
             cellGrid[key] = cell;
-            cellPositions[cell] = {colIt->second, rowIt->second};
         }
     }
 
@@ -1286,10 +1305,10 @@ std::string generateWorksheet(
         }
     }
 
-    // Write dimension
+    // Write dimension from axis positions (Excel addresses), not packed counts
     if (!columns.empty() && !rows.empty()) {
-        xml << "  <dimension ref=\"A1:" << colIndexToLetter(columns.size() - 1) << rows.size()
-            << "\"/>\n";
+        xml << "  <dimension ref=\"A1:" << colIndexToLetter(columns.back().first)
+            << (rows.back().first + 1) << "\"/>\n";
     }
 
     // Write sheetViews (including showGridLines, zoomScale, and freeze panes)
@@ -1360,8 +1379,8 @@ std::string generateWorksheet(
         };
         std::vector<ColEntry> colEntries;
 
-        for (size_t i = 0; i < columns.size(); ++i) {
-            const cells::Axis* col = sheet.getColumn(columns[i].second);
+        for (const auto& colPair : columns) {
+            const cells::Axis* col = sheet.getColumn(colPair.second);
             if (col == nullptr) {
                 continue;
             }
@@ -1381,17 +1400,18 @@ std::string generateWorksheet(
                                               : static_cast<double>(col->size) / 7.5;
             }
             const size_t sIdx = hasStyle ? styleIt->second : 0;
+            const size_t excelCol = static_cast<size_t>(colPair.first) + 1;
 
-            // Try to extend the previous entry if attributes match
+            // Try to extend the previous entry if attributes match and Excel cols are adjacent
             if (!colEntries.empty()) {
                 auto& prev = colEntries.back();
-                if (prev.max == i && prev.width == width && prev.styleIdx == sIdx &&
+                if (prev.max + 1 == excelCol && prev.width == width && prev.styleIdx == sIdx &&
                     prev.hidden == hidden) {
-                    prev.max = i + 1;
+                    prev.max = excelCol;
                     continue;
                 }
             }
-            colEntries.push_back({i + 1, i + 1, width, sIdx, hidden});
+            colEntries.push_back({excelCol, excelCol, width, sIdx, hidden});
         }
 
         xml << "  <cols>\n";
@@ -1413,13 +1433,15 @@ std::string generateWorksheet(
 
     xml << "  <sheetData>\n";
 
-    // Write rows
-    for (size_t rowIdx = 0; rowIdx < rows.size(); ++rowIdx) {
+    // Write rows using Excel 1-based axis positions (gaps stay empty)
+    for (const auto& rowPair : rows) {
+        const uint32_t rowPos = rowPair.first;
         bool hasAnyCells = false;
 
         // Check if this row has any cells
-        for (size_t colIdx = 0; colIdx < columns.size(); ++colIdx) {
-            const uint64_t key = (static_cast<uint64_t>(rowIdx) << 32) | colIdx;
+        for (const auto& colPair : columns) {
+            const uint32_t colPos = colPair.first;
+            const uint64_t key = (static_cast<uint64_t>(rowPos) << 32) | colPos;
             if (cellGrid.count(key) > 0) {
                 hasAnyCells = true;
                 break;
@@ -1430,7 +1452,7 @@ std::string generateWorksheet(
         bool rowHidden = false;
         bool hasCustomHeight = false;
         size_t rowStyleIdx = 0;
-        const cells::Axis* row = sheet.getRow(rows[rowIdx].second);
+        const cells::Axis* row = sheet.getRow(rowPair.second);
         if (row != nullptr) {
             if (row->hidden()) {
                 rowHidden = true;
@@ -1449,7 +1471,7 @@ std::string generateWorksheet(
             continue;
         }
 
-        xml << "    <row r=\"" << (rowIdx + 1) << "\"";
+        xml << "    <row r=\"" << (rowPos + 1) << "\"";
         if (hasCustomHeight) {
             // Use original Excel value if available (avoids lossy pixel conversion)
             // Otherwise convert pixels back: points = pixels * 72.0 / 96.0
@@ -1465,15 +1487,16 @@ std::string generateWorksheet(
         }
         xml << ">\n";
 
-        for (size_t colIdx = 0; colIdx < columns.size(); ++colIdx) {
-            const uint64_t key = (static_cast<uint64_t>(rowIdx) << 32) | colIdx;
+        for (const auto& colPair : columns) {
+            const uint32_t colPos = colPair.first;
+            const uint64_t key = (static_cast<uint64_t>(rowPos) << 32) | colPos;
             auto it = cellGrid.find(key);
             if (it == cellGrid.end()) {
                 continue;
             }
 
             const cells::Cell* cell = it->second;
-            const std::string cellRef = colIndexToLetter(colIdx) + std::to_string(rowIdx + 1);
+            const std::string cellRef = colIndexToLetter(colPos) + std::to_string(rowPos + 1);
 
             // Determine cell type and value
             const cells::CellValue& value = cell->value;
@@ -1632,12 +1655,18 @@ std::string generateWorksheet(
 
     // Write pageMargins
     if (sheet.hasPageMargins) {
-        xml << "  <pageMargins" << " left=\"" << formatDouble(sheet.pageMargins.left) << "\""
-            << " right=\"" << formatDouble(sheet.pageMargins.right) << "\"" << " top=\""
-            << formatDouble(sheet.pageMargins.top) << "\"" << " bottom=\""
-            << formatDouble(sheet.pageMargins.bottom) << "\"" << " header=\""
-            << formatDouble(sheet.pageMargins.header) << "\"" << " footer=\""
-            << formatDouble(sheet.pageMargins.footer) << "\"" << "/>\n";
+        xml << "  <pageMargins"
+            << " left=\"" << formatDouble(sheet.pageMargins.left) << "\""
+            << " right=\"" << formatDouble(sheet.pageMargins.right) << "\""
+            << " top=\"" << formatDouble(sheet.pageMargins.top) << "\""
+            << " bottom=\"" << formatDouble(sheet.pageMargins.bottom) << "\""
+            << " header=\"" << formatDouble(sheet.pageMargins.header) << "\""
+            << " footer=\"" << formatDouble(sheet.pageMargins.footer) << "\""
+            << "/>\n";
+    }
+
+    for (const auto& frag : sheet.xlsxExtraChildXmlAfter) {
+        xml << "  " << frag << "\n";
     }
 
     xml << "</worksheet>";
@@ -2017,12 +2046,14 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     }
 
     // Write root files
-    if (!zip.addFile("[Content_Types].xml", generateContentTypes(workbook.sheets.size()))) {
+    if (!zip.addFile(
+            "[Content_Types].xml",
+            generateContentTypes(workbook.sheets.size(), workbook.xlsxExtraContentTypeXml))) {
         result.error = XLSXWriteError("Failed to write [Content_Types].xml");
         return result;
     }
 
-    if (!zip.addFile("_rels/.rels", generateRootRels())) {
+    if (!zip.addFile("_rels/.rels", generateRootRels(workbook.xlsxExtraRootRelXml))) {
         result.error = XLSXWriteError("Failed to write _rels/.rels");
         return result;
     }
@@ -2050,7 +2081,9 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
-    if (!zip.addFile("xl/_rels/workbook.xml.rels", generateWorkbookRels(workbook.sheets.size()))) {
+    if (!zip.addFile(
+            "xl/_rels/workbook.xml.rels",
+            generateWorkbookRels(workbook.sheets.size(), workbook.xlsxExtraWorkbookRelXml))) {
         result.error = XLSXWriteError("Failed to write xl/_rels/workbook.xml.rels");
         return result;
     }
@@ -2192,6 +2225,17 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     if (!zip.addFile("xl/sharedStrings.xml", generateSharedStrings(sst))) {
         result.error = XLSXWriteError("Failed to write xl/sharedStrings.xml");
         return result;
+    }
+
+    // Opaque unread parts (charts, pivots, drawings, media, sheet rels, ...)
+    for (const auto& part : workbook.xlsxOpaqueParts) {
+        if (part.path.empty()) {
+            continue;
+        }
+        if (!zip.addFile(part.path, part.bytes)) {
+            result.error = XLSXWriteError("Failed to write passthrough part: " + part.path);
+            return result;
+        }
     }
 
     // Finalize archive

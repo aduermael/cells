@@ -1,6 +1,6 @@
 // Remaining-work XLSX fidelity tests.
-// Supported content still roundtrips. Currently-dropped domains (charts first)
-// must be reported as remaining — they must not pass as "perfect preserve".
+// Supported content still roundtrips. Unmodeled domains (charts, pivots, ...)
+// are stored opaquely and written back; they are not evaluated.
 
 #include <cctype>
 #include <cstdio>
@@ -67,7 +67,7 @@ bool warnings_mention(const std::vector<std::string>& warnings, const char* need
     return false;
 }
 
-TEST(XlsxRemainingWork, ChartFixtureIsNotSilentlyPreserved) {
+TEST(XlsxRemainingWork, ChartFixtureIsPreservedOpaquely) {
     const std::string input = testFilePath("charts.xlsx");
     auto names_in = zip_names(input);
     ASSERT_FALSE(names_in.empty()) << "missing fixture " << input;
@@ -78,7 +78,7 @@ TEST(XlsxRemainingWork, ChartFixtureIsNotSilentlyPreserved) {
     ASSERT_NE(read.workbook, nullptr);
 
     EXPECT_TRUE(warnings_mention(read.warnings, "chart"))
-        << "reader must report charts as remaining/skipped, not silently drop them";
+        << "reader must report charts as unsupported-for-eval, not silently drop them";
 
     // Supported cell values from the fixture still load.
     Sheet* sheet = read.workbook->getSheetByIndex(0);
@@ -90,17 +90,15 @@ TEST(XlsxRemainingWork, ChartFixtureIsNotSilentlyPreserved) {
     ASSERT_TRUE(write.ok()) << (write.error ? write.error->toString() : "write failed");
 
     auto names_out = zip_names(out);
-    EXPECT_FALSE(has_chart_part(names_out))
-        << "charts are not implemented: roundtrip must not claim xl/charts/ was preserved";
+    EXPECT_TRUE(has_chart_part(names_out))
+        << "unmodeled chart parts must be stored and written back";
 
     auto read_back = readXLSX(out);
     ASSERT_TRUE(read_back.ok());
     ASSERT_NE(read_back.workbook, nullptr);
     EXPECT_GT(read_back.workbook->getSheetByIndex(0)->cellCount(), 0u);
 
-    std::cout << "XLSX remaining-work: charts NOT preserved (TODO). "
-                 "Other currently dropped domains: pivots, tables, comments, images, "
-                 "VBA, print settings, drawings, slicers, external links.\n";
+    std::cout << "XLSX remaining-work: charts preserved opaquely (not evaluated).\n";
     std::remove(out.c_str());
 }
 

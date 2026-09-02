@@ -1,11 +1,18 @@
 #include "core/cells/luau_sandbox.h"
 
+#include <cstdio>
+
 #include <gtest/gtest.h>
 
 #include "core/cells/crdt.h"
+#include "core/cells/formula_eval.h"
+#include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
+#include "core/cells/xlsx_reader.h"
+#include "core/cells/xlsx_writer.h"
 
 namespace cells {
 namespace {
@@ -2207,6 +2214,67 @@ TEST(LuauSandboxTest, SetRowHeightEmitsCrdtForPeers) {
         }
     }
     EXPECT_TRUE(sawRow) << "setRowHeight on missing row must emit ROW_SET";
+}
+
+TEST(LuauSandboxTest, SparseSkippedRowXlsxWriteReload) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "LuauSparse");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheetPtr);
+    auto exec = sandbox.execute(R"(
+        setCell('A1', 'title')
+        setCell('A3', 10)
+        setCell('A4', '=A3*2')
+    )");
+    ASSERT_TRUE(exec.success) << exec.error;
+
+    EXPECT_NE(sheetPtr->getRowByPosition(0), nullptr);
+    EXPECT_EQ(sheetPtr->getRowByPosition(1), nullptr)
+        << "Luau setCell must not densify skipped row";
+    EXPECT_NE(sheetPtr->getRowByPosition(2), nullptr);
+    EXPECT_NE(sheetPtr->getRowByPosition(3), nullptr);
+
+    Cell* liveA4 = sheetPtr->getCellAtPosition(0, 3);
+    ASSERT_NE(liveA4, nullptr);
+    EXPECT_DOUBLE_EQ(liveA4->value.asNumber(), 20.0);
+
+    const std::string path = "/tmp/luau_sparse_xlsx_roundtrip.xlsx";
+    auto write = writeXLSX(*workbook, path);
+    ASSERT_TRUE(write.ok()) << (write.error ? write.error->toString() : "write failed");
+
+    auto read = readXLSX(path);
+    ASSERT_TRUE(read.ok()) << (read.error ? read.error->toString() : "read failed");
+    Sheet* reloaded = read.workbook->getSheetByIndex(0);
+    ASSERT_NE(reloaded, nullptr);
+
+    Cell* a1 = reloaded->getCellAtPosition(0, 0);
+    Cell* a2 = reloaded->getCellAtPosition(0, 1);
+    Cell* a3 = reloaded->getCellAtPosition(0, 2);
+    Cell* a4 = reloaded->getCellAtPosition(0, 3);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "title");
+    EXPECT_EQ(a2, nullptr);
+    ASSERT_NE(a3, nullptr);
+    EXPECT_DOUBLE_EQ(a3->value.asNumber(), 10.0);
+    ASSERT_NE(a4, nullptr);
+    EXPECT_TRUE(a4->isFormula());
+    EXPECT_EQ(a4->value.raw.find("CIRCULAR"), std::string::npos);
+    EXPECT_EQ(a4->value.raw, "20") << "cached formula result must round-trip";
+
+    ASSERT_NE(a4->getFormula(), nullptr);
+    ASSERT_NE(a4->getFormula()->ast, nullptr);
+    FormulaResolver resolver(*read.workbook, *reloaded, read.workbook->getNamedRanges());
+    ASSERT_TRUE(resolver.resolve(a4->getFormula()->ast).success);
+    const EvalResult eval = evaluateCell(reloaded, a4);
+    EXPECT_NE(eval.error, CellError::CIRCULAR);
+    ASSERT_EQ(eval.type, EvalResult::Type::NUMBER);
+    EXPECT_DOUBLE_EQ(eval.numberValue, 20.0);
+    EXPECT_DOUBLE_EQ(a4->value.asNumber(), 20.0);
+    std::remove(path.c_str());
 }
 
 }  // namespace
