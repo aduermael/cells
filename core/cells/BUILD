@@ -1394,6 +1394,54 @@ cc_test(
 )
 
 cc_library(
+    name = "js_sandbox",
+    srcs = [
+        "js_sandbox.cc",
+        "officejs_api.cc",
+        "officejs_api.h",
+        "script_dispatch.cc",
+    ],
+    hdrs = [
+        "js_sandbox.h",
+        "script_dispatch.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":dependency_graph",
+        ":format_buffer",
+        ":formula_display",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":formula_serializer",
+        ":id",
+        ":luau_sandbox",
+        ":model",
+        ":named_ranges",
+        ":ref_converter",
+        ":style_buffer",
+        "@quickjs//:quickjs",
+    ],
+)
+
+cc_test(
+    name = "officejs_test",
+    srcs = ["officejs_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":js_sandbox",
+        ":luau_sandbox",
+        ":model",
+        ":named_ranges",
+        ":style_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "ui_mutation",
     srcs = ["ui_mutation.cc"],
     hdrs = ["ui_mutation.h"],

@@ -18,7 +18,7 @@ public:
     // Load path (xlsx/csv/tsv/zcd) or create an empty workbook when path is empty.
     bool load(const std::string& path, std::string& error_out);
 
-    // Run a Luau script against the loaded workbook (same path as session exec).
+    // Run a Luau or Office.js script against the loaded workbook.
     ScriptResult exec(const std::string& code);
 
     // Export to path. format empty → detect from extension (zcd|xlsx|csv).

@@ -5,6 +5,8 @@
 #include "converter.h"
 #include "options.h"
 
+#include "core/cells/script_dispatch.h"
+
 namespace cells::cli {
 
 bool SessionWorkbook::load(const std::string& path, std::string& error_out) {
@@ -28,10 +30,9 @@ ScriptResult SessionWorkbook::exec(const std::string& code) {
         result.error = "no sheet available";
         return result;
     }
-    LuauSandbox sandbox;
     Sheet* sheet = workbook_->getSheetByIndex(0);
-    sandbox.setContext(workbook_.get(), sheet);
-    return sandbox.execute(code);
+    const ScriptKind kind = detectScriptKind("", code);
+    return executeUserScript(*workbook_, sheet, code, kind);
 }
 
 bool SessionWorkbook::export_to(const std::string& path, std::string format,

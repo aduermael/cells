@@ -1,7 +1,16 @@
-# Scripting (Luau)
+# Scripting (Luau + Office.js)
 
 Luau is the **only** UI mutation surface. Spreadsheet logic still lives in C++17;
 scripts do not replace the formula engine.
+
+CLI `-e` / `--script` can also run **Office.js Excel add-in** scripts in an
+embedded **QuickJS** VM (not the browser engine). `.js` / `.mjs` files and
+inline source containing `Excel.run` / `Office.onReady` select JavaScript;
+`.luau` / `.lua` and other inline scripts stay on the Luau path. JavaScript is
+an additional interface — it does not replace Luau.
+
+Office.js host: `core/cells/js_sandbox.h` (`JsSandbox::execute`). Tests:
+`bazel run :officejs` (or `bazel run :officejs -- WriteValues` for a specific test).
 
 ## Architecture contract
 

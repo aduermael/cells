@@ -54,8 +54,8 @@ struct Options {
     bool evaluate_formulas = false;  // --eval: Evaluate formulas before export
 
     // Script options
-    std::string script_file;    // --script <file>: Run Luau script from file
-    std::string script_inline;  // -e "<code>": Run inline Luau script
+    std::string script_file;    // --script <file>: Run Luau or Office.js script from file
+    std::string script_inline;  // -e "<code>": Run inline Luau or Office.js script
 
     // Info flags
     bool show_help = false;

@@ -68,6 +68,7 @@
 #include "core/cells/csv_writer.h"
 #include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
+#include "core/cells/script_dispatch.h"
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
 #include "core/cells/serializer.h"
@@ -1135,7 +1136,6 @@ private:
             return r;
         }
 
-        LuauSandbox sandbox;
         // Critical: do not default to sheets[0] if a later empty Sheet1 was
         // minted — write to the sheet that holds peer content (e.g. B1).
         Sheet* sheet = pickScriptSheet();
@@ -1144,8 +1144,8 @@ private:
             r.error = "no sheet available (wait for peer sync or create alone)";
             return r;
         }
-        sandbox.setContext(workbook_.get(), sheet);
-        ScriptResult result = sandbox.execute(script);
+        const ScriptKind kind = detectScriptKind(req.script_path, script);
+        ScriptResult result = executeUserScript(*workbook_, sheet, script, kind);
         r.output = result.output;
         if (!result.success) {
             r.ok = false;

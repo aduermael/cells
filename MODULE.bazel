@@ -104,3 +104,12 @@ git_repository(
     remote = "https://github.com/luau-lang/luau.git",
     tag = "0.703",
 )
+
+# QuickJS - Small embeddable Javascript engine (Office.js host)
+# https://bellard.org/quickjs/ - MIT License
+git_repository(
+    name = "quickjs",
+    build_file = "//third_party/quickjs:BUILD.quickjs",
+    remote = "https://github.com/bellard/quickjs.git",
+    commit = "04be246001599f5995fa2f2d8c91a0f198d3f34c",  # 2026-06-04
+)
