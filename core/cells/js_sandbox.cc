@@ -5,6 +5,7 @@
 
 #include "core/cells/js_sandbox.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include "core/cells/model.h"
@@ -75,7 +76,10 @@ void JsSandbox::initState() {
         return;
     }
     JS_SetContextOpaque(ctx_, this);
+    JS_UpdateStackTop(rt_);
+    std::fprintf(stderr, "[officejs] eval bootstrap\n");
     registerHost();
+    std::fprintf(stderr, "[officejs] bootstrap ok\n");
 }
 
 void JsSandbox::registerHost() {
@@ -248,14 +252,19 @@ ScriptResult JsSandbox::execute(const std::string& script) {
     unhandledRejection_.clear();
     JS_UpdateStackTop(rt_);
 
-    const int flags = JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC;
-    JSValue val = JS_Eval(ctx_, script.c_str(), script.size(), "<script>", flags);
+    std::fprintf(stderr, "[officejs] eval user bytes=%zu\n", script.size());
+    // Wrap so top-level await works without JS_EVAL_FLAG_ASYNC (deep compiler
+    // recursion on WASM). Result is still a Promise; drainJobs waits for it.
+    const std::string wrapped = "(async function(){\n" + script + "\n})()";
+    const int flags = JS_EVAL_TYPE_GLOBAL;
+    JSValue val = JS_Eval(ctx_, wrapped.c_str(), wrapped.size(), "<script>", flags);
     if (JS_IsException(val)) {
         result.error = exceptionToString();
         result.output = printBuffer_;
         result.instructions = instructionCount_;
         return result;
     }
+    std::fprintf(stderr, "[officejs] user eval ok, draining jobs\n");
 
     if (!drainJobs(&result)) {
         JS_FreeValue(ctx_, val);

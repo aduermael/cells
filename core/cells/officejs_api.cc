@@ -2085,19 +2085,18 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this._queue.push(cmd);
   };
   RequestContext.prototype.sync = function () {
-    var self = this;
-    return Promise.resolve().then(function () {
-      var result = native.flush(self._queue);
-      self._queue = [];
-      if (result && result.loads) {
-        var ids = Object.keys(result.loads);
-        for (var i = 0; i < ids.length; i++) {
-          var obj = self._objects[ids[i]];
-          if (obj && obj._applyLoad) obj._applyLoad(result.loads[ids[i]]);
-        }
+    // Host is in-process (not Excel RPC). Keep this synchronous so
+    // await context.sync() does not nest Promise jobs on the WASM C stack.
+    var result = native.flush(this._queue);
+    this._queue = [];
+    if (result && result.loads) {
+      var ids = Object.keys(result.loads);
+      for (var i = 0; i < ids.length; i++) {
+        var obj = this._objects[ids[i]];
+        if (obj && obj._applyLoad) obj._applyLoad(result.loads[ids[i]]);
       }
-      return self;
-    });
+    }
+    return this;
   };
 
   function Workbook(context) {
@@ -2602,7 +2601,8 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
       return Promise.resolve()
         .then(function () { return batch(context); })
         .then(function (value) {
-          return context.sync().then(function () { return value === undefined ? context : value; });
+          context.sync();
+          return value === undefined ? context : value;
         });
     },
     RequestContext: RequestContext,
