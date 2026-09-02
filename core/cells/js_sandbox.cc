@@ -14,6 +14,9 @@
 
 namespace cells {
 
+// QuickJS predicates return int; JSValue handles are freed by value.
+// NOLINTBEGIN(readability-implicit-bool-conversion,misc-const-correctness)
+
 namespace {
 
 int interruptHandler(JSRuntime* /*rt*/, void* opaque) {
@@ -346,5 +349,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
     JS_FreeValue(ctx_, val);
     return result;
 }
+
+// NOLINTEND(readability-implicit-bool-conversion,misc-const-correctness)
 
 }  // namespace cells

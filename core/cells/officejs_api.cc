@@ -46,6 +46,9 @@
 namespace cells {
 namespace {
 
+// QuickJS predicates return int; JSValue handles are freed by value.
+// NOLINTBEGIN(readability-implicit-bool-conversion,misc-const-correctness)
+
 JsSandbox* sandboxFrom(JSContext* ctx) {
     return static_cast<JsSandbox*>(JS_GetContextOpaque(ctx));
 }
@@ -193,7 +196,7 @@ std::string colToName(int col) {
 }
 
 std::string a1Address(int row, int col, int rowCount, int colCount) {
-    const std::string start = colToName(col) + std::to_string(row + 1);
+    std::string start = colToName(col) + std::to_string(row + 1);
     if (rowCount <= 1 && colCount <= 1) {
         return start;
     }
@@ -2698,5 +2701,7 @@ void registerOfficeJsHost(JSContext* ctx, JsSandbox* /*sandbox*/) {
     }
     JS_FreeValue(ctx, ret);
 }
+
+// NOLINTEND(readability-implicit-bool-conversion,misc-const-correctness)
 
 }  // namespace cells

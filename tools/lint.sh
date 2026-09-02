@@ -46,6 +46,7 @@ BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_b
 find_third_party_includes() {
     PUGIXML_INCLUDE=""
     LUAU_INCLUDE=""
+    QUICKJS_INCLUDE=""
     if [ -z "$BAZEL_OUTPUT_BASE" ]; then
         return
     fi
@@ -92,27 +93,48 @@ find_third_party_includes() {
         luau_dir=$(dirname "$(dirname "$luau_vm_inc")")
         LUAU_INCLUDE="-I$luau_dir/VM/include -I$luau_dir/Compiler/include -I$luau_dir/Ast/include -I$luau_dir/Common/include -I$luau_dir/Analysis/include -I$luau_dir/Config/include"
     fi
+
+    # QuickJS (Office.js host) — headers live at the repo root of the checkout
+    local qjs_dir=""
+    for candidate in \
+        "$external/+git_repository+quickjs/quickjs.h" \
+        "$external/quickjs+/quickjs.h" \
+        "$external/quickjs~/quickjs.h" \
+        "$external/quickjs/quickjs.h"; do
+        if [ -f "$candidate" ]; then
+            qjs_dir=$(dirname "$candidate")
+            break
+        fi
+    done
+    if [ -z "$qjs_dir" ] && [ -d "$external" ]; then
+        qjs_dir=$(find -L "$external" -name "quickjs.h" -type f 2>/dev/null \
+            | head -1 | xargs dirname 2>/dev/null || echo "")
+    fi
+    if [ -n "$qjs_dir" ]; then
+        QUICKJS_INCLUDE="-I$qjs_dir"
+    fi
 }
 
 find_third_party_includes
 
 # If headers are missing, fetch external deps so clang-tidy can resolve includes.
 # Prefer Bazel 9 --repo form; fall back to target patterns for older clients.
-if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ]; then
-    echo -e "${YELLOW}Third-party headers not found; fetching @pugixml and @luau...${NC}"
+if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ] || [ -z "${QUICKJS_INCLUDE:-}" ]; then
+    echo -e "${YELLOW}Third-party headers not found; fetching @pugixml, @luau, and @quickjs...${NC}"
     # Fetch may fail offline; continue and report missing includes below.
-    if ! bazel fetch --repo=@pugixml --repo=@luau >/dev/null 2>&1; then
-        bazel fetch @pugixml//... @luau//... >/dev/null 2>&1 || true
+    if ! bazel fetch --repo=@pugixml --repo=@luau --repo=@quickjs >/dev/null 2>&1; then
+        bazel fetch @pugixml//... @luau//... @quickjs//... >/dev/null 2>&1 || true
     fi
     # Refresh output_base in case fetch populated a new path layout
     BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
     find_third_party_includes
 fi
 
-if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ]; then
+if [ -z "${PUGIXML_INCLUDE:-}" ] || [ -z "${LUAU_INCLUDE:-}" ] || [ -z "${QUICKJS_INCLUDE:-}" ]; then
     echo -e "${YELLOW}Warning: missing third-party includes for clang-tidy:${NC}"
     [ -z "${PUGIXML_INCLUDE:-}" ] && echo "  - pugixml.hpp (build/fetch @pugixml)"
     [ -z "${LUAU_INCLUDE:-}" ] && echo "  - Luau headers (build/fetch @luau)"
+    [ -z "${QUICKJS_INCLUDE:-}" ] && echo "  - quickjs.h (build/fetch @quickjs)"
 fi
 
 # Parse arguments
@@ -196,6 +218,9 @@ EXTRA_ARGS_FILE="$TMPDIR/extra_args.txt"
         for arg in $LUAU_INCLUDE; do
             echo "$arg"
         done
+    fi
+    if [ -n "${QUICKJS_INCLUDE:-}" ]; then
+        echo "$QUICKJS_INCLUDE"
     fi
 } > "$EXTRA_ARGS_FILE"
 
