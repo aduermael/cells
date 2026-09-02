@@ -1419,11 +1419,16 @@ cc_test(
 cc_library(
     name = "js_sandbox",
     srcs = [
-        "js_sandbox.cc",
-        "officejs_api.cc",
-        "officejs_api.h",
         "script_dispatch.cc",
-    ],
+    ] + select({
+        # QuickJS's interpreter uses GNU labels-as-values; cl.exe cannot compile it.
+        "@platforms//os:windows": ["js_sandbox_stub.cc"],
+        "//conditions:default": [
+            "js_sandbox.cc",
+            "officejs_api.cc",
+            "officejs_api.h",
+        ],
+    }),
     hdrs = [
         "js_sandbox.h",
         "script_dispatch.h",
@@ -1446,8 +1451,10 @@ cc_library(
         ":range",
         ":ref_converter",
         ":style_buffer",
-        "@quickjs//:quickjs",
-    ],
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@quickjs//:quickjs"],
+    }),
 )
 
 cc_test(
