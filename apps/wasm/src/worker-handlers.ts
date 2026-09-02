@@ -1666,9 +1666,27 @@ export function handleExecuteScript(
     params: Record<string, unknown>,
     respond: RespondFn,
 ): void {
-    const { script } = params as { script: string };
-    const result = engine.executeScript(script);
-    respond({ type: "scriptExecuted", result });
+    const { script, language } = params as { script: string; language?: string };
+    const lang = language ?? "";
+    console.log(
+        "[executeScript] start lang=" + lang + " bytes=" + script.length +
+            " head=" + script.slice(0, 80).replace(/\n/g, " "),
+    );
+    try {
+        const result = engine.executeScript(script, lang);
+        console.log("[executeScript] done", String(result).slice(0, 240));
+        respond({ type: "scriptExecuted", result });
+    } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        console.error("[executeScript] threw", err);
+        const error = /call stack/i.test(raw)
+            ? "Office.js in the browser WASM build hits a QuickJS stack limit compiling the host. Use the CLI: cells --script your.js out.xlsx"
+            : raw;
+        respond({
+            type: "scriptExecuted",
+            result: JSON.stringify({ success: false, error, instructions: 0 }),
+        });
+    }
 }
 
 export function handleTokenizeLuau(

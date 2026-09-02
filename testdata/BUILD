@@ -9,3 +9,9 @@ filegroup(
     srcs = glob(["csv/*.csv"]) + glob(["csv/*.tsv"]),
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "officejs_scripts",
+    srcs = glob(["officejs/*.js"]),
+    visibility = ["//visibility:public"],
+)

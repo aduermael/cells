@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "core/cells/format_buffer.h"
@@ -135,6 +136,53 @@ struct XmlChildrenRange {
 
 XmlChildrenRange xmlChildren(pugi::xml_node parent, const char* name) {
     return {parent, name};
+}
+
+std::string serializeXmlNode(pugi::xml_node node) {
+    std::ostringstream oss;
+    node.print(oss, "", pugi::format_raw | pugi::format_no_declaration);
+    return oss.str();
+}
+
+bool isModeledWorksheetChild(const char* name) {
+    const char* n = localName(name);
+    return std::strcmp(n, "dimension") == 0 || std::strcmp(n, "sheetViews") == 0 ||
+           std::strcmp(n, "sheetFormatPr") == 0 || std::strcmp(n, "cols") == 0 ||
+           std::strcmp(n, "sheetData") == 0 || std::strcmp(n, "mergeCells") == 0 ||
+           std::strcmp(n, "pageMargins") == 0;
+}
+
+const char* relTypeLocal(const char* type) {
+    if (type == nullptr || type[0] == '\0') {
+        return "";
+    }
+    const char* slash = std::strrchr(type, '/');
+    return slash != nullptr ? slash + 1 : type;
+}
+
+std::string sheetRelsZipPath(const std::string& sheetPath) {
+    const size_t slash = sheetPath.rfind('/');
+    if (slash == std::string::npos) {
+        return "_rels/" + sheetPath + ".rels";
+    }
+    return sheetPath.substr(0, slash) + "/_rels/" + sheetPath.substr(slash + 1) + ".rels";
+}
+
+void replaceQuotedAttr(std::string& xml, const std::string& oldVal, const std::string& newVal) {
+    const std::string dqOld = "\"" + oldVal + "\"";
+    const std::string dqNew = "\"" + newVal + "\"";
+    const std::string sqOld = "'" + oldVal + "'";
+    const std::string sqNew = "'" + newVal + "'";
+    size_t pos = 0;
+    while ((pos = xml.find(dqOld, pos)) != std::string::npos) {
+        xml.replace(pos, dqOld.size(), dqNew);
+        pos += dqNew.size();
+    }
+    pos = 0;
+    while ((pos = xml.find(sqOld, pos)) != std::string::npos) {
+        xml.replace(pos, sqOld.size(), sqNew);
+        pos += sqNew.size();
+    }
 }
 
 // Debug timing - set via environment variable
@@ -1530,7 +1578,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     {
         const auto names = zip.listFiles();
         auto warnPart = [&](const char* domain, const std::string& part) {
-            addWarning(std::string("Skipping unsupported XLSX part (") + domain + "): " + part);
+            addWarning(std::string("Preserving unsupported XLSX part (") + domain +
+                       ") without evaluation: " + part);
         };
         for (const auto& name : names) {
             std::string lower = name;
@@ -2303,6 +2352,27 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         }
         logTiming("parse merged cells", start);
 
+        // Keep unmodeled worksheet children (drawing, tableParts, sheetPr, ...) for save-back.
+        if (worksheetNode) {
+            for (auto child = worksheetNode.first_child(); child; child = child.next_sibling()) {
+                if (child.type() != pugi::node_element) {
+                    continue;
+                }
+                if (isModeledWorksheetChild(child.name())) {
+                    continue;
+                }
+                const std::string frag = serializeXmlNode(child);
+                if (frag.empty()) {
+                    continue;
+                }
+                if (std::strcmp(localName(child.name()), "sheetPr") == 0) {
+                    sheet->xlsxExtraChildXmlBefore.push_back(frag);
+                } else {
+                    sheet->xlsxExtraChildXmlAfter.push_back(frag);
+                }
+            }
+        }
+
         workbook->addSheet(std::move(sheet));
     }
 
@@ -2435,6 +2505,160 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     }
 
     logTiming("TOTAL", totalStart);
+
+    // Preserve unmodeled package XML (content types, rels, workbook children) and
+    // unread zip parts so charts/pivots/media survive write-back.
+    {
+        auto parseRelsExtras = [&](const std::string& xml, bool workbookRels) {
+            std::vector<std::string> extras;
+            if (xml.empty()) {
+                return extras;
+            }
+            pugi::xml_document doc;
+            if (!doc.load_buffer(xml.data(), xml.size())) {
+                return extras;
+            }
+            for (auto rel : xmlChildren(xmlChild(doc, "Relationships"), "Relationship")) {
+                const char* typeLocal = relTypeLocal(rel.attribute("Type").value());
+                if (workbookRels) {
+                    if (std::strcmp(typeLocal, "worksheet") == 0 ||
+                        std::strcmp(typeLocal, "styles") == 0 ||
+                        std::strcmp(typeLocal, "sharedStrings") == 0 ||
+                        std::strcmp(typeLocal, "theme") == 0) {
+                        continue;
+                    }
+                } else {
+                    if (std::strcmp(typeLocal, "officeDocument") == 0 ||
+                        std::strcmp(typeLocal, "core-properties") == 0 ||
+                        std::strcmp(typeLocal, "extended-properties") == 0) {
+                        continue;
+                    }
+                }
+                const std::string frag = serializeXmlNode(rel);
+                if (!frag.empty()) {
+                    extras.push_back(frag);
+                }
+            }
+            return extras;
+        };
+
+        const std::string ctXml = zip.readFile("[Content_Types].xml");
+        if (!ctXml.empty()) {
+            pugi::xml_document ctDoc;
+            if (ctDoc.load_buffer(ctXml.data(), ctXml.size())) {
+                for (auto child = xmlChild(ctDoc, "Types").first_child(); child;
+                     child = child.next_sibling()) {
+                    if (child.type() != pugi::node_element) {
+                        continue;
+                    }
+                    const char* ln = localName(child.name());
+                    if (std::strcmp(ln, "Default") == 0) {
+                        const char* ext = child.attribute("Extension").value();
+                        if (ext != nullptr &&
+                            (std::strcmp(ext, "rels") == 0 || std::strcmp(ext, "xml") == 0)) {
+                            continue;
+                        }
+                    } else if (std::strcmp(ln, "Override") == 0) {
+                        const std::string part = child.attribute("PartName").value();
+                        if (part == "/docProps/core.xml" || part == "/docProps/app.xml" ||
+                            part == "/xl/workbook.xml" || part == "/xl/theme/theme1.xml" ||
+                            part == "/xl/styles.xml" || part == "/xl/sharedStrings.xml" ||
+                            part.find("/xl/worksheets/") == 0) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                    const std::string frag = serializeXmlNode(child);
+                    if (!frag.empty()) {
+                        workbook->xlsxExtraContentTypeXml.push_back(frag);
+                    }
+                }
+            }
+        }
+
+        workbook->xlsxExtraRootRelXml = parseRelsExtras(zip.readFile("_rels/.rels"), false);
+
+        auto wbNode = xmlChild(wbDoc, "workbook");
+        if (wbNode) {
+            for (auto child = wbNode.first_child(); child; child = child.next_sibling()) {
+                if (child.type() != pugi::node_element) {
+                    continue;
+                }
+                const char* ln = localName(child.name());
+                if (std::strcmp(ln, "sheets") == 0 || std::strcmp(ln, "definedNames") == 0) {
+                    continue;
+                }
+                const std::string frag = serializeXmlNode(child);
+                if (!frag.empty()) {
+                    workbook->xlsxExtraWorkbookChildXml.push_back(frag);
+                }
+            }
+        }
+
+        auto extraWbRels = parseRelsExtras(zip.readFile("xl/_rels/workbook.xml.rels"), true);
+        std::unordered_set<std::string> usedRels;
+        for (size_t i = 1; i <= workbook->sheetCount() + 3; ++i) {
+            usedRels.insert("rId" + std::to_string(i));
+        }
+        size_t nextRel = workbook->sheetCount() + 4;
+        for (auto& frag : extraWbRels) {
+            pugi::xml_document relDoc;
+            const std::string wrapped = "<root>" + frag + "</root>";
+            if (relDoc.load_buffer(wrapped.data(), wrapped.size())) {
+                auto rel = relDoc.child("root").first_child();
+                const char* idAttr = rel.attribute("Id").value();
+                if (idAttr != nullptr && idAttr[0] != '\0' && usedRels.count(idAttr) != 0) {
+                    const std::string oldId = idAttr;
+                    std::string newId;
+                    do {
+                        newId = "rId" + std::to_string(nextRel++);
+                    } while (usedRels.count(newId) != 0);
+                    usedRels.insert(newId);
+                    replaceQuotedAttr(frag, oldId, newId);
+                    for (auto& childXml : workbook->xlsxExtraWorkbookChildXml) {
+                        replaceQuotedAttr(childXml, oldId, newId);
+                    }
+                } else if (idAttr != nullptr && idAttr[0] != '\0') {
+                    usedRels.insert(idAttr);
+                }
+            }
+            workbook->xlsxExtraWorkbookRelXml.push_back(std::move(frag));
+        }
+
+        std::unordered_set<std::string> regenerated;
+        regenerated.insert("[Content_Types].xml");
+        regenerated.insert("_rels/.rels");
+        regenerated.insert("docProps/core.xml");
+        regenerated.insert("docProps/app.xml");
+        regenerated.insert("xl/workbook.xml");
+        regenerated.insert("xl/_rels/workbook.xml.rels");
+        regenerated.insert("xl/styles.xml");
+        regenerated.insert("xl/sharedStrings.xml");
+        regenerated.insert("xl/theme/theme1.xml");
+        size_t sheetIdx = 0;
+        for (const auto& [sheetName, sheetPath] : sheetInfo) {
+            regenerated.insert(sheetPath);
+            const std::string origRels = sheetRelsZipPath(sheetPath);
+            const std::string outRels =
+                "xl/worksheets/_rels/sheet" + std::to_string(sheetIdx + 1) + ".xml.rels";
+            std::string relsContent = zip.readFile(origRels);
+            if (!relsContent.empty()) {
+                workbook->xlsxOpaqueParts.push_back({outRels, std::move(relsContent)});
+            }
+            regenerated.insert(origRels);
+            regenerated.insert(outRels);
+            ++sheetIdx;
+        }
+
+        for (const auto& name : zip.listFiles()) {
+            if (regenerated.count(name) != 0) {
+                continue;
+            }
+            std::string bytes = zip.readFile(name);
+            workbook->xlsxOpaqueParts.push_back({name, std::move(bytes)});
+        }
+    }
 
     result.workbook = std::move(workbook);
     result.warnings = std::move(warnings);

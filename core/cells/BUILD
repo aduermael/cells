@@ -719,9 +719,13 @@ cc_test(
     srcs = ["xlsx_writer_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
+        ":formula_eval",
+        ":formula_recalc",
+        ":formula_resolver",
         ":id",
         ":xlsx_reader",
         ":xlsx_writer",
+        "//third_party/miniz",
         "@googletest//:gtest_main",
     ],
 )
@@ -735,6 +739,20 @@ cc_test(
         ":xlsx_writer",
         "//third_party/miniz",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "xlsx_xml_roundtrip_test",
+    srcs = ["xlsx_xml_roundtrip_test.cc"],
+    data = ["//testdata/xlsx:xml_roundtrip_corpus"],
+    size = "medium",
+    deps = [
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "//third_party/miniz",
+        "@googletest//:gtest_main",
+        "@pugixml",
     ],
 )
 
@@ -1386,9 +1404,72 @@ cc_test(
     srcs = ["luau_sandbox_test.cc"],
     shard_count = 4,
     deps = [
+        ":formula_eval",
+        ":formula_recalc",
+        ":formula_resolver",
         ":id",
         ":luau_sandbox",
         ":model",
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "js_sandbox",
+    srcs = [
+        "script_dispatch.cc",
+    ] + select({
+        # QuickJS's interpreter uses GNU labels-as-values; cl.exe cannot compile it.
+        "@platforms//os:windows": ["js_sandbox_stub.cc"],
+        "//conditions:default": [
+            "js_sandbox.cc",
+            "officejs_api.cc",
+            "officejs_api.h",
+        ],
+    }),
+    hdrs = [
+        "js_sandbox.h",
+        "script_dispatch.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":dependency_graph",
+        ":format_buffer",
+        ":formula_display",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":formula_serializer",
+        ":id",
+        ":luau_sandbox",
+        ":model",
+        ":named_ranges",
+        ":range",
+        ":ref_converter",
+        ":style_buffer",
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@quickjs//:quickjs"],
+    }),
+)
+
+cc_test(
+    name = "officejs_test",
+    srcs = ["officejs_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":js_sandbox",
+        ":luau_sandbox",
+        ":model",
+        ":format_buffer",
+        ":named_ranges",
+        ":range",
+        ":style_buffer",
         "@googletest//:gtest_main",
     ],
 )

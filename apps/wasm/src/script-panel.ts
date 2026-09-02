@@ -79,7 +79,7 @@ export class ScriptPanel {
   private consoleClearBtn: HTMLElement;
   private consoleResizeHandle: HTMLElement;
 
-  private executeScript: (script: string) => Promise<ScriptResult>;
+  private executeScript: (script: string, language: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void | Promise<void>;
   private tokenize?: TokenizeFunction;
 
@@ -120,7 +120,7 @@ export class ScriptPanel {
     consoleCloseBtn: HTMLElement;
     consoleClearBtn: HTMLElement;
     consoleResizeHandle: HTMLElement;
-    executeScript: (script: string) => Promise<ScriptResult>;
+    executeScript: (script: string, language: string) => Promise<ScriptResult>;
     onScriptExecuted: () => void | Promise<void>;
     tokenize?: TokenizeFunction;
     getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
@@ -279,9 +279,11 @@ export class ScriptPanel {
     this.runBtn.setAttribute("disabled", "true");
 
     const startTime = performance.now();
+    console.log("[script-panel] run lang=luau bytes=" + script.length);
 
     try {
-      const result = await this.executeScript(script);
+      const result = await this.executeScript(script, "luau");
+      console.log("[script-panel] result", result);
       const elapsed = performance.now() - startTime;
 
       if (result.success) {

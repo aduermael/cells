@@ -1298,8 +1298,8 @@ export class CellsClient {
 
   // ========== Scripting API (Luau) ==========
 
-  async executeScript(script: string): Promise<ScriptResult> {
-    const response = await this._send("executeScript", { script });
+  async executeScript(script: string, language?: string): Promise<ScriptResult> {
+    const response = await this._send("executeScript", { script, language: language ?? "" });
     return JSON.parse(response.result as string) as ScriptResult;
   }
 

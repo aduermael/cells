@@ -471,6 +471,12 @@ struct Sheet {
     PageMargins pageMargins;
     bool hasPageMargins{false};
 
+    // Unmodeled XLSX worksheet children preserved for load→save (not CRDT/ZCD).
+    // Before: elements that belong ahead of sheetData (e.g. sheetPr).
+    // After: drawing, tableParts, hyperlinks, extLst, etc.
+    std::vector<std::string> xlsxExtraChildXmlBefore;
+    std::vector<std::string> xlsxExtraChildXmlAfter;
+
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");
     ~Sheet();
@@ -839,6 +845,13 @@ private:
     static std::string makeCellKey(const ID& colId, const ID& rowId);
 };
 
+// Opaque XLSX zip part the engine does not model (charts, pivots, media, ...).
+// Filled by XLSXReader; emitted by XLSXWriter. Not part of CRDT/ZCD.
+struct XlsxOpaquePart {
+    std::string path;
+    std::string bytes;
+};
+
 // Workbook - top-level container
 struct Workbook {
     ID id;             // Document ID
@@ -846,6 +859,13 @@ struct Workbook {
 
     // Sheets (order matters for tab display)
     std::vector<std::unique_ptr<Sheet>> sheets;
+
+    // Unmodeled XLSX package extras preserved for load→save (not CRDT/ZCD).
+    std::vector<XlsxOpaquePart> xlsxOpaqueParts;
+    std::vector<std::string> xlsxExtraContentTypeXml;
+    std::vector<std::string> xlsxExtraRootRelXml;
+    std::vector<std::string> xlsxExtraWorkbookRelXml;
+    std::vector<std::string> xlsxExtraWorkbookChildXml;
 
     Workbook();
     explicit Workbook(const ID& id, std::string name = "Untitled");

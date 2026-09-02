@@ -241,8 +241,8 @@ export interface CellsEngine {
     // Debug/Development
     debugParseFormula(formulaText: string): string;
 
-    // Scripting (Luau)
-    executeScript(script: string): string;
+    // Scripting (Luau default; pass "javascript" for Office.js)
+    executeScript(script: string, language?: string): string;
     tokenizeLuau(source: string): string;
     getAutocomplete(source: string, line: number, column: number): string;
 

@@ -37,6 +37,10 @@ EMSCRIPTEN_LINKOPTS = [
     "-s MODULARIZE=1",  # Export as module for manual initialization
     "-s EXPORT_NAME=createCellsModule",  # Module factory name
     "-s ALLOW_MEMORY_GROWTH=1",  # Allow heap to grow for large spreadsheets
+    # QuickJS defaults to a 1MB JS C-stack. Emscripten's default STACK_SIZE is
+    # 64KB, so Excel.run (async/await + promises) overflows in the browser
+    # ("Maximum call stack size exceeded") while native officejs tests pass.
+    "-sSTACK_SIZE=2097152",
     "-s INITIAL_MEMORY=67108864",  # 64MB initial memory
     "-s MAXIMUM_MEMORY=2147483648",  # 2GB max memory (for large files with millions of cells)
     "-s ENVIRONMENT=web,worker,node",  # Target web, web workers, and node (for testing)
@@ -84,6 +88,7 @@ cc_binary(
         "//core/cells:hlc",
         "//core/cells:id",
         "//core/cells:luau_autocomplete",
+        "//core/cells:js_sandbox",
         "//core/cells:luau_sandbox",
         "//core/cells:ui_mutation",
         "//core/cells:model",

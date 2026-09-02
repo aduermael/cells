@@ -22,6 +22,8 @@ if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     echo "  bazel run :check        # Run all checks" >&2
     echo "  bazel run :test         # Run C++ unit tests" >&2
     echo "  bazel run :test-js      # Run JS/TS unit tests" >&2
+    echo "  bazel run :officejs     # Run Office.js (QuickJS) tests" >&2
+    echo "  bazel run :officejs -- WriteValues  # One Office.js test" >&2
     echo "  bazel run :release-test # Run release/install tests" >&2
     echo "  bazel run :e2e          # Run E2E tests" >&2
     echo "  bazel run :e2e-headed   # Run E2E tests with visible browser" >&2

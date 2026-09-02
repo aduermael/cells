@@ -555,11 +555,11 @@ export function createComponents(config: ComponentsConfig): Components {
     consoleCloseBtn: elements.scriptConsoleCloseBtn,
     consoleClearBtn: elements.scriptConsoleClearBtn,
     consoleResizeHandle: elements.scriptConsoleResizeHandle,
-    executeScript: async (script: string) => {
+    executeScript: async (script: string, language: string) => {
       if (!app.dataSource) {
         return { success: false, error: "No data source available", instructions: 0 };
       }
-      return app.dataSource.executeScript(script);
+      return app.dataSource.executeScript(script, language);
     },
     onScriptExecuted: async () => {
       fetchViewportNow();

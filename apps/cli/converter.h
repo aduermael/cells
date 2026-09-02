@@ -73,7 +73,7 @@ private:
     // Evaluate all formulas in the workbook and store computed values
     void evaluateFormulas(Workbook& workbook);
 
-    // Execute a Luau script on the workbook
+    // Execute a Luau or Office.js (QuickJS) script on the workbook
     // Returns false on error (sets error_out)
     bool executeScript(Workbook& workbook, std::string& error_out);
 

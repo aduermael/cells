@@ -86,6 +86,8 @@ testdata/                   # Sample .zcd files for testing
 | Task | Command |
 |------|---------|
 | Run unit tests | `bazel run :test` |
+| Run Office.js (QuickJS) tests | `bazel run :officejs` |
+| Run one Office.js test | `bazel run :officejs -- WriteValues` |
 | Run E2E tests (headless) | `bazel run :e2e` |
 | Run E2E tests (headed) | `bazel run :e2e-headed` |
 | Run single E2E test | `bazel run :e2e -- smoke` |

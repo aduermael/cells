@@ -1010,13 +1010,12 @@ declare module 'cells-wasm' {
     // ========================================================================
 
     /**
-     * Execute a Luau script in the sandboxed environment
-     * Scripts can use cells API functions like cellGet(), cellSet(), etc.
-     * Scripts starting with '/' prefix are meant to be entered in the formula bar
-     * @param script - Luau script code to execute
+     * Execute a script in the sandboxed environment.
+     * @param script - source to execute
+     * @param language - "luau" (default) or "javascript" (Office.js host)
      * @returns JSON string with ScriptResult
      */
-    executeScript(script: string): string;
+    executeScript(script: string, language?: string): string;
 
     /**
      * Tokenize a Luau script using the Luau lexer

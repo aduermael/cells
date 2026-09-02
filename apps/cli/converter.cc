@@ -16,6 +16,7 @@
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/luau_sandbox.h"
+#include "core/cells/script_dispatch.h"
 #include "core/cells/parser.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
@@ -523,13 +524,9 @@ bool Converter::executeScript(Workbook& workbook, std::string& error_out) {
         return true;
     }
 
-    // Create sandbox and set context
-    LuauSandbox sandbox;
     Sheet* sheet = workbook.sheets.empty() ? nullptr : workbook.sheets[0].get();
-    sandbox.setContext(&workbook, sheet);
-
-    // Execute script
-    ScriptResult result = sandbox.execute(script);
+    const ScriptKind kind = detectScriptKind(options_.script_file, script);
+    const ScriptResult result = executeUserScript(workbook, sheet, script, kind);
 
     // Print script output if any (unless quiet mode). Large payloads spill to
     // /tmp with a JSON pointer so agents do not ingest multi-megabyte stdout.

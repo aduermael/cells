@@ -109,6 +109,13 @@ sh_binary(
     data = ["tools/guard.sh"],
 )
 
+# Office.js (QuickJS) tests. Filter: bazel run :officejs -- WriteValues
+sh_binary(
+    name = "officejs",
+    srcs = ["tools/officejs.sh"],
+    data = ["tools/guard.sh"],
+)
+
 sh_binary(
     name = "release-test",
     srcs = ["tools/release-test.sh"],

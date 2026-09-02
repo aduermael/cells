@@ -1,0 +1,59 @@
+# BUILD file for QuickJS (https://bellard.org/quickjs/)
+# https://github.com/bellard/quickjs - MIT License
+#
+# Embeddable JS engine. Sandbox builds omit quickjs-libc (no std/os/file).
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+_COPTS = select({
+    "@platforms//os:windows": [
+        "/DCONFIG_VERSION=\\\"2026-06-04\\\"",
+        "/D_CRT_SECURE_NO_WARNINGS",
+        "/J",
+    ],
+    "//conditions:default": [
+        "-DCONFIG_VERSION=\\\"2026-06-04\\\"",
+        "-D_GNU_SOURCE",
+        "-fwrapv",
+        "-funsigned-char",
+        "-Wno-sign-compare",
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-Wno-unused-but-set-variable",
+        "-Wno-implicit-fallthrough",
+        "-Wno-array-bounds",
+        "-Wno-format-truncation",
+        "-Wno-missing-field-initializers",
+    ],
+})
+
+cc_library(
+    name = "quickjs",
+    srcs = [
+        "cutils.c",
+        "dtoa.c",
+        "libregexp.c",
+        "libunicode.c",
+        "quickjs.c",
+    ],
+    hdrs = ["quickjs.h"],
+    copts = _COPTS,
+    includes = ["."],
+    linkopts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-lm"],
+    }),
+    textual_hdrs = [
+        "cutils.h",
+        "dtoa.h",
+        "libregexp.h",
+        "libregexp-opcode.h",
+        "libunicode.h",
+        "libunicode-table.h",
+        "list.h",
+        "quickjs-atom.h",
+        "quickjs-opcode.h",
+    ],
+)

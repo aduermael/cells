@@ -9,7 +9,12 @@
 
 /** Injected at bundle time; may be undeclared in unstamped source. */
 declare const __CELLS_VERSION__: string | undefined;
+declare const __CELLS_BUILD_ID__: string | undefined;
 
 /** Product version string (no leading "v"). */
 export const CELLS_VERSION: string =
   typeof __CELLS_VERSION__ !== "undefined" ? __CELLS_VERSION__ : "0.0.1";
+
+/** Per-build stamp so worker.js / wasm glue are not served from a stale cache. */
+export const CELLS_BUILD_ID: string =
+  typeof __CELLS_BUILD_ID__ !== "undefined" ? __CELLS_BUILD_ID__ : "dev";
