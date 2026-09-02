@@ -282,9 +282,12 @@ export class ScriptPanel {
     this.runBtn.setAttribute("disabled", "true");
 
     const startTime = performance.now();
+    const language = this.currentLanguage();
+    console.log("[script-panel] run lang=" + language + " bytes=" + script.length);
 
     try {
-      const result = await this.executeScript(script, this.currentLanguage());
+      const result = await this.executeScript(script, language);
+      console.log("[script-panel] result", result);
       const elapsed = performance.now() - startTime;
 
       if (result.success) {

@@ -32,6 +32,7 @@ import type {
     WorkerRequest,
     WorkerResponse,
 } from "./worker-types.js";
+import { CELLS_BUILD_ID } from "./version";
 
 // Core spreadsheet handlers
 import {
@@ -199,7 +200,7 @@ async function initModule(): Promise<void> {
         // Using importScripts for classic workers, or dynamic import for module workers
         if (typeof importScripts === "function") {
             // Classic worker - use importScripts
-            importScripts("./cells_wasm_bin.js");
+            importScripts(`./cells_wasm_bin.js?b=${CELLS_BUILD_ID}`);
             Module = await createCellsModule();
         } else {
             // Module worker - use dynamic import
@@ -212,6 +213,7 @@ async function initModule(): Promise<void> {
 
         // Create the engine instance (Module is guaranteed non-null here)
         engine = new (Module as CellsModule).CellsEngine();
+        console.log("[worker] ready build=" + CELLS_BUILD_ID);
 
         // Register listener for change notifications from WASM
         // This sends unsolicited messages to the main thread when data changes

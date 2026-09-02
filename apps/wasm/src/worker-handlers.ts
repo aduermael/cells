@@ -1667,8 +1667,19 @@ export function handleExecuteScript(
     respond: RespondFn,
 ): void {
     const { script, language } = params as { script: string; language?: string };
-    const result = engine.executeScript(script, language ?? "");
-    respond({ type: "scriptExecuted", result });
+    const lang = language ?? "";
+    console.log(
+        "[executeScript] start lang=" + lang + " bytes=" + script.length +
+            " head=" + script.slice(0, 80).replace(/\n/g, " "),
+    );
+    try {
+        const result = engine.executeScript(script, lang);
+        console.log("[executeScript] done", String(result).slice(0, 240));
+        respond({ type: "scriptExecuted", result });
+    } catch (err) {
+        console.error("[executeScript] threw", err);
+        throw err;
+    }
 }
 
 export function handleTokenizeLuau(

@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { CellsClient } from "./client";
+import { CELLS_BUILD_ID } from "./version";
 import { WasmDataSource, type DataChangeType } from "./wasm-data-source";
 import { detectFormat, getBaseName, downloadBlob } from "./utils";
 import { getMenuStateManager } from "./menu-state";
@@ -120,7 +121,7 @@ export class FileLoader {
   async ensureWasmClient(): Promise<CellsClient> {
     if (this.wasmClient) return this.wasmClient;
 
-    this.wasmClient = new CellsClient("./worker.js");
+    this.wasmClient = new CellsClient(`./worker.js?b=${CELLS_BUILD_ID}`);
     await this.wasmClient.ready;
 
     // NOTE: Collaboration is NOT initialized here - it's done lazily

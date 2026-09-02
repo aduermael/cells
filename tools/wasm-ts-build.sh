@@ -158,7 +158,8 @@ mkdir -p "$out_dir"
 # shellcheck source=../scripts/release/common.sh
 . "$REPO_ROOT/scripts/release/common.sh"
 product_version="$(cells_resolve_product_version)"
-echo "Stamping frontend CELLS_VERSION=${product_version}"
+build_id="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)-$(date +%s)"
+echo "Stamping frontend CELLS_VERSION=${product_version} BUILD_ID=${build_id}"
 
 # Production TS bundle flags (bazel run :wasm / :wasm-dist / :wasm-debug).
 # esbuild --define expects a JSON value; quote so the replacement is a string literal.
@@ -171,6 +172,7 @@ common_flags=(
   --minify
   --log-level=info
   "--define:__CELLS_VERSION__=\"${product_version}\""
+  "--define:__CELLS_BUILD_ID__=\"${build_id}\""
 )
 
 echo "Bundling TypeScript with esbuild ${esbuild_version} ($esbuild_bin)..."
