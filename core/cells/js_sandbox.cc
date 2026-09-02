@@ -63,6 +63,10 @@ void JsSandbox::initState() {
     if (rt_ == nullptr) {
         return;
     }
+    // WASM C-stack is smaller than a native thread. Cap QuickJS so it throws a
+    // JS error instead of walking off the WASM stack. execute() also calls
+    // JS_UpdateStackTop so the limit is measured from the current frame.
+    JS_SetMaxStackSize(rt_, 512 * 1024);
     JS_SetInterruptHandler(rt_, interruptHandler, this);
     JS_SetHostPromiseRejectionTracker(rt_, rejectionTracker, this);
 
@@ -242,6 +246,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
     interrupted_ = false;
     printBuffer_.clear();
     unhandledRejection_.clear();
+    JS_UpdateStackTop(rt_);
 
     const int flags = JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC;
     JSValue val = JS_Eval(ctx_, script.c_str(), script.size(), "<script>", flags);

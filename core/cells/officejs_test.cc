@@ -27,6 +27,9 @@ Cell* cellAt(Sheet* sheet, uint32_t col, uint32_t row) {
     return sheet->getCellAtPosition(col, row);
 }
 
+// Same source as the web script panel. Native QuickJS (this suite) has an 8MB
+// C stack; the WASM build needs STACK_SIZE >= QuickJS's stack cap or the
+// browser reports "Maximum call stack size exceeded".
 TEST(OfficeJsTest, ExcelRunSingleCellValues) {
     auto workbook = createEmptyWorkbook();
     Sheet* sheet = workbook->sheets[0].get();
