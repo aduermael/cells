@@ -391,7 +391,8 @@ await Excel.run(async (context) => {
     ASSERT_NE(d2, nullptr);
     EXPECT_DOUBLE_EQ(d2->value.asNumber(), 9.0);
     EXPECT_TRUE(cellAt(sheet, 3, 2) == nullptr || cellAt(sheet, 3, 2)->value.raw.empty());
-    EXPECT_NE(result.output.find("used="), std::string::npos);
+    EXPECT_NE(result.output.find("A1:D7"), std::string::npos) << result.output;
+    EXPECT_NE(result.output.find("r0c0 7x4"), std::string::npos) << result.output;
 
     JsSandbox unmerge;
     unmerge.setContext(workbook.get(), sheet);
@@ -510,7 +511,8 @@ await Excel.run(async (context) => {
   const range = context.workbook.worksheets.getActiveWorksheet().getRange("A1");
   console.log("autoFill=" + typeof range.autoFill);
   console.log("autofit=" + typeof range.format.autofitColumns);
-  range.autoFill();
+  console.log("getIntersection=" + typeof range.getIntersection);
+  range.getIntersection(range);
   await context.sync();
 });
 )JS");
@@ -518,8 +520,10 @@ await Excel.run(async (context) => {
     ASSERT_FALSE(result.success);
     EXPECT_NE(result.output.find("autoFill=function"), std::string::npos) << result.output;
     EXPECT_NE(result.output.find("autofit=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.output.find("getIntersection=function"), std::string::npos) << result.output;
     EXPECT_NE(result.error.find("OfficeExtension.Error"), std::string::npos) << result.error;
     EXPECT_NE(result.error.find("NotImplemented"), std::string::npos) << result.error;
+    EXPECT_NE(result.error.find("getIntersection"), std::string::npos) << result.error;
     EXPECT_EQ(result.error.find("is not a function"), std::string::npos) << result.error;
 }
 

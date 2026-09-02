@@ -1442,6 +1442,22 @@ JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueCons
             int col = getInt(ctx, cmd, "col");
             int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
             int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            // getUsedRange / getSelectedRange resolve bounds into loads[id] first;
+            // a following load() still carries the placeholder A1 coords.
+            if (!oid.empty()) {
+                const JSValue prev = JS_GetPropertyStr(ctx, loads, oid.c_str());
+                if (JS_IsObject(prev)) {
+                    const JSValue prevRow = JS_GetPropertyStr(ctx, prev, "row");
+                    if (!JS_IsUndefined(prevRow) && !JS_IsNull(prevRow)) {
+                        row = getInt(ctx, prev, "row");
+                        col = getInt(ctx, prev, "col");
+                        rowCount = std::max(getInt(ctx, prev, "rowCount", 1), 1);
+                        colCount = std::max(getInt(ctx, prev, "colCount", 1), 1);
+                    }
+                    JS_FreeValue(ctx, prevRow);
+                }
+                JS_FreeValue(ctx, prev);
+            }
             if (!named.empty()) {
                 NamedAddr addr;
                 if (!resolveNamedItem(workbook, sandbox->activeSheet(), named, &addr)) {
@@ -2538,6 +2554,43 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     if (!data) return;
     this._loaded = data;
   };
+
+  function isStubbableMethodName(prop) {
+    if (typeof prop !== 'string') return false;
+    if (prop.charAt(0) === '_') return false;
+    return prop !== 'then' && prop !== 'toJSON' && prop !== 'toString' && prop !== 'valueOf' &&
+           prop !== 'constructor' && prop !== 'inspect' && prop !== 'prototype';
+  }
+  function installMissingMethodProxy(ctor, typeName) {
+    var proto = ctor.prototype;
+    ctor.prototype = new Proxy(proto, {
+      get: function (target, prop, receiver) {
+        if ((prop in target) || !isStubbableMethodName(prop)) {
+          return Reflect.get(target, prop, receiver);
+        }
+        return function () {
+          var ctx = receiver && receiver.context;
+          if (!ctx && receiver && receiver._range) ctx = receiver._range.context;
+          if (ctx) enqueueNotSupported(ctx, 'Excel.' + typeName + '.' + prop);
+          return receiver;
+        };
+      }
+    });
+  }
+  installMissingMethodProxy(Range, 'Range');
+  installMissingMethodProxy(Worksheet, 'Worksheet');
+  installMissingMethodProxy(Workbook, 'Workbook');
+  installMissingMethodProxy(RangeFormat, 'RangeFormat');
+  installMissingMethodProxy(RangeFill, 'RangeFill');
+  installMissingMethodProxy(RangeFont, 'RangeFont');
+  installMissingMethodProxy(RangeBorder, 'RangeBorder');
+  installMissingMethodProxy(RangeBorderCollection, 'RangeBorderCollection');
+  installMissingMethodProxy(NamedItem, 'NamedItem');
+  installMissingMethodProxy(NamedItemCollection, 'NamedItemCollection');
+  installMissingMethodProxy(WorksheetCollection, 'WorksheetCollection');
+  installMissingMethodProxy(TableCollection, 'TableCollection');
+  installMissingMethodProxy(ChartCollection, 'ChartCollection');
+  installMissingMethodProxy(WorksheetProtection, 'WorksheetProtection');
 
   var Excel = {
     run: function (arg1, arg2) {
