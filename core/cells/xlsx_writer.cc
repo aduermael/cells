@@ -1661,14 +1661,12 @@ std::string generateWorksheet(
 
     // Write pageMargins
     if (sheet.hasPageMargins) {
-        xml << "  <pageMargins"
-            << " left=\"" << formatDouble(sheet.pageMargins.left) << "\""
-            << " right=\"" << formatDouble(sheet.pageMargins.right) << "\""
-            << " top=\"" << formatDouble(sheet.pageMargins.top) << "\""
-            << " bottom=\"" << formatDouble(sheet.pageMargins.bottom) << "\""
-            << " header=\"" << formatDouble(sheet.pageMargins.header) << "\""
-            << " footer=\"" << formatDouble(sheet.pageMargins.footer) << "\""
-            << "/>\n";
+        xml << "  <pageMargins" << " left=\"" << formatDouble(sheet.pageMargins.left) << "\""
+            << " right=\"" << formatDouble(sheet.pageMargins.right) << "\"" << " top=\""
+            << formatDouble(sheet.pageMargins.top) << "\"" << " bottom=\""
+            << formatDouble(sheet.pageMargins.bottom) << "\"" << " header=\""
+            << formatDouble(sheet.pageMargins.header) << "\"" << " footer=\""
+            << formatDouble(sheet.pageMargins.footer) << "\"" << "/>\n";
     }
 
     for (const auto& frag : sheet.xlsxExtraChildXmlAfter) {

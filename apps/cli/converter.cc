@@ -1,7 +1,6 @@
 // Converter implementation for cells CLI
 
 #include "converter.h"
-#include "output_spill.h"
 
 #include <filesystem>
 #include <fstream>
@@ -10,16 +9,18 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
-#include "core/cells/id.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
+#include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
-#include "core/cells/script_dispatch.h"
 #include "core/cells/parser.h"
+#include "core/cells/script_dispatch.h"
 #include "core/cells/serializer.h"
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
+
+#include "output_spill.h"
 
 namespace fs = std::filesystem;
 
@@ -140,7 +141,8 @@ ConversionResult Converter::convertAllSheets() {
     if (!fs::exists(output_dir)) {
         fs::create_directories(output_dir, ec);
         if (ec) {
-            result.error = "Could not create directory: " + output_dir.string() + " (" + ec.message() + ")";
+            result.error =
+                "Could not create directory: " + output_dir.string() + " (" + ec.message() + ")";
             return result;
         }
     }
@@ -166,7 +168,8 @@ ConversionResult Converter::convertAllSheets() {
         // Copy columns
         for (const auto& col_id : sheet->getColumnIds()) {
             const Axis* col = workbook->getColumn(col_id);
-            if (!col) continue;
+            if (!col)
+                continue;
             auto new_col = std::make_unique<Axis>(col->id, true);
             new_col->position = col->position;
             new_col->size = col->size;
@@ -177,7 +180,8 @@ ConversionResult Converter::convertAllSheets() {
         // Copy rows
         for (const auto& row_id : sheet->getRowIds()) {
             const Axis* row = workbook->getRow(row_id);
-            if (!row) continue;
+            if (!row)
+                continue;
             auto new_row = std::make_unique<Axis>(row->id, false);
             new_row->position = row->position;
             new_row->size = row->size;
@@ -187,7 +191,8 @@ ConversionResult Converter::convertAllSheets() {
         // Copy cells (shallow copy of value is fine)
         for (const auto& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook->getCell(cellId);
-            if (!cell) continue;
+            if (!cell)
+                continue;
             auto new_cell = std::make_unique<Cell>(cell->id, cell->colId, cell->rowId);
             new_cell->value = cell->value;
             // Don't copy formula (CSV exports computed values only)
@@ -209,7 +214,8 @@ ConversionResult Converter::convertAllSheets() {
         // Write CSV
         CSVWriteResult csv_result = writeCSV(temp_workbook, csv_opts);
         if (!csv_result.ok() && csv_result.error.has_value()) {
-            result.error = "Error writing " + sheet_file.string() + ": " + csv_result.error->toString();
+            result.error =
+                "Error writing " + sheet_file.string() + ": " + csv_result.error->toString();
             return result;
         }
 
