@@ -1936,9 +1936,9 @@ JSValue jsActiveSheet(JSContext* ctx, JSValueConst /*this_val*/, int /*argc*/,
 }
 
 constexpr const char kBootstrap[] = R"OFFICEJS(
-(function (native) {
-  'use strict';
-  delete globalThis.__cellsNative;
+'use strict';
+var native = globalThis.__cellsNative;
+delete globalThis.__cellsNative;
 
   function parseLoad(arg) {
     if (arg == null) return ['*'];
@@ -2667,7 +2667,6 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   globalThis.console.info = globalThis.console.log;
   globalThis.console.warn = globalThis.console.log;
   globalThis.console.error = globalThis.console.log;
-})(globalThis.__cellsNative);
 )OFFICEJS";
 
 }  // namespace
