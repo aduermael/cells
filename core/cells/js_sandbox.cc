@@ -5,7 +5,6 @@
 
 #include "core/cells/js_sandbox.h"
 
-#include <cstdio>
 #include <cstring>
 
 #include "core/cells/model.h"
@@ -64,10 +63,10 @@ void JsSandbox::initState() {
     if (rt_ == nullptr) {
         return;
     }
-    // WASM C-stack is smaller than a native thread. Cap QuickJS so it throws a
-    // JS error instead of walking off the WASM stack. execute() also calls
-    // JS_UpdateStackTop so the limit is measured from the current frame.
+#ifdef __EMSCRIPTEN__
+    // Browser workers have a tiny WASM call stack. Native/CLI does not.
     JS_SetMaxStackSize(rt_, 512 * 1024);
+#endif
     JS_SetInterruptHandler(rt_, interruptHandler, this);
     JS_SetHostPromiseRejectionTracker(rt_, rejectionTracker, this);
 
@@ -76,10 +75,10 @@ void JsSandbox::initState() {
         return;
     }
     JS_SetContextOpaque(ctx_, this);
+#ifdef __EMSCRIPTEN__
     JS_UpdateStackTop(rt_);
-    std::fprintf(stderr, "[officejs] eval bootstrap\n");
+#endif
     registerHost();
-    std::fprintf(stderr, "[officejs] bootstrap ok\n");
 }
 
 void JsSandbox::registerHost() {
@@ -250,21 +249,17 @@ ScriptResult JsSandbox::execute(const std::string& script) {
     interrupted_ = false;
     printBuffer_.clear();
     unhandledRejection_.clear();
+#ifdef __EMSCRIPTEN__
     JS_UpdateStackTop(rt_);
-
-    std::fprintf(stderr, "[officejs] eval user bytes=%zu\n", script.size());
-    // Wrap so top-level await works without JS_EVAL_FLAG_ASYNC (deep compiler
-    // recursion on WASM). Result is still a Promise; drainJobs waits for it.
-    const std::string wrapped = "(async function(){\n" + script + "\n})()";
-    const int flags = JS_EVAL_TYPE_GLOBAL;
-    JSValue val = JS_Eval(ctx_, wrapped.c_str(), wrapped.size(), "<script>", flags);
+#endif
+    JSValue val = JS_Eval(ctx_, script.c_str(), script.size(), "<script>",
+                          JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC);
     if (JS_IsException(val)) {
         result.error = exceptionToString();
         result.output = printBuffer_;
         result.instructions = instructionCount_;
         return result;
     }
-    std::fprintf(stderr, "[officejs] user eval ok, draining jobs\n");
 
     if (!drainJobs(&result)) {
         JS_FreeValue(ctx_, val);

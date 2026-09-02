@@ -32,14 +32,7 @@ std::string CellsEngine::executeScript(const std::string& script, const std::str
         return R"({"success":false,"error":"Invalid sheet"})";
     }
 
-    const ScriptKind kind = resolveScriptKind(language, script);
-    ScriptResult result;
-    if (kind == ScriptKind::JavaScript) {
-        _jsSandbox.setContext(_workbook.get(), sheet);
-        result = _jsSandbox.execute(script);
-    } else {
-        result = executeUserScript(*_workbook, sheet, script, kind);
-    }
+    ScriptResult result = executeUserScript(*_workbook, sheet, script, language);
 
     std::ostringstream json;
     json << "{\"success\":" << (result.success ? "true" : "false");

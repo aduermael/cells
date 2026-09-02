@@ -1677,8 +1677,15 @@ export function handleExecuteScript(
         console.log("[executeScript] done", String(result).slice(0, 240));
         respond({ type: "scriptExecuted", result });
     } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
         console.error("[executeScript] threw", err);
-        throw err;
+        const error = /call stack/i.test(raw)
+            ? "Office.js in the browser WASM build hits a QuickJS stack limit compiling the host. Use the CLI: cells --script your.js out.xlsx"
+            : raw;
+        respond({
+            type: "scriptExecuted",
+            result: JSON.stringify({ success: false, error, instructions: 0 }),
+        });
     }
 }
 

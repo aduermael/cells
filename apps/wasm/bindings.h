@@ -31,7 +31,6 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/luau_autocomplete.h"
-#include "core/cells/js_sandbox.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/number_format.h"
@@ -457,9 +456,6 @@ private:
     std::unique_ptr<SyncManager> _syncManager;
     std::unique_ptr<cells::net::SyncClient> _syncClient;
     LuauSandbox _luauSandbox;
-    // Constructed with the engine so Office.js bootstrap eval runs at worker
-    // init (shallow WASM stack), not on the first executeScript call.
-    JsSandbox _jsSandbox;
     LuauAutocomplete _luauAutocomplete;
     NumberFormatRegistry _formatRegistry;
 
