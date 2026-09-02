@@ -36,22 +36,23 @@ Legend: **bug** = implemented surface, wrong result · **gap** = API missing.
 | Worksheet add / get / rename / activate | ✅ | |
 | `Range.values` write + load | ✅ | `=`-prefixed strings are stored as formulas |
 | `Range.formulas` write | ✅ | Same host path as `values` (`setFormulas` → `setCellFromJs`) |
-| `Range.formulas` **read** | **bug** | Getter returns `==A1` (double `=`) |
-| `Range.numberFormat` | 🟡 | 2D array works; a scalar string is a silent no-op/misparse |
+| `Range.formulas` **read** | ✅ | `toDisplayString` already prefixes `=` |
+| `Range.numberFormat` | ✅ | 2D array or scalar string (`"0.00%"`) |
 | Fill color + font (bold/italic/underline/name/size/color) | ✅ | |
-| Named items | 🟡 | `names.getItem` + `getRange` only; no `names.add` |
+| Named items | ✅ | `names.getItem` + `names.add` + `getRange` |
 | Same-sheet formulas in memory | ✅ | `SUM`, `SUMIF`, `$A$1`, etc. |
 | Cross-sheet formulas in memory / `.zcd` | ✅ | `'Cap Table'!A1` evaluates |
-| Cross-sheet formulas in **`.xlsx`** | **bug** | Written as `<f>#REF!</f>` |
-| Sparse layout (skipped rows/cols) in **`.xlsx`** | **bug** | Packed axes vs positional A1 |
-| Merge, copy, insert/delete, tables, charts, borders | **gap** | Throw |
-| Column width, row height, alignment, wrap | **gap** | Silent no-op |
+| Cross-sheet formulas in **`.xlsx`** | ✅ | Sheet-qualified A1 on export |
+| Sparse layout (skipped rows/cols) in **`.xlsx`** | ✅ | Cell `r=` uses axis position |
+| Merge, copy, insert/delete, used range, borders | ✅ | Applied via CRDT flush |
+| Column width, row height, alignment, wrap | ✅ | `RangeFormat` setters flush |
+| Tables, charts, worksheet protection | 🟡 | Callable; `sync` returns `OfficeExtension.Error` (`NotImplemented`) |
 
 ---
 
-## Bugs (implemented, wrong)
+## Historical bugs (fixed)
 
-### 1. `range.formulas` getter prefixes `=` twice
+### 1. `range.formulas` getter prefixes `=` twice (fixed)
 
 **Fixture:** [`testdata/officejs/formulas-getter.js`](../testdata/officejs/formulas-getter.js)
 
@@ -155,50 +156,16 @@ workbook (same approach as `FormulaDisplayConverter`), emit `Sheet!A1` or
 
 ---
 
-## API gaps (not implemented)
+## Remaining host limits
 
-Probed with assignments / calls against the current bootstrap in
-`officejs_api.cc` (`kBootstrap`).
-
-### Throw (missing object or method)
-
-| Call | Error |
-|------|--------|
-| `range.merge()` / `unmerge()` | not a function |
-| `range.copyFrom()` | not a function |
-| `range.insert()` / `delete()` | not a function |
-| `worksheet.getUsedRange()` | not a function |
-| `range.format.borders.getItem(...)` | `borders` undefined |
-| `worksheet.tables.add(...)` | `tables` undefined |
-| `worksheet.charts.add(...)` | `charts` undefined |
-| `workbook.names.add(...)` | not a function |
-| `worksheet.protection.protect()` | `protection` undefined |
+Layout and structure calls in the scorecard persist through `Excel.run` +
+`sync`. `worksheet.tables.add`, `worksheet.charts.add`, and
+`worksheet.protection.protect` are callable; the engine has no table/chart/
+protection model, so `sync` rejects with `OfficeExtension.Error` (`code`:
+`NotImplemented`) rather than a TypeError or a silent no-op.
 
 **Fixture:** [`testdata/officejs/range-layout.js`](../testdata/officejs/range-layout.js)
-(merge, column widths, alignment — should apply, currently throws or no-ops).
-
-### Silent no-op (assignment succeeds, nothing is stored)
-
-These are worse than throws: a script believes the layout was applied.
-
-- `range.format.columnWidth`
-- `range.format.rowHeight`
-- `range.format.horizontalAlignment`
-- `range.format.verticalAlignment`
-- `range.format.wrapText`
-
-`RangeFormat` only implements `fill` and `font`. Extra properties become
-expandos and are never flushed.
-
-### Other host mismatches vs Excel
-
-- `Range.prototype.getRange(address)` parses as a **sheet-level** A1 address
-  and ignores the range origin. Excel’s `range.getRange` is relative to that
-  range.
-- `numberFormat` must be a 2D array matching the range. A string (`"0.00%"`)
-  is accepted in JS and does not apply correctly.
-- `names.add` is missing; only `getItem` on names that already exist in the
-  workbook.
+(merge, column widths, alignment, wrap, row height).
 
 ---
 

@@ -103,6 +103,7 @@ export interface DOMElements {
   scriptEditorHighlight: HTMLElement;
   scriptRunBtn: HTMLElement;
   scriptStatus: HTMLElement;
+  scriptLanguage: HTMLSelectElement;
   scriptPanelResizeHandle: HTMLElement;
   scriptConsole: HTMLElement;
   scriptConsoleContent: HTMLElement;
@@ -609,6 +610,7 @@ export function createApp(): App {
     scriptEditorHighlight: getElement("script-editor-highlight"),
     scriptRunBtn: getElement("script-run-btn"),
     scriptStatus: getElement("script-status"),
+    scriptLanguage: getElement<HTMLSelectElement>("script-language"),
     scriptPanelResizeHandle: getElement("script-panel-resize-handle"),
     scriptConsole: getElement("script-console"),
     scriptConsoleContent: getElement("script-console-content"),

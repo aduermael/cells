@@ -1,9 +1,7 @@
 // Office.js: range layout APIs that Excel add-ins use for a titled sheet.
 //
 // Expected: merge A1:F1, set column widths, center-align the title, wrap
-// the subtitle, set row height. None of this is applied today:
-//   merge() throws; columnWidth / rowHeight / alignment / wrapText are
-//   silent no-ops on RangeFormat.
+// the subtitle, set row height.
 //
 // Run:
 //   dist/cli/cells --script testdata/officejs/range-layout.js /tmp/layout.xlsx -y

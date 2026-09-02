@@ -14,14 +14,15 @@
 #include <sstream>
 
 #include "Luau/Lexer.h"
+#include "core/cells/script_dispatch.h"
 
 namespace cells::wasm {
 
 // ============================================================================
-// Scripting API (Luau)
+// Scripting API (Luau default; JavaScript uses the same Office.js host as CLI)
 // ============================================================================
 
-std::string CellsEngine::executeScript(const std::string& script) {
+std::string CellsEngine::executeScript(const std::string& script, const std::string& language) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return R"({"success":false,"error":"No workbook loaded"})";
     }
@@ -31,8 +32,7 @@ std::string CellsEngine::executeScript(const std::string& script) {
         return R"({"success":false,"error":"Invalid sheet"})";
     }
 
-    _luauSandbox.setContext(_workbook.get(), sheet);
-    ScriptResult result = _luauSandbox.execute(script);
+    ScriptResult result = executeUserScript(*_workbook, sheet, script, language);
 
     std::ostringstream json;
     json << "{\"success\":" << (result.success ? "true" : "false");

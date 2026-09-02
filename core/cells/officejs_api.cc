@@ -35,6 +35,7 @@
 #include "core/cells/js_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
@@ -98,11 +99,39 @@ int32_t getInt(JSContext* ctx, JSValueConst obj, const char* prop, int32_t def =
     return n;
 }
 
+double getNumber(JSContext* ctx, JSValueConst obj, const char* prop, double def = 0) {
+    const JSValue v = JS_GetPropertyStr(ctx, obj, prop);
+    double n = def;
+    if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+        JS_ToFloat64(ctx, &n, v);
+    }
+    JS_FreeValue(ctx, v);
+    return n;
+}
+
+bool getBool(JSContext* ctx, JSValueConst obj, const char* prop, bool def = false) {
+    const JSValue v = JS_GetPropertyStr(ctx, obj, prop);
+    bool out = def;
+    if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+        out = JS_ToBool(ctx, v) != 0;
+    }
+    JS_FreeValue(ctx, v);
+    return out;
+}
+
+std::string toLowerCopy(std::string s) {
+    for (char& c : s) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return s;
+}
+
 JSValue throwOfficeError(JSContext* ctx, const char* code, const char* message) {
     const JSValue err = JS_NewError(ctx);
+    const std::string full = std::string(code) + ": " + message;
     JS_SetPropertyStr(ctx, err, "name", JS_NewString(ctx, "OfficeExtension.Error"));
     JS_SetPropertyStr(ctx, err, "code", JS_NewString(ctx, code));
-    JS_SetPropertyStr(ctx, err, "message", JS_NewString(ctx, message));
+    JS_SetPropertyStr(ctx, err, "message", JS_NewString(ctx, full.c_str()));
     return JS_Throw(ctx, err);
 }
 
@@ -464,7 +493,7 @@ std::string cellFormulaDisplay(Workbook& workbook, Sheet& sheet, Cell* cell) {
         return cell->value.raw.empty() ? "" : cell->value.raw;
     }
     FormulaDisplayConverter conv(sheet, &workbook);
-    return "=" + conv.toDisplayString(f->ast);
+    return conv.toDisplayString(f->ast);
 }
 
 bool mergeStyle(Workbook& workbook, Sheet& sheet, int colIdx, int rowIdx,
@@ -722,6 +751,394 @@ bool resolveNamedItem(Workbook& workbook, Sheet* hint, const std::string& name, 
     return false;
 }
 
+void ensureAxesInRect(Workbook& workbook, Sheet& sheet, int col, int row, int colCount,
+                      int rowCount) {
+    for (int c = 0; c < colCount; c++) {
+        (void)ensureColumnViaCrdt(workbook, sheet, static_cast<uint32_t>(col + c));
+    }
+    for (int r = 0; r < rowCount; r++) {
+        (void)ensureRowViaCrdt(workbook, sheet, static_cast<uint32_t>(row + r));
+    }
+}
+
+void clearCellAt(Workbook& workbook, Sheet& sheet, int colIdx, int rowIdx) {
+    Cell* cell =
+        sheet.getCellAtPosition(static_cast<uint32_t>(colIdx), static_cast<uint32_t>(rowIdx));
+    if (cell == nullptr) {
+        return;
+    }
+    DependencyGraph* depGraph = sheet.getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->removeFormula(cell->id);
+        depGraph->unmarkVolatile(cell->id);
+    }
+    const ID cellId = cell->id;
+    applyOperation(workbook, makeCellDeleteOp(workbook, cellId));
+    markDirty(&sheet, cellId);
+    const std::vector<ID> changed = {cellId};
+    cells::recalculate(&workbook, changed);
+    cells::recalculateVolatile(&sheet);
+}
+
+void copyStyleFormat(Workbook& workbook, Cell* src, Cell* dest) {
+    if (src == nullptr || dest == nullptr) {
+        return;
+    }
+    const StyleBuffer* style = workbook.getEntityStyle(src->id);
+    if (style != nullptr) {
+        applyOperation(workbook, makeCellSetStyleOp(workbook, dest->id, *style));
+    }
+    const FormatBuffer* fmt = workbook.getEntityFormat(src->id);
+    if (fmt != nullptr) {
+        applyOperation(workbook, makeCellSetFormatOp(workbook, dest->id, *fmt));
+    }
+}
+
+void copyCellAt(JSContext* ctx, Workbook& workbook, Sheet& srcSheet, int srcCol, int srcRow,
+                Sheet& destSheet, int destCol, int destRow, bool copyValues, bool copyFormulas,
+                bool copyFormats) {
+    Cell* src =
+        srcSheet.getCellAtPosition(static_cast<uint32_t>(srcCol), static_cast<uint32_t>(srcRow));
+    if (src == nullptr) {
+        if (copyValues) {
+            clearCellAt(workbook, destSheet, destCol, destRow);
+        }
+        return;
+    }
+    if (copyFormulas && src->isFormula()) {
+        const std::string formula = cellFormulaDisplay(workbook, srcSheet, src);
+        Axis* col = ensureColumnViaCrdt(workbook, destSheet, static_cast<uint32_t>(destCol));
+        Axis* row = ensureRowViaCrdt(workbook, destSheet, static_cast<uint32_t>(destRow));
+        if (col != nullptr && row != nullptr) {
+            Cell* existing = destSheet.getCellAt(col->id, row->id);
+            const ID cellId = existing != nullptr ? existing->id : generate_id();
+            setCellFormula(workbook, destSheet, destCol, destRow, formula, existing, cellId,
+                           col->id.toString(), row->id.toString());
+        }
+    } else if (copyValues) {
+        JSValue v = cellValueToJs(ctx, workbook, srcSheet, src);
+        setCellFromJs(ctx, workbook, destSheet, destCol, destRow, v);
+        JS_FreeValue(ctx, v);
+    }
+    if (copyFormats) {
+        Cell* dest = destSheet.getCellAtPosition(static_cast<uint32_t>(destCol),
+                                                 static_cast<uint32_t>(destRow));
+        if (dest == nullptr) {
+            dest = ensureCellAtPositionViaCrdt(workbook, destSheet, static_cast<uint32_t>(destCol),
+                                               static_cast<uint32_t>(destRow));
+        }
+        copyStyleFormat(workbook, src, dest);
+    }
+}
+
+int maxUsedRowInCols(Sheet& sheet, int col, int colCount) {
+    int maxRow = -1;
+    for (const ID& id : sheet.getCellIds()) {
+        Cell* cell = sheet.getCell(id);
+        if (cell == nullptr) {
+            continue;
+        }
+        const Axis* c = sheet.getColumn(cell->colId);
+        const Axis* r = sheet.getRow(cell->rowId);
+        if (c == nullptr || r == nullptr) {
+            continue;
+        }
+        const int cpos = static_cast<int>(c->position);
+        if (cpos >= col && cpos < col + colCount) {
+            maxRow = std::max(maxRow, static_cast<int>(r->position));
+        }
+    }
+    return maxRow;
+}
+
+int maxUsedColInRows(Sheet& sheet, int row, int rowCount) {
+    int maxCol = -1;
+    for (const ID& id : sheet.getCellIds()) {
+        Cell* cell = sheet.getCell(id);
+        if (cell == nullptr) {
+            continue;
+        }
+        const Axis* c = sheet.getColumn(cell->colId);
+        const Axis* r = sheet.getRow(cell->rowId);
+        if (c == nullptr || r == nullptr) {
+            continue;
+        }
+        const int rpos = static_cast<int>(r->position);
+        if (rpos >= row && rpos < row + rowCount) {
+            maxCol = std::max(maxCol, static_cast<int>(c->position));
+        }
+    }
+    return maxCol;
+}
+
+bool computeUsedRange(Sheet& sheet, int clipRow, int clipCol, int clipRowCount, int clipColCount,
+                      bool clip, int* row, int* col, int* rowCount, int* colCount) {
+    int minR = 0x7fffffff;
+    int minC = 0x7fffffff;
+    int maxR = -1;
+    int maxC = -1;
+    const int clipRowEnd = clipRow + clipRowCount;
+    const int clipColEnd = clipCol + clipColCount;
+    for (const ID& id : sheet.getCellIds()) {
+        Cell* cell = sheet.getCell(id);
+        if (cell == nullptr) {
+            continue;
+        }
+        const Axis* c = sheet.getColumn(cell->colId);
+        const Axis* r = sheet.getRow(cell->rowId);
+        if (c == nullptr || r == nullptr) {
+            continue;
+        }
+        const int cpos = static_cast<int>(c->position);
+        const int rpos = static_cast<int>(r->position);
+        if (clip) {
+            if (cpos < clipCol || cpos >= clipColEnd || rpos < clipRow || rpos >= clipRowEnd) {
+                continue;
+            }
+        }
+        minC = std::min(minC, cpos);
+        minR = std::min(minR, rpos);
+        maxC = std::max(maxC, cpos);
+        maxR = std::max(maxR, rpos);
+    }
+    if (maxR < 0) {
+        return false;
+    }
+    *row = minR;
+    *col = minC;
+    *rowCount = maxR - minR + 1;
+    *colCount = maxC - minC + 1;
+    return true;
+}
+
+bool mergeCells(Workbook& workbook, Sheet& sheet, int col, int row, int colCount, int rowCount) {
+    if (colCount <= 1 && rowCount <= 1) {
+        return true;
+    }
+    ensureAxesInRect(workbook, sheet, col, row, colCount, rowCount);
+    Axis* startCol = sheet.getColumnByPosition(static_cast<uint32_t>(col));
+    Axis* startRow = sheet.getRowByPosition(static_cast<uint32_t>(row));
+    Axis* endCol = sheet.getColumnByPosition(static_cast<uint32_t>(col + colCount - 1));
+    Axis* endRow = sheet.getRowByPosition(static_cast<uint32_t>(row + rowCount - 1));
+    if (startCol == nullptr || startRow == nullptr || endCol == nullptr || endRow == nullptr) {
+        return false;
+    }
+    const ID rangeId = generate_id();
+    std::string payload = "{\"startCol\":\"" + startCol->id.toString() + "\",\"startRow\":\"" +
+                          startRow->id.toString() + "\",\"endCol\":\"" + endCol->id.toString() +
+                          "\",\"endRow\":\"" + endRow->id.toString() +
+                          "\",\"flags\":" + std::to_string(static_cast<int>(RangeFlags::MERGE)) +
+                          "}";
+    applyOperation(workbook, makeRangeSetOp(workbook, rangeId, payload));
+    return true;
+}
+
+void unmergeCells(Workbook& workbook, Sheet& sheet, int col, int row, int colCount, int rowCount) {
+    std::vector<ID> seen;
+    for (int r = 0; r < rowCount; r++) {
+        for (int c = 0; c < colCount; c++) {
+            const std::vector<Range*> merges = sheet.getRangesAt(
+                static_cast<uint32_t>(col + c), static_cast<uint32_t>(row + r), RangeFlags::MERGE);
+            for (Range* mergeRange : merges) {
+                if (mergeRange == nullptr) {
+                    continue;
+                }
+                bool already = false;
+                for (const ID& id : seen) {
+                    if (id == mergeRange->id) {
+                        already = true;
+                        break;
+                    }
+                }
+                if (already) {
+                    continue;
+                }
+                seen.push_back(mergeRange->id);
+                const std::string payload = "{\"sheet\":\"" + sheet.id.toString() + "\"}";
+                applyOperation(workbook, makeRangeDeleteOp(workbook, mergeRange->id, payload));
+            }
+        }
+    }
+}
+
+TextAlign parseHAlign(const std::string& raw) {
+    const std::string s = toLowerCopy(raw);
+    if (s == "center" || s == "centercrossselection" || s == "centercontinuous") {
+        return TextAlign::CENTER;
+    }
+    if (s == "left") {
+        return TextAlign::LEFT;
+    }
+    if (s == "right") {
+        return TextAlign::RIGHT;
+    }
+    if (s == "justify" || s == "distributed") {
+        return TextAlign::JUSTIFY;
+    }
+    return TextAlign::GENERAL;
+}
+
+VerticalAlign parseVAlign(const std::string& raw) {
+    const std::string s = toLowerCopy(raw);
+    if (s == "top") {
+        return VerticalAlign::TOP;
+    }
+    if (s == "center" || s == "middle") {
+        return VerticalAlign::MIDDLE;
+    }
+    return VerticalAlign::BOTTOM;
+}
+
+BorderStyle parseBorderStyle(const std::string& raw) {
+    const std::string s = toLowerCopy(raw);
+    if (s.empty() || s == "none" || s == "0") {
+        return BorderStyle::NONE;
+    }
+    if (s == "dash" || s == "dashed") {
+        return BorderStyle::DASHED;
+    }
+    if (s == "dot" || s == "dotted") {
+        return BorderStyle::DOTTED;
+    }
+    if (s == "double") {
+        return BorderStyle::DOUBLE;
+    }
+    if (s == "hair" || s == "hairline") {
+        return BorderStyle::HAIR;
+    }
+    if (s == "medium") {
+        return BorderStyle::MEDIUM;
+    }
+    if (s == "thick") {
+        return BorderStyle::THICK;
+    }
+    if (s == "mediumdashed") {
+        return BorderStyle::MEDIUM_DASHED;
+    }
+    if (s == "dashdot") {
+        return BorderStyle::DASH_DOT;
+    }
+    if (s == "mediumdashdot") {
+        return BorderStyle::MEDIUM_DASH_DOT;
+    }
+    if (s == "dashdotdot") {
+        return BorderStyle::DASH_DOT_DOT;
+    }
+    if (s == "mediumdashdotdot") {
+        return BorderStyle::MEDIUM_DASH_DOT_DOT;
+    }
+    if (s == "slantdashdot") {
+        return BorderStyle::SLANT_DASH_DOT;
+    }
+    return BorderStyle::THIN;
+}
+
+enum class BorderEdgeKind : std::uint8_t {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    InsideVertical,
+    InsideHorizontal,
+    DiagonalDown,
+    DiagonalUp,
+    Unknown
+};
+
+BorderEdgeKind parseBorderEdge(const std::string& raw) {
+    const std::string s = toLowerCopy(raw);
+    if (s == "edgetop" || s == "top" || s == "0") {
+        return BorderEdgeKind::Top;
+    }
+    if (s == "edgebottom" || s == "bottom" || s == "2") {
+        return BorderEdgeKind::Bottom;
+    }
+    if (s == "edgeleft" || s == "left" || s == "1") {
+        return BorderEdgeKind::Left;
+    }
+    if (s == "edgeright" || s == "right" || s == "3") {
+        return BorderEdgeKind::Right;
+    }
+    if (s == "insidevertical" || s == "5") {
+        return BorderEdgeKind::InsideVertical;
+    }
+    if (s == "insidehorizontal" || s == "6") {
+        return BorderEdgeKind::InsideHorizontal;
+    }
+    if (s == "diagonaldown" || s == "7") {
+        return BorderEdgeKind::DiagonalDown;
+    }
+    if (s == "diagonalup" || s == "8") {
+        return BorderEdgeKind::DiagonalUp;
+    }
+    return BorderEdgeKind::Unknown;
+}
+
+void applyBorderEdge(CellStyle& style, BorderEdgeKind edge, BorderStyle bstyle,
+                     const std::string& color) {
+    BorderEdge be;
+    be.style = bstyle;
+    be.color = color;
+    switch (edge) {
+        case BorderEdgeKind::Top:
+            style.border.top = be;
+            style.setDefined(DEFINED_BORDER_TOP);
+            break;
+        case BorderEdgeKind::Bottom:
+            style.border.bottom = be;
+            style.setDefined(DEFINED_BORDER_BOTTOM);
+            break;
+        case BorderEdgeKind::Left:
+            style.border.left = be;
+            style.setDefined(DEFINED_BORDER_LEFT);
+            break;
+        case BorderEdgeKind::Right:
+            style.border.right = be;
+            style.setDefined(DEFINED_BORDER_RIGHT);
+            break;
+        default:
+            break;
+    }
+}
+
+bool addNamedItem(Workbook& workbook, Sheet* sheet, const std::string& name, int row, int col,
+                  int rowCount, int colCount) {
+    if (sheet == nullptr || name.empty()) {
+        return false;
+    }
+    NamedRangeRegistry* reg = workbook.getNamedRanges();
+    if (reg == nullptr) {
+        return false;
+    }
+    ensureAxesInRect(workbook, *sheet, col, row, rowCount, colCount);
+    Cell* a = ensureCellAtPositionViaCrdt(workbook, *sheet, static_cast<uint32_t>(col),
+                                          static_cast<uint32_t>(row));
+    if (a == nullptr) {
+        return false;
+    }
+    NamedRangeTarget target;
+    if (rowCount <= 1 && colCount <= 1) {
+        target = NamedRangeTarget::cell(a->id, sheet->id);
+    } else {
+        Cell* b =
+            ensureCellAtPositionViaCrdt(workbook, *sheet, static_cast<uint32_t>(col + colCount - 1),
+                                        static_cast<uint32_t>(row + rowCount - 1));
+        if (b == nullptr) {
+            return false;
+        }
+        target = NamedRangeTarget::range(a->id, b->id, sheet->id);
+    }
+    std::string payload =
+        "{\"name\":\"" + jsonEscape(name) +
+        "\",\"scope\":\"W\",\"scopeSheetId\":\"-\",\"targetType\":\"" +
+        std::string(target.type == NamedRangeTarget::Type::CELL ? "CELL" : "RANGE") +
+        "\",\"id1\":\"" + target.id1.toString() + "\",\"id2\":\"" +
+        (target.id2.isNull() ? "-" : target.id2.toString()) + "\",\"targetSheetId\":\"" +
+        sheet->id.toString() + "\"}";
+    applyOperation(workbook, makeNamedRangeSetOp(workbook, payload));
+    return true;
+}
+
 JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueConst* argv) {
     JsSandbox* sandbox = sandboxFrom(ctx);
     if (sandbox == nullptr || sandbox->workbook() == nullptr) {
@@ -860,29 +1277,44 @@ JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueCons
             const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
             const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
             JSValue formats = JS_GetPropertyStr(ctx, cmd, "values");
-            for (int r = 0; r < rowCount; r++) {
-                JSValue rowv = JS_GetPropertyUint32(ctx, formats, static_cast<uint32_t>(r));
-                for (int c = 0; c < colCount; c++) {
-                    JSValue cellv = JS_IsArray(ctx, rowv) > 0
-                                        ? JS_GetPropertyUint32(ctx, rowv, static_cast<uint32_t>(c))
-                                        : JS_DupValue(ctx, rowv);
-                    const char* fs = JS_ToCString(ctx, cellv);
-                    std::string code = fs != nullptr ? fs : "General";
-                    JS_FreeCString(ctx, fs);
-                    JS_FreeValue(ctx, cellv);
-                    Cell* cell = ensureCellAtPositionViaCrdt(workbook, *sheet,
-                                                             static_cast<uint32_t>(col + c),
-                                                             static_cast<uint32_t>(row + r));
-                    if (cell == nullptr) {
-                        continue;
-                    }
-                    auto parsed = FormatBuffer::fromFormatCode(code);
-                    if (parsed.has_value()) {
-                        const Operation fop = makeCellSetFormatOp(workbook, cell->id, *parsed);
-                        applyOperation(workbook, fop);
+            auto applyCode = [&](int r, int c, const std::string& code) {
+                Cell* cell =
+                    ensureCellAtPositionViaCrdt(workbook, *sheet, static_cast<uint32_t>(col + c),
+                                                static_cast<uint32_t>(row + r));
+                if (cell == nullptr) {
+                    return;
+                }
+                auto parsed = FormatBuffer::fromFormatCode(code);
+                if (parsed.has_value()) {
+                    const Operation fop = makeCellSetFormatOp(workbook, cell->id, *parsed);
+                    applyOperation(workbook, fop);
+                }
+            };
+            if (JS_IsString(formats)) {
+                const char* fs = JS_ToCString(ctx, formats);
+                const std::string code = fs != nullptr ? fs : "General";
+                JS_FreeCString(ctx, fs);
+                for (int r = 0; r < rowCount; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        applyCode(r, c, code);
                     }
                 }
-                JS_FreeValue(ctx, rowv);
+            } else {
+                for (int r = 0; r < rowCount; r++) {
+                    JSValue rowv = JS_GetPropertyUint32(ctx, formats, static_cast<uint32_t>(r));
+                    for (int c = 0; c < colCount; c++) {
+                        JSValue cellv =
+                            JS_IsArray(ctx, rowv) > 0
+                                ? JS_GetPropertyUint32(ctx, rowv, static_cast<uint32_t>(c))
+                                : JS_DupValue(ctx, rowv);
+                        const char* fs = JS_ToCString(ctx, cellv);
+                        std::string code = fs != nullptr ? fs : "General";
+                        JS_FreeCString(ctx, fs);
+                        JS_FreeValue(ctx, cellv);
+                        applyCode(r, c, code);
+                    }
+                    JS_FreeValue(ctx, rowv);
+                }
             }
             JS_FreeValue(ctx, formats);
         } else if (op == "setFill") {
@@ -1109,6 +1541,327 @@ JSValue jsFlush(JSContext* ctx, JSValueConst /*this_val*/, int argc, JSValueCons
             } else {
                 JS_FreeValue(ctx, rec);
             }
+        } else if (op == "merge") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int col = getInt(ctx, cmd, "col");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            if (!mergeCells(workbook, *sheet, col, row, colCount, rowCount)) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "GeneralException", "Failed to merge range");
+            }
+        } else if (op == "unmerge") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            unmergeCells(workbook, *sheet, getInt(ctx, cmd, "col"), getInt(ctx, cmd, "row"),
+                         std::max(getInt(ctx, cmd, "colCount", 1), 1),
+                         std::max(getInt(ctx, cmd, "rowCount", 1), 1));
+        } else if (op == "copyFrom") {
+            Sheet* destSheet = resolveSheet();
+            if (destSheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            Sheet* srcSheet = findSheet(sandbox, getStr(ctx, cmd, "srcSheet"), idToName, "");
+            if (srcSheet == nullptr) {
+                srcSheet = destSheet;
+            }
+            const int destRow = getInt(ctx, cmd, "row");
+            const int destCol = getInt(ctx, cmd, "col");
+            const int srcRow = getInt(ctx, cmd, "srcRow");
+            const int srcCol = getInt(ctx, cmd, "srcCol");
+            const int srcRowCount = std::max(getInt(ctx, cmd, "srcRowCount", 1), 1);
+            const int srcColCount = std::max(getInt(ctx, cmd, "srcColCount", 1), 1);
+            const std::string copyType = toLowerCopy(getStr(ctx, cmd, "copyType"));
+            const bool copyValues = copyType.empty() || copyType == "all" || copyType == "values";
+            const bool copyFormulas =
+                copyType.empty() || copyType == "all" || copyType == "formulas";
+            const bool copyFormats = copyType.empty() || copyType == "all" || copyType == "formats";
+            const bool skipBlanks = getBool(ctx, cmd, "skipBlanks");
+            const bool transpose = getBool(ctx, cmd, "transpose");
+            for (int r = 0; r < srcRowCount; r++) {
+                for (int c = 0; c < srcColCount; c++) {
+                    Cell* src = srcSheet->getCellAtPosition(static_cast<uint32_t>(srcCol + c),
+                                                            static_cast<uint32_t>(srcRow + r));
+                    if (skipBlanks && src == nullptr) {
+                        continue;
+                    }
+                    const int dr = transpose ? destRow + c : destRow + r;
+                    const int dc = transpose ? destCol + r : destCol + c;
+                    copyCellAt(ctx, workbook, *srcSheet, srcCol + c, srcRow + r, *destSheet, dc, dr,
+                               copyValues, copyFormulas, copyFormats);
+                }
+            }
+        } else if (op == "insert") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int col = getInt(ctx, cmd, "col");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            const std::string shift = toLowerCopy(getStr(ctx, cmd, "shift"));
+            const bool right = shift == "right";
+            if (right) {
+                const int last = maxUsedColInRows(*sheet, row, rowCount);
+                for (int c = last; c >= col; c--) {
+                    for (int r = 0; r < rowCount; r++) {
+                        copyCellAt(ctx, workbook, *sheet, c, row + r, *sheet, c + colCount, row + r,
+                                   true, true, true);
+                        clearCellAt(workbook, *sheet, c, row + r);
+                    }
+                }
+            } else {
+                const int last = maxUsedRowInCols(*sheet, col, colCount);
+                for (int r = last; r >= row; r--) {
+                    for (int c = 0; c < colCount; c++) {
+                        copyCellAt(ctx, workbook, *sheet, col + c, r, *sheet, col + c, r + rowCount,
+                                   true, true, true);
+                        clearCellAt(workbook, *sheet, col + c, r);
+                    }
+                }
+            }
+        } else if (op == "deleteCells") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int col = getInt(ctx, cmd, "col");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            const std::string shift = toLowerCopy(getStr(ctx, cmd, "shift"));
+            const bool left = shift == "left";
+            if (left) {
+                const int last = maxUsedColInRows(*sheet, row, rowCount);
+                for (int c = col; c <= last - colCount; c++) {
+                    for (int r = 0; r < rowCount; r++) {
+                        copyCellAt(ctx, workbook, *sheet, c + colCount, row + r, *sheet, c, row + r,
+                                   true, true, true);
+                    }
+                }
+                for (int c = std::max(col, last - colCount + 1); c <= last; c++) {
+                    for (int r = 0; r < rowCount; r++) {
+                        clearCellAt(workbook, *sheet, c, row + r);
+                    }
+                }
+            } else {
+                const int last = maxUsedRowInCols(*sheet, col, colCount);
+                for (int r = row; r <= last - rowCount; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        copyCellAt(ctx, workbook, *sheet, col + c, r + rowCount, *sheet, col + c, r,
+                                   true, true, true);
+                    }
+                }
+                for (int r = std::max(row, last - rowCount + 1); r <= last; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        clearCellAt(workbook, *sheet, col + c, r);
+                    }
+                }
+            }
+        } else if (op == "getUsedRange") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const bool clip = getBool(ctx, cmd, "clip");
+            int row = 0;
+            int col = 0;
+            int rowCount = 1;
+            int colCount = 1;
+            if (!computeUsedRange(*sheet, getInt(ctx, cmd, "row"), getInt(ctx, cmd, "col"),
+                                  std::max(getInt(ctx, cmd, "rowCount", 1), 1),
+                                  std::max(getInt(ctx, cmd, "colCount", 1), 1), clip, &row, &col,
+                                  &rowCount, &colCount)) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet has no used range");
+            }
+            JSValue rec = JS_NewObject(ctx);
+            JS_SetPropertyStr(ctx, rec, "sheet", JS_NewString(ctx, sheet->name.c_str()));
+            JS_SetPropertyStr(ctx, rec, "row", JS_NewInt32(ctx, row));
+            JS_SetPropertyStr(ctx, rec, "col", JS_NewInt32(ctx, col));
+            JS_SetPropertyStr(ctx, rec, "rowCount", JS_NewInt32(ctx, rowCount));
+            JS_SetPropertyStr(ctx, rec, "colCount", JS_NewInt32(ctx, colCount));
+            const std::string addr = sheet->name + "!" + a1Address(row, col, rowCount, colCount);
+            JS_SetPropertyStr(ctx, rec, "address", JS_NewString(ctx, addr.c_str()));
+            if (!oid.empty()) {
+                JS_SetPropertyStr(ctx, loads, oid.c_str(), rec);
+            } else {
+                JS_FreeValue(ctx, rec);
+            }
+        } else if (op == "addNamedItem") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                sheet = sandbox->activeSheet();
+            }
+            const std::string name = getStr(ctx, cmd, "name");
+            if (!addNamedItem(workbook, sheet, name, getInt(ctx, cmd, "row"),
+                              getInt(ctx, cmd, "col"), std::max(getInt(ctx, cmd, "rowCount", 1), 1),
+                              std::max(getInt(ctx, cmd, "colCount", 1), 1))) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "InvalidArgument", "Failed to add named item");
+            }
+        } else if (op == "setColumnWidth") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int col = getInt(ctx, cmd, "col");
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            const auto width = static_cast<uint32_t>(std::max(getNumber(ctx, cmd, "value"), 0.0));
+            for (int c = 0; c < colCount; c++) {
+                (void)setColumnWidthByPosition(workbook, *sheet, static_cast<uint32_t>(col + c),
+                                               width);
+            }
+        } else if (op == "setRowHeight") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const auto height = static_cast<uint32_t>(std::max(getNumber(ctx, cmd, "value"), 0.0));
+            for (int r = 0; r < rowCount; r++) {
+                (void)setRowHeightByPosition(workbook, *sheet, static_cast<uint32_t>(row + r),
+                                             height);
+            }
+        } else if (op == "setHAlign" || op == "setVAlign" || op == "setWrapText") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int col = getInt(ctx, cmd, "col");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            const std::string value = getStr(ctx, cmd, "value");
+            const bool wrap = getBool(ctx, cmd, "value");
+            for (int r = 0; r < rowCount; r++) {
+                for (int c = 0; c < colCount; c++) {
+                    mergeStyle(workbook, *sheet, col + c, row + r, [&](CellStyle& style) {
+                        if (op == "setHAlign") {
+                            style.hAlign = parseHAlign(value);
+                            style.setDefined(DEFINED_HALIGN);
+                        } else if (op == "setVAlign") {
+                            style.vAlign = parseVAlign(value);
+                            style.setDefined(DEFINED_VALIGN);
+                        } else {
+                            style.wrapText = wrap;
+                            style.setDefined(DEFINED_WRAPTEXT);
+                        }
+                    });
+                }
+            }
+        } else if (op == "setBorder") {
+            Sheet* sheet = resolveSheet();
+            if (sheet == nullptr) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "ItemNotFound", "Worksheet not found");
+            }
+            const int row = getInt(ctx, cmd, "row");
+            const int col = getInt(ctx, cmd, "col");
+            const int rowCount = std::max(getInt(ctx, cmd, "rowCount", 1), 1);
+            const int colCount = std::max(getInt(ctx, cmd, "colCount", 1), 1);
+            const BorderEdgeKind edge = parseBorderEdge(getStr(ctx, cmd, "edge"));
+            if (edge == BorderEdgeKind::Unknown || edge == BorderEdgeKind::DiagonalDown ||
+                edge == BorderEdgeKind::DiagonalUp) {
+                JS_FreeValue(ctx, cmd);
+                JS_FreeValue(ctx, loads);
+                return throwOfficeError(ctx, "NotImplemented",
+                                        "Not supported: Excel.RangeBorder diagonal");
+            }
+            std::string styleStr = getStr(ctx, cmd, "style");
+            std::string color = normalizeColor(getStr(ctx, cmd, "color"));
+            const std::string weight = toLowerCopy(getStr(ctx, cmd, "weight"));
+            BorderStyle bstyle = parseBorderStyle(styleStr);
+            if (!weight.empty()) {
+                if (weight == "hairline") {
+                    bstyle = BorderStyle::HAIR;
+                } else if (weight == "thin") {
+                    bstyle = BorderStyle::THIN;
+                } else if (weight == "medium") {
+                    bstyle = BorderStyle::MEDIUM;
+                } else if (weight == "thick") {
+                    bstyle = BorderStyle::THICK;
+                }
+            }
+            if (bstyle == BorderStyle::NONE && (!styleStr.empty() || !color.empty()) &&
+                toLowerCopy(styleStr) != "none") {
+                bstyle = BorderStyle::THIN;
+            }
+            auto applyAt = [&](int c, int r, BorderEdgeKind e) {
+                mergeStyle(workbook, *sheet, c, r,
+                           [&](CellStyle& style) { applyBorderEdge(style, e, bstyle, color); });
+            };
+            if (edge == BorderEdgeKind::InsideVertical) {
+                for (int r = 0; r < rowCount; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        if (c < colCount - 1) {
+                            applyAt(col + c, row + r, BorderEdgeKind::Right);
+                        }
+                        if (c > 0) {
+                            applyAt(col + c, row + r, BorderEdgeKind::Left);
+                        }
+                    }
+                }
+            } else if (edge == BorderEdgeKind::InsideHorizontal) {
+                for (int r = 0; r < rowCount; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        if (r < rowCount - 1) {
+                            applyAt(col + c, row + r, BorderEdgeKind::Bottom);
+                        }
+                        if (r > 0) {
+                            applyAt(col + c, row + r, BorderEdgeKind::Top);
+                        }
+                    }
+                }
+            } else {
+                for (int r = 0; r < rowCount; r++) {
+                    for (int c = 0; c < colCount; c++) {
+                        applyAt(col + c, row + r, edge);
+                    }
+                }
+            }
+        } else if (op == "notSupported") {
+            const std::string feature = getStr(ctx, cmd, "feature");
+            const std::string msg =
+                "Not supported: " + (feature.empty() ? std::string("this API") : feature);
+            JS_FreeValue(ctx, cmd);
+            JS_FreeValue(ctx, loads);
+            return throwOfficeError(ctx, "NotImplemented", msg.c_str());
+        } else if (!op.empty()) {
+            const std::string msg = "Not supported: " + op;
+            JS_FreeValue(ctx, cmd);
+            JS_FreeValue(ctx, loads);
+            return throwOfficeError(ctx, "NotImplemented", msg.c_str());
         }
 
         JS_FreeValue(ctx, cmd);
@@ -1178,12 +1931,126 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     return String(arg).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
+  function parseA1(ref) {
+    var m = /^([A-Za-z]+)([0-9]+)$/.exec(String(ref || ''));
+    if (!m) return { col: 0, row: 0 };
+    var col = 0;
+    var letters = m[1].toUpperCase();
+    for (var i = 0; i < letters.length; i++) col = col * 26 + (letters.charCodeAt(i) - 64);
+    return { col: col - 1, row: parseInt(m[2], 10) - 1 };
+  }
+
+  function parseAddress(address) {
+    var a = String(address || 'A1');
+    var sheet = '';
+    var bang = a.lastIndexOf('!');
+    if (bang >= 0) {
+      sheet = a.slice(0, bang).replace(/^'+|'+$/g, '');
+      a = a.slice(bang + 1);
+    }
+    a = a.replace(/\$/g, '');
+    var parts = a.split(':');
+    var p1 = parseA1(parts[0]);
+    var p2 = parts.length > 1 ? parseA1(parts[1]) : p1;
+    var row = Math.min(p1.row, p2.row);
+    var col = Math.min(p1.col, p2.col);
+    return {
+      sheet: sheet,
+      row: row,
+      col: col,
+      rowCount: Math.abs(p2.row - p1.row) + 1,
+      colCount: Math.abs(p2.col - p1.col) + 1
+    };
+  }
+
   function OfficeError(code, message) {
-    var e = new Error(message || code);
+    var e = new Error((code ? code + ': ' : '') + (message || code));
     e.name = 'OfficeExtension.Error';
     e.code = code;
     return e;
   }
+
+  function enqueueNotSupported(context, feature) {
+    context._enqueue({ op: 'notSupported', feature: feature || 'this API' });
+  }
+
+  function Dummy(context, feature) {
+    this.context = context;
+    this._feature = feature || 'Excel.Unknown';
+  }
+  Dummy.prototype.load = function () { return this; };
+  Dummy.prototype.getRange = function () {
+    enqueueNotSupported(this.context, this._feature);
+    return new Range(this.context, native.activeSheet(), 0, 0, 1, 1);
+  };
+  Dummy.prototype.add = function () {
+    enqueueNotSupported(this.context, this._feature + '.add');
+    return this;
+  };
+  Dummy.prototype.getItem = function () {
+    enqueueNotSupported(this.context, this._feature + '.getItem');
+    return this;
+  };
+  Dummy.prototype.getItemOrNullObject = Dummy.prototype.getItem;
+  Dummy.prototype.delete = function () {
+    enqueueNotSupported(this.context, this._feature + '.delete');
+    return this;
+  };
+  Dummy.prototype.set = function () {
+    enqueueNotSupported(this.context, this._feature + '.set');
+    return this;
+  };
+  Dummy.prototype.clear = function () {
+    enqueueNotSupported(this.context, this._feature + '.clear');
+    return this;
+  };
+  Dummy.prototype.protect = function () {
+    enqueueNotSupported(this.context, this._feature + '.protect');
+    return this;
+  };
+  Dummy.prototype.unprotect = function () {
+    enqueueNotSupported(this.context, this._feature + '.unprotect');
+    return this;
+  };
+
+  function TableCollection(context) {
+    this.context = context;
+  }
+  TableCollection.prototype.add = function () {
+    enqueueNotSupported(this.context, 'Excel.TableCollection.add');
+    return new Dummy(this.context, 'Excel.Table');
+  };
+  TableCollection.prototype.getItem = function () {
+    enqueueNotSupported(this.context, 'Excel.TableCollection.getItem');
+    return new Dummy(this.context, 'Excel.Table');
+  };
+  TableCollection.prototype.getItemOrNullObject = TableCollection.prototype.getItem;
+  TableCollection.prototype.load = function () { return this; };
+
+  function ChartCollection(context) {
+    this.context = context;
+  }
+  ChartCollection.prototype.add = function () {
+    enqueueNotSupported(this.context, 'Excel.ChartCollection.add');
+    return new Dummy(this.context, 'Excel.Chart');
+  };
+  ChartCollection.prototype.getItem = function () {
+    enqueueNotSupported(this.context, 'Excel.ChartCollection.getItem');
+    return new Dummy(this.context, 'Excel.Chart');
+  };
+  ChartCollection.prototype.getItemOrNullObject = ChartCollection.prototype.getItem;
+  ChartCollection.prototype.load = function () { return this; };
+
+  function WorksheetProtection(context) {
+    this.context = context;
+  }
+  WorksheetProtection.prototype.protect = function () {
+    enqueueNotSupported(this.context, 'Excel.WorksheetProtection.protect');
+  };
+  WorksheetProtection.prototype.unprotect = function () {
+    enqueueNotSupported(this.context, 'Excel.WorksheetProtection.unprotect');
+  };
+  WorksheetProtection.prototype.load = function () { return this; };
 
   function RequestContext() {
     this._queue = [];
@@ -1221,11 +2088,21 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this.context = context;
     this.worksheets = new WorksheetCollection(context);
     this.names = new NamedItemCollection(context);
+    this.tables = new TableCollection(context);
+    this.protection = new WorksheetProtection(context);
   }
   Workbook.prototype.getSelectedRange = function () {
     var r = new Range(this.context, native.activeSheet(), 0, 0, 1, 1);
     this.context._enqueue({ op: 'getSelectedRange', id: this.context._id(r) });
     return r;
+  };
+  Workbook.prototype.getActiveCell = function () {
+    return this.getSelectedRange();
+  };
+  Workbook.prototype.getRange = function (address) {
+    var p = parseAddress(address);
+    var sheet = p.sheet || native.activeSheet();
+    return new Range(this.context, sheet, p.row, p.col, p.rowCount, p.colCount);
   };
 
   function WorksheetCollection(context) {
@@ -1278,6 +2155,10 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     this.context = context;
     this._name = name;
     this._loaded = {};
+    this.tables = new TableCollection(context);
+    this.charts = new ChartCollection(context);
+    this.protection = new WorksheetProtection(context);
+    this.names = new NamedItemCollection(context);
     this.context._id(this);
   }
   Object.defineProperty(Worksheet.prototype, 'name', {
@@ -1289,32 +2170,35 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     }
   });
   Worksheet.prototype.getRange = function (address) {
-    var a = String(address || 'A1');
-    var bang = a.lastIndexOf('!');
-    if (bang >= 0) a = a.slice(bang + 1);
-    a = a.replace(/\$/g, '');
-    var parts = a.split(':');
-    function parseA1(ref) {
-      var m = /^([A-Za-z]+)([0-9]+)$/.exec(ref);
-      if (!m) return { col: 0, row: 0 };
-      var col = 0;
-      var letters = m[1].toUpperCase();
-      for (var i = 0; i < letters.length; i++) col = col * 26 + (letters.charCodeAt(i) - 64);
-      return { col: col - 1, row: parseInt(m[2], 10) - 1 };
-    }
-    var p1 = parseA1(parts[0]);
-    var p2 = parts.length > 1 ? parseA1(parts[1]) : p1;
-    var row = Math.min(p1.row, p2.row);
-    var col = Math.min(p1.col, p2.col);
-    var rowCount = Math.abs(p2.row - p1.row) + 1;
-    var colCount = Math.abs(p2.col - p1.col) + 1;
-    return new Range(this.context, this._name, row, col, rowCount, colCount);
+    var p = parseAddress(address);
+    return new Range(this.context, this._name, p.row, p.col, p.rowCount, p.colCount);
+  };
+  Worksheet.prototype.getRangeByIndexes = function (startRow, startCol, rowCount, colCount) {
+    return new Range(this.context, this._name, startRow|0, startCol|0, rowCount|0 || 1, colCount|0 || 1);
   };
   Worksheet.prototype.getCell = function (row, column) {
     return new Range(this.context, this._name, row|0, column|0, 1, 1);
   };
+  Worksheet.prototype.getUsedRange = function () {
+    var r = new Range(this.context, this._name, 0, 0, 1, 1);
+    this.context._enqueue({ op: 'getUsedRange', sheet: this._name, id: this.context._id(r) });
+    return r;
+  };
+  Worksheet.prototype.getUsedRangeOrNullObject = function () {
+    return this.getUsedRange();
+  };
   Worksheet.prototype.activate = function () {
     this.context._enqueue({ op: 'activateSheet', sheet: this._name, id: this._oid });
+  };
+  Worksheet.prototype.delete = function () {
+    enqueueNotSupported(this.context, 'Excel.Worksheet.delete');
+  };
+  Worksheet.prototype.calculate = function () {
+    enqueueNotSupported(this.context, 'Excel.Worksheet.calculate');
+  };
+  Worksheet.prototype.copy = function () {
+    enqueueNotSupported(this.context, 'Excel.Worksheet.copy');
+    return this;
   };
   Worksheet.prototype.load = function (props) {
     this.context._enqueue({ op: 'loadWorksheet', sheet: this._name, id: this._oid, properties: parseLoad(props) });
@@ -1372,8 +2256,103 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     return new Range(this.context, this._sheet, this._row + (row|0), this._col + (column|0), 1, 1, this._named);
   };
   Range.prototype.getRange = function (address) {
-    return Worksheet.prototype.getRange.call({ context: this.context, _name: this._sheet }, address);
+    var p = parseAddress(address);
+    return new Range(this.context, this._sheet, this._row + p.row, this._col + p.col, p.rowCount, p.colCount, this._named);
   };
+  Range.prototype.getOffsetRange = function (rowOffset, columnOffset) {
+    return new Range(this.context, this._sheet, this._row + (rowOffset|0), this._col + (columnOffset|0), this._rowCount, this._colCount, this._named);
+  };
+  Range.prototype.getResizedRange = function (deltaRows, deltaColumns) {
+    var rc = this._rowCount + (deltaRows|0);
+    var cc = this._colCount + (deltaColumns|0);
+    if (rc < 1) rc = 1;
+    if (cc < 1) cc = 1;
+    return new Range(this.context, this._sheet, this._row, this._col, rc, cc, this._named);
+  };
+  Range.prototype.getEntireRow = function () {
+    return new Range(this.context, this._sheet, this._row, 0, this._rowCount, 1, this._named);
+  };
+  Range.prototype.getEntireColumn = function () {
+    return new Range(this.context, this._sheet, 0, this._col, 1, this._colCount, this._named);
+  };
+  Range.prototype.getRow = function (row) {
+    return new Range(this.context, this._sheet, this._row + (row|0), this._col, 1, this._colCount, this._named);
+  };
+  Range.prototype.getColumn = function (column) {
+    return new Range(this.context, this._sheet, this._row, this._col + (column|0), this._rowCount, 1, this._named);
+  };
+  Range.prototype.getUsedRange = function () {
+    var r = new Range(this.context, this._sheet, this._row, this._col, this._rowCount, this._colCount, this._named);
+    this.context._enqueue(r._base({ op: 'getUsedRange', clip: true }));
+    return r;
+  };
+  Range.prototype.merge = function () {
+    this.context._enqueue(this._base({ op: 'merge' }));
+  };
+  Range.prototype.unmerge = function () {
+    this.context._enqueue(this._base({ op: 'unmerge' }));
+  };
+  Range.prototype.copyFrom = function (source, copyType, skipBlanks, transpose) {
+    var cmd = this._base({
+      op: 'copyFrom',
+      copyType: copyType == null ? 'All' : String(copyType),
+      skipBlanks: !!skipBlanks,
+      transpose: !!transpose
+    });
+    if (source && typeof source === 'object') {
+      cmd.srcSheet = source._sheet;
+      cmd.srcRow = source._row;
+      cmd.srcCol = source._col;
+      cmd.srcRowCount = source._rowCount;
+      cmd.srcColCount = source._colCount;
+    } else {
+      var p = parseAddress(source);
+      cmd.srcSheet = p.sheet || this._sheet;
+      cmd.srcRow = p.row;
+      cmd.srcCol = p.col;
+      cmd.srcRowCount = p.rowCount;
+      cmd.srcColCount = p.colCount;
+    }
+    this.context._enqueue(cmd);
+  };
+  Range.prototype.insert = function (shift) {
+    this.context._enqueue(this._base({ op: 'insert', shift: shift == null ? 'Down' : String(shift) }));
+  };
+  Range.prototype.delete = function (shift) {
+    this.context._enqueue(this._base({ op: 'deleteCells', shift: shift == null ? 'Up' : String(shift) }));
+  };
+  Range.prototype.select = function () {};
+  Range.prototype.set = function (props) {
+    if (!props) return this;
+    if (props.values != null) this.values = props.values;
+    if (props.formulas != null) this.formulas = props.formulas;
+    if (props.numberFormat != null) this.numberFormat = props.numberFormat;
+    if (props.format) {
+      var f = props.format;
+      if (f.fill && f.fill.color != null) this.format.fill.color = f.fill.color;
+      if (f.font) {
+        if (f.font.bold != null) this.format.font.bold = f.font.bold;
+        if (f.font.italic != null) this.format.font.italic = f.font.italic;
+        if (f.font.underline != null) this.format.font.underline = f.font.underline;
+        if (f.font.name != null) this.format.font.name = f.font.name;
+        if (f.font.size != null) this.format.font.size = f.font.size;
+        if (f.font.color != null) this.format.font.color = f.font.color;
+      }
+      if (f.columnWidth != null) this.format.columnWidth = f.columnWidth;
+      if (f.rowHeight != null) this.format.rowHeight = f.rowHeight;
+      if (f.horizontalAlignment != null) this.format.horizontalAlignment = f.horizontalAlignment;
+      if (f.verticalAlignment != null) this.format.verticalAlignment = f.verticalAlignment;
+      if (f.wrapText != null) this.format.wrapText = f.wrapText;
+    }
+    return this;
+  };
+  Range.prototype.autoFill = function () { enqueueNotSupported(this.context, 'Excel.Range.autoFill'); };
+  Range.prototype.calculate = function () { enqueueNotSupported(this.context, 'Excel.Range.calculate'); };
+  Range.prototype.find = function () {
+    enqueueNotSupported(this.context, 'Excel.Range.find');
+    return new Dummy(this.context, 'Excel.Range');
+  };
+  Range.prototype.moveTo = function () { enqueueNotSupported(this.context, 'Excel.Range.moveTo'); };
   Range.prototype.clear = function (applyTo) {
     var a = applyTo;
     if (a && typeof a === 'object' && a.toString) a = String(a);
@@ -1398,9 +2377,66 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
 
   function RangeFormat(range) {
     this._range = range;
+    this._loaded = {};
     this.fill = new RangeFill(range);
     this.font = new RangeFont(range);
+    this.borders = new RangeBorderCollection(range);
   }
+  function defFormat(prop, op) {
+    Object.defineProperty(RangeFormat.prototype, prop, {
+      get: function () { return this._loaded[prop]; },
+      set: function (v) {
+        var r = this._range;
+        var cmd = r._base({ op: op });
+        cmd.value = v;
+        r.context._enqueue(cmd);
+        this._loaded[prop] = v;
+      }
+    });
+  }
+  defFormat('columnWidth', 'setColumnWidth');
+  defFormat('rowHeight', 'setRowHeight');
+  defFormat('horizontalAlignment', 'setHAlign');
+  defFormat('verticalAlignment', 'setVAlign');
+  defFormat('wrapText', 'setWrapText');
+  RangeFormat.prototype.autofitColumns = function () {
+    enqueueNotSupported(this._range.context, 'Excel.RangeFormat.autofitColumns');
+  };
+  RangeFormat.prototype.autofitRows = function () {
+    enqueueNotSupported(this._range.context, 'Excel.RangeFormat.autofitRows');
+  };
+  RangeFormat.prototype.load = function () { return this; };
+
+  function RangeBorderCollection(range) {
+    this._range = range;
+  }
+  RangeBorderCollection.prototype.getItem = function (index) {
+    return new RangeBorder(this._range, String(index));
+  };
+  RangeBorderCollection.prototype.getItemOrNullObject = RangeBorderCollection.prototype.getItem;
+  RangeBorderCollection.prototype.load = function () { return this; };
+
+  function RangeBorder(range, index) {
+    this._range = range;
+    this._index = index;
+    this._loaded = {};
+  }
+  function defBorder(prop) {
+    Object.defineProperty(RangeBorder.prototype, prop, {
+      get: function () { return this._loaded[prop]; },
+      set: function (v) {
+        var r = this._range;
+        var cmd = r._base({ op: 'setBorder', edge: this._index });
+        cmd[prop] = v;
+        r.context._enqueue(cmd);
+        this._loaded[prop] = v;
+      }
+    });
+  }
+  defBorder('style');
+  defBorder('color');
+  defBorder('weight');
+  RangeBorder.prototype.load = function () { return this; };
 
   function RangeFill(range) {
     this._range = range;
@@ -1452,6 +2488,32 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   NamedItemCollection.prototype.getItem = function (name) {
     return new NamedItem(this.context, String(name));
   };
+  NamedItemCollection.prototype.getItemOrNullObject = NamedItemCollection.prototype.getItem;
+  NamedItemCollection.prototype.add = function (name, reference, comment) {
+    var item = new NamedItem(this.context, String(name));
+    var cmd = {
+      op: 'addNamedItem',
+      name: String(name),
+      comment: comment == null ? '' : String(comment),
+      id: this.context._id(item)
+    };
+    if (reference && typeof reference === 'object' && reference._row != null) {
+      cmd.sheet = reference._sheet;
+      cmd.row = reference._row;
+      cmd.col = reference._col;
+      cmd.rowCount = reference._rowCount;
+      cmd.colCount = reference._colCount;
+    } else {
+      var p = parseAddress(String(reference || 'A1'));
+      cmd.sheet = p.sheet;
+      cmd.row = p.row;
+      cmd.col = p.col;
+      cmd.rowCount = p.rowCount;
+      cmd.colCount = p.colCount;
+    }
+    this.context._enqueue(cmd);
+    return item;
+  };
 
   function NamedItem(context, name) {
     this.context = context;
@@ -1464,6 +2526,9 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
   });
   NamedItem.prototype.getRange = function () {
     return new Range(this.context, '', 0, 0, 1, 1, this._name);
+  };
+  NamedItem.prototype.delete = function () {
+    enqueueNotSupported(this.context, 'Excel.NamedItem.delete');
   };
   NamedItem.prototype.load = function (props) {
     this.context._enqueue({ op: 'loadNamedItem', namedItem: this._name, id: this._oid, properties: parseLoad(props) });
@@ -1503,7 +2568,16 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
     Range: Range,
     NamedItem: NamedItem,
     ClearApplyTo: { All: 'All', Formats: 'Formats', Contents: 'Contents', Hyperlinks: 'Hyperlinks' },
-    RangeUnderlineStyle: { None: 'None', Single: 'Single', Double: 'Double' }
+    RangeUnderlineStyle: { None: 'None', Single: 'Single', Double: 'Double' },
+    InsertShiftDirection: { Down: 'Down', Right: 'Right' },
+    DeleteShiftDirection: { Up: 'Up', Left: 'Left' },
+    HorizontalAlignment: { General: 'General', Left: 'Left', Center: 'Center', Right: 'Right', Fill: 'Fill', Justify: 'Justify', CenterAcrossSelection: 'CenterAcrossSelection', Distributed: 'Distributed' },
+    VerticalAlignment: { Top: 'Top', Center: 'Center', Bottom: 'Bottom', Justify: 'Justify', Distributed: 'Distributed' },
+    BorderIndex: { EdgeTop: 'EdgeTop', EdgeBottom: 'EdgeBottom', EdgeLeft: 'EdgeLeft', EdgeRight: 'EdgeRight', InsideVertical: 'InsideVertical', InsideHorizontal: 'InsideHorizontal', DiagonalDown: 'DiagonalDown', DiagonalUp: 'DiagonalUp' },
+    BorderLineStyle: { None: 'None', Continuous: 'Continuous', Dash: 'Dash', DashDot: 'DashDot', DashDotDot: 'DashDotDot', Dot: 'Dot', Double: 'Double', SlantDashDot: 'SlantDashDot' },
+    BorderWeight: { Hairline: 'Hairline', Thin: 'Thin', Medium: 'Medium', Thick: 'Thick' },
+    RangeCopyType: { All: 'All', Formulas: 'Formulas', Values: 'Values', Formats: 'Formats' },
+    ChartType: { ColumnClustered: 'ColumnClustered', Line: 'Line', Pie: 'Pie', BarClustered: 'BarClustered', Area: 'Area', XYScatter: 'XYScatter' }
   };
 
   var info = { host: 'Excel', platform: 'OfficeOnline' };
@@ -1527,7 +2601,8 @@ constexpr const char kBootstrap[] = R"OFFICEJS(
       itemNotFound: 'ItemNotFound',
       invalidArgument: 'InvalidArgument',
       generalException: 'GeneralException',
-      propertyNotLoaded: 'PropertyNotLoaded'
+      propertyNotLoaded: 'PropertyNotLoaded',
+      notImplemented: 'NotImplemented'
     }
   };
 

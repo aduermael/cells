@@ -2130,12 +2130,34 @@ canvas {
 #script-panel-footer {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: 12px;
     padding: 8px 12px;
     background: var(--script-bg-footer);
     border-top: 1px solid var(--script-border);
     flex-shrink: 0;
+}
+
+#script-language-label {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#script-language {
+    font-size: 11px;
+    background: var(--script-bg-footer);
+    color: var(--script-text-muted);
+    border: 1px solid var(--script-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+#script-panel-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
 }
 
 #script-status {

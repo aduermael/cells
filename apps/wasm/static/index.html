@@ -581,8 +581,16 @@
                 </div>
             </div>
             <div id="script-panel-footer">
-                <span id="script-status"></span>
-                <button class="btn btn-primary" id="script-run-btn">Run<span class="btn-shortcut">⌘⏎</span></button>
+                <label id="script-language-label" title="Script language">
+                    <select id="script-language">
+                        <option value="luau" selected>Luau</option>
+                        <option value="javascript">JavaScript</option>
+                    </select>
+                </label>
+                <div id="script-panel-footer-actions">
+                    <span id="script-status"></span>
+                    <button class="btn btn-primary" id="script-run-btn">Run<span class="btn-shortcut">⌘⏎</span></button>
+                </div>
             </div>
             <div id="script-panel-resize-handle"></div>
         </div>

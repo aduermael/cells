@@ -79,7 +79,8 @@ export class ScriptPanel {
   private consoleClearBtn: HTMLElement;
   private consoleResizeHandle: HTMLElement;
 
-  private executeScript: (script: string) => Promise<ScriptResult>;
+  private executeScript: (script: string, language: string) => Promise<ScriptResult>;
+  private languageSelect: HTMLSelectElement | null;
   private onScriptExecuted: () => void | Promise<void>;
   private tokenize?: TokenizeFunction;
 
@@ -120,7 +121,8 @@ export class ScriptPanel {
     consoleCloseBtn: HTMLElement;
     consoleClearBtn: HTMLElement;
     consoleResizeHandle: HTMLElement;
-    executeScript: (script: string) => Promise<ScriptResult>;
+    executeScript: (script: string, language: string) => Promise<ScriptResult>;
+    languageSelect?: HTMLSelectElement;
     onScriptExecuted: () => void | Promise<void>;
     tokenize?: TokenizeFunction;
     getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
@@ -141,6 +143,7 @@ export class ScriptPanel {
     this.consoleResizeHandle = config.consoleResizeHandle;
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
+    this.languageSelect = config.languageSelect ?? null;
 
     // Initialize syntax highlighting and smart indent if tokenize function provided
     if (config.tokenize) {
@@ -281,7 +284,7 @@ export class ScriptPanel {
     const startTime = performance.now();
 
     try {
-      const result = await this.executeScript(script);
+      const result = await this.executeScript(script, this.currentLanguage());
       const elapsed = performance.now() - startTime;
 
       if (result.success) {
@@ -322,10 +325,30 @@ export class ScriptPanel {
     this.statusEl.className = state;
   }
 
+  private currentLanguage(): string {
+    const value = this.languageSelect?.value ?? "luau";
+    return value === "javascript" ? "javascript" : "luau";
+  }
+
+  private updatePlaceholder(): void {
+    if (this.currentLanguage() === "javascript") {
+      this.editor.placeholder =
+        'await Excel.run(async (context) => {\n  const ws = context.workbook.worksheets.getActiveWorksheet();\n  ws.getRange("A1").values = [[1]];\n  await context.sync();\n});';
+    } else {
+      this.editor.placeholder =
+        "-- set value: setCell('A1', 100)\n-- get value: setCell('B1', getCell('A1') * 2)\n-- loop: for i = 1, 10 do setCell('A'..i, i) end\n-- fill range: fillRange({from='A1', to='A1:A10'})";
+    }
+  }
+
   /**
    * Set up event listeners
    */
   private setupEventListeners(): void {
+    this.updatePlaceholder();
+    this.languageSelect?.addEventListener("change", () => {
+      this.updatePlaceholder();
+    });
+
     // Toggle button
     this.toggleBtn.addEventListener("click", () => {
       this.toggle();

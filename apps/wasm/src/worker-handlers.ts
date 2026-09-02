@@ -1666,8 +1666,8 @@ export function handleExecuteScript(
     params: Record<string, unknown>,
     respond: RespondFn,
 ): void {
-    const { script } = params as { script: string };
-    const result = engine.executeScript(script);
+    const { script, language } = params as { script: string; language?: string };
+    const result = engine.executeScript(script, language ?? "");
     respond({ type: "scriptExecuted", result });
 }
 

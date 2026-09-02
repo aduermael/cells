@@ -740,13 +740,13 @@ export class WasmDataSource {
    * Execute a Luau script in the sandboxed environment
    * Scripts can use cells API functions like cellGet(), cellSet(), etc.
    */
-  async executeScript(script: string): Promise<{
+  async executeScript(script: string, language?: string): Promise<{
     success: boolean;
     output?: string;
     error?: string;
     instructions: number;
   }> {
-    return this._client.executeScript(script);
+    return this._client.executeScript(script, language);
   }
 
   /**

@@ -134,25 +134,73 @@ void JsSandbox::setMaxInstructions(int64_t limit) {
     config_.maxInstructions = limit;
 }
 
+std::string jsErrorToString(JSContext* ctx, JSValueConst val) {
+    std::string name;
+    std::string code;
+    std::string message;
+    auto readProp = [&](const char* key, std::string* out) {
+        const JSValue v = JS_GetPropertyStr(ctx, val, key);
+        if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+            const char* s = JS_ToCString(ctx, v);
+            if (s != nullptr) {
+                *out = s;
+            }
+            JS_FreeCString(ctx, s);
+        }
+        JS_FreeValue(ctx, v);
+    };
+    if (JS_IsObject(val)) {
+        readProp("name", &name);
+        readProp("code", &code);
+        readProp("message", &message);
+    }
+    if (message.empty()) {
+        const char* s = JS_ToCString(ctx, val);
+        message = s != nullptr ? s : "JavaScript exception";
+        JS_FreeCString(ctx, s);
+    }
+    std::string out;
+    if (!name.empty()) {
+        out += name;
+    }
+    if (!code.empty()) {
+        if (!out.empty()) {
+            out += " ";
+        }
+        out += "[";
+        out += code;
+        out += "]";
+    }
+    if (!message.empty()) {
+        if (!out.empty()) {
+            out += ": ";
+        }
+        out += message;
+    }
+    if (JS_IsObject(val)) {
+        const JSValue stack = JS_GetPropertyStr(ctx, val, "stack");
+        if (!JS_IsUndefined(stack) && !JS_IsNull(stack)) {
+            const char* st = JS_ToCString(ctx, stack);
+            if (st != nullptr && st[0] != '\0') {
+                out += "\n";
+                out += st;
+            }
+            JS_FreeCString(ctx, st);
+        }
+        JS_FreeValue(ctx, stack);
+    }
+    if (out.empty()) {
+        return "JavaScript exception";
+    }
+    return out;
+}
+
 std::string JsSandbox::exceptionToString() {
     if (ctx_ == nullptr) {
         return "no JS context";
     }
     const JSValue ex = JS_GetException(ctx_);
-    const char* msg = JS_ToCString(ctx_, ex);
-    std::string out = msg != nullptr ? msg : "JavaScript exception";
-    JS_FreeCString(ctx_, msg);
-
-    const JSValue stack = JS_GetPropertyStr(ctx_, ex, "stack");
-    if (!JS_IsUndefined(stack) && !JS_IsNull(stack)) {
-        const char* st = JS_ToCString(ctx_, stack);
-        if (st != nullptr && st[0] != '\0') {
-            out += "\n";
-            out += st;
-        }
-        JS_FreeCString(ctx_, st);
-    }
-    JS_FreeValue(ctx_, stack);
+    std::string out = jsErrorToString(ctx_, ex);
     JS_FreeValue(ctx_, ex);
     return out;
 }
@@ -174,9 +222,8 @@ bool JsSandbox::drainJobs(ScriptResult* result) {
         if (err < 0) {
             JSContext* errCtx = jobCtx != nullptr ? jobCtx : ctx_;
             const JSValue ex = JS_GetException(errCtx);
-            const char* msg = JS_ToCString(errCtx, ex);
-            result->error = msg != nullptr ? msg : "Promise job failed";
-            JS_FreeCString(errCtx, msg);
+            result->error = jsErrorToString(errCtx, ex);
+            result->output = printBuffer_;
             JS_FreeValue(errCtx, ex);
             return false;
         }
@@ -200,12 +247,14 @@ ScriptResult JsSandbox::execute(const std::string& script) {
     JSValue val = JS_Eval(ctx_, script.c_str(), script.size(), "<script>", flags);
     if (JS_IsException(val)) {
         result.error = exceptionToString();
+        result.output = printBuffer_;
         result.instructions = instructionCount_;
         return result;
     }
 
     if (!drainJobs(&result)) {
         JS_FreeValue(ctx_, val);
+        result.output = printBuffer_;
         result.instructions = instructionCount_;
         return result;
     }
@@ -226,6 +275,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
                 JS_FreeValue(ctx_, office);
                 JS_FreeValue(ctx_, global);
                 JS_FreeValue(ctx_, val);
+                result.output = printBuffer_;
                 result.instructions = instructionCount_;
                 return result;
             }
@@ -235,6 +285,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
                 JS_FreeValue(ctx_, office);
                 JS_FreeValue(ctx_, global);
                 JS_FreeValue(ctx_, val);
+                result.output = printBuffer_;
                 result.instructions = instructionCount_;
                 return result;
             }
@@ -246,6 +297,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
 
     if (!unhandledRejection_.empty()) {
         result.error = unhandledRejection_;
+        result.output = printBuffer_;
         JS_FreeValue(ctx_, val);
         result.instructions = instructionCount_;
         return result;
@@ -255,9 +307,8 @@ ScriptResult JsSandbox::execute(const std::string& script) {
         const JSPromiseStateEnum st = JS_PromiseState(ctx_, val);
         if (st == JS_PROMISE_REJECTED) {
             const JSValue reason = JS_PromiseResult(ctx_, val);
-            const char* msg = JS_ToCString(ctx_, reason);
-            result.error = msg != nullptr ? msg : "Promise rejected";
-            JS_FreeCString(ctx_, msg);
+            result.error = jsErrorToString(ctx_, reason);
+            result.output = printBuffer_;
             JS_FreeValue(ctx_, reason);
             JS_FreeValue(ctx_, val);
             result.instructions = instructionCount_;
@@ -265,6 +316,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
         }
         if (st == JS_PROMISE_PENDING) {
             result.error = "Script did not complete (pending promise)";
+            result.output = printBuffer_;
             JS_FreeValue(ctx_, val);
             result.instructions = instructionCount_;
             return result;
@@ -273,6 +325,7 @@ ScriptResult JsSandbox::execute(const std::string& script) {
 
     if (interrupted_) {
         result.error = "Script exceeded instruction limit";
+        result.output = printBuffer_;
         JS_FreeValue(ctx_, val);
         result.instructions = instructionCount_;
         return result;

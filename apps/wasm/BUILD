@@ -84,6 +84,7 @@ cc_binary(
         "//core/cells:hlc",
         "//core/cells:id",
         "//core/cells:luau_autocomplete",
+        "//core/cells:js_sandbox",
         "//core/cells:luau_sandbox",
         "//core/cells:ui_mutation",
         "//core/cells:model",

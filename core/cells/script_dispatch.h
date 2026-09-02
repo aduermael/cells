@@ -20,9 +20,16 @@ enum class ScriptKind : std::uint8_t { Luau, JavaScript };
 
 [[nodiscard]] ScriptKind detectScriptKind(const std::string& path, const std::string& source);
 
+// Map a language label from the web script panel (or WASM) to a ScriptKind.
+// Empty / "luau" / "lua" → Luau (default). "javascript" / "js" / "officejs" → JavaScript.
+[[nodiscard]] ScriptKind scriptKindFromLanguage(const std::string& language);
+
 // Run source in the matching sandbox against workbook/sheet.
 [[nodiscard]] ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet,
                                              const std::string& source, ScriptKind kind);
+[[nodiscard]] ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet,
+                                             const std::string& source,
+                                             const std::string& language);
 
 }  // namespace cells
 

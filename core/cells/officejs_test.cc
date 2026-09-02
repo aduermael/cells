@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
 #include "core/cells/crdt.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/id.h"
 #include "core/cells/js_sandbox.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/script_dispatch.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
@@ -335,6 +337,283 @@ await Excel.run(async (context) => {
     Cell* a1 = cellAt(other, 0, 0);
     ASSERT_NE(a1, nullptr);
     EXPECT_EQ(a1->value.asString(), "active");
+}
+
+TEST(OfficeJsTest, MergeUnmergeCopyInsertDeleteAndUsedRange) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const ws = context.workbook.worksheets.getActiveWorksheet();
+  const title = ws.getRange("A1:C1");
+  title.merge();
+  title.values = [["Title"]];
+  ws.getRange("A3").values = [[10]];
+  ws.getRange("B3").copyFrom(ws.getRange("A3"));
+  ws.getRange("A5").values = [[1]];
+  ws.getRange("A6").values = [[2]];
+  ws.getRange("A5").insert(Excel.InsertShiftDirection.Down);
+  ws.getRange("D1").values = [[7]];
+  ws.getRange("D2").values = [[8]];
+  ws.getRange("D3").values = [[9]];
+  ws.getRange("D2").delete(Excel.DeleteShiftDirection.Up);
+  const used = ws.getUsedRange();
+  used.load("address,rowIndex,columnIndex,rowCount,columnCount");
+  await context.sync();
+  console.log("used=" + used.address + " r" + used.rowIndex + "c" + used.columnIndex +
+              " " + used.rowCount + "x" + used.columnCount);
+});
+)JS");
+
+    ASSERT_TRUE(result.success) << result.error;
+    const std::vector<Range*> merges = sheet->getRangesAt(0, 0, RangeFlags::MERGE);
+    ASSERT_FALSE(merges.empty());
+    Cell* a1 = cellAt(sheet, 0, 0);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "Title");
+    Cell* b3 = cellAt(sheet, 1, 2);
+    ASSERT_NE(b3, nullptr);
+    EXPECT_DOUBLE_EQ(b3->value.asNumber(), 10.0);
+    EXPECT_TRUE(cellAt(sheet, 0, 4) == nullptr || cellAt(sheet, 0, 4)->value.raw.empty());
+    Cell* a6 = cellAt(sheet, 0, 5);
+    ASSERT_NE(a6, nullptr);
+    EXPECT_DOUBLE_EQ(a6->value.asNumber(), 1.0);
+    Cell* a7 = cellAt(sheet, 0, 6);
+    ASSERT_NE(a7, nullptr);
+    EXPECT_DOUBLE_EQ(a7->value.asNumber(), 2.0);
+    Cell* d1 = cellAt(sheet, 3, 0);
+    ASSERT_NE(d1, nullptr);
+    EXPECT_DOUBLE_EQ(d1->value.asNumber(), 7.0);
+    Cell* d2 = cellAt(sheet, 3, 1);
+    ASSERT_NE(d2, nullptr);
+    EXPECT_DOUBLE_EQ(d2->value.asNumber(), 9.0);
+    EXPECT_TRUE(cellAt(sheet, 3, 2) == nullptr || cellAt(sheet, 3, 2)->value.raw.empty());
+    EXPECT_NE(result.output.find("used="), std::string::npos);
+
+    JsSandbox unmerge;
+    unmerge.setContext(workbook.get(), sheet);
+    const auto unmerged = unmerge.execute(R"JS(
+await Excel.run(async (context) => {
+  context.workbook.worksheets.getActiveWorksheet().getRange("A1:C1").unmerge();
+  await context.sync();
+});
+)JS");
+    ASSERT_TRUE(unmerged.success) << unmerged.error;
+    EXPECT_TRUE(sheet->getRangesAt(0, 0, RangeFlags::MERGE).empty());
+}
+
+TEST(OfficeJsTest, NamesAddRelativeGetRangeScalarFormatAndLayout) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const ws = context.workbook.worksheets.getActiveWorksheet();
+  const named = context.workbook.names.add("Total", ws.getRange("A1"));
+  named.getRange().values = [[42]];
+  const inner = ws.getRange("C5:F10").getRange("B2");
+  inner.values = [[99]];
+  const pct = ws.getRange("B1");
+  pct.values = [[0.25]];
+  pct.numberFormat = "0.00%";
+  const title = ws.getRange("A2:C2");
+  title.format.horizontalAlignment = Excel.HorizontalAlignment.Center;
+  title.format.verticalAlignment = Excel.VerticalAlignment.Center;
+  title.format.wrapText = true;
+  title.format.rowHeight = 32;
+  ws.getRange("A2").format.columnWidth = 28;
+  ws.getRange("A3").format.borders.getItem(Excel.BorderIndex.EdgeBottom).style =
+      Excel.BorderLineStyle.Continuous;
+  ws.getRange("A3").format.borders.getItem("EdgeBottom").color = "black";
+  await context.sync();
+});
+)JS");
+
+    ASSERT_TRUE(result.success) << result.error;
+    Cell* a1 = cellAt(sheet, 0, 0);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_DOUBLE_EQ(a1->value.asNumber(), 42.0);
+    const NamedRange* nr = workbook->getNamedRanges()->resolve("Total", sheet->id);
+    ASSERT_NE(nr, nullptr);
+    Cell* d6 = cellAt(sheet, 3, 5);
+    ASSERT_NE(d6, nullptr);
+    EXPECT_DOUBLE_EQ(d6->value.asNumber(), 99.0);
+    Cell* b1 = cellAt(sheet, 1, 0);
+    ASSERT_NE(b1, nullptr);
+    const FormatBuffer* fmt = workbook->getEntityFormat(b1->id);
+    ASSERT_NE(fmt, nullptr);
+    EXPECT_NE(fmt->toFormatCode().find("%"), std::string::npos);
+    Cell* a2 = cellAt(sheet, 0, 1);
+    ASSERT_NE(a2, nullptr);
+    const StyleBuffer* styleBuf = workbook->getEntityStyle(a2->id);
+    ASSERT_NE(styleBuf, nullptr);
+    const CellStyle style = styleBuf->toCellStyle();
+    EXPECT_EQ(style.hAlign, TextAlign::CENTER);
+    EXPECT_EQ(style.vAlign, VerticalAlign::MIDDLE);
+    EXPECT_TRUE(style.wrapText);
+    Axis* colA = sheet->getColumnByPosition(0);
+    ASSERT_NE(colA, nullptr);
+    EXPECT_EQ(colA->size, 28u);
+    Axis* row2 = sheet->getRowByPosition(1);
+    ASSERT_NE(row2, nullptr);
+    EXPECT_EQ(row2->size, 32u);
+    Cell* a3 = cellAt(sheet, 0, 2);
+    ASSERT_NE(a3, nullptr);
+    const StyleBuffer* borderBuf = workbook->getEntityStyle(a3->id);
+    ASSERT_NE(borderBuf, nullptr);
+    const CellStyle borderStyle = borderBuf->toCellStyle();
+    EXPECT_NE(borderStyle.border.bottom.style, BorderStyle::NONE);
+}
+
+TEST(OfficeJsTest, TablesChartsProtectionAreCallableAndCleanError) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const ws = context.workbook.worksheets.getActiveWorksheet();
+  console.log("tables=" + typeof ws.tables.add);
+  console.log("charts=" + typeof ws.charts.add);
+  console.log("protect=" + typeof ws.protection.protect);
+  ws.tables.add("A1:B2", true);
+  ws.charts.add("Line", ws.getRange("A1:B2"));
+  ws.protection.protect();
+  await context.sync();
+});
+)JS");
+
+    ASSERT_FALSE(result.success);
+    EXPECT_NE(result.output.find("tables=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.output.find("charts=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.output.find("protect=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.error.find("OfficeExtension.Error"), std::string::npos) << result.error;
+    EXPECT_NE(result.error.find("NotImplemented"), std::string::npos) << result.error;
+    EXPECT_EQ(result.error.find("is not a function"), std::string::npos) << result.error;
+    EXPECT_EQ(result.error.find("Cannot read"), std::string::npos) << result.error;
+}
+
+TEST(OfficeJsTest, HostedObjectStubsReturnOfficeExtensionError) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const range = context.workbook.worksheets.getActiveWorksheet().getRange("A1");
+  console.log("autoFill=" + typeof range.autoFill);
+  console.log("autofit=" + typeof range.format.autofitColumns);
+  range.autoFill();
+  await context.sync();
+});
+)JS");
+
+    ASSERT_FALSE(result.success);
+    EXPECT_NE(result.output.find("autoFill=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.output.find("autofit=function"), std::string::npos) << result.output;
+    EXPECT_NE(result.error.find("OfficeExtension.Error"), std::string::npos) << result.error;
+    EXPECT_NE(result.error.find("NotImplemented"), std::string::npos) << result.error;
+    EXPECT_EQ(result.error.find("is not a function"), std::string::npos) << result.error;
+}
+
+TEST(OfficeJsTest, RangeLayoutFixtureAppliesMergeAlignAndSizes) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const ws = context.workbook.worksheets.getActiveWorksheet();
+  const title = ws.getRange("A1:F1");
+  title.merge();
+  title.values = [["Helios Robotics, Inc."]];
+  title.format.font.bold = true;
+  title.format.font.size = 18;
+  title.format.horizontalAlignment = "Center";
+  title.format.rowHeight = 28;
+  ws.getRange("A2").values = [["Fully diluted cap table — hypothetical sample"]];
+  ws.getRange("A2").format.wrapText = true;
+  ws.getRange("A2").format.rowHeight = 32;
+  ws.getRange("A1").format.columnWidth = 28;
+  ws.getRange("B1").format.columnWidth = 14;
+  await context.sync();
+  console.log("layout applied");
+});
+)JS");
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_NE(result.output.find("layout applied"), std::string::npos);
+    EXPECT_FALSE(sheet->getRangesAt(0, 0, RangeFlags::MERGE).empty());
+    Cell* a1 = cellAt(sheet, 0, 0);
+    ASSERT_NE(a1, nullptr);
+    EXPECT_EQ(a1->value.asString(), "Helios Robotics, Inc.");
+    const StyleBuffer* styleBuf = workbook->getEntityStyle(a1->id);
+    ASSERT_NE(styleBuf, nullptr);
+    EXPECT_EQ(styleBuf->toCellStyle().hAlign, TextAlign::CENTER);
+    EXPECT_EQ(sheet->getColumnByPosition(0)->size, 28u);
+    EXPECT_EQ(sheet->getRowByPosition(0)->size, 28u);
+    Cell* a2 = cellAt(sheet, 0, 1);
+    ASSERT_NE(a2, nullptr);
+    const StyleBuffer* a2Style = workbook->getEntityStyle(a2->id);
+    ASSERT_NE(a2Style, nullptr);
+    EXPECT_TRUE(a2Style->toCellStyle().wrapText);
+    EXPECT_EQ(sheet->getRowByPosition(1)->size, 32u);
+}
+
+TEST(OfficeJsTest, ScriptPanelLanguageDispatch) {
+    EXPECT_EQ(scriptKindFromLanguage(""), ScriptKind::Luau);
+    EXPECT_EQ(scriptKindFromLanguage("luau"), ScriptKind::Luau);
+    EXPECT_EQ(scriptKindFromLanguage("javascript"), ScriptKind::JavaScript);
+    EXPECT_EQ(scriptKindFromLanguage("JS"), ScriptKind::JavaScript);
+
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+    const auto js = executeUserScript(*workbook, sheet, R"JS(
+await Excel.run(async (context) => {
+  context.workbook.worksheets.getActiveWorksheet().getRange("A1").values = [[11]];
+  await context.sync();
+});
+)JS",
+                                      "javascript");
+    ASSERT_TRUE(js.success) << js.error;
+    ASSERT_NE(cellAt(sheet, 0, 0), nullptr);
+    EXPECT_DOUBLE_EQ(cellAt(sheet, 0, 0)->value.asNumber(), 11.0);
+
+    const auto luau = executeUserScript(*workbook, sheet, "setCell('B1', 22)", "");
+    ASSERT_TRUE(luau.success) << luau.error;
+    ASSERT_NE(cellAt(sheet, 1, 0), nullptr);
+    EXPECT_DOUBLE_EQ(cellAt(sheet, 1, 0)->value.asNumber(), 22.0);
+}
+
+TEST(OfficeJsTest, FormulasGetterSingleEquals) {
+    auto workbook = createEmptyWorkbook();
+    Sheet* sheet = workbook->sheets[0].get();
+
+    JsSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+    const auto result = sandbox.execute(R"JS(
+await Excel.run(async (context) => {
+  const ws = context.workbook.worksheets.getActiveWorksheet();
+  ws.getRange("A1").values = [[2]];
+  ws.getRange("A2").formulas = [["=A1*2"]];
+  const r = ws.getRange("A2");
+  r.load("formulas");
+  await context.sync();
+  console.log("formula=" + JSON.stringify(r.formulas));
+});
+)JS");
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_NE(result.output.find("formula=[[\"=A1*2\"]]"), std::string::npos) << result.output;
+    EXPECT_EQ(result.output.find("==A1"), std::string::npos) << result.output;
 }
 
 }  // namespace

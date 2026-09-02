@@ -45,6 +45,18 @@ ScriptKind detectScriptKind(const std::string& path, const std::string& source) 
     return ScriptKind::Luau;
 }
 
+ScriptKind scriptKindFromLanguage(const std::string& language) {
+    std::string lower;
+    lower.reserve(language.size());
+    for (const char c : language) {
+        lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    if (lower == "javascript" || lower == "js" || lower == "officejs") {
+        return ScriptKind::JavaScript;
+    }
+    return ScriptKind::Luau;
+}
+
 ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::string& source,
                                ScriptKind kind) {
     Sheet* ctxSheet = sheet;
@@ -59,6 +71,11 @@ ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::stri
     LuauSandbox sandbox;
     sandbox.setContext(&workbook, ctxSheet);
     return sandbox.execute(source);
+}
+
+ScriptResult executeUserScript(Workbook& workbook, Sheet* sheet, const std::string& source,
+                               const std::string& language) {
+    return executeUserScript(workbook, sheet, source, scriptKindFromLanguage(language));
 }
 
 }  // namespace cells

@@ -409,7 +409,8 @@ public:
     // Scripting API (Luau) (bindings_luau.cc)
     // ========================================================================
 
-    std::string executeScript(const std::string& script);
+    // language: empty/"luau" (default) or "javascript". Same dispatch as CLI.
+    std::string executeScript(const std::string& script, const std::string& language);
     std::string tokenizeLuau(const std::string& source);
     std::string getAutocomplete(const std::string& source, unsigned line, unsigned column);
 
