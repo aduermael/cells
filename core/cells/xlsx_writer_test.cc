@@ -6,11 +6,11 @@
 #include <filesystem>
 #include <string>
 
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
-#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
@@ -739,11 +739,11 @@ TEST(XLSXWriterTest, WriteFormulas) {
             const Formula* f = c->getFormula();
             ASSERT_NE(f, nullptr);
             ASSERT_NE(f->ast, nullptr);
-            // Formula should contain A1+B1 (possibly with = prefix)
-            std::string formulaText = FormulaSerializer::serialize(f->ast);
-            EXPECT_TRUE(formulaText.find("A1") != std::string::npos)
+            FormulaDisplayConverter disp(*readSheet, readResult.workbook.get());
+            const std::string formulaText = disp.toDisplayString(f->ast);
+            EXPECT_NE(formulaText.find("A1"), std::string::npos)
                 << "Formula should reference A1: " << formulaText;
-            EXPECT_TRUE(formulaText.find("B1") != std::string::npos)
+            EXPECT_NE(formulaText.find("B1"), std::string::npos)
                 << "Formula should reference B1: " << formulaText;
         }
     }
@@ -3472,6 +3472,124 @@ TEST(XLSXWriterTest, SparseSkippedColumnUsesAxisPosition) {
     EXPECT_EQ(b1, nullptr);
     ASSERT_NE(c1, nullptr);
     EXPECT_DOUBLE_EQ(c1->value.asNumber(), 5.0);
+}
+
+Sheet* addSheetWithA1Number(Workbook& workbook, const std::string& name, double value) {
+    auto sheet = std::make_unique<Sheet>(generate_id(), name);
+    sheet->setWorkbook(&workbook);
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    const ID colId = col->id;
+    sheet->addColumn(std::move(col));
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    const ID rowId = row->id;
+    sheet->addRow(std::move(row));
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(value);
+    sheet->addCell(std::move(cell));
+    Sheet* ptr = sheet.get();
+    workbook.addSheet(std::move(sheet));
+    return ptr;
+}
+
+void setResolvedFormula(Workbook& workbook, Sheet& sheet, Cell& cell, const std::string& text) {
+    FormulaParser parser(text);
+    std::unique_ptr<ASTNode> ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << text;
+    FormulaResolver resolver(workbook, sheet, workbook.getNamedRanges());
+    const ResolveResult resolved = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolved.success) << resolved.errorMessage << " for " << text;
+    auto* formula = new Formula();
+    formula->ast = ast.release();
+    cell.setFormula(formula);
+}
+
+TEST(XLSXWriterTest, CrossSheetFormulaUsesSheetQualifiedA1) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "CrossSheet");
+    addSheetWithA1Number(*workbook, "Data", 42.0);
+    addSheetWithA1Number(*workbook, "Cap Table", 99.0);
+
+    auto summary = std::make_unique<Sheet>(generate_id(), "Summary");
+    summary->setWorkbook(workbook.get());
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    const ID colId = col->id;
+    summary->addColumn(std::move(col));
+    std::vector<ID> rowIds;
+    for (uint32_t r = 0; r < 3; ++r) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = r;
+        rowIds.push_back(row->id);
+        summary->addRow(std::move(row));
+    }
+    auto a1 = std::make_unique<Cell>(generate_id(), colId, rowIds[0]);
+    Cell* a1Ptr = a1.get();
+    summary->addCell(std::move(a1));
+    auto a2 = std::make_unique<Cell>(generate_id(), colId, rowIds[1]);
+    Cell* a2Ptr = a2.get();
+    summary->addCell(std::move(a2));
+    auto a3 = std::make_unique<Cell>(generate_id(), colId, rowIds[2]);
+    Cell* a3Ptr = a3.get();
+    summary->addCell(std::move(a3));
+    Sheet* summaryPtr = summary.get();
+    workbook->addSheet(std::move(summary));
+
+    setResolvedFormula(*workbook, *summaryPtr, *a1Ptr, "=Data!A1");
+    setResolvedFormula(*workbook, *summaryPtr, *a2Ptr, "='Cap Table'!A1");
+    setResolvedFormula(*workbook, *summaryPtr, *a3Ptr, "=SUM('Cap Table'!A1:A1)");
+    evaluateCell(summaryPtr, a1Ptr);
+    evaluateCell(summaryPtr, a2Ptr);
+    evaluateCell(summaryPtr, a3Ptr);
+
+    FormulaDisplayConverter live(*summaryPtr, workbook.get());
+    EXPECT_EQ(live.toDisplayString(a1Ptr->getFormula()->ast), "=Data!A1");
+    EXPECT_EQ(live.toDisplayString(a2Ptr->getFormula()->ast), "='Cap Table'!A1");
+    EXPECT_NE(live.toDisplayString(a3Ptr->getFormula()->ast).find("'Cap Table'!A1"),
+              std::string::npos);
+
+    std::string path = tempFilePath("cross_sheet_a1.xlsx");
+    TempFileGuard guard(path);
+    auto result = writeXLSX(*workbook, path);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "write failed");
+
+    const std::string sheetXml = zipEntry(path, "xl/worksheets/sheet3.xml");
+    ASSERT_FALSE(sheetXml.empty());
+    EXPECT_NE(sheetXml.find(">Data!A1</f>"), std::string::npos) << sheetXml;
+    EXPECT_TRUE(sheetXml.find("'Cap Table'!A1") != std::string::npos ||
+                sheetXml.find("&apos;Cap Table&apos;!A1") != std::string::npos)
+        << sheetXml;
+    EXPECT_TRUE(sheetXml.find("A1:A1") != std::string::npos) << sheetXml;
+    EXPECT_EQ(sheetXml.find("#REF!"), std::string::npos) << sheetXml;
+
+    auto readResult = readXLSX(path);
+    ASSERT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString()
+                                                      : "read failed");
+    Sheet* reloaded = readResult.workbook->getSheetByName("Summary");
+    ASSERT_NE(reloaded, nullptr);
+    Cell* r1 = reloaded->getCellAtPosition(0, 0);
+    Cell* r2 = reloaded->getCellAtPosition(0, 1);
+    Cell* r3 = reloaded->getCellAtPosition(0, 2);
+    ASSERT_NE(r1, nullptr);
+    ASSERT_NE(r2, nullptr);
+    ASSERT_NE(r3, nullptr);
+    ASSERT_TRUE(r1->isFormula());
+    ASSERT_TRUE(r2->isFormula());
+    ASSERT_TRUE(r3->isFormula());
+
+    FormulaResolver resolver(*readResult.workbook, *reloaded,
+                             readResult.workbook->getNamedRanges());
+    ASSERT_TRUE(resolver.resolve(r1->getFormula()->ast).success);
+    ASSERT_TRUE(resolver.resolve(r2->getFormula()->ast).success);
+    ASSERT_TRUE(resolver.resolve(r3->getFormula()->ast).success);
+    EXPECT_DOUBLE_EQ(evaluateCell(reloaded, r1).numberValue, 42.0);
+    EXPECT_DOUBLE_EQ(evaluateCell(reloaded, r2).numberValue, 99.0);
+    EXPECT_DOUBLE_EQ(evaluateCell(reloaded, r3).numberValue, 99.0);
+
+    FormulaDisplayConverter disp(*reloaded, readResult.workbook.get());
+    EXPECT_EQ(disp.toDisplayString(r1->getFormula()->ast), "=Data!A1");
+    EXPECT_EQ(disp.toDisplayString(r2->getFormula()->ast), "='Cap Table'!A1");
+    EXPECT_EQ(disp.toDisplayString(r3->getFormula()->ast).find("#REF!"), std::string::npos);
 }
 
 }  // namespace

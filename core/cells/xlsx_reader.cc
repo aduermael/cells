@@ -16,6 +16,7 @@
 
 #include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/number_format.h"
@@ -2658,6 +2659,10 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             std::string bytes = zip.readFile(name);
             workbook->xlsxOpaqueParts.push_back({name, std::move(bytes)});
         }
+    }
+
+    if (options.readFormulas && workbook) {
+        cells::resolveWorkbookFormulas(*workbook);
     }
 
     result.workbook = std::move(workbook);

@@ -3,7 +3,7 @@
 // Excel: after range.formulas = [["=A1*2"]] and load("formulas"),
 // range.formulas[0][0] === "=A1*2"
 //
-// Cells today: "==A1*2" (FormulaDisplayConverter and officejs_api both prefix "=").
+// Cells returns the same (single leading "="), in memory and after .xlsx reload.
 //
 // Run:
 //   dist/cli/cells --script testdata/officejs/formulas-getter.js /tmp/formulas-getter.xlsx -y

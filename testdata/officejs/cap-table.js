@@ -1,9 +1,8 @@
 // Helios Robotics cap table — Office.js as an Excel add-in would write it.
 //
-// Should produce two sheets (Cap Table + Summary), a blank layout row,
+// Produces two sheets (Cap Table + Summary), a blank layout row,
 // formulas via Range.formulas, quoted cross-sheet refs, number formats,
-// and fill/font. In memory the numbers are correct today; .xlsx reload
-// is not (sparse-row packing + cross-sheet #REF!).
+// and fill/font. In memory and after .xlsx reload the numbers match.
 //
 // Expected after eval:
 //   issued 13,950,000 | FD 15,150,000 | capital 15,500,900

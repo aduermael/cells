@@ -889,4 +889,26 @@ void FormulaResolver::collectRequiredEntitiesFromRowRangeRef(const RowRangeRefNo
     }
 }
 
+void resolveWorkbookFormulas(Workbook& workbook) {
+    NamedRangeRegistry* namedRanges = workbook.getNamedRanges();
+    for (auto& sheetPtr : workbook.sheets) {
+        Sheet* sheet = sheetPtr.get();
+        if (sheet == nullptr) {
+            continue;
+        }
+        FormulaResolver resolver(workbook, *sheet, namedRanges);
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook.getCell(cellId);
+            if (cell == nullptr || !cell->isFormula()) {
+                continue;
+            }
+            Formula* formula = cell->getFormula();
+            if (formula == nullptr || formula->ast == nullptr) {
+                continue;
+            }
+            resolver.resolve(formula->ast);
+        }
+    }
+}
+
 }  // namespace cells

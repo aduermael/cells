@@ -8,8 +8,9 @@
 // 4. shared-string index remapping — compare resolved strings, not <v> index
 // 5. writer-emitted worksheet chrome — dimension/sheetViews/sheetFormatPr/cols
 //    may be added; original unmodeled children must still be present
-// 6. cross-sheet formula text → #REF! or dropped sheet prefix (docs/officejs.md
-//    bug 3). Same-sheet formulas becoming #REF!/#ERROR! still fail.
+// 6. residual third-party cross-sheet formula text → #REF! or dropped sheet
+//    prefix. Cells-authored workbooks emit sheet-qualified A1 (quoted names).
+//    Same-sheet formulas becoming #REF!/#ERROR! still fail.
 // 7. _xlfn./_xlpm. prefix and dotted Excel function names (FLOOR.MATH →
 //    FLOOR_MATH) — reader/writer normalize these
 // 8. formula cached <v> on formula cells (not Excel-result parity)

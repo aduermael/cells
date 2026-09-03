@@ -10,11 +10,10 @@
 #include <unordered_set>
 
 #include "core/cells/format_buffer.h"
-#include "core/cells/formula_serializer.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/number_format.h"
 #include "core/cells/range.h"
-#include "core/cells/ref_converter.h"
 #include "core/cells/theme.h"
 
 #include "miniz.h"
@@ -1191,12 +1190,23 @@ std::string colIndexToLetter(size_t index) {
     return result;
 }
 
+// Excel <f> body: workbook-aware A1 (quoted sheet names), no leading '='.
+std::string formulaAstToExcelA1(const cells::Sheet& sheet, const cells::Workbook& workbook,
+                                const cells::ASTNode* ast) {
+    const cells::FormulaDisplayConverter conv(sheet, &workbook);
+    std::string display = conv.toDisplayString(ast);
+    if (!display.empty() && display.front() == '=') {
+        display.erase(0, 1);
+    }
+    return display;
+}
+
 // Generate worksheet XML
 // cellStyleIndices maps cell pointer to XLSX style index (s attribute)
 // axisStyleIndices maps axis pointer to XLSX style index (style attribute for cols, s for rows)
 std::string generateWorksheet(
     const cells::Sheet& sheet, const cells::Workbook& workbook, SharedStringTable& sst,
-    const cells::RefConverter& refConverter, bool writeFormulas, bool writeDimensions,
+    bool writeFormulas, bool writeDimensions,
     const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices,
     const std::unordered_map<const cells::Axis*, size_t>& axisStyleIndices) {
     std::ostringstream xml;
@@ -1527,11 +1537,7 @@ std::string generateWorksheet(
                 // NUMBER types don't need a t attribute (it's the default)
                 xml << ">\n";
 
-                // Generate UUID-format formula text from AST, then convert to A1
-                const std::string uuidFormula = cells::FormulaSerializer::serialize(formula->ast);
-                // Skip the leading '=' for refConverter
-                const std::string uuidBody = uuidFormula.empty() ? "" : uuidFormula.substr(1);
-                const std::string a1Formula = refConverter.formulaToA1(uuidBody);
+                const std::string a1Formula = formulaAstToExcelA1(sheet, workbook, formula->ast);
 
                 // Check if this is a shared formula
                 auto masterIt = masterToSi.find(cell);
@@ -2201,13 +2207,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     for (size_t i = 0; i < workbook.sheets.size(); ++i) {
         const Sheet& sheet = *workbook.sheets[i];
 
-        // Set up ref converter for this sheet
-        RefConverter refConverter;
-        refConverter.setContext(sheet);
-
-        // Generate worksheet XML
         const std::string sheetXml =
-            generateWorksheet(sheet, workbook, sst, refConverter, options_.writeFormulas,
+            generateWorksheet(sheet, workbook, sst, options_.writeFormulas,
                               options_.writeDimensions, cellStyleIndices, axisStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";

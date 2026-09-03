@@ -205,6 +205,10 @@ private:
     NamedRangeRegistry* _namedRanges;
 };
 
+// Resolve A1 formula ASTs (from XLSX load) to cell UUIDs on every sheet.
+// Existing cells only; missing refs stay unresolved. Idempotent.
+void resolveWorkbookFormulas(Workbook& workbook);
+
 // Note: FormulaDisplayConverter is now in formula_display.h
 
 }  // namespace cells

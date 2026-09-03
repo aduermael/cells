@@ -6,7 +6,7 @@
 //   A4 = =A3*2
 //
 // After save/load as .xlsx, A3 must still be 10 and A4 must still be 20.
-// Cells today packs A3→A2 and writes <f>A3*2</f> on packed A3 → #CIRCULAR!.
+// Cell r= uses axis position so the skipped row stays a gap.
 //
 // Run:
 //   dist/cli/cells --script testdata/officejs/skipped-row-xlsx.js /tmp/gap.xlsx -y
