@@ -140,6 +140,13 @@ sh_binary(
     data = ["tools/guard.sh"],
 )
 
+# Excel golden generator (Windows COM). excel-save errors off Windows.
+sh_binary(
+    name = "excel-verify",
+    srcs = ["tools/excel-verify.sh"],
+    data = ["tools/guard.sh"],
+)
+
 # Code quality scripts
 sh_binary(
     name = "check",

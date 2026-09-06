@@ -31,6 +31,7 @@ if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     echo "  bazel run :lint         # Run linter" >&2
     echo "  bazel run :format       # Run formatter" >&2
     echo "  bazel run :xlsx-roundtrip # Run XLSX roundtrip tests" >&2
+    echo "  bazel run :excel-verify # Excel goldens (Windows COM excel-save)" >&2
     echo "  bazel run :cli          # Build CLI (development)" >&2
     echo "  bazel run :cli-release  # Build CLI (release)" >&2
     echo "  bazel run :cli-headless # Build CLI only (no WASM/UI)" >&2
